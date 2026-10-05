@@ -14,7 +14,8 @@
     "test:remote": "tsx scripts/remote-workflow.mts",
     "test:load": "tsx scripts/load-test.mts",
     "seed:generate": "tsx scripts/generate-seed.mts",
-    "verify:deployment": "tsx scripts/verify-deployment.mts"
+    "verify:deployment": "tsx scripts/verify-deployment.mts",
+    "drive:plan": "tsx scripts/drive-plan.mts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
