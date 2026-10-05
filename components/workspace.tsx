@@ -11,6 +11,7 @@ import { StatusStrip, SystemHealth, SyncStatus } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { ScheduleImport } from "./operations/schedule-import";
+import { DelegateSubmissions } from "./operations/resolution-links";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
     id: "chair",
@@ -306,6 +307,7 @@ export function Workspace({ path }: { path: string }) {
           {role === "chair" ? (
             section === "documents" ? (
               <>
+                <DelegateSubmissions committeeId={committeeId} />
                 <Documents
                   key={committeeId}
                   committeeId={committeeId}

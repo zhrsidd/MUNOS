@@ -2,9 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import type { LinkInfo, SubmissionError } from "./rules";
 import { SubmissionRejected, type SubmissionBackend } from "./service";
 // SERVER ONLY. Uses SUPABASE_SECRET_KEY, which must never reach the browser. It is used for exactly
-// three things: resolve a submission link, store the file in the private "resolutions" bucket,
-// and call public.submit_resolution (all executable only by service_role).
-const known: SubmissionError[] = ["invalid_link", "invalid_submitter", "invalid_title", "rate_limited", "no_session"];
+// three things: resolve a submission link, store a fallback file in the private "resolutions" bucket,
+// and call public.submit_resolution (all executable only by service_role). Google Docs are never fetched.
+const known: SubmissionError[] = ["invalid_link", "invalid_submitter", "invalid_title", "invalid_google_doc", "rate_limited", "no_session"];
 export function supabaseSubmissionBackend(url: string, secret: string): SubmissionBackend {
   const client = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
   const bucket = client.storage.from("resolutions");
@@ -25,7 +25,8 @@ export function supabaseSubmissionBackend(url: string, secret: string): Submissi
     async submit(a) {
       const { data, error } = await client.rpc("submit_resolution", {
         link_token: a.token, submission: a.submissionId, submitter: a.submitterId, title: a.title,
-        file_name: a.fileName, storage_key: a.storageKey, file_sha256: a.sha256, file_size: a.size,
+        google_doc_id: a.googleDocId ?? null, file_name: a.file?.fileName ?? null, storage_key: a.file?.storageKey ?? null,
+        file_sha256: a.file?.sha256 ?? null, file_size: a.file?.size ?? null,
       });
       if (error) {
         const reason = known.find((k) => error.message.includes(k));

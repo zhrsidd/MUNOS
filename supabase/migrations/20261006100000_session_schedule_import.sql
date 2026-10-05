@@ -1,5 +1,6 @@
 -- Conference schedule import (Claude-owned).
 -- CODEX REVIEW REQUIRED: adds the nullable column public.sessions."endsAt" (core table).
+-- It also adds the sessionImport handler to Claude's own extension dispatcher.
 -- Nothing else in the core changes: conference_snapshot already serializes every session column,
 -- so "endsAt" appears in snapshots automatically; existing session commands leave it null.
 
@@ -8,20 +9,6 @@ alter table public.sessions add constraint sessions_ends_after_start check ("end
 create index sessions_committee_start on public.sessions(committee_id, "startsAt");
 
 -- Handlers run inside private.apply_operations_mutation (SECURITY DEFINER) and are not callable directly.
-create function private.ops_submission_link(conf uuid, cid uuid, actor uuid, new_id uuid, command jsonb) returns uuid
-language plpgsql set search_path='' as $$
-begin
- update public.submission_links set revoked_at = now(), updated_at = now() where committee_id = cid and revoked_at is null;
- if command->>'action' in ('create','rotate') then
-   insert into public.submission_links(id, conference_id, committee_id, token, contact, created_by)
-   values (new_id, conf, cid, command->>'token', left(coalesce(command->>'contact',''),200), actor);
-   return new_id;
- elsif command->>'action' <> 'revoke' then raise exception 'Unknown link action' using errcode='22023';
- end if;
- return cid;
-end; $$;
-revoke all on function private.ops_submission_link(uuid,uuid,uuid,uuid,jsonb) from public, anon, authenticated;
-
 -- Bulk session creation. Row n gets id substr(mutation,1,24)||hex(n), matching the client's optimistic ids.
 -- A session that already exists for the same committee and start time is skipped (safe re-import).
 create function private.ops_session_import(conf uuid, mutation uuid, command jsonb) returns uuid[]
@@ -53,7 +40,8 @@ revoke all on function private.ops_session_import(uuid,uuid,jsonb) from public, 
 create or replace function private.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role public.conference_role, expected text, client_time timestamptz)
 returns void language plpgsql security definer set search_path='' as $$
 declare
- actor uuid := auth.uid(); kind text := command->>'type'; cid uuid; entity uuid; affected uuid[] := '{}'; c uuid;
+ actor uuid := auth.uid(); kind text := command->>'type'; cid uuid; entity uuid; affected uuid[] := '{}'; c uuid; topic text := 'configuration';
+ allowed public.conference_role[] := array['admin']::public.conference_role[];
  prior private.mutation_receipts;
  new_id uuid := (substr(mutation::text,1,24)||'000000000001')::uuid;
  payload jsonb := jsonb_build_object('command',command,'role',requested_role,'expected',expected,'client_time',client_time);
@@ -70,22 +58,27 @@ begin
  when 'submissionLink' then
    cid := private.uuid_or_null(command->>'committeeId');
    if cid is null or not exists(select 1 from public.committees where id = cid and conference_id = conf) then raise exception 'Committee unavailable' using errcode='22023'; end if;
+ when 'resolutionLink' then
+   select committee_id into cid from public.documents where id = private.uuid_or_null(command->>'documentId') and conference_id = conf;
+   if cid is null then raise exception 'Document unavailable' using errcode='42501'; end if;
+   allowed := array['chair','admin']::public.conference_role[]; topic := 'documents';
  when 'sessionImport' then cid := null;
  else raise exception 'Unknown operations command' using errcode='22023';
  end case;
- if requested_role <> 'admin' then raise exception 'Executive access required' using errcode='42501'; end if;
+ if not requested_role = any(allowed) then raise exception '% access required', case when 'chair' = any(allowed) then 'Chair' else 'Executive' end using errcode='42501'; end if;
  if not private.has_access(conf, cid, array[requested_role]) then raise exception 'This session has no access to this role or committee' using errcode='42501'; end if;
  if cid is not null then perform 1 from public.committees where id = cid and conference_id = conf for update;
  else perform 1 from public.conferences where id = conf for update; end if;
  case kind
  when 'submissionLink' then entity := private.ops_submission_link(conf, cid, actor, new_id, command);
+ when 'resolutionLink' then entity := private.ops_resolution_link(conf, cid, command);
  when 'sessionImport' then affected := private.ops_session_import(conf, mutation, command);
  end case;
  insert into public.audit_log(conference_id, committee_id, "actorId", action, "entityId", mutation_id, details)
  values (conf, cid, actor, kind || ' ' || coalesce(command->>'action', 'updated'), coalesce(entity, cid, conf), mutation,
    case kind when 'submissionLink' then command - 'token' when 'sessionImport' then jsonb_build_object('type', kind, 'rows', jsonb_array_length(command->'rows')) else command end);
  insert into private.mutation_receipts(id, conference_id, actor_id, payload) values (mutation, conf, actor, payload);
- insert into public.operational_changes(conference_id, committee_id, topic, mutation_id) values (conf, cid, 'configuration', mutation);
+ insert into public.operational_changes(conference_id, committee_id, topic, mutation_id) values (conf, cid, topic, mutation);
  -- Chairs subscribe per committee: notify each affected committee as well (one small row each).
  foreach c in array affected loop
    insert into public.operational_changes(conference_id, committee_id, topic, mutation_id) values (conf, c, 'configuration', gen_random_uuid());
