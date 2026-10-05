@@ -7,7 +7,7 @@ import { Role } from "@/lib/domain";
 import { Icon, Chip, Timer } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { SystemHealth, SyncStatus } from "./health";
+import { SystemHealth, SyncStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
@@ -71,7 +71,7 @@ export function Workspace({ path }: { path: string }) {
   const section = path.split("/")[1] || "";
   const committee =
     data.committees.find((c) => c.id === requestedCommitteeId) ||
-    data.committees[0];
+    data.committees.find(c=>c.code === "GA1") || data.committees[0];
   const committeeId = committee?.id ?? "";
   const session =
     data.sessions.find(
@@ -327,7 +327,7 @@ export function Workspace({ path }: { path: string }) {
         <footer className="workspace-footer">
           Conference OS{" "}
           <span>
-            Illustrative DCMUN-inspired data · External services not connected
+            Illustrative DCMUN-inspired data · <DataModeLabel />
           </span>
         </footer>
       </div>

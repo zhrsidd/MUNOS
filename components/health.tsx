@@ -23,3 +23,8 @@ export function SyncStatus(){
  const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
  return <span title={h.mode==='local'?'Local demonstration; no changes are sent to Supabase.':undefined}>{h.message}<small>{h.mode==='supabase'?'Development database': 'Local demo · cloud unavailable'}</small></span>;
 }
+
+export function DataModeLabel(){
+ const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
+ return <span>{h.mode==='supabase'?'Supabase development':'Local demo'}</span>;
+}
