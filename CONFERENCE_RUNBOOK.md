@@ -1,150 +1,136 @@
 # Conference runbook
 
-For conference organizers. No technical knowledge needed. Keep a printed copy in the operations room.
+For conference organizers. No technical knowledge needed. Print it and keep it in the operations room.
+One-page emergency sheet: [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.md). Technical detail for the technical contact: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
-**Fill in before the conference:**
-
-| | Name | Phone |
+| Role | Name | Phone |
 | --- | --- | --- |
 | Executive (lead) | | |
 | Executive (deputy) | | |
-| Technical contact | | |
-| School IT / Wi-Fi contact | | |
+| Technical contact (Vercel + Supabase access) | | |
+| School IT / Wi-Fi | | |
 
-Known-good release card: attach the printed card from `docs/RELEASES.md`.
-Health page: **Executive → System health** (`/admin/health`).
+Attach: the **known-good release card** (from `docs/RELEASES.md`).
 
-**How resolutions flow.** Delegates write resolutions in **Google Docs** and share them with their Chair (edit access). Conference OS tracks the workflow around the document — who submitted it, when, whether the Chair has sent it to Approval, approval, printing, debate and voting. Conference OS never edits the document text; amendments are typed into the Google Doc by the Chair.
+**Names in the app today.** *Executive* screens are labelled **Administrator**; the *Admins* (print team) workspace is labelled **Logistics**. The renaming is planned.
+
+## How it fits together
+
+- **Conference OS** = who is present, speakers, timer, participation, votes, resolution workflow (submitted → with Chair → Approval → printed → debate → result), group photos. It is the record for all of these.
+- **Google Docs** = the resolution text. Delegates write it; Chairs edit it and type in passed amendments. Conference OS never edits the text.
+- **Google Drive** = the Approval Panel's folder where Chairs put a copy of each resolution (by hand, for now).
 
 ```
-Delegate: Google Doc → share with Chair → scan committee QR → paste link → Submit
-Chair:    Open Google Doc → review/edit → copy into the Approval folder → "Submit to Approval"
-Approval: review → approve → Admins print → debate → vote
+Delegate:  write Google Doc → share with the committee address (Editor) → scan QR → paste link → Submit
+Chair:     Documents → Delegate submissions → Open Google Doc → review → copy into Approval folder → Submit to Approval
+Approval:  review the copy → approve → Admins (Logistics) print → debate → vote
 ```
-
----
 
 ## The three colours
 
-System health shows one colour. Every Conference OS screen also shows a strip at the top when something is not GREEN.
+System health (**Administrator → System health**) shows one colour. Every screen shows a strip at the top when it is not GREEN.
 
-| Colour | Meaning | What to do |
+| | Meaning | Do |
 | --- | --- | --- |
-| **GREEN** — All systems operational | Everything is saving and syncing. | Carry on. |
-| **YELLOW** — Degraded | Something is slow or temporarily unavailable, but committees can keep working. Changes are kept on the device and sync automatically. | Carry on. Do not close the laptop or clear the browser. Check again in 5 minutes. If it lasts more than 15 minutes, follow the matching procedure below. |
-| **RED** — Action needed | A device cannot save, changes need review, changes have been waiting more than 15 minutes, or the device is not connected to the conference. | Stop recording on that device. Call the Executive. Do **not** clear browser data or switch laptops. |
+| **GREEN** | Everything normal. | Carry on. |
+| **YELLOW** | Something is slow or unavailable, but the committee can continue. Changes are kept on the device and sync automatically. | Carry on. Don't close the laptop or clear the browser. If it lasts 15 minutes, use the matching procedure below. |
+| **RED** | Action needed: this device can't save, changes need review, changes have waited over 15 minutes, or the device isn't connected to the conference. | Stop recording on that device. Call the Executive. Don't clear the browser or swap laptops. |
 
-Common messages:
+## Before the conference (by 48 hours before)
 
-- *"Live updates temporarily unavailable. Committee operations can continue."* → YELLOW. Screens still refresh at least once a minute.
-- *"Internet unavailable. 4 changes are saved on this device and will sync automatically."* → YELLOW. Keep the laptop open.
-- *"Document storage is temporarily unavailable."* → YELLOW. Only the optional file-upload fallback and opening uploaded files are affected. Google Doc submissions, debate, attendance and voting continue.
-- *"Not connected to the conference"* → RED. This device has not been set up; nothing it records is shared.
+**Release and systems** (technical contact)
+- [ ] System health → *Running version* matches the known-good card. Production is frozen from 48 hours before opening.
+- [ ] System health is GREEN. Supabase dashboard shows the production project healthy and a backup exists.
+- [ ] Rollback rehearsed once on staging; the person who will do it has Vercel access.
 
----
+**Conference data** (Executive)
+- [ ] Committees: right code, name and room.
+- [ ] Schools: every school exists once (no near-duplicates).
+- [ ] Delegates: spot-check five per committee (country, school, committee).
+- [ ] Sessions: **Administrator → Schedule import**, preview, confirm. Each committee shows the right sessions and times.
+- [ ] Group photos: **Administrator → Group photos** — every school has its slot, time and place; affected committees look right.
 
-## Before the conference (one week to 48 hours before)
+**Access** (technical contact grants it; there is no access-code login yet)
+- [ ] Every Chair laptop opens its committee in Chair Console.
+- [ ] Approval Panel, Admins (Logistics) and Executive (Administrator) devices open their workspaces.
+- [ ] **Two spare laptops** prepared with Chair access to *every* committee, signed in, Chair Console opened once.
 
-- [ ] **Known-good release.** System health → *Running version* matches the printed known-good card. Production is frozen 48 hours before opening (no changes except emergencies).
-- [ ] **Supabase.** Technical contact confirms the production database is healthy and a backup/export exists.
-- [ ] **Committees.** Every committee exists with the right code, name and room.
-- [ ] **Delegates.** Delegate import complete; spot-check five delegates per committee (country, school, committee).
-- [ ] **Sessions.** Executive → Sessions → *Import schedule*; review the preview and confirm. Each committee shows the right sessions with correct times.
-- [ ] **Resolution submission.** For each committee, open its submission QR link on a phone, confirm the page shows the right "share edit access with" email, and submit a test Google Doc link. It must appear in that Chair's *Delegate submissions*. The Chair opens the Google Doc, then clicks *Submit to Approval*; it must appear in the Approval inbox. Withdraw the test afterwards.
-- [ ] **Chair sharing addresses.** Each committee's sharing email (Executive → Submission links → *Share with*) is an account the Chair actually uses. Test that a document shared to it opens on the Chair's laptop.
-- [ ] **Approval folder.** Each Chair knows the Approval Panel's Google Drive folder and how to make a copy into it.
-- [ ] **Approval workflow.** Approval Panel approves the test resolution.
-- [ ] **Admin print workflow.** Admins/print team marks it printed.
-- [ ] **School Wi-Fi.** Test in every committee room: open Conference OS, check System health is GREEN. Note rooms with weak signal.
-- [ ] **Conference devices.** Each Chair laptop: date and time set automatically (group-photo reminders use the device clock); sign in once, open Chair Console and Chair Console → Group photos, open System health (GREEN, 0 unsynced). Then turn Wi-Fi off, refresh, and confirm the Chair Console still opens. Turn Wi-Fi back on.
-- [ ] **Health page.** Executive can open System health and explain the three colours.
-- [ ] **Fallback material.** Print per committee: delegate list, blank attendance sheet, blank speakers list, submission QR sheet. Download current resolutions.
-- [ ] **Photo schedule.** Executive → Group photos: every school has its slot(s), times and location are right, and the affected committees look sensible.
-- [ ] **Submission QR sheets.** Print one per committee room (Chair Console → Documents → *Print room sheet*).
-- [ ] **Access.** Every Chair, Approval, Admins and Executive device has working access. (Access-code entry, when it exists: test one code per role.)
+**Resolutions**
+- [ ] **Administrator → Submission links**: every committee has a link and a *Share edit access with* address that its Chair really uses.
+- [ ] For each committee: on a phone, scan the QR, submit a test Google Doc link. Chair → Documents → *Delegate submissions* shows it; *Open Google Doc* works on the Chair laptop; Chair copies it into the Approval folder and clicks *Submit to Approval*; it appears in Approval; Approval approves; Admins mark it printed.
+- [ ] Each Chair knows the Approval Panel's Drive folder and how to copy a Google Doc into it (File → Make a copy → choose the folder).
+- [ ] Print the room sheets (Chair Console → Documents → *Print room sheet*).
 
-## Conference morning (every day, 45 minutes before sessions)
+**Rooms and devices**
+- [ ] Wi-Fi tested in every committee room (System health GREEN). Note weak rooms.
+- [ ] Every conference device has **date and time set automatically** (photo reminders use the device clock).
+- [ ] Each Chair laptop: open Chair Console and Group photos, then Wi-Fi off → refresh → Chair Console still opens → Wi-Fi on → GREEN, 0 unsynced.
 
-- [ ] **System health** on the Executive device: GREEN, running version matches the known-good card.
-- [ ] **Chair test.** In one committee: mark one delegate present, add a speaker, start and stop the timer. Undo afterwards if needed.
-- [ ] **Resolution submission test.** Scan one committee's QR code with a phone and submit a test Google Doc link. The Chair opens it from *Delegate submissions* and clicks *Submit to Approval*. Confirm it appears in Approval.
-- [ ] **Approval test.** Approve the test resolution.
-- [ ] **Admin print test.** Mark it printed.
-- [ ] **SC voting test** (once Security Council veto handling exists): run one practice vote in SC.
-- [ ] **No unsynced changes.** Every Chair laptop: sidebar shows GREEN / "Synced". Any device showing unsynced or "need review" → Executive resolves it before sessions start.
-- [ ] Today's group photos: check the list for today in Executive → Group photos.
+**Fallback**
+- [ ] Per committee, printed: delegate list, blank attendance sheet, blank speakers list, room sheet.
+- [ ] Approval folder copies are readable by the Executive (so documents are reachable even if Conference OS is down).
+
+## Every conference morning (45 minutes before sessions)
+
+- [ ] Executive opens System health: **GREEN**, version matches the card.
+- [ ] Each Chair opens their committee and checks the **Working session** selector shows today's session.
+- [ ] One committee: mark a delegate present, add a speaker, record one participation point, start/stop the timer (undo the point afterwards).
+- [ ] One test submission by QR → Chair opens the Google Doc → *Submit to Approval* → Approval approves → Admins mark printed.
+- [ ] Today's group photos look right (Administrator → Group photos).
+- [ ] Every Chair laptop: sidebar GREEN / "Synced" and **0 unsynced**. Fix anything else before sessions start.
+
+Not available yet (do not test): Security Council veto, amendment flow.
 
 ## During the conference
 
-### Wi-Fi outage (internet unavailable)
+| Situation | What to do |
+| --- | --- |
+| **A Chair loses internet** | Keep chairing. Attendance, speakers, timer, participation and votes save on the laptop (YELLOW) and sync when back online. Don't close the laptop or switch devices. |
+| **School Wi-Fi fails everywhere** | Same as above in every room. Delegates keep writing in Google Docs and submit links when Wi-Fi returns. If it lasts long, phones on mobile data can still submit. |
+| **Conference OS page won't load** | Laptops already open keep working — don't close them. Check on a phone with mobile data. Call the technical contact. See the emergency sheet. |
+| **Database problem** (System health: "Conference database unreachable" on all devices) | Open screens keep saving on their devices. QR submissions stop until it returns. Don't refresh repeatedly. Technical contact checks [status.supabase.com](https://status.supabase.com/). |
+| **Live updates disconnected** (YELLOW) | Nothing to do. Screens refresh at least every minute and when a page is reopened. Photo reminders still appear. |
+| **Google Docs / Drive down** | Conference OS keeps working (see below). Documents can't be opened or copied until Google recovers. |
+| **Chair can't open a submitted Google Doc** | Chair clicks *Can't access* on it and asks the delegate to share with the committee address as **Editor**. When it opens, click *Access fixed*. |
+| **Delegate forgot to share the Doc** | Same as above. Their submission is safe; only access is missing. |
+| **Submission fails** | "Not received" → tap Submit again (safe, no duplicates). "Not a Google Docs link" → copy the link from the Doc's *Share* button. Still failing → see "file fallback". |
+| **QR code doesn't work** | Use the link printed under the QR, or open Chair Console → Documents → *Submission QR*. If the link says "not valid", the Executive replaced it — print the new room sheet. |
+| **File fallback needed** | On the submission page tap *Upload a file instead* (PDF or Word, up to 4 MB). If uploads are also unavailable, the delegate gives the file to the Chair and submits later. |
+| **A device shows unsynced changes** | Normal while offline. Keep it open and connected. If RED for over 15 minutes, call the Executive. Never clear the browser. |
+| **A Chair laptop dies** | Follow *Chair device failure* below. |
+| **Photo reminder didn't appear** | Check the laptop's clock is automatic and correct. Chair Console → Group photos lists the committee's slots. The Executive can see who acknowledged in Administrator → Group photos and send a runner if needed. |
 
-1. Chairs keep working. Attendance, speakers, timer and scoring keep saving on the laptop (YELLOW).
-2. Do **not** close laptops, switch laptops, clear browser data, or "log out".
-3. Resolution submission needs internet: delegates keep writing in Google Docs (it works offline on many devices) and submit the link once Wi-Fi returns.
-4. When Wi-Fi returns, changes sync automatically. Check each laptop returns to GREEN.
-5. Over 15 minutes → the device turns RED as a reminder. It is still safe; keep it open. Use paper for anything new only if the Chair cannot use the laptop.
+### Google Docs/Drive down vs Conference OS down
 
-### Live updates (Realtime) outage
+**Google Docs/Drive down, Conference OS working:** attendance, speakers, timer, participation (including POI points), votes and the resolution workflow all continue. Only opening, editing or copying documents waits. Vote on resolutions already printed; pause document editing until Google recovers.
 
-YELLOW *"Live updates temporarily unavailable"*. Nothing to do. Screens refresh at least every minute and whenever a page regains focus. Group-photo reminders still appear on time (they are calculated on each device, not sent live).
+**Conference OS down, Google working:** Chairs use the Approval-folder copies and the delegates' Google Docs to keep debate going, and record attendance, speakers and votes **on paper**. Don't create a parallel digital record (no new spreadsheet). When Conference OS returns, one person per committee enters the paper record.
 
-### Resolution submission problems
+### Chair device failure
 
-1. **"Not received"** — nothing was submitted. Ask the delegate to tap Submit once more (it is safe; duplicates are detected).
-2. **"That is not a Google Docs link"** — the delegate must copy the link from the Google Doc's *Share* button (it starts `https://docs.google.com/document/d/…`). Drive file links, "Publish to the web" links and other sites are refused.
-3. **Chair can't open the document** — the Chair clicks *Can't access* on that submission and asks the delegate to share edit access with the committee's sharing email. When it opens, the Chair clicks *Access fixed*.
-4. **Google Docs unavailable** — the delegate taps *Upload a file instead* and uploads a PDF or Word file. If System health shows *Document storage* YELLOW, uploads are also unavailable: the delegate gives the file to the Chair and submits later.
+1. Take a **spare laptop** (prepared with access to every committee). Open Conference OS → Chair Console.
+2. Choose the committee in the top bar and check the **Working session**.
+3. Check roll call, the speaker queue and recent participation. Only changes the old laptop had **already synced** are there.
+4. The status strip must be GREEN with 0 unsynced. Continue chairing.
 
-### Supabase (database) outage
-
-1. System health: *Conference database unreachable* on every device. Check [status.supabase.com](https://status.supabase.com/).
-2. Chairs keep working on their laptops; changes are kept and sync later.
-3. Resolution submission, approval and printing stop until it returns. Use the printed fallback material.
-4. Do not refresh laptops repeatedly; leave them on their current screen.
-
-### Application outage (Conference OS will not open)
-
-1. Check on a phone using mobile data: does the site open? Check [vercel-status.com](https://www.vercel-status.com/).
-2. Laptops already open on Chair Console keep working; do not close them.
-3. If a recent emergency change caused it, the technical contact rolls back (see Emergency).
-4. Otherwise use paper fallback; record times and who did what for later entry.
+If the old laptop had **unsynced changes**: they exist only on that laptop. They do not transfer.
+- If it can be revived, give it to the Executive. **Before connecting it to Wi-Fi**, open System health on it (`/admin/health`) and **Export device recovery file**, then let the technical contact decide whether to let it sync. This avoids the same thing being recorded twice.
+- If it cannot be revived, those changes are lost. Re-enter anything important on the new laptop and note it in the incident log.
 
 ## End of each day
 
-- [ ] Every laptop: GREEN, **0 unsynced changes**. Leave any laptop with unsynced changes open and connected until it syncs.
-- [ ] Any RED "need review" → Executive exports the recovery file from that device, then reviews.
-- [ ] Document archive: Approval inbox and print queue are empty or understood; download the day's approved resolutions.
-- [ ] Database export/backup: technical contact confirms a backup exists for today.
-- [ ] Tomorrow's schedule: each committee's sessions for tomorrow are present with the right times.
-- [ ] Tomorrow's group-photo slots: correct times and locations; cancelled slots are marked cancelled.
-- [ ] Write down any incidents (time, room, what happened, what was done).
+- [ ] Every laptop: GREEN, **0 unsynced**. Leave any laptop with unsynced changes open and connected until it syncs.
+- [ ] Any RED "need review": Executive opens System health on that device, exports the recovery file, then resolves it.
+- [ ] Resolution states look right: nothing stuck in *Delegate submissions*; Approval inbox and print queue understood.
+- [ ] The day's important Google Docs and Approval copies open for the Executive.
+- [ ] Technical contact confirms a database backup exists for today.
+- [ ] Tomorrow's sessions and group-photo slots are correct (cancelled slots marked cancelled).
+- [ ] Final check: System health GREEN on the Executive device. Write down any incidents.
 
 ## Emergency
 
-### Return to the known-good release (Vercel rollback)
+- **Return to the known-good release, Supabase checks, broken deployment:** [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.md).
+- **Paper fallback** (only if absolutely necessary): printed attendance sheet and speakers list; record times and names; one person enters them afterwards. Never record the same thing in two systems at once.
+- **Emergency fix during the freeze:** only for something blocking the conference — small, tested, checked on a Preview first, with the known-good release ready for rollback ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#production-freeze)).
 
-Only the technical contact or the Executive with Vercel access.
-
-1. Vercel → the Conference OS project → **Deployments**.
-2. Find the deployment whose commit matches the **known-good card**.
-3. **⋯ → Instant Rollback → Continue → Confirm Rollback**.
-4. On one device open System health. *Running version* must match the card.
-5. Then ask chairs to refresh — but only devices showing **0 unsynced changes**.
-
-A rollback changes the application only. It does not change the database or delete anything saved on laptops. Full detail: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#rollback).
-
-### Check Supabase
-
-[status.supabase.com](https://status.supabase.com/). If Supabase has an incident, there is nothing to roll back; keep laptops open and use fallback material.
-
-### Drive fallback
-
-Not available yet. Google Drive archive copies will be added later. Until then, download approved resolutions at the end of each day.
-
-### Spreadsheet / paper fallback (only if absolutely necessary)
-
-Use the printed attendance sheet, speakers list and downloaded resolutions. Write times and names. Do **not** enter the same thing in two places at once. After recovery, one person enters the paper records into Conference OS.
-
-### Emergency fix during the freeze
-
-Only for something that blocks the conference. It must be small, tested, checked on a Preview first, and have the known-good release ready for rollback. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#production-freeze).
+Planned, not yet available: automatic Approval-folder copies, PDF snapshots and Drive archive exports ([docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md)), access-code login, Security Council veto, amendment tracking.

@@ -53,7 +53,7 @@ npm run build
 npm start -- --port 3001
 ```
 
-`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. See [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) and [organizer runbook](docs/OPERATIONS.md).
+`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. See [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) , the [organizer runbook](CONFERENCE_RUNBOOK.md), [emergency sheet](docs/EMERGENCY_RECOVERY.md) and [troubleshooting](docs/TROUBLESHOOTING.md).
 
 ## Deployment
 
