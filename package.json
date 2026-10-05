@@ -15,7 +15,9 @@
     "test:load": "tsx scripts/load-test.mts",
     "seed:generate": "tsx scripts/generate-seed.mts",
     "verify:deployment": "tsx scripts/verify-deployment.mts",
-    "drive:plan": "tsx scripts/drive-plan.mts"
+    "drive:plan": "tsx scripts/drive-plan.mts",
+    "rehearsal:plan": "tsx scripts/rehearsal-plan.mts",
+    "rehearsal:run": "tsx scripts/rehearsal-run.mts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

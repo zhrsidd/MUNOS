@@ -46,7 +46,7 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 ## Supabase
 
 - Status: [status.supabase.com](https://status.supabase.com/). Project dashboard → *Logs* (API, Auth, Realtime, Postgres) and *Observability* for CPU/connections; *Advisors* for security/performance findings.
-- **Anonymous sign-in rate limit** (shared school IP): fresh devices failing to start with auth errors during a burst means the per-IP limit was hit. Do not lower security; stagger device start-up, reuse prepared devices, and review the project's auth rate limits in the dashboard ahead of time. See [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md#phase-d--burst-start-and-shared-nat).
+- **Anonymous sign-in rate limit** (shared school IP): fresh devices failing to start with auth errors during a burst means the per-IP limit was hit. Do not lower security; stagger device start-up, reuse prepared devices, and review the project's auth rate limits in the dashboard ahead of time. See [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md#phase-d--burst-start-and-shared-nat-45-min).
 - Backups: confirm the daily backup (plan-dependent) or take an export at the end of each day. Verify restore steps before the conference.
 - A Vercel rollback never changes the database. Migrations are never applied during the freeze.
 

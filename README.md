@@ -57,7 +57,7 @@ npm start -- --port 3001
 
 ## Deployment
 
-Vercel Preview for every branch/PR, Production from `main`, CI on every PR, build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL.
+Vercel Preview for every branch/PR, Production from `main`, CI on every PR, build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL. Pre-conference rehearsal: [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) (`npm run rehearsal:plan`, guarded `npm run rehearsal:run`). Drive design: [docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md) (`npm run drive:plan`, dry run).
 
 ## Deferred
 

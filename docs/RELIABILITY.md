@@ -38,5 +38,5 @@ No Redis, queue, cron job, second database, push service or monitoring platform.
 
 ## Open items
 
-- A real load test against a deployed Preview with the extension migration applied (submission burst + 150 chair clients) has not been run; the existing load scripts can be extended once a Preview with Storage exists.
+- A real load test against a deployed Preview has not been run yet. The full plan (ramp to 200, burst start, shared NAT, failure injection, rollback drill) and the human-paced harness (`npm run rehearsal:plan` / `rehearsal:run`) are in [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md).
 - Per-IP rate limiting of `/api/submissions` is not implemented (link possession + per-link limit only). Vercel's platform DDoS protection applies; add a Vercel Firewall rule if abuse is observed.
