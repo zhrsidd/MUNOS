@@ -18,13 +18,18 @@ export default async function SubmissionSheet({ params }: { params: Promise<{ to
       <h1>{link.committeeCode} resolution submission</h1>
       <h2>{link.committeeName}</h2>
       <div className="room-sheet-qr" dangerouslySetInnerHTML={{ __html: renderSVG(url, { ecc: "M", border: 2 }) }} />
+      {link.shareWith && (
+        <p className="room-sheet-share">
+          Share your Google Doc (edit access) with <b>{link.shareWith}</b>
+        </p>
+      )}
       <ol>
-        <li>Scan the QR code with your phone camera.</li>
-        <li>Choose your country, enter the title, attach the PDF or Word file.</li>
-        <li>Tap <b>Submit</b>. Keep the reference number you receive.</li>
+        <li>Write the resolution in Google Docs. Share it with {link.shareWith ? <b>{link.shareWith}</b> : "your Chair"} as an <b>Editor</b>.</li>
+        <li>Scan the QR code. Choose your country, enter the title and paste the Google Doc link (Share → Copy link).</li>
+        <li>Tap <b>Submit</b> and keep the reference number. Your Chair sends it on to the Approval Panel.</li>
       </ol>
       <p className="room-sheet-url">{url}</p>
-      <p>Only the main submitter submits. No email to the Chair is needed — the Approval Panel receives it automatically.{link.contact && <> Problems? Contact {link.contact}.</>}</p>
+      <p>Only the main submitter submits. Cannot use Google Docs? The page also accepts a PDF or Word file.</p>
       <PrintButton />
     </main>
   );

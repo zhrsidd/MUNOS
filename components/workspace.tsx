@@ -13,6 +13,7 @@ import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-link
 import { ScheduleImport } from "./operations/schedule-import";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
+import { DelegateSubmissions } from "./operations/resolution-links";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
     id: "chair",
@@ -313,6 +314,7 @@ export function Workspace({ path }: { path: string }) {
               <ChairPhotos committeeId={committeeId} />
             ) : section === "documents" ? (
               <>
+                <DelegateSubmissions committeeId={committeeId} />
                 <Documents
                   key={committeeId}
                   committeeId={committeeId}

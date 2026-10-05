@@ -111,8 +111,10 @@ revoke all on function private.ops_photo_ack(uuid,uuid,uuid,jsonb) from public, 
 
 create or replace function public.operations_snapshot(conf uuid) returns jsonb language sql stable security invoker set search_path='' as $$
  select jsonb_build_object(
-  'submissionLinks', (select coalesce(jsonb_agg(jsonb_build_object('id',l.id,'committeeId',l.committee_id,'token',l.token,'contact',l.contact,'createdAt',l.created_at) order by l.created_at, l.id),'[]')
+  'submissionLinks', (select coalesce(jsonb_agg(jsonb_build_object('id',l.id,'committeeId',l.committee_id,'token',l.token,'shareWith',l.share_with,'createdAt',l.created_at) order by l.created_at, l.id),'[]')
     from public.submission_links l where l.conference_id = conf and l.revoked_at is null),
+  'resolutionLinks', (select coalesce(jsonb_agg(jsonb_build_object('documentId',r.document_id,'workingDocId',r.working_doc_id,'approvalCopyDocId',r.approval_copy_doc_id,'access',r.access,'submittedAt',r.submitted_at,'revision',r.revision) order by r.created_at, r.document_id),'[]')
+    from public.resolution_links r where r.conference_id = conf),
   'photoSlots', (select coalesce(jsonb_agg(jsonb_build_object('id',p.id,'schoolId',p.school_id,'startsAt',p.starts_at,'endsAt',p.ends_at,'location',p.location,'note',p.note,'enabled',p.enabled,'warnMinutes',p.warn_minutes,'revision',p.revision) order by p.starts_at, p.id),'[]')
     from public.photo_slots p where p.conference_id = conf),
   'photoAcks', (select coalesce(jsonb_agg(jsonb_build_object('slotId',a.slot_id,'committeeId',a.committee_id,'stage',a.stage,'revision',a.slot_revision,'at',a.created_at) order by a.created_at),'[]')
@@ -124,7 +126,7 @@ create or replace function private.apply_operations_mutation(conf uuid, mutation
 returns void language plpgsql security definer set search_path='' as $$
 declare
  actor uuid := auth.uid(); kind text := command->>'type'; cid uuid; entity uuid; affected uuid[] := '{}'; c uuid; topic text := 'configuration';
- required public.conference_role := 'admin';
+ allowed public.conference_role[] := array['admin']::public.conference_role[];
  prior private.mutation_receipts;
  new_id uuid := (substr(mutation::text,1,24)||'000000000001')::uuid;
  payload jsonb := jsonb_build_object('command',command,'role',requested_role,'expected',expected,'client_time',client_time);
@@ -141,16 +143,21 @@ begin
  when 'submissionLink', 'photoAck' then
    cid := private.uuid_or_null(command->>'committeeId');
    if cid is null or not exists(select 1 from public.committees where id = cid and conference_id = conf) then raise exception 'Committee unavailable' using errcode='22023'; end if;
-   if kind = 'photoAck' then required := 'chair'; topic := 'chair'; end if;
+   if kind = 'photoAck' then allowed := array['chair']::public.conference_role[]; topic := 'chair'; end if;
+ when 'resolutionLink' then
+   select committee_id into cid from public.documents where id = private.uuid_or_null(command->>'documentId') and conference_id = conf;
+   if cid is null then raise exception 'Document unavailable' using errcode='42501'; end if;
+   allowed := array['chair','admin']::public.conference_role[]; topic := 'documents';
  when 'sessionImport', 'photoSlot', 'photoImport' then cid := null;
  else raise exception 'Unknown operations command' using errcode='22023';
  end case;
- if requested_role <> required then raise exception '% access required', case required when 'admin' then 'Executive' else 'Chair' end using errcode='42501'; end if;
+ if not requested_role = any(allowed) then raise exception '% access required', case when 'chair' = any(allowed) then 'Chair' else 'Executive' end using errcode='42501'; end if;
  if not private.has_access(conf, cid, array[requested_role]) then raise exception 'This session has no access to this role or committee' using errcode='42501'; end if;
  if cid is not null then perform 1 from public.committees where id = cid and conference_id = conf for update;
  else perform 1 from public.conferences where id = conf for update; end if;
  case kind
  when 'submissionLink' then entity := private.ops_submission_link(conf, cid, actor, new_id, command);
+ when 'resolutionLink' then entity := private.ops_resolution_link(conf, cid, command);
  when 'sessionImport' then affected := private.ops_session_import(conf, mutation, command);
  when 'photoSlot' then affected := private.ops_photo_slot(conf, new_id, command); entity := coalesce(private.uuid_or_null(command->>'slotId'), new_id);
  when 'photoImport' then affected := private.ops_photo_import(conf, mutation, command);

@@ -14,6 +14,14 @@ For conference organizers. No technical knowledge needed. Keep a printed copy in
 Known-good release card: attach the printed card from `docs/RELEASES.md`.
 Health page: **Executive → System health** (`/admin/health`).
 
+**How resolutions flow.** Delegates write resolutions in **Google Docs** and share them with their Chair (edit access). Conference OS tracks the workflow around the document — who submitted it, when, whether the Chair has sent it to Approval, approval, printing, debate and voting. Conference OS never edits the document text; amendments are typed into the Google Doc by the Chair.
+
+```
+Delegate: Google Doc → share with Chair → scan committee QR → paste link → Submit
+Chair:    Open Google Doc → review/edit → copy into the Approval folder → "Submit to Approval"
+Approval: review → approve → Admins print → debate → vote
+```
+
 ---
 
 ## The three colours
@@ -30,7 +38,7 @@ Common messages:
 
 - *"Live updates temporarily unavailable. Committee operations can continue."* → YELLOW. Screens still refresh at least once a minute.
 - *"Internet unavailable. 4 changes are saved on this device and will sync automatically."* → YELLOW. Keep the laptop open.
-- *"Document storage is temporarily unavailable."* → YELLOW. Only uploads and opening files are affected. Debate, attendance and voting continue.
+- *"Document storage is temporarily unavailable."* → YELLOW. Only the optional file-upload fallback and opening uploaded files are affected. Google Doc submissions, debate, attendance and voting continue.
 - *"Not connected to the conference"* → RED. This device has not been set up; nothing it records is shared.
 
 ---
@@ -42,7 +50,9 @@ Common messages:
 - [ ] **Committees.** Every committee exists with the right code, name and room.
 - [ ] **Delegates.** Delegate import complete; spot-check five delegates per committee (country, school, committee).
 - [ ] **Sessions.** Executive → Sessions → *Import schedule*; review the preview and confirm. Each committee shows the right sessions with correct times.
-- [ ] **Document upload.** For each committee, open its submission QR link on a phone and submit a test PDF. It must appear in the Approval inbox. Delete/withdraw the test afterwards.
+- [ ] **Resolution submission.** For each committee, open its submission QR link on a phone, confirm the page shows the right "share edit access with" email, and submit a test Google Doc link. It must appear in that Chair's *Delegate submissions*. The Chair opens the Google Doc, then clicks *Submit to Approval*; it must appear in the Approval inbox. Withdraw the test afterwards.
+- [ ] **Chair sharing addresses.** Each committee's sharing email (Executive → Submission links → *Share with*) is an account the Chair actually uses. Test that a document shared to it opens on the Chair's laptop.
+- [ ] **Approval folder.** Each Chair knows the Approval Panel's Google Drive folder and how to make a copy into it.
 - [ ] **Approval workflow.** Approval Panel approves the test resolution.
 - [ ] **Admin print workflow.** Admins/print team marks it printed.
 - [ ] **School Wi-Fi.** Test in every committee room: open Conference OS, check System health is GREEN. Note rooms with weak signal.
@@ -57,7 +67,7 @@ Common messages:
 
 - [ ] **System health** on the Executive device: GREEN, running version matches the known-good card.
 - [ ] **Chair test.** In one committee: mark one delegate present, add a speaker, start and stop the timer. Undo afterwards if needed.
-- [ ] **Resolution submission test.** Scan one committee's QR code with a phone and submit a test file. Confirm it appears in Approval.
+- [ ] **Resolution submission test.** Scan one committee's QR code with a phone and submit a test Google Doc link. The Chair opens it from *Delegate submissions* and clicks *Submit to Approval*. Confirm it appears in Approval.
 - [ ] **Approval test.** Approve the test resolution.
 - [ ] **Admin print test.** Mark it printed.
 - [ ] **SC voting test** (once Security Council veto handling exists): run one practice vote in SC.
@@ -70,7 +80,7 @@ Common messages:
 
 1. Chairs keep working. Attendance, speakers, timer and scoring keep saving on the laptop (YELLOW).
 2. Do **not** close laptops, switch laptops, clear browser data, or "log out".
-3. Resolution submission needs internet: delegates wait, or hand the file to the Chair on a USB stick for later upload.
+3. Resolution submission needs internet: delegates keep writing in Google Docs (it works offline on many devices) and submit the link once Wi-Fi returns.
 4. When Wi-Fi returns, changes sync automatically. Check each laptop returns to GREEN.
 5. Over 15 minutes → the device turns RED as a reminder. It is still safe; keep it open. Use paper for anything new only if the Chair cannot use the laptop.
 
@@ -78,11 +88,12 @@ Common messages:
 
 YELLOW *"Live updates temporarily unavailable"*. Nothing to do. Screens refresh at least every minute and whenever a page regains focus. Group-photo reminders still appear on time (they are calculated on each device, not sent live).
 
-### Resolution upload failure
+### Resolution submission problems
 
-1. The delegate sees "not received" — nothing was submitted. Ask them to try again once (it is safe; duplicates are detected).
-2. Still failing: check System health → *Document storage*. If YELLOW, uploads are temporarily unavailable.
-3. Fallback: the delegate emails the file to the submission contact shown on the page, or gives it to the Chair. Approval records it once storage returns.
+1. **"Not received"** — nothing was submitted. Ask the delegate to tap Submit once more (it is safe; duplicates are detected).
+2. **"That is not a Google Docs link"** — the delegate must copy the link from the Google Doc's *Share* button (it starts `https://docs.google.com/document/d/…`). Drive file links, "Publish to the web" links and other sites are refused.
+3. **Chair can't open the document** — the Chair clicks *Can't access* on that submission and asks the delegate to share edit access with the committee's sharing email. When it opens, the Chair clicks *Access fixed*.
+4. **Google Docs unavailable** — the delegate taps *Upload a file instead* and uploads a PDF or Word file. If System health shows *Document storage* YELLOW, uploads are also unavailable: the delegate gives the file to the Chair and submits later.
 
 ### Supabase (database) outage
 

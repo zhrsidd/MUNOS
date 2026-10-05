@@ -3018,7 +3018,7 @@ dd {
 .submit-card p { margin:0; }
 .submit-steps { margin:8px 0 0; padding-left:20px; display:grid; gap:16px; }
 .submit-steps label { display:block; font-weight:600; margin-bottom:6px; }
-.submit-steps select, .submit-steps input:not([type=file]) { width:100%; min-height:44px; padding:8px 10px; border:1px solid #cfd7e3; border-radius:8px; background:#fff; font-size:16px; }
+.submit-steps select, .submit-steps input:not([type=file]):not([type=checkbox]) { width:100%; min-height:44px; padding:8px 10px; border:1px solid #cfd7e3; border-radius:8px; background:#fff; font-size:16px; }
 .submit-steps input[type=file] { width:100%; font-size:15px; }
 .submit-button { min-height:48px; font-size:16px; width:100%; }
 .submit-error { background:#fff0ed; border:1px solid #efc8c0; color:#8a2a1b; padding:10px 12px; border-radius:8px; }
@@ -3083,3 +3083,24 @@ dd {
 .committee-acks span { background:var(--blue-soft); border-radius:6px; padding:2px 7px; font-size:12px; white-space:nowrap; }
 .photo-form .schedule-table select { min-width:200px; }
 .modal:has(.photo-form .schedule-table) { max-width:min(1100px, 95vw); }
+/* ---- Google-Doc-first submission (Claude-owned) ---- */
+.share-box { display:grid; gap:6px; padding:14px; border-radius:10px; background:var(--blue-soft); border:1px solid #cbdcf3; }
+.share-address { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.share-address b { font-size:18px; word-break:break-all; }
+.share-address .button { min-height:32px; padding:4px 10px; }
+.share-box small { color:var(--muted); }
+.share-confirm { margin-top:10px; font-weight:400; display:flex !important; gap:8px; align-items:flex-start; }
+.share-confirm input { margin-top:2px; width:20px; height:20px; flex:none; }
+.field-error { color:#a33320; }
+.link-button { background:none; border:none; color:var(--blue); padding:4px 0; min-height:0; justify-content:flex-start; text-decoration:underline; font-weight:500; }
+.link-button:hover { background:none; color:var(--blue-dark); }
+.room-sheet-share { font-size:18px; margin:0 0 12px; }
+.resolution-sources { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.submission-list { display:grid; gap:12px; margin:16px 24px 24px; }
+.submission-card { border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:grid; gap:10px; }
+.submission-card.problem { border-color:#efc8c0; background:#fffaf9; }
+.submission-card-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.submission-card-head strong { display:block; font-size:15px; }
+.submission-card-head p { margin:2px 0 0; }
+.approval-copy { display:grid; gap:4px; font-weight:600; font-size:12px; }
+.approval-copy input { padding:7px 8px; border:1px solid var(--line); border-radius:7px; font-weight:400; }

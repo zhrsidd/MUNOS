@@ -5,11 +5,11 @@ import { renderSVG } from "uqr";
 import { useConference } from "@/lib/context";
 import { repository } from "@/lib/repository";
 import { newSubmissionToken } from "@/lib/operations/commands";
-import { browserClient } from "@/lib/supabase/client";
+import type { Committee } from "@/lib/domain";
 import { Chip, PageHeading, Panel } from "../ui";
 
 const submitUrl = (token: string) => `${typeof window === "undefined" ? "" : window.location.origin}/submit/${token}`;
-function useDemo() {
+export function useDemo() {
   const health = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
   return health.mode === "local";
 }
@@ -38,11 +38,14 @@ export function SubmissionQrPanel({ committeeId }: { committeeId: string }) {
   const link = data.submissionLinks?.find((l) => l.committeeId === committeeId);
   if (!committee) return null;
   return (
-    <Panel title={`${committee.code} submission QR`} subtitle="Delegates scan this to submit a resolution. It goes straight to the Approval Panel.">
+    <Panel title={`${committee.code} submission QR`} subtitle="Delegates share their Google Doc with you, then scan this to register it. It appears under Delegate submissions.">
       {link ? (
         <div className="submission-panel">
           <QrCode value={submitUrl(link.token)} label={`QR code for ${committee.code} resolution submission`} />
           <div>
+            <p>
+              Delegates are told to share edit access with: <b>{link.shareWith || "— not set (ask the Executive)"}</b>
+            </p>
             <CopyLink url={submitUrl(link.token)} />
             <div className="actions">
               <a className="button" href={`/submit/${link.token}/sheet`} target="_blank" rel="noreferrer">
@@ -61,41 +64,54 @@ export function SubmissionQrPanel({ committeeId }: { committeeId: string }) {
     </Panel>
   );
 }
-/** Executive → Submission links: create, replace and retire one link per committee. */
+const fromPattern = (pattern: string, c: Committee) => pattern.trim().replaceAll("{code}", c.code.toLowerCase().replace(/[^a-z0-9]+/g, ""));
+function ShareWithCell({ committeeId, value }: { committeeId: string; value: string }) {
+  const { act } = useConference();
+  const [draft, setDraft] = useState(value);
+  return (
+    <div className="link-field">
+      <input value={draft} maxLength={200} aria-label="Share edit access with" placeholder="chair@dcmun.example" onChange={(e) => setDraft(e.target.value)} />
+      <button type="button" disabled={draft.trim() === value} onClick={() => void act({ type: "submissionLink", action: "shareWith", committeeId, shareWith: draft.trim() }, "admin")}>
+        Save
+      </button>
+    </div>
+  );
+}
+/** Executive → Submission links: one QR link per committee and the address delegates share their Google Doc with. */
 export function SubmissionLinks() {
   const { data, act } = useConference();
   const demo = useDemo();
-  const [contact, setContact] = useState(() => data.submissionLinks?.find((l) => l.contact)?.contact ?? "");
+  const [pattern, setPattern] = useState("");
   const links = data.submissionLinks ?? [];
   const missing = data.committees.filter((c) => !links.some((l) => l.committeeId === c.id));
-  const save = (committeeId: string, action: "create" | "rotate" | "revoke") =>
-    act({ type: "submissionLink", action, committeeId, contact: contact.trim(), ...(action === "revoke" ? {} : { token: newSubmissionToken(committeeId, demo) }) }, "admin");
+  const save = (c: Committee, action: "create" | "rotate" | "revoke", shareWith = "") =>
+    act({ type: "submissionLink", action, committeeId: c.id, shareWith, ...(action === "revoke" ? {} : { token: newSubmissionToken(c.id, demo) }) }, "admin");
   return (
     <>
       <PageHeading
         eyebrow="EXECUTIVE"
         title="Submission links"
-        description="One QR code per committee. Delegates submit without an account; resolutions enter the Approval inbox as Submitted."
+        description="One QR code per committee. Delegates write in Google Docs, share the document with their Chair, then register it here without an account. The Chair sends it on to Approval."
         action={
           missing.length ? (
-            <button className="primary" onClick={() => void (async () => { for (const c of missing) if (!(await save(c.id, "create"))) break; })()}>
+            <button className="primary" onClick={() => void (async () => { for (const c of missing) if (!(await save(c, "create", fromPattern(pattern, c)))) break; })()}>
               Create {missing.length} missing link{missing.length === 1 ? "" : "s"}
             </button>
           ) : undefined
         }
       />
-      <Panel title="Fallback contact" subtitle="Shown to delegates if submission fails (for example an email address). Applied to links created or replaced from now on.">
+      <Panel title="Sharing address for new links" subtitle="Who delegates share their Google Doc with (edit access). {code} becomes the committee code, e.g. {code}@dcmun.org → ga1@dcmun.org. Each committee can be changed below.">
         <div className="panel-body">
-        <input className="search" value={contact} maxLength={200} placeholder="resolutions@dcmun.example" onChange={(e) => setContact(e.target.value)} aria-label="Fallback contact" />
+          <input className="search" value={pattern} maxLength={200} placeholder="{code}@dcmun.org" onChange={(e) => setPattern(e.target.value)} aria-label="Sharing address pattern" />
         </div>
       </Panel>
-      <Panel title="Committee links" subtitle="Replace a link if it was shared outside the committee. The old QR code stops working immediately.">
+      <Panel title="Committee links" subtitle="Replace a link if it was shared outside the committee: the old QR code stops working immediately. Changing the sharing address keeps the QR code.">
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
                 <th>Committee</th>
-                <th>Status</th>
+                <th>Share edit access with</th>
                 <th>Link</th>
                 <th>Actions</th>
               </tr>
@@ -107,8 +123,9 @@ export function SubmissionLinks() {
                   <tr key={c.id}>
                     <td>
                       <strong>{c.code}</strong> · {c.name}
+                      <div>{link ? <Chip tone="green">Active</Chip> : <Chip tone="neutral">No link</Chip>}</div>
                     </td>
-                    <td>{link ? <Chip tone="green">Active</Chip> : <Chip tone="neutral">None</Chip>}</td>
+                    <td>{link ? <ShareWithCell key={link.id + link.shareWith} committeeId={c.id} value={link.shareWith} /> : <span className="muted">{fromPattern(pattern, c) || "—"}</span>}</td>
                     <td>{link ? <CopyLink url={submitUrl(link.token)} /> : "—"}</td>
                     <td>
                       <div className="actions">
@@ -117,11 +134,11 @@ export function SubmissionLinks() {
                             <a className="button" href={`/submit/${link.token}/sheet`} target="_blank" rel="noreferrer">
                               Print sheet
                             </a>
-                            <button onClick={() => window.confirm(`Replace the ${c.code} link? The current QR code stops working immediately.`) && void save(c.id, "rotate")}>Replace</button>
-                            <button onClick={() => window.confirm(`Turn off online submission for ${c.code}?`) && void save(c.id, "revoke")}>Turn off</button>
+                            <button onClick={() => window.confirm(`Replace the ${c.code} link? The current QR code stops working immediately.`) && void save(c, "rotate", link.shareWith)}>Replace</button>
+                            <button onClick={() => window.confirm(`Turn off online submission for ${c.code}?`) && void save(c, "revoke")}>Turn off</button>
                           </>
                         ) : (
-                          <button className="primary" onClick={() => void save(c.id, "create")}>
+                          <button className="primary" onClick={() => void save(c, "create", fromPattern(pattern, c))}>
                             Create link
                           </button>
                         )}
@@ -134,42 +151,14 @@ export function SubmissionLinks() {
           </table>
         </div>
         <p className="footnote">
-          Security: each link is a 128-bit random code. Anyone holding it can submit to that committee only, at most 20 files per 10 minutes. It
-          cannot read anything. {demo && "Local demo: links work against demo data only."} Chairs see their committee&apos;s QR in Chair Console → Documents.
+          Security: each link is a 128-bit random code. Anyone holding it can register a resolution for that committee only (at most 20 per 10 minutes); it
+          cannot read anything. Conference OS stores the Google Doc&apos;s id, never its text. {demo && "Local demo: links work against demo data only."} Chairs see
+          their QR in Chair Console → Documents.
         </p>
       </Panel>
       <p className="muted">
         <Link href="/approval">Open the Approval inbox →</Link>
       </p>
     </>
-  );
-}
-/** Opens the stored file for a submitted version through a short-lived signed URL (staff RLS). */
-export function OpenSubmittedFile({ storageKey, fileName }: { storageKey: string; fileName: string }) {
-  const demo = useDemo();
-  const [error, setError] = useState("");
-  async function open() {
-    setError("");
-    // Open synchronously so the browser does not treat it as a pop-up, then point it at the signed URL.
-    const tab = window.open("", "_blank");
-    try {
-      const { data, error } = await browserClient().storage.from("resolutions").createSignedUrl(storageKey, 600);
-      if (error || !data) throw error ?? Error("No URL");
-      if (tab) tab.location.href = data.signedUrl;
-      else window.location.href = data.signedUrl;
-    } catch {
-      tab?.close();
-      setError("Document storage is temporarily unavailable. Try again shortly.");
-    }
-  }
-  if (demo) return <span className="muted">{fileName} · stored by the local demo server (no file preview in demo mode)</span>;
-  return (
-    <span>
-      <button className="button" onClick={() => void open()}>
-        Open submitted file
-      </button>{" "}
-      <span className="muted">{fileName}</span>
-      {error && <span role="alert"> · {error}</span>}
-    </span>
   );
 }

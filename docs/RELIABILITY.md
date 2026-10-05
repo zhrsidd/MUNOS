@@ -13,7 +13,7 @@ Target: ~100 simultaneous users, 150–200 headroom, one school network, no IT t
 | Photo acknowledgement | 1 outbox write per committee per slot stage | ≈ schools × affected committees × 2 over the whole conference. |
 | Schedule / photo import | 1 write per import | One atomic command; ≤ 500 sessions / ≤ 300 slots. |
 | Delegate submission page | 1 RPC per page view, cached 30 s per link per server instance | A room scanning the QR at once costs one lookup. |
-| Delegate submission | 1 lookup + 1 Storage upload + 1 RPC | ~150 submissions per conference. Committee-row lock held for one short transaction. |
+| Delegate submission | Google Doc link: 1 lookup + 1 RPC (no Storage, no Google API call). Fallback file: + 1 Storage upload | ~150 submissions per conference. Committee-row lock held for one short transaction. |
 
 Realtime: no new channels. Extension writes insert into the existing `operational_changes` table, so every device keeps its one filtered subscription. Changes affecting several committees insert one small row per affected committee (photo slots, schedule import) so only those chairs refresh early; everyone else picks changes up on the normal recovery read.
 
@@ -23,8 +23,9 @@ Realtime: no new channels. Extension writes insert into the existing `operationa
 | --- | --- |
 | Realtime down | Health YELLOW. Reminders unaffected (local derivation). Schedule/photo changes arrive within ~60 s via recovery reads. |
 | Wi-Fi down on a Chair laptop | Health YELLOW (RED after 15 min of unsynced changes, as an escalation prompt — data is still safe). Reminders keep working from the cached snapshot. Acknowledgements queue in the outbox. `/chair` and `/chair/photos` open offline once prepared. |
-| Supabase down | Health YELLOW "database unreachable". Submissions fail with a clear "NOT submitted" message and the fallback contact. Reminders keep working. |
-| Storage down | Health YELLOW "Document storage is temporarily unavailable". Submission returns 503; nothing is created (upload happens before the database step). Debate/attendance/voting unaffected. |
+| Supabase down | Health YELLOW "database unreachable". Submissions fail with a clear "NOT submitted" message; delegates keep the Google Doc and submit the link later. Reminders keep working. |
+| Storage down | Health YELLOW "Document storage is temporarily unavailable". Only the file-upload fallback fails (503, nothing created); Google Doc submissions continue. Debate/attendance/voting unaffected. |
+| Google Docs / Google sign-in down | Conference OS keeps tracking the workflow; Chairs cannot open documents until Google recovers. Delegates can use the file-upload fallback. |
 | App (Vercel) down | Open Chair screens keep working offline. Rollback procedure in DEPLOYMENT.md. |
 | Lost response during submission | Retry with the same submission UUID returns the original reference (`replayed`). |
 | Device time zone wrong | No effect: times are stored as instants and shown in the conference zone. |
