@@ -7,6 +7,27 @@ export interface SubmissionLink {
   contact: string;
   createdAt: string;
 }
+export interface PhotoSlot {
+  id: string;
+  schoolId: string;
+  startsAt: string;
+  endsAt: string | null;
+  location: string;
+  note: string;
+  enabled: boolean;
+  warnMinutes: number;
+  /** Increments on every change; acknowledgements of an older revision no longer silence reminders. */
+  revision: number;
+}
+export interface PhotoAck {
+  slotId: string;
+  committeeId: string;
+  stage: "warning" | "due";
+  revision: number;
+  at: string;
+}
 export interface OperationsData {
   submissionLinks?: SubmissionLink[];
+  photoSlots?: PhotoSlot[];
+  photoAcks?: PhotoAck[];
 }

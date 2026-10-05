@@ -41,6 +41,7 @@ Set these in Vercel → Project → Settings → Environment Variables, separate
 | `NEXT_PUBLIC_CONFERENCE_ID` | browser | dev conference UUID | prod conference UUID | |
 | `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP` | browser | `false` | `false` | see INTEGRATION.md before enabling |
 | `NEXT_PUBLIC_APP_VERSION` | browser | optional | optional | defaults to `package.json` version |
+| `NEXT_PUBLIC_CONFERENCE_TIMEZONE` | browser | `Asia/Qatar` | `Asia/Qatar` | venue time zone for schedule import and group photos |
 | `SUPABASE_SECRET_KEY` | **server only** | dev secret key | prod secret key | mark **Sensitive**. Used only by server routes (health storage probe, resolution submission). Never prefix with `NEXT_PUBLIC_`. |
 | `CONFERENCE_FREEZE` | build only | unset | `1` during freeze | see Production freeze |
 
