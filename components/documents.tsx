@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useConference } from "@/lib/context";
 import { Resolution } from "@/lib/domain";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel, Timeline } from "./ui";
+import { OpenSubmittedFile } from "./operations/submission-links";
 export function DocumentPreview({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
   const [versionId, setVersionId] = useState("");
@@ -48,7 +49,11 @@ export function DocumentPreview({ resolution }: { resolution: Resolution }) {
         </div>
       </div>
       <div className="preview-caption">
-        {version?.fileName} · Text preview only · File storage not connected
+        {version?.storageKey ? (
+          <OpenSubmittedFile storageKey={version.storageKey} fileName={version.fileName} />
+        ) : (
+          <>{version?.fileName} · Text preview only · File storage not connected</>
+        )}
       </div>
     </div>
   );

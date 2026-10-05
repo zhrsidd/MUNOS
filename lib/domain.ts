@@ -161,7 +161,9 @@ export interface TimerState {
   remaining: number;
   startedAt: number | null;
 }
-export interface ConferenceData {
+import type { OperationsData } from "./operations/types";
+// CODEX REVIEW REQUIRED: OperationsData adds optional, extension-owned fields only.
+export interface ConferenceData extends OperationsData {
   conference: Conference;
   committees: Committee[];
   schools: School[];

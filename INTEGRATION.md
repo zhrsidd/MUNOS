@@ -48,7 +48,7 @@ The included 150-client test uses one pre-provisioned identity to exercise opera
 
 ## Next integrations
 
-Storage: private bucket, version-specific immutable paths `resolutions/{conference}/{committee}/{document}/{version}.pdf`, scoped RLS and signed reads. Upload failure must not advance workflow; finalize metadata only after successful upload. Actual upload failure testing remains deferred with upload implementation.
+Storage: private bucket `resolutions`, version-specific immutable paths `{conference}/{committee}/{document}/{version}.{ext}`, scoped staff read policy and signed reads. Implemented for delegate QR submission (see [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md)): upload first, then create the Submitted resolution; a failed upload never advances the workflow. Chair-created versions remain text previews.
 
 Drive: separate background archive job with pending/synced/failed states and retry. A failed mirror must never roll back a successful upload or stop debate. No mirror integration exists yet.
 

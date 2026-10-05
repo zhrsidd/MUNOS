@@ -20,6 +20,7 @@ const paths = [
   "admin/scoring",
   "admin/awards",
   "admin/workflow",
+  "admin/submissions",
   "admin/resources",
   "admin/audit",
   "admin/health",

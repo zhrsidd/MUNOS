@@ -9,6 +9,7 @@ import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus } from "./health";
 import { AdminScreen } from "./admin";
+import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
     id: "chair",
@@ -54,6 +55,7 @@ const adminNav = [
   ["scoring", "Scoring", "log"],
   ["awards", "Award criteria", "awards"],
   ["workflow", "Workflow & features", "settings"],
+  ["submissions", "Submission links", "documents"],
   ["resources", "Resources & Drive", "documents"],
   ["audit", "Audit log", "log"],
   ["health", "System health", "settings"],
@@ -301,11 +303,14 @@ export function Workspace({ path }: { path: string }) {
             )}
           {role === "chair" ? (
             section === "documents" ? (
-              <Documents
-                key={committeeId}
-                committeeId={committeeId}
-                sessionId={session?.id || ""}
-              />
+              <>
+                <Documents
+                  key={committeeId}
+                  committeeId={committeeId}
+                  sessionId={session?.id || ""}
+                />
+                <SubmissionQrPanel committeeId={committeeId} />
+              </>
             ) : (
               <ChairScreen
                 key={`${committeeId}-${session?.id}`}
@@ -319,7 +324,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "health" ? <SystemHealth /> : <AdminScreen section={section} />
+            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

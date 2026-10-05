@@ -33,7 +33,11 @@ The example defaults to an isolated local demo. For the development database, se
 | `/logistics` | Print queue |
 | `/admin` | Conference overview |
 | `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,awards,workflow,resources,audit}` | Configuration |
-| `/admin/health` | Connection and recovery |
+| `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
+| `/admin/submissions` | Committee resolution-submission links / QR codes |
+| `/submit/{token}` | Public, mobile resolution submission for delegates (no account) |
+| `/submit/{token}/sheet` | Printable committee room sheet with QR code |
+| `/api/health` | Build identity and Supabase/Storage reachability (JSON) |
 | `/projector` | Lightweight display |
 
 ## Verify
@@ -55,5 +59,7 @@ Vercel Preview for every branch/PR, Production from `main`, CI on every PR, buil
 ## Deferred
 
 Actual PDFs/Storage, Google Drive mirroring, access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+
+Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.
