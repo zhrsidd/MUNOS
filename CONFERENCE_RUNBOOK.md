@@ -46,7 +46,7 @@ Common messages:
 - [ ] **Approval workflow.** Approval Panel approves the test resolution.
 - [ ] **Admin print workflow.** Admins/print team marks it printed.
 - [ ] **School Wi-Fi.** Test in every committee room: open Conference OS, check System health is GREEN. Note rooms with weak signal.
-- [ ] **Conference devices.** Each Chair laptop: sign in once, open Chair Console, open System health (GREEN, 0 unsynced). Then turn Wi-Fi off, refresh, and confirm the Chair Console still opens. Turn Wi-Fi back on.
+- [ ] **Conference devices.** Each Chair laptop: date and time set automatically (group-photo reminders use the device clock); sign in once, open Chair Console and Chair Console → Group photos, open System health (GREEN, 0 unsynced). Then turn Wi-Fi off, refresh, and confirm the Chair Console still opens. Turn Wi-Fi back on.
 - [ ] **Health page.** Executive can open System health and explain the three colours.
 - [ ] **Fallback material.** Print per committee: delegate list, blank attendance sheet, blank speakers list, submission QR sheet. Download current resolutions.
 - [ ] **Photo schedule.** Executive → Group photos: every school has its slot(s), times and location are right, and the affected committees look sensible.
