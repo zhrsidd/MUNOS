@@ -1,0 +1,14 @@
+node_modules/
+.next/
+*.tsbuildinfo
+.env*
+artifacts/
+!.env.example
+supabase/.temp/
+supabase/.branches/
+.test-sessions/
+.vercel/
+.DS_Store
+sources/
+coverage/
+*.log

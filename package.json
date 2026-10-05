@@ -1,0 +1,37 @@
+{
+  "name": "conference-os",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:database": "tsx --test tests/database.test.ts",
+    "test:offline": "tsx --test tests/offline.test.ts",
+    "test:remote": "tsx scripts/remote-workflow.mts",
+    "test:load": "tsx scripts/load-test.mts",
+    "seed:generate": "tsx scripts/generate-seed.mts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.2",
+    "idb": "8.0.3",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "fake-indexeddb": "6.2.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

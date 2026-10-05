@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-05T15:14:25.134Z",
+  "project": "opmydpozhdgkpcnjwpqb",
+  "passed": [
+    "authorized snapshot",
+    "speech +2, opportunity +1, duplicate retry exactly once",
+    "speaker queue",
+    "submitted → review → approved → printed → in debate",
+    "attendance-fed voting, configured majority, closure and audit",
+    "fresh repository read persists"
+  ],
+  "documentId": "fa2916fd-99ab-4a51-bacb-000000000001"
+}

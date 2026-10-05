@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-05T15:17:29.480Z",
+  "project": "opmydpozhdgkpcnjwpqb",
+  "conference": "8040a733-999e-42b1-8b3e-a8df7af7ec5f",
+  "concurrency": 150,
+  "distinctAuthIdentities": 1,
+  "authNote": "150 simulated operational clients reuse one explicitly authorized test identity. This is not a 150-person anonymous enrollment/NAT burst test.",
+  "requests": 1500,
+  "errorRate": 0,
+  "errors": [],
+  "writes": {
+    "expectedParticipation": 150,
+    "actualParticipation": 150,
+    "duplicateParticipation": 0,
+    "attendance": 150,
+    "printed": 150
+  },
+  "realtime": {
+    "connections": 150,
+    "reconnections": 150,
+    "disconnects": 0
+  },
+  "latency": {
+    "realtime_connect": {
+      "requests": 150,
+      "p50_ms": 1398,
+      "p95_ms": 1575,
+      "p99_ms": 1584
+    },
+    "burst_read": {
+      "requests": 150,
+      "p50_ms": 4152,
+      "p95_ms": 10095,
+      "p99_ms": 12238
+    },
+    "attendance": {
+      "requests": 150,
+      "p50_ms": 1337,
+      "p95_ms": 6627,
+      "p99_ms": 8256
+    },
+    "participation": {
+      "requests": 150,
+      "p50_ms": 1203,
+      "p95_ms": 5345,
+      "p99_ms": 7306
+    },
+    "duplicate_retry": {
+      "requests": 150,
+      "p50_ms": 831,
+      "p95_ms": 3698,
+      "p99_ms": 7808
+    },
+    "newDocument": {
+      "requests": 150,
+      "p50_ms": 523,
+      "p95_ms": 3255,
+      "p99_ms": 4456
+    },
+    "document": {
+      "requests": 450,
+      "p50_ms": 329,
+      "p95_ms": 1720,
+      "p99_ms": 3468
+    },
+    "realtime_reconnect": {
+      "requests": 150,
+      "p50_ms": 64,
+      "p95_ms": 81,
+      "p99_ms": 140
+    }
+  },
+  "databaseCpu": "Not available from Data API; inspect Supabase Observability for this time window."
+}

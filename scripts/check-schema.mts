@@ -1,0 +1,10 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFile} from 'node:fs/promises';
+const db=new PGlite();
+await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
+ await db.exec(await readFile('supabase/migrations/20261005103403_conference_foundation.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005103922_conference_access_hardening.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005151954_conference_read_performance.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005152815_restore_stable_read_policies.sql','utf8'));
+console.log('Fresh PostgreSQL migration applied successfully.');
+await db.close();

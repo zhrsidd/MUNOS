@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {PGlite} from '@electric-sql/pglite';
+import {readFile} from 'node:fs/promises';
+const actor='20000000-0000-4000-8000-000000000001';
+test('fresh migration: RLS isolation, transactional commands, idempotency, concurrency and workflow',async()=>{
+ const db=new PGlite();
+ try {
+ await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
+ await db.exec(await readFile('supabase/migrations/20261005103403_conference_foundation.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005103922_conference_access_hardening.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005151954_conference_read_performance.sql','utf8'));
+ await db.exec(await readFile('supabase/migrations/20261005152815_restore_stable_read_policies.sql','utf8'));
+ await db.exec(await readFile('supabase/seed.sql','utf8'));
+ const ids=JSON.parse(await readFile('supabase/fixture-ids.json','utf8'));
+ const query=async(sql:string,p:unknown[]=[])=> (await db.query<Record<string,unknown>>(sql,p)).rows;
+ await db.exec(`insert into auth.users values ('${actor}'); set role authenticated;`);
+ assert.equal((await query('select * from public.conferences')).length,0);
+ await assert.rejects(()=>db.query('select public.conference_snapshot($1)',[ids.conference]),/access has not been granted/);
+ await db.exec(`reset role; insert into public.user_access(conference_id,user_id,role,committee_id,expires_at) values('${ids.conference}','${actor}','chair','${ids.ga1}',now()+interval '1 day'); select set_config('request.jwt.claim.sub','${actor}',false); set role authenticated;`);
+ const snapshot=async()=> (await db.query<{data:Record<string,unknown>}>('select public.conference_snapshot($1) data',[ids.conference])).rows[0].data;
+ const first=await snapshot();
+ assert.equal((first.committees as unknown[]).length,1);
+ assert.equal((first.delegates as unknown[]).length,12);
+ await assert.rejects(()=>db.query('update public.delegates set name=$1',['Forbidden']),/permission denied/);
+ const send=(c:unknown,id=crypto.randomUUID(),expected:string|null=null,role='chair')=>db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,id,JSON.stringify(c),role,expected,'2026-10-05T10:30:00Z']);
+ const count=(await query('select * from public.participation_events')).length;
+ const mutation=crypto.randomUUID();const speech={type:'participation',delegateId:ids.france,sessionId:ids.session,resolutionId:ids.resolution,categoryId:'speech',points:2};
+ await send(speech,mutation);await send(speech,mutation);
+ assert.equal((await query('select * from public.participation_events')).length,count+1);
+ await assert.rejects(()=>send({...speech,points:3},mutation),/Idempotency/);
+ await assert.rejects(()=>send({...speech,points:99}),/Invalid scoring/);
+ await assert.rejects(()=>send({type:'conference',name:'Unauthorised',venue:'x',date:'2026-10-05'},crypto.randomUUID(),null,'admin'),/no access/);
+ const roll={type:'attendance',delegateId:ids.france,sessionId:ids.session,status:'Present & Voting'};
+ await send(roll,crypto.randomUUID(),'1');
+ await assert.rejects(()=>send({...roll,status:'Absent'},crypto.randomUUID(),'1'),/Another chair/);
+ await assert.rejects(()=>send({type:'vote',delegateId:ids.france,sessionId:ids.session,resolutionId:ids.resolution,choice:'Abstain'},crypto.randomUUID(),'0'),/Attendance/);
+ // Full document lifecycle under separately granted operational roles.
+ await db.exec(`reset role; insert into public.user_access(conference_id,user_id,role,expires_at) values('${ids.conference}','${actor}','approval',now()+interval '1 day'),('${ids.conference}','${actor}','logistics',now()+interval '1 day'); set role authenticated;`);
+ await send({type:'document',id:ids.resolution,status:'Closed',outcome:'Withdrawn'},crypto.randomUUID(),'1');
+ const draftMutation=crypto.randomUUID();const documentId=draftMutation.slice(0,24)+'000000000001';
+ await send({type:'newDocument',committeeId:ids.ga1,sessionId:ids.session,title:'Workflow test',submitterId:ids.france},draftMutation);
+ for(const [status,role,revision] of [['Submitted','chair','1'],['Approved','approval','2'],['Printed','logistics','3'],['In Debate','chair','4']]) await send({type:'document',id:documentId,status},crypto.randomUUID(),revision,role);
+ const attendance=(await snapshot()).attendance as {delegateId:string;sessionId:string;status:string}[];
+ for(const a of attendance.filter(a=>a.sessionId===ids.session && a.status!=='Absent'))await send({type:'vote',delegateId:a.delegateId,sessionId:ids.session,resolutionId:documentId,choice:'For'},crypto.randomUUID(),'0');
+ await assert.rejects(()=>send({type:'document',id:documentId,status:'Closed',outcome:'Failed'},crypto.randomUUID(),'5'),/configured voting/);
+ await send({type:'document',id:documentId,status:'Closed',outcome:'Passed'},crypto.randomUUID(),'5');
+ assert.equal((await query('select outcome from public.documents where id=$1',[documentId]))[0].outcome,'Passed');
+ const tables=await query("select tablename,rowsecurity from pg_tables where schemaname='public'");assert.ok(tables.every(t=>t.rowsecurity));
+ await db.exec('reset role');
+ assert.equal((await query('select count(*) n from private.mutation_receipts'))[0].n,(await query('select count(*) n from public.audit_log'))[0].n);
+ }finally {await db.close();}
+});
