@@ -7,8 +7,13 @@ import { Role } from "@/lib/domain";
 import { Icon, Chip, Timer } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { SystemHealth, SyncStatus, DataModeLabel } from "./health";
+import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
+import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
+import { ScheduleImport } from "./operations/schedule-import";
+import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
+import { PhotoSchedule } from "./operations/photo-schedule";
+import { DelegateSubmissions } from "./operations/resolution-links";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
     id: "chair",
@@ -41,6 +46,7 @@ const chairNav = [
   ["participation", "Participation", "log"],
   ["documents", "Documents", "documents"],
   ["voting", "Voting", "voting"],
+  ["photos", "Group photos", "clock"],
   ["awards", "Award notes", "awards"],
 ];
 const adminNav = [
@@ -48,12 +54,15 @@ const adminNav = [
   ["conference", "Conference", "settings"],
   ["committees", "Committees", "debate"],
   ["sessions", "Sessions", "clock"],
+  ["schedule", "Schedule import", "clock"],
   ["delegates", "Delegates", "attendance"],
   ["schools", "Schools", "admin"],
+  ["photos", "Group photos", "clock"],
   ["staff", "Chairs & staff", "review"],
   ["scoring", "Scoring", "log"],
   ["awards", "Award criteria", "awards"],
   ["workflow", "Workflow & features", "settings"],
+  ["submissions", "Submission links", "documents"],
   ["resources", "Resources & Drive", "documents"],
   ["audit", "Audit log", "log"],
   ["health", "System health", "settings"],
@@ -217,10 +226,7 @@ export function Workspace({ path }: { path: string }) {
         </nav>
         <div className="sidebar-bottom">
           <div className="local-state">
-            <span className="dot" />
-            <span>
-              <SyncStatus />
-            </span>
+            <SyncStatus />
           </div>
           <Link href="/" className="switch-role">
             <Icon name="arrow" />
@@ -279,6 +285,8 @@ export function Workspace({ path }: { path: string }) {
           </div>
         </header>
         <main className="workspace-content">
+          {!(role === "admin" && section === "health") && <StatusStrip />}
+          {role === "chair" && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
           {role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId).length >
               1 && (
@@ -302,12 +310,18 @@ export function Workspace({ path }: { path: string }) {
               </div>
             )}
           {role === "chair" ? (
-            section === "documents" ? (
-              <Documents
-                key={committeeId}
-                committeeId={committeeId}
-                sessionId={session?.id || ""}
-              />
+            section === "photos" ? (
+              <ChairPhotos committeeId={committeeId} />
+            ) : section === "documents" ? (
+              <>
+                <DelegateSubmissions committeeId={committeeId} />
+                <Documents
+                  key={committeeId}
+                  committeeId={committeeId}
+                  sessionId={session?.id || ""}
+                />
+                <SubmissionQrPanel committeeId={committeeId} />
+              </>
             ) : (
               <ChairScreen
                 key={`${committeeId}-${session?.id}`}
@@ -321,7 +335,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "health" ? <SystemHealth /> : <AdminScreen section={section} />
+            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <ScheduleImport /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

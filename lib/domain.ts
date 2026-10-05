@@ -57,6 +57,8 @@ export interface Session {
   committeeId: ID;
   name: string;
   startsAt: string;
+  /** CODEX REVIEW REQUIRED: optional end time, set by schedule import (sessions."endsAt"). */
+  endsAt?: string | null;
   state: "scheduled" | "active" | "closed";
 }
 export interface Attendance {
@@ -161,7 +163,9 @@ export interface TimerState {
   remaining: number;
   startedAt: number | null;
 }
-export interface ConferenceData {
+import type { OperationsData } from "./operations/types";
+// CODEX REVIEW REQUIRED: OperationsData adds optional, extension-owned fields only.
+export interface ConferenceData extends OperationsData {
   conference: Conference;
   committees: Committee[];
   schools: School[];

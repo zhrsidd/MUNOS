@@ -48,9 +48,9 @@ The included 150-client test uses one pre-provisioned identity to exercise opera
 
 ## Next integrations
 
-Storage: private bucket, version-specific immutable paths `resolutions/{conference}/{committee}/{document}/{version}.pdf`, scoped RLS and signed reads. Upload failure must not advance workflow; finalize metadata only after successful upload. Actual upload failure testing remains deferred with upload implementation.
+Documents: **Google Docs is the resolution editor; Conference OS tracks the workflow around it** and never stores or parses document text. Delegate submissions register the working Google Doc id (see [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md)). Storage: private bucket `resolutions` holds only the optional PDF/Word upload fallback (and future snapshots), at `{conference}/{committee}/{document}/{version}.{ext}`, with a scoped staff read policy and signed reads; upload first, then create the Draft, so a failed upload never advances the workflow. Chair-created versions remain text placeholders.
 
-Drive: separate background archive job with pending/synced/failed states and retry. A failed mirror must never roll back a successful upload or stop debate. No mirror integration exists yet.
+Drive: later, copying the working Google Doc into the Approval folder on *Submit to Approval*, PDF snapshots and archive copies, as a separate background job with pending/synced/failed states and retry. A failed mirror must never roll back a successful upload or stop debate. No mirror integration exists yet.
 
 Auth UI and credential redemption, hardened replacement-device recovery, deployment/monitoring and school-network rehearsal precede conference use. See the operations runbook and verification report.
 
