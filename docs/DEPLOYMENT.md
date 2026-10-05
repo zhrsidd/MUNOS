@@ -41,7 +41,7 @@ Set these in Vercel → Project → Settings → Environment Variables, separate
 | `NEXT_PUBLIC_CONFERENCE_ID` | browser | dev conference UUID | prod conference UUID | |
 | `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP` | browser | `false` | `false` | see INTEGRATION.md before enabling |
 | `NEXT_PUBLIC_APP_VERSION` | browser | optional | optional | defaults to `package.json` version |
-| `SUPABASE_SECRET_KEY` | **server only** | dev secret key | prod secret key | mark **Sensitive**. Used only by server routes (health storage probe, resolution submission). Never prefix with `NEXT_PUBLIC_`. |
+| `SUPABASE_SECRET_KEY` | **server only** | dev secret key | prod secret key | mark **Sensitive**. Used only by server routes (resolution submission links and the file-upload fallback, health storage probe). Never prefix with `NEXT_PUBLIC_`. |
 | `CONFERENCE_FREEZE` | build only | unset | `1` during freeze | see Production freeze |
 
 Vercel's system variables (`VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`, `VERCEL_GIT_COMMIT_REF`, `VERCEL_DEPLOYMENT_ID`) are read at build time to stamp each deployment; leave "Automatically expose System Environment Variables" enabled.

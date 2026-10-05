@@ -1,4 +1,5 @@
 // Shared by the public submission page (instant feedback) and the server route (authoritative).
+// The normal path is a Google Doc link; a PDF/Word upload is the optional fallback.
 export const MAX_SUBMISSION_BYTES = 4 * 1024 * 1024; // below Vercel's 4.5 MB function body limit
 export const SUBMISSION_TOKEN = /^[A-Za-z0-9_-]{22,64}$/;
 export const ACCEPT = ".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword";
@@ -26,6 +27,8 @@ export function cleanTitle(title: string) {
 }
 export type SubmissionError =
   | "invalid_link"
+  | "missing_source"
+  | "invalid_google_doc"
   | "invalid_file"
   | "too_large"
   | "invalid_title"
@@ -37,13 +40,15 @@ export type SubmissionError =
   | "server_error";
 export const submissionMessages: Record<SubmissionError, string> = {
   invalid_link: "This submission link is not valid or has been replaced. Scan the QR code in your committee room again.",
+  missing_source: "Paste the link to your Google Doc (or tap “Upload a file instead”).",
+  invalid_google_doc: "That is not a Google Docs link. Open your resolution in Google Docs, press Share → Copy link, and paste it here.",
   invalid_file: "Upload a PDF or Word document (.pdf or .docx).",
   too_large: "The file is larger than 4 MB. Save it as a PDF and try again.",
   invalid_title: "Enter the resolution title (3 to 200 characters).",
   invalid_submitter: "Choose your country from the list.",
   rate_limited: "Too many submissions for this committee in the last few minutes. Wait a few minutes and try again.",
   no_session: "This committee has no session yet. Ask your Chair.",
-  storage_unavailable: "Document storage is temporarily unavailable. Your resolution was NOT submitted. Try again in a minute.",
+  storage_unavailable: "File upload is temporarily unavailable. Your resolution was NOT submitted. Submit your Google Doc link instead, or try again in a minute.",
   not_configured: "Online submission is not available right now. Your resolution was NOT submitted.",
   server_error: "Something went wrong. Your resolution was NOT submitted. Try again.",
 };
@@ -55,7 +60,8 @@ export interface LinkInfo {
   conferenceName: string;
   committeeCode: string;
   committeeName: string;
-  contact: string;
+  /** Who to share the Google Doc with (edit access). */
+  shareWith: string;
   submitters: Submitter[];
 }
 export type SubmissionResponse =
