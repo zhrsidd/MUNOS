@@ -1,16 +1,22 @@
 import type { ConferenceData, Role } from "../domain";
 // Extension commands travel through the same durable outbox as core commands, but are
 // applied server-side by public.apply_operations_mutation (see the operations migrations).
-export type OperationsCommand = {
-  type: "submissionLink";
-  action: "create" | "rotate" | "revoke";
-  committeeId: string;
-  token?: string;
-  contact?: string;
-};
-export const operationsCommandTypes = ["submissionLink"] as const satisfies readonly OperationsCommand["type"][];
+export type OperationsCommand =
+  | {
+      type: "submissionLink";
+      action: "create" | "rotate" | "revoke";
+      committeeId: string;
+      token?: string;
+      contact?: string;
+    }
+  | {
+      type: "sessionImport";
+      rows: { committeeId: string; name: string; startsAt: string; endsAt: string | null }[];
+    };
+export const operationsCommandTypes = ["submissionLink", "sessionImport"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
+  sessionImport: ["admin"],
 };
 export function isOperationsCommand(c: { type: string }): c is OperationsCommand {
   return (operationsCommandTypes as readonly string[]).includes(c.type);
@@ -40,6 +46,20 @@ export function applyOperationsCommand(
       if (c.action !== "revoke")
         links.push({ id: nextId(), committeeId: c.committeeId, token: c.token!, contact: c.contact ?? "", createdAt: now });
       d.submissionLinks = links;
+      break;
+    }
+    case "sessionImport": {
+      if (!c.rows.length || c.rows.length > 500) throw Error("Import between 1 and 500 sessions at a time.");
+      for (const row of c.rows) {
+        // Every row consumes an id, created or not, so ids match the database's derivation.
+        const id = nextId();
+        if (!d.committees.some((x) => x.id === row.committeeId)) throw Error("Choose a valid committee.");
+        const name = row.name.trim();
+        if (!name || name.length > 120 || Number.isNaN(Date.parse(row.startsAt))) throw Error("Each session needs a name and start time.");
+        if (row.endsAt && Date.parse(row.endsAt) <= Date.parse(row.startsAt)) throw Error("A session ends before it starts.");
+        if (d.sessions.some((s) => s.committeeId === row.committeeId && Date.parse(s.startsAt) === Date.parse(row.startsAt))) continue;
+        d.sessions.push({ id, committeeId: row.committeeId, name, startsAt: new Date(row.startsAt).toISOString(), endsAt: row.endsAt ? new Date(row.endsAt).toISOString() : null, state: "scheduled" });
+      }
       break;
     }
   }

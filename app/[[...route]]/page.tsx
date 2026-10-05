@@ -14,6 +14,7 @@ const paths = [
   "admin/conference",
   "admin/committees",
   "admin/sessions",
+  "admin/schedule",
   "admin/delegates",
   "admin/schools",
   "admin/staff",

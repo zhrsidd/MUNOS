@@ -57,6 +57,8 @@ export interface Session {
   committeeId: ID;
   name: string;
   startsAt: string;
+  /** CODEX REVIEW REQUIRED: optional end time, set by schedule import (sessions."endsAt"). */
+  endsAt?: string | null;
   state: "scheduled" | "active" | "closed";
 }
 export interface Attendance {

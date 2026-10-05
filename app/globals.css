@@ -3043,3 +3043,21 @@ dd {
   .no-print, .sidebar, .topbar, .workspace-footer { display:none !important; }
   .room-sheet { padding:0; }
 }
+
+/* ---- Schedule import (Claude-owned) ---- */
+.schedule-input { display:grid; gap:14px; }
+.schedule-input label { display:grid; gap:6px; font-weight:600; }
+.schedule-input textarea { width:100%; font-family:ui-monospace, monospace; font-size:12px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+.schedule-options { display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; }
+.schedule-options fieldset { border:1px solid var(--line); border-radius:8px; padding:8px 12px; display:flex; flex-wrap:wrap; gap:10px; }
+.schedule-options legend { font-weight:600; padding:0 4px; }
+.schedule-options label.inline, label.inline { display:inline-flex; gap:6px; align-items:center; font-weight:400; }
+.schedule-summary { margin:0; }
+.schedule-table input:not([type=checkbox]) { width:100%; min-width:90px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px; }
+.schedule-table td { vertical-align:top; }
+.schedule-table td small { display:block; margin-top:3px; }
+.schedule-table tr.skipped { opacity:.55; }
+.schedule-table tr.invalid { background:#fff6f4; }
+.schedule-result { display:flex; flex-direction:column; gap:4px; min-width:160px; }
+.danger-text { color:#a33320; }
+.schedule-table td:nth-child(3) input { min-width:200px; }
