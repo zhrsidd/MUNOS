@@ -1,10 +1,10 @@
 # Operations extensions (Claude-owned)
 
-New, independent conference-operations systems built around the Codex-owned core. This page is the contract between the two: what was added, how it plugs in, and every item marked **CODEX REVIEW REQUIRED**.
+New, independent conference-operations systems built around the Codex-owned core. This page describes the current extension contract after Codex integration review. The original review checklist is retained below for traceability; review outcomes and corrections are in [CLAUDE_REVIEW.md](CLAUDE_REVIEW.md).
 
 ## Extension pattern
 
-The core (schema, `conference_snapshot`, `apply_conference_mutation`, `lib/commands.ts`, the offline outbox) is **not modified in behaviour**. Extensions plug in beside it:
+Extensions retain separate read/write RPCs while sharing the core durable outbox. The integrated core additionally implements shared sessions, speech/POI procedure and voting safeguards:
 
 | Layer | Core (Codex) | Extension (Claude) |
 | --- | --- | --- |
@@ -31,38 +31,38 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Flow.**
 
-1. Delegate writes the resolution in Google Docs and shares it **with edit access** with the committee's sharing address (e.g. `ga1@dcmun.org`, shown prominently on the page and the room sheet).
-2. Delegate scans the committee QR → `/submit/{token}` (public, mobile, no account) → country (main submitter), title, **Google Doc link**, ticks "I have shared this document" → Submit.
+1. Delegate writes the resolution in Google Docs and preferably chooses **Anyone with the link → Editor**. If school sharing rules prevent this, the form shows actual assigned Chair names and configured contact emails so the delegate can share directly. Do not invent committee mailboxes.
+2. Delegate scans the committee QR → `/submit/{token}` (public, mobile, no account) → country (main submitter), title, **Google Doc link**, ticks “I have made sure the Chairs can edit this document.” → Submit.
 3. The server validates the link and calls `public.submit_resolution`, which creates the resolution in the existing **Draft** state (with the Chair) plus a `resolution_links` record (working Google Doc id, submitted time) and notifies the committee's Chair.
 4. Chair Console → Documents → **Delegate submissions**: *Open Google Doc* · *Can't access* / *Access fixed* · optional *Approval-folder copy* link · **Submit to Approval** (the existing core `Draft → Submitted` transition).
 5. Approval Panel sees it in its inbox with *Open approval copy* (if recorded) and *Open working Google Doc*; the existing workflow continues (Review/Approved → Printed → In Debate → Closed).
 
 **Fallback.** "Can't use Google Docs? Upload a file instead" reveals a PDF/Word upload (≤ 4 MB, checked by extension and file signature). The file is stored in the private `resolutions` bucket first; the Draft is created only after the upload succeeds. Use for exceptional delegates, external documents, or when Google Docs is unavailable.
 
-**Google Doc links.** Accepted: `https://docs.google.com/document/d/<id>/…` (any suffix/query, `/u/<n>/` account paths, missing `https://`). Rejected with a plain explanation: other hosts and look-alikes (`docs.google.com.evil…`, `user@host` tricks, ports), non-HTTP(S) protocols (`javascript:`, `data:`), Drive file links, spreadsheets, "Publish to the web" links (`/d/e/…`, view-only), malformed ids. Only the document **id** (`[A-Za-z0-9_-]{25,100}`) is stored — the database checks the same pattern — and the URL is always rebuilt as `https://docs.google.com/document/d/<id>/edit`, so no user-supplied URL is ever rendered. Conference OS makes **no Google API calls**; delegates need no Google sign-in with Conference OS. Whether the Chair can open the document is recorded by the Chair (*Can't access*), not verified by Conference OS.
+**Google Doc links.** Accepted: `https://docs.google.com/document/d/<id>/…` (any suffix/query, `/u/<n>/` account paths, missing `https://`). Rejected with a plain explanation: other hosts and look-alikes (`docs.google.com.evil…`, `user@host` tricks, ports), non-HTTP(S) protocols (`javascript:`, `data:`), Drive file links, spreadsheets, "Publish to the web" links (`/d/e/…`, view-only), malformed ids. Only the document **id** (`[A-Za-z0-9_-]{25,100}`) is stored — the database checks the same pattern — and the URL is always rebuilt as `https://docs.google.com/document/d/<id>/edit`, so no arbitrary user-supplied URL is rendered. This currently drops rare legacy `resourcekey` query parameters; preserving those is a low-priority follow-up. Conference OS makes **no Google API calls**; delegates need no Google sign-in with Conference OS. Whether the Chair can open the document is recorded by the Chair (*Can't access*), not verified by Conference OS.
 
 **Approval (manual for now).** The Chair copies the Google Doc into the Approval Panel's Drive folder by hand and may paste that copy's link (optional). Drive automation (copy on *Submit to Approval*, PDF snapshot) is a later Claude integration and is not implemented.
 
 **Security model.**
 
-- One active link per committee (`public.submission_links`); the token is 128 bits of randomness. Possessing it lets someone register a resolution **for that committee only**; it cannot read anything. The page shows committee name, the sharing address and country names (no delegate names or emails).
+- One active link per committee (`public.submission_links`); the token is 128 bits of randomness. Possessing it lets someone register a resolution **for that committee only**; it grants no staff-table access. The server deliberately returns only the committee context, country choices and assigned Chair contact details needed for submission (no delegate names or emails).
 - The browser never talks to the database for submission. The server route uses `SUPABASE_SECRET_KEY` (server-only) to call two functions executable **only by `service_role`**: `submission_link_info` and `submit_resolution`. No `anon` grants or policies; core RLS unchanged.
 - Validation: Google Doc link as above **or** a PDF/DOCX/DOC file (never both), title 3–200 characters, submitter must be a delegate of that committee, a stored file must be inside that committee's folder.
 - Abuse limits: 20 accepted submissions per link per 10 minutes; the same Google Doc (or the same file, SHA-256) to the same committee returns the original reference.
-- Executive can change the **sharing address** (QR unchanged), **Replace** a leaked link (old QR stops working immediately) or **Turn off** online submission for a committee.
+- Executive manages actual Chair contact emails in staff records and committee assignments; changing contact metadata does not grant authentication or database access. Legacy `share_with` is temporary compatibility data, not the source of sharing instructions. Executive can **Replace** a leaked link (old QR stops working immediately) or **Turn off** online submission for a committee.
 - Pages under `/submit/` send `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`, `Cache-Control: private, no-store`, and do not open the staff workspace, device storage, a staff session or the service worker.
 
-**Reliability.** Each attempt carries a client UUID; a lost response is retried with the same UUID and returns the original reference (`replayed`). For the fallback, a failed upload creates nothing and a failed database step removes the uploaded object. Google Doc submissions keep working while Storage is down.
+**Reliability.** Each attempt carries a client UUID; a lost response is retried with the same UUID and returns the original reference (`replayed`). For the fallback, a failed upload creates no Draft. An ambiguous database response retains the uploaded bytes for recovery; cleanup occurs only after a confirmed duplicate with a different canonical storage key. Receipts bind the submitted payload, and retries with changed payloads are rejected. Google Doc submissions keep working while Storage is down.
 
-**What Supabase Storage is for.** Only uploaded fallback files (and, later, snapshots). It is never the authoritative resolution; the working Google Doc is. Path `{conference}/{committee}/{document}/{version}.{ext}`; staff with access to that committee (admin/chair/approval/logistics) read through a 10-minute signed URL (*Open uploaded file*).
+**What Supabase Storage is for.** Only uploaded fallback files (and, later, snapshots). It is never the authoritative resolution; the working Google Doc is. Path `{conference}/{committee}/{document}/{version}.{ext}`; staff read through a 10-minute signed URL only when the referenced document/version is visible to their role and lifecycle scope; unreferenced objects are not readable. Use *Open uploaded file*.
 
 **Data.** `public.resolution_links` (per resolution): `working_doc_id`, `approval_copy_doc_id`, `access` (`unchecked`/`ok`/`problem`), `submitted_at`. Chairs (own committee) and Executives update it with the `resolutionLink` extension command (`workingDoc`, `approvalCopy`, `access`) through the normal outbox. Chair-created resolutions can also be given a working Google Doc from the document preview.
 
 **Not built (by design).** No document parser, clause import, structured clause editor, text storage, automatic amendment editing, Drive copying or Google OAuth. Future amendment tracking (Codex) only needs "passed, not yet applied" / "applied to the working document" flags on top of this.
 
-**Local demo.** With `NEXT_PUBLIC_DATA_BACKEND=local` the route uses an in-memory demo backend (tokens `demo_<committee>_<hex>`, seed committees only, sharing address `<code>@dcmun.example`). Demo submissions do not appear in the browser's local demo workspace; the Chair panel can be exercised by linking a Google Doc to a demo resolution.
+**Local demo.** With `NEXT_PUBLIC_DATA_BACKEND=local` the route uses an in-memory demo backend (tokens `demo_<committee>_<hex>`, seed committees only, contact details derived from configured demo staff assignments). Demo submissions do not appear in the browser's local demo workspace; the Chair panel can be exercised by linking a Google Doc to a demo resolution.
 
-**Operator UI.** Executive → *Submission links* (create missing links with a `{code}@dcmun.org` sharing-address pattern, per-committee sharing address, copy, print sheet, replace, turn off). Chair Console → Documents → *Delegate submissions* and *Submission QR*. Printable A4 room sheet at `/submit/{token}/sheet`.
+**Operator UI.** Executive → *Submission links* (create missing links, view assigned Chair contacts, copy, print sheet, replace, turn off). Configure contact emails under *Chairs/Staff*. Chair Console → Documents → *Delegate submissions* and *Submission QR*. Printable A4 room sheet at `/submit/{token}/sheet`.
 
 ## Schedule import
 
@@ -77,7 +77,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Safety.** Lunch, breaks, coffee, registration, prayers, photos and ceremonies are shown but unticked; they are created only if ticked. Unknown committees, unreadable dates/times, end-before-start and missing names block confirmation until fixed or unticked. Duplicates (same committee and start time, or same name on the same day, already in the conference or twice in the import) are skipped and listed. One import creates at most 500 sessions in one atomic command; repeating an import creates nothing new. Times are entered and shown in conference time (`NEXT_PUBLIC_CONFERENCE_TIMEZONE`, default `Asia/Qatar`), independent of a device's own time zone.
 
-**Data.** `sessions."endsAt"` (nullable) is the only core schema addition. Imported sessions are `scheduled`; the core's session selection is unchanged. The `sessionImport` command runs through the normal outbox into `apply_operations_mutation`, which notifies each affected committee.
+**Data.** `sessions."endsAt"` (nullable) is the only core schema addition. Imported sessions are `scheduled`; Chairs explicitly set the shared `currentSessionId`. Schedule times never silently change the operational session. The `sessionImport` command runs through the normal outbox into `apply_operations_mutation`, which notifies each affected committee.
 
 ## School group photos and chair reminders
 
@@ -101,11 +101,13 @@ Acknowledging the warning hides it until the photo is due; "Delegates sent" hide
 
 **Import.** Executive → Group photos → *Import CSV*: `school,date,start_time,end_time,location[,note]`. School names are matched against existing schools after normalizing case, accents, punctuation, `&`/"and" and spacing (`"Doha College "` → Doha College). Near misses (`"Doha Collge"`) are offered as a suggestion that must be confirmed; unknown names must be chosen or the row unticked. Schools are never created by the import. Same school + start time as an existing slot is skipped.
 
-## CODEX REVIEW REQUIRED
+## Original shared-architecture review checklist (resolved by integration review)
+
+The table preserves the original review scope, with session decisions and migration paths updated. It is not a list of unreviewed changes. The additive Chair-contact migration `20261006073442_staff_chair_contacts` is applied to development; contact persistence and the service-only assigned-contact projection have been verified.
 
 | # | Item | Why it touches shared architecture | Risk / notes |
 | --- | --- | --- | --- |
-| 1 | `supabase/migrations/20261006090000_operations_extensions.sql` | New tables (`public.submission_links`, `public.resolution_links`, `private.resolution_submissions`), new functions, Storage bucket + `storage.objects` read policy | Additive only. No existing table/policy/function altered. All new tables have RLS; no `anon` grants. `submit_resolution` inserts into `documents` (status **Draft**), `document_versions` (placeholder text pointing to the Google Doc; `storageKey` only for fallback files) and `operational_changes` as definer — review against core invariants (code uniqueness, session choice). `resolution_links` has a composite FK to `documents(id, conference_id, committee_id)`. |
+| 1 | `supabase/migrations/20261006023101_operations_extensions.sql` | New tables (`public.submission_links`, `public.resolution_links`, `private.resolution_submissions`), new functions, Storage bucket + `storage.objects` read policy | Additive only. No existing table/policy/function altered. All new tables have RLS; no `anon` grants. `submit_resolution` inserts into `documents` (status **Draft**), `document_versions` (placeholder text pointing to the Google Doc; `storageKey` only for fallback files) and `operational_changes` as definer — review against core invariants (code uniqueness, session choice). `resolution_links` has a composite FK to `documents(id, conference_id, committee_id)`. |
 | 2 | `lib/domain.ts` — `ConferenceData extends OperationsData` | Shared domain type | Optional fields only. |
 | 3 | `lib/commands.ts` — `OperationsCommand` in `Command`, `operationsRoles` in `allowed`, `default:` delegation | Shared command model | Core cases untouched. Audit label for extension commands uses the existing generic `"<type> updated"`. |
 | 4 | `lib/supabase/repository.ts` — parallel `operations_snapshot` read, RPC routing in `send` | Repository/transport contract | Two RPCs per read instead of one (the second is small). Missing function tolerated. |
@@ -114,9 +116,13 @@ Acknowledging the warning hides it until the photo is due; "Delegates sent" hide
 | 7 | `components/documents.tsx` — preview caption | Existing document UI | Replaced the "text preview only" caption with `ResolutionSources`: *Open working Google Doc*, *Open approval copy*, *Open uploaded file*, or (Chair) *Link Google Doc*. The paper text preview is unchanged. |
 | 8a | Delegate submissions enter **Draft** (not Submitted) | Core workflow semantics | Matches the real DCMUN process: Chair reviews, copies to the Approval folder, then uses the existing Chair `Draft → Submitted` transition ("Submit to Approval"). No new states. |
 | 8b | `components/workspace.tsx` — `DelegateSubmissions` panel on Chair → Documents | Existing Chair UI | Additive panel above the existing documents list; only shown when delegate submissions are waiting. |
-| 8 | Session chosen for a delegate submission | Core session semantics | `submit_resolution` picks: active session → latest started → first scheduled. When Codex adds "Chair sets current session", switch this to that value. |
-| 9 | `supabase/migrations/20261006100000_session_schedule_import.sql` — `public.sessions."endsAt"` + check constraint + `(committee_id, "startsAt")` index | Core table column | Nullable; existing commands and snapshot unaffected (snapshot serializes all columns). Also refactors Claude's own `apply_operations_mutation` into per-command handlers. |
+| 8 | Session chosen for a delegate submission | Core session semantics | `submit_resolution` uses the authoritative committee current session, which may be null. Starting debate requires an explicit current session; there is no date-based fallback. |
+| 9 | `supabase/migrations/20261006023104_session_schedule_import.sql` — `public.sessions."endsAt"` + check constraint + `(committee_id, "startsAt")` index | Core table column | Nullable; existing commands and snapshot unaffected (snapshot serializes all columns). Also refactors Claude's own `apply_operations_mutation` into per-command handlers. |
 | 10 | `lib/domain.ts` — `Session.endsAt?` | Shared domain type | Optional. |
-| 11 | Imported sessions and the Chair's "current session" | Chair/session state (Codex backlog item) | Imported sessions are `scheduled`. The Workspace still defaults to an `active` session or the first session; Codex's planned "Chair sets current session" should consider `startsAt`/`endsAt` for its default. |
-| 12 | `supabase/migrations/20261006110000_photo_schedule.sql` | New staff-readable tables (`photo_slots`: all staff roles incl. committee-scoped chairs; `photo_acknowledgements`: admin + that committee's chair) and a replacement of Claude's `operations_snapshot` / `apply_operations_mutation` | No core table changes. Chairs can read every photo slot (school, time, location) — not personal data, needed to derive reminders. |
+| 11 | Imported sessions and the Chair's "current session" | Shared Chair/session state | Imported sessions are `scheduled`. The Chair explicitly selects the authoritative shared current session; timestamps may suggest a choice but never override it. |
+| 12 | `supabase/migrations/20261006023106_photo_schedule.sql` | New staff-readable tables (`photo_slots`: all staff roles incl. committee-scoped chairs; `photo_acknowledgements`: admin + that committee's chair) and a replacement of Claude's `operations_snapshot` / `apply_operations_mutation` | No core table changes. Chairs can read every photo slot (school, time, location) — not personal data, needed to derive reminders. |
 | 13 | `public/sw.js` — `/chair/photos` added to the offline shell, cache version bumped to `conference-os-0.2.1` | Offline architecture | One extra shell path; old cache is replaced on activation as before. |
+
+## Rehearsal boundary
+
+MUNOS is staff-only. Public submission routes create no Supabase Auth session. Rehearse staff-app reads/writes/reconnect and device enrollment separately from delegate QR-form HTTP bursts. The recorded 150-client staff load reused one authorized identity and does not test QR submission capacity. Real HTTP submission and fallback upload verification require the server-only development secret; direct SQL submission tests are not a substitute. Future Drive automation credentials are separate from human Chair contacts.

@@ -9,9 +9,10 @@ class RepositoryController {
  private active?:DurableRepository;
  private listeners=new Set<()=>void>();
  private starting=false;
+ private blockedReason="";
  private health:Health={mode:'local',state:'syncing',pending:0,conflicts:0,realtime:false,latency:null,message:'Opening conference…',detail:''};
  getSnapshot=()=>this.active?.getSnapshot()??null;
- getHealth=()=>this.active?.getHealth()??this.health;
+ getHealth=()=>this.health;
  subscribe=(f:()=>void)=>{this.listeners.add(f);return()=>{this.listeners.delete(f);};};
  private emit=()=>this.listeners.forEach(f=>f());
  initialize=()=>{if(!this.starting){this.starting=true;void this.start().catch(()=>{this.health={...this.health,state:"error",message:"Device storage could not open. Enable browser storage and reload."};this.emit();});}};
@@ -22,9 +23,12 @@ class RepositoryController {
    if(process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase'){
     const client=browserClient();const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
     const pointer=await store.readPreferences(`last-authorized:${conf}`);
-    if(!navigator.onLine && pointer && Number(pointer.validUntil)>Date.now()){
+    if(!navigator.onLine && pointer){
       const cached=await store.read(pointer.key);
-      if(cached)this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId));
+      if(cached){
+        this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId,[],Number(pointer.validUntil)<=Date.now()));
+        if(Number(pointer.validUntil)<=Date.now())this.blockedReason="Reconnect to renew device access. Saved changes remain available for recovery.";
+      }
     }
     if(!this.active){
     let {data:{session}}=await client.auth.getSession();
@@ -50,17 +54,32 @@ class RepositoryController {
     this.active=new SupabaseConferenceRepository(key,initial,store,transport);
     }
    }
-  }catch(error){reason=error instanceof Error?error.message:'The cloud conference is unavailable or access has not been granted.';}
+   }catch(error){
+    reason=error instanceof Error?error.message:'The cloud conference is unavailable or access has not been granted.';
+    const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID;
+    const pointer=conf?await store.readPreferences(`last-authorized:${conf}`):undefined;
+    const cached=pointer?await store.read(pointer.key):undefined;
+    if(pointer && cached && conf){
+      this.blockedReason='Reconnect or ask an administrator to restore device access. Your saved conference and outstanding changes are retained.';
+      this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(browserClient(),conf,pointer.actorId,[],true));
+      this.active.health={...this.active.health,detail:reason};
+    }
+  }
+  if(!this.active && process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase') this.blockedReason='Conference access is unavailable. This device cannot record changes until access is restored.';
   if(!this.active)this.active=new DurableRepository('local-demo',()=>{
    const saved=localStorage.getItem('conference-os-demo-v2');
    return saved?JSON.parse(saved):createSeed();
   },store,undefined,reason);
-  this.active.subscribe(this.emit);
+  this.active.subscribe(()=>{
+    const next=this.active!.getHealth();
+    this.health=this.blockedReason?{...next,state:'error',message:this.blockedReason}:next;
+    this.emit();
+  });
   try {await this.active.ready();}catch{this.health={...this.health,state:'error',message:'Device storage is unavailable. Enable browser storage before recording changes.'};this.active=undefined;this.emit();}
  }
- execute=(c:Command,r:Role)=>{if(!this.active) return Promise.reject(Error('Workspace is loading.'));return this.active.execute(c,r);};
+ execute=(c:Command,r:Role)=>{if(this.blockedReason)return Promise.reject(Error(this.blockedReason));if(!this.active) return Promise.reject(Error('Workspace is loading.'));return this.active.execute(c,r);};
  reset=()=>this.active?.reset();
- retry=()=>{if(this.active?.health.mode==='local' && process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase') window.location.reload();else this.active?.retry();};
+ retry=()=>{if(this.blockedReason || (this.active?.health.mode==='local' && process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase')) window.location.reload();else this.active?.retry();};
  exportRecovery=()=>this.active?.exportRecovery();
  getPending=()=>this.active?.getPending()??[];
  resolveConflict=(id:string)=>this.active?.resolveConflict(id);

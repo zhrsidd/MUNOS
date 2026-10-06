@@ -1,3 +1,4 @@
+import type { DebateState, Speech, PoiEntry, Lane, SpeechKind } from "./procedure/types";
 export type ID = string;
 export type Role = "chair" | "approval" | "logistics" | "admin";
 export type AttendanceStatus = "Present" | "Present & Voting" | "Absent";
@@ -25,6 +26,10 @@ export interface ScoringDefinition {
   values: number[];
 }
 export interface Committee {
+  currentSessionId?: ID | null;
+  sessionRevision?: number;
+  vetoEnabled?: boolean;
+  vetoDelegateIds?: ID[];
   votingRule?: "simple_majority" | "two_thirds";
   id: ID;
   conferenceId: ID;
@@ -47,6 +52,9 @@ export interface Delegate {
   email: string;
 }
 export interface Staff {
+  /** Directory contact, not an authentication identity. Published only for assigned Chairs. */
+  email?: string | null;
+  contactRevision?: number;
   id: ID;
   name: string;
   role: Role;
@@ -94,10 +102,13 @@ export interface DocumentVersion {
   text: string;
 }
 export interface Resolution {
+  voteMode?: "normal" | "divide";
+  voteType?: "substantive" | "procedural";
+  vetoedBy?: ID[];
   revision?: number;
   id: ID;
   committeeId: ID;
-  sessionId: ID;
+  sessionId: ID | null;
   code: string;
   title: string;
   submitterId: ID;
@@ -108,6 +119,9 @@ export interface Resolution {
   comments: { id: ID; text: string; authorId: ID; createdAt: string }[];
 }
 export interface ParticipationEvent {
+  speechId?: ID;
+  classification?: SpeechKind;
+  yieldedFrom?: ID | null;
   revision?: number;
   id: ID;
   delegateId: ID;
@@ -121,6 +135,7 @@ export interface ParticipationEvent {
   updatedAt?: string;
 }
 export interface SpeakerQueueEntry {
+  lane?: Lane;
   id: ID;
   delegateId: ID;
   sessionId: ID;
@@ -166,6 +181,9 @@ export interface TimerState {
 import type { OperationsData } from "./operations/types";
 // CODEX REVIEW REQUIRED: OperationsData adds optional, extension-owned fields only.
 export interface ConferenceData extends OperationsData {
+  debateStates?: DebateState[];
+  speeches?: Speech[];
+  poiQueue?: PoiEntry[];
   conference: Conference;
   committees: Committee[];
   schools: School[];

@@ -1,3 +1,5 @@
+import {applyProcedure} from "./procedure/commands";
+import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
 import {
   AttendanceStatus,
   ConferenceData,
@@ -10,6 +12,7 @@ import { applyOperationsCommand, isOperationsCommand, operationsRoles, type Oper
 // delegated to lib/operations; core command handling is unchanged.
 export type Command =
   | OperationsCommand
+  | ProcedureCommand
   | {
       type: "attendance";
       delegateId: string;
@@ -98,7 +101,8 @@ export type Command =
     }
   | { type: "session"; committeeId: string; name: string }
   | { type: "school"; name: string }
-  | { type: "staff"; name: string; role: Role; committeeIds: string[] };
+  | { type: "staff"; name: string; role: Role; committeeIds: string[]; email?: string }
+  | { type: "staffContact"; id: string; email: string };
 export interface ConferenceRepository {
   getSnapshot(): ConferenceData | null;
   subscribe(listener: () => void): () => void;
@@ -112,7 +116,7 @@ export function participationSummary(data: ConferenceData, delegateId: string) {
     (e) => e.delegateId === delegateId && !e.voidedAt,
   );
   return {
-    opportunities: events.length,
+    opportunities: events.filter(e=>e.categoryId!=="submitter").length,
     points: events.reduce((n, e) => n + e.points, 0),
     speeches: events.filter((e) => e.categoryId === "speech").length,
   };
@@ -163,7 +167,9 @@ const allowed: Record<Command["type"], Role[]> = {
   session: ["admin"],
   school: ["admin"],
   staff: ["admin"],
+  staffContact: ["admin"],
   ...operationsRoles,
+  currentSession:["chair"], debateMode:["chair"], queueAdd:["chair"], queueOrder:["chair"], queueRemove:["chair"], speechStart:["chair"], speechYield:["chair"], speechScore:["chair"], speechFinish:["chair"], poiAllowance:["chair"], poiAdd:["chair"], poiOrder:["chair"], poiRecognize:["chair"], voteMode:["chair"], vetoRules:["admin"],
 };
 export function applyCommand(
   previous: ConferenceData,
@@ -230,6 +236,7 @@ export function applyCommand(
       break;
     }
     case "participation": {
+      if(c.categoryId==="submitter" && (!c.resolutionId || d.documents.find(r=>r.id===c.resolutionId)?.submitterId!==c.delegateId || d.events.some(e=>e.categoryId==="submitter" && e.resolutionId===c.resolutionId))) throw Error("Main Submitter credit requires a resolution and may only be recorded once.");
       const definition =
         d.committees
           .find(
@@ -326,8 +333,10 @@ export function applyCommand(
         if(!eligible.length || ballots.length!==eligible.length)throw Error('Record every eligible ballot before closing.');
         if(c.outcome!==votingOutcome(d,r.id))throw Error('Outcome differs from configured voting rule.');
       }
+      if(c.status==="In Debate") {const current=d.committees.find(x=>x.id===r.committeeId)?.currentSessionId;if(current)r.sessionId=current;}
       r.status = c.status;
       r.outcome = c.outcome;
+      if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
       if (c.comment)
         r.comments.push({
           id: nextId(),
@@ -426,6 +435,7 @@ export function applyCommand(
       const a = d.attendance.find(
         (a) => a.delegateId === c.delegateId && a.sessionId === c.sessionId,
       );
+      if(c.choice==="Abstain" && d.documents.find(r=>r.id===c.resolutionId)?.voteMode==="divide") throw Error("Divide the House does not permit abstentions.");
       if (
         !a ||
         a.status === "Absent" ||
@@ -523,37 +533,7 @@ export function applyCommand(
       } else d.scoring.find((s) => s.id === c.id)!.values = c.values;
       break;
     }
-    case "criterion": {
-      const criterion = d.criteria.find((x) => x.id === c.id);
-      if (criterion)
-        Object.assign(criterion, {
-          name: c.name,
-          description: c.description,
-          max: c.max,
-        });
-      break;
-    }
-    case "award": {
-      const criterion = d.criteria.find((x) => x.id === c.criterionId);
-      if (!criterion || c.score < 0 || c.score > criterion.max)
-        throw Error("Score outside criterion range.");
-      d.awardScores
-        .filter((s) => s.delegateId === c.delegateId)
-        .forEach((s) => (s.notes = c.notes));
-      d.awardScores = d.awardScores.filter(
-        (s) =>
-          !(s.delegateId === c.delegateId && s.criterionId === c.criterionId),
-      );
-      d.awardScores.push({
-        id: nextId(),
-        delegateId: c.delegateId,
-        criterionId: c.criterionId,
-        score: c.score,
-        notes: c.notes,
-        chairId: metadata?.actorId ?? "chair-demo",
-      });
-      break;
-    }
+    case "criterion": case "award": throw Error("Award rubrics have been retired. Awards remain Chair judgement.");
     case "session":
       d.sessions.push({
         id: nextId(),
@@ -566,18 +546,28 @@ export function applyCommand(
     case "school":
       d.schools.push({ id: nextId(), name: c.name });
       break;
+    case "staffContact": {
+      const staff = d.staff.find(s=>s.id===c.id);
+      if (!staff) throw Error("Staff member unavailable");
+      staff.email = cleanStaffEmail(c.email);
+      staff.contactRevision = (staff.contactRevision ?? 1) + 1;
+      break;
+    }
     case "staff":
       d.staff.push({
         id: nextId(),
         name: c.name,
+        email: cleanStaffEmail(c.email ?? ""),
+        contactRevision: 1,
         role: c.role,
         committeeIds: c.committeeIds,
       });
       break;
     default:
-      if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
+      if (isProcedureCommand(c)) applyProcedure(d,c,nextId,now,metadata?.actorId ?? "chair-demo");
+      else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
   }
-  d.audit.unshift({
+  if (!["queue","queueAdd","queueOrder","queueRemove","poiAdd","poiOrder","poiAllowance","debateMode"].includes(c.type)) d.audit.unshift({
     id: nextId(),
     actorId: metadata?.actorId ?? `${role}-demo`,
     action:
@@ -600,6 +590,7 @@ export function applyCommand(
 export function votingOutcome(data: ConferenceData, resolutionId: string): "Passed" | "Failed" {
  const resolution=data.documents.find(r=>r.id===resolutionId);
  const votes=data.votes.filter(v=>v.resolutionId===resolutionId && v.sessionId===resolution?.sessionId);
+ if(vetoDelegates(data,resolutionId).length)return "Failed";
  const yes=votes.filter(v=>v.choice==='For').length, no=votes.filter(v=>v.choice==='Against').length;
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
  return yes+no>0 && (rule==='two_thirds'?yes*3>=(yes+no)*2:yes>no)?'Passed':'Failed';
@@ -607,4 +598,17 @@ export function votingOutcome(data: ConferenceData, resolutionId: string): "Pass
 export function effectiveScoring(data: ConferenceData, committeeId: string) {
  const overrides=data.committees.find(c=>c.id===committeeId)?.scoringOverrides;
  return data.scoring.map(s=>overrides?.find(o=>o.id===s.id)??s);
+}
+
+export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
+ const r=data.documents.find(r=>r.id===resolutionId); if(!r)return []; if(r.status==="Closed")return r.vetoedBy??[];
+ const c=data.committees.find(c=>c.id===r.committeeId);
+ if(!c?.vetoEnabled || r.voteType==="procedural")return [];
+ return data.votes.filter(v=>v.resolutionId===r.id && v.sessionId===r.sessionId && v.choice==="Against" && c.vetoDelegateIds?.includes(v.delegateId) && data.attendance.some(a=>a.delegateId===v.delegateId&&a.sessionId===v.sessionId&&a.status!=="Absent")).map(v=>v.delegateId);
+}
+
+function cleanStaffEmail(value: string): string | null {
+  const email=value.trim();
+  if (email && (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw Error("Enter a valid contact email");
+  return email || null;
 }

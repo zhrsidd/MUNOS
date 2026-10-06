@@ -321,5 +321,5 @@ test("CSV handles quoted cells, duplicate validation, and atomic rejection", () 
       ),
     /duplicate/,
   );
-  assert.equal(data.delegates.length, 16);
+  assert.equal(data.delegates.length, createSeed().delegates.length);
 });

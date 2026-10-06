@@ -4,7 +4,7 @@ import { SubmissionRejected, type SubmissionBackend } from "./service";
 // SERVER ONLY. Uses SUPABASE_SECRET_KEY, which must never reach the browser. It is used for exactly
 // three things: resolve a submission link, store a fallback file in the private "resolutions" bucket,
 // and call public.submit_resolution (all executable only by service_role). Google Docs are never fetched.
-const known: SubmissionError[] = ["invalid_link", "invalid_submitter", "invalid_title", "invalid_google_doc", "rate_limited", "no_session"];
+const known: SubmissionError[] = ["invalid_link", "invalid_submitter", "invalid_title", "invalid_google_doc", "rate_limited", "no_session", "idempotency_conflict"];
 export function supabaseSubmissionBackend(url: string, secret: string): SubmissionBackend {
   const client = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
   const bucket = client.storage.from("resolutions");
@@ -33,7 +33,7 @@ export function supabaseSubmissionBackend(url: string, secret: string): Submissi
         if (reason) throw new SubmissionRejected(reason);
         throw error;
       }
-      return data as { status: "created" | "duplicate" | "replayed"; code: string };
+      return data as { status: "created" | "duplicate" | "replayed"; code: string; storageKey?: string | null };
     },
   };
 }

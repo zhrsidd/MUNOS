@@ -7,7 +7,7 @@ import { Role } from "@/lib/domain";
 import { Icon, Chip, Timer } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { StatusStrip, SystemHealth, SyncStatus } from "./health";
+import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { ScheduleImport } from "./operations/schedule-import";
@@ -29,13 +29,13 @@ const roles: { id: Role; name: string; description: string; icon: string }[] = [
   },
   {
     id: "logistics",
-    name: "Logistics",
+    name: "Admins",
     description: "The right document, printed at the right time.",
     icon: "print",
   },
   {
     id: "admin",
-    name: "Administrator",
+    name: "Executive",
     description: "Set up the conference. Keep the day running.",
     icon: "settings",
   },
@@ -47,7 +47,7 @@ const chairNav = [
   ["documents", "Documents", "documents"],
   ["voting", "Voting", "voting"],
   ["photos", "Group photos", "clock"],
-  ["awards", "Award notes", "awards"],
+  ["awards", "Award discussion", "awards"],
 ];
 const adminNav = [
   ["", "Overview", "admin"],
@@ -60,7 +60,6 @@ const adminNav = [
   ["photos", "Group photos", "clock"],
   ["staff", "Chairs & staff", "review"],
   ["scoring", "Scoring", "log"],
-  ["awards", "Award criteria", "awards"],
   ["workflow", "Workflow & features", "settings"],
   ["submissions", "Submission links", "documents"],
   ["resources", "Resources & Drive", "documents"],
@@ -72,24 +71,18 @@ export function Workspace({ path }: { path: string }) {
     data,
     committeeId: requestedCommitteeId,
     setCommitteeId,
-    selectedSessionId,
-    setSelectedSessionId,
+    act,
   } = useConference();
+  const [now] = useState(()=>Date.now());
   const [menu, setMenu] = useState(false);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
   const committee =
     data.committees.find((c) => c.id === requestedCommitteeId) ||
-    data.committees[0];
+    data.committees.find(c=>c.code === "GA1") || data.committees[0];
   const committeeId = committee?.id ?? "";
-  const session =
-    data.sessions.find(
-      (s) => s.id === selectedSessionId && s.committeeId === committeeId,
-    ) ||
-    data.sessions.find(
-      (s) => s.committeeId === committeeId && s.state === "active",
-    ) ||
-    data.sessions.find((s) => s.committeeId === committeeId);
+  const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId);
+  const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
   const current = data.documents.find(
     (d) => d.committeeId === committeeId && d.status === "In Debate",
   );
@@ -289,15 +282,16 @@ export function Workspace({ path }: { path: string }) {
           {role === "chair" && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
           {role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId).length >
-              1 && (
+              0 && (
               <div className="session-selector">
                 <label>
-                  Working session
+                  Current session
                   <select
-                    aria-label="Working session"
+                    aria-label="Current session"
                     value={session?.id || ""}
-                    onChange={(e) => setSelectedSessionId(e.target.value)}
+                    onChange={(e) => {if(e.target.value) void act({type:"currentSession",committeeId,sessionId:e.target.value},"chair");}}
                   >
+                    <option value="">Select current session{suggestedSession?` · suggested ${suggestedSession.name}`:""}</option>
                     {data.sessions
                       .filter((s) => s.committeeId === committeeId)
                       .map((s) => (
@@ -341,7 +335,7 @@ export function Workspace({ path }: { path: string }) {
         <footer className="workspace-footer">
           Conference OS{" "}
           <span>
-            Illustrative DCMUN-inspired data · External services not connected
+            Illustrative DCMUN-inspired data · <DataModeLabel />
           </span>
         </footer>
       </div>

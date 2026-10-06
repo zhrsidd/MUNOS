@@ -233,3 +233,8 @@ export function StatusStrip() {
     </div>
   );
 }
+
+export function DataModeLabel(){
+ const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
+ return <span>{h.mode==='supabase'?'Supabase development':'Local demo'}</span>;
+}
