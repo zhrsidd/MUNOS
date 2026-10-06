@@ -1,5 +1,5 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
-import type {ConferenceData} from '../domain';
+import type {ConferenceData,Role} from '../domain';
 import {ConflictError,DurableRepository,type Transport} from '../sync/repository';
 import {DurableStore,type Mutation} from '../sync/store';
 import {isOperationsCommand} from '../operations/commands';
@@ -8,7 +8,7 @@ import type {OperationsData} from '../operations/types';
 // and send() routes extension commands to apply_operations_mutation. Same idempotency contract.
 const missingFunction=(e:{code?:string})=>e.code==='PGRST202'||e.code==='42883';
 export class SupabaseTransport implements Transport {
- constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false){ }
+ constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false,private authenticatedRoles:readonly Role[]=[]){ }
  async read():Promise<ConferenceData>{
   if(this.recoveryOnly)throw Error("Renew device access before syncing.");
   const [core,operations]=await Promise.all([this.client.rpc('conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
@@ -40,8 +40,13 @@ export class SupabaseTransport implements Transport {
   const scopes=this.committeeIds.length?this.committeeIds.map(id=>`committee_id=eq.${id}`):[`conference_id=eq.${this.conferenceId}`];
   const connected=new Set<string>();
   const channels=scopes.map((filter,i)=>this.client.channel(`operations:${this.conferenceId}:${this.actorId}:${i}`)
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'operational_changes',filter},changed)
-   .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);changed();}else connected.delete(filter);state(connected.size===scopes.length);}));
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:'operational_changes',filter},payload=>{
+    // These roles consume document/configuration changes, not Chair-only activity.
+    // Unknown or broader grants keep all notifications; this is not authorization.
+    if(payload.new.topic==='chair' && this.authenticatedRoles.length>0 && this.authenticatedRoles.every(role=>role==='approval'||role==='logistics'))return;
+    changed();
+   })
+   .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);}else connected.delete(filter);state(connected.size===scopes.length);}));
   return ()=>{clearTimeout(debounce);channels.forEach(c=>{void this.client.removeChannel(c);});};
  }
 }
