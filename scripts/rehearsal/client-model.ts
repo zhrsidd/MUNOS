@@ -6,7 +6,8 @@
 //  * One flush in flight per device. Any trigger while `flushing` is true returns immediately and is NOT queued
 //    or replayed — no dirty flag, no follow-up refresh. [flush(): `if (!this.transport || this.flushing) return;`]
 //  * Triggers: initial open [ready() → flush()], a write [execute() → flush()], a Realtime notification
-//    [transport.subscribe(this.retry) debounced 350 ms, reset on every event], window focus [addEventListener("focus",
+//    [transport.subscribe(this.retry) debounced 350 ms, reset on every event; Executive-only Chair events use PR #10's
+//    fixed 2 s window — see notify()], window focus [addEventListener("focus",
 //    this.retry)], and the recovery timer [schedule() after every flush].
 //  * Flush body (PR #9): for each pending item in order — send, then one full read-back, then the item is removed.
 //    The final full read runs only when no read-back happened in this flush (empty-outbox recovery/poll) or a
@@ -31,6 +32,12 @@
 export type RefreshSource = "open" | "postWrite" | "realtime" | "periodic" | "refocus";
 export const REFRESH_SOURCES: RefreshSource[] = ["open", "postWrite", "realtime", "periodic", "refocus"];
 export const REALTIME_DEBOUNCE_MS = 350;
+/** Core PR #10: fixed Chair-topic window for a device whose ONLY grant is Executive/Admin. */
+export const EXECUTIVE_CHAIR_WINDOW_MS = 2_000;
+export interface RealtimeOptions {
+  /** Executive/Admin-only identity with PR #10 behaviour: 'chair' events use a fixed window (0 = plain debounce). */
+  executiveChairWindowMs?: number;
+}
 export const RECOVERY_MS = 60_000;
 export interface Clock {
   now(): number;
@@ -47,6 +54,10 @@ export interface ClientIO<W> {
 }
 const zero = () => Object.fromEntries(REFRESH_SOURCES.map((s) => [s, 0])) as Record<RefreshSource, number>;
 export interface ClientStats {
+  /** Realtime events delivered to this device, chair-topic windows started, chair events absorbed by a pending timer. */
+  realtimeEvents: number;
+  chairWindows: number;
+  chairEventsCoalesced: number;
   attempted: Record<RefreshSource, number>;
   dropped: Record<RefreshSource, number>;
   reads: Record<RefreshSource, number>;
@@ -63,20 +74,37 @@ export class SimClient<W> {
   private debounce?: unknown;
   private closed = false;
   private readsInFlight = 0;
-  readonly stats: ClientStats = { attempted: zero(), dropped: zero(), reads: zero(), failedReads: 0, sendFailures: 0, conflicts: 0, maxConcurrentReads: 0 };
+  private chairWindow?: unknown;
+  readonly stats: ClientStats = { realtimeEvents: 0, chairWindows: 0, chairEventsCoalesced: 0, attempted: zero(), dropped: zero(), reads: zero(), failedReads: 0, sendFailures: 0, conflicts: 0, maxConcurrentReads: 0 };
   /** Resolves whenever the current flush (if any) finishes. */
   private idle: Promise<void> = Promise.resolve();
-  constructor(private io: ClientIO<W>, private clock: Clock) {}
+  constructor(private io: ClientIO<W>, private clock: Clock, private realtime: RealtimeOptions = {}) {}
   get busy() { return this.flushing; }
   get pending() { return this.outbox.length; }
   open() { this.trigger("open"); }
   /** execute(): the write is stored in the outbox first, then flush() is attempted. */
   execute(item: W) { if (this.closed) return; this.outbox.push(item); this.trigger("postWrite"); }
-  /** Realtime INSERT on operational_changes: trailing 350 ms debounce, reset by every event. */
-  notify() {
+  /**
+   * Realtime INSERT on operational_changes (lib/supabase/repository.ts subscribe()).
+   *  * Default: trailing 350 ms debounce, reset by every event.
+   *  * Executive/Admin-only identity (PR #10), topic 'chair': if the fast debounce or a Chair window is already pending,
+   *    the event is absorbed; otherwise a FIXED 2 s window starts (later Chair events never extend it) and one refresh
+   *    trigger fires at expiry. Any non-Chair event cancels a pending Chair window and (re)starts the 350 ms debounce,
+   *    because that full read also reconciles Chair state.
+   */
+  notify(topic?: string) {
     if (this.closed) return;
+    this.stats.realtimeEvents++;
+    const windowMs = this.realtime.executiveChairWindowMs ?? 0;
+    if (windowMs > 0 && topic === "chair") {
+      if (this.debounce !== undefined || this.chairWindow !== undefined) { this.stats.chairEventsCoalesced++; return; }
+      this.stats.chairWindows++;
+      this.chairWindow = this.clock.setTimeout(() => { this.chairWindow = undefined; this.trigger("realtime"); }, windowMs);
+      return;
+    }
+    this.clock.clearTimeout(this.chairWindow); this.chairWindow = undefined;
     this.clock.clearTimeout(this.debounce);
-    this.debounce = this.clock.setTimeout(() => this.trigger("realtime"), REALTIME_DEBOUNCE_MS);
+    this.debounce = this.clock.setTimeout(() => { this.debounce = undefined; this.trigger("realtime"); }, REALTIME_DEBOUNCE_MS);
   }
   focus() { this.trigger("refocus"); }
   trigger(source: RefreshSource) {
@@ -86,7 +114,7 @@ export class SimClient<W> {
     this.idle = this.flush(source);
   }
   /** Stop timers and ignore further triggers; resolves after any in-flight flush. */
-  async close() { this.closed = true; this.clock.clearTimeout(this.timer); this.clock.clearTimeout(this.debounce); await this.idle; }
+  async close() { this.closed = true; this.clock.clearTimeout(this.timer); this.clock.clearTimeout(this.debounce); this.clock.clearTimeout(this.chairWindow); await this.idle; }
   async settled() { await this.idle; }
   private async read(source: RefreshSource) {
     this.stats.reads[source]++;
@@ -123,9 +151,10 @@ export class SimClient<W> {
   }
 }
 export function sumStats(list: ClientStats[]) {
-  const total = { attempted: zero(), dropped: zero(), reads: zero(), failedReads: 0, sendFailures: 0, conflicts: 0, maxConcurrentReads: 0 };
+  const total = { realtimeEvents: 0, chairWindows: 0, chairEventsCoalesced: 0, attempted: zero(), dropped: zero(), reads: zero(), failedReads: 0, sendFailures: 0, conflicts: 0, maxConcurrentReads: 0 };
   for (const s of list) {
     for (const k of REFRESH_SOURCES) { total.attempted[k] += s.attempted[k]; total.dropped[k] += s.dropped[k]; total.reads[k] += s.reads[k]; }
+    total.realtimeEvents += s.realtimeEvents; total.chairWindows += s.chairWindows; total.chairEventsCoalesced += s.chairEventsCoalesced;
     total.failedReads += s.failedReads; total.sendFailures += s.sendFailures; total.conflicts += s.conflicts;
     total.maxConcurrentReads = Math.max(total.maxConcurrentReads, s.maxConcurrentReads);
   }

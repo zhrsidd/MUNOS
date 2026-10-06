@@ -12,6 +12,8 @@ export interface EstimateOptions {
   /** Server commit → Realtime delivery to subscribed devices. */
   realtimeMs?: number;
   model: RealtimeModel;
+  /** PR #10 fixed Chair-topic window for Executive/Admin-only devices (topic-aware only; 0 = plain debounce). */
+  executiveChairWindowMs?: number;
   seed?: number;
 }
 interface Item { user: SimUser; step: Step }
@@ -54,6 +56,7 @@ export function estimate(users: SimUser[], o: EstimateOptions) {
   const readsByRole: Record<string, number> = {};
   const readsBySourceRole: Record<string, Record<RefreshSource, number>> = {};
   for (const user of staff) {
+    const windowMs = user.role === "executive" && o.model === "topic-aware" ? (o.executiveChairWindowMs ?? 0) : 0;
     clients.set(user, new SimClient<Item>({
       isConflict: () => false,
       read: async (source) => { readsByRole[user.role] = (readsByRole[user.role] ?? 0) + 1; (readsBySourceRole[user.role] ??= { open: 0, postWrite: 0, realtime: 0, periodic: 0, refocus: 0 })[source]++; await clock.sleep(o.readMs); },
@@ -62,9 +65,9 @@ export function estimate(users: SimUser[], o: EstimateOptions) {
         writes++;
         const topic = TOPIC_OF[item.step.action];
         if (!topic) return; // e.g. timer: no operational change, no Realtime fan-out
-        for (const r of recipients(o.model, staff, { topic, committee: item.user.committee })) clock.setTimeout(() => clients.get(r)!.notify(), o.realtimeMs ?? 100);
+        for (const r of recipients(o.model, staff, { topic, committee: item.user.committee })) clock.setTimeout(() => clients.get(r)!.notify(topic), o.realtimeMs ?? 100);
       },
-    }, clock));
+    }, clock, { executiveChairWindowMs: windowMs }));
   }
   for (const user of staff) for (const step of user.steps) clock.setTimeout(() => {
     const client = clients.get(user)!;
@@ -76,14 +79,16 @@ export function estimate(users: SimUser[], o: EstimateOptions) {
   return clock.run(end).then(() => {
     const total = sumStats([...clients.values()].map((c) => c.stats));
     const pendingAtEnd = [...clients.values()].reduce((n, c) => n + c.pending, 0);
+    const exec = sumStats([...clients.entries()].filter(([u]) => u.role === "executive").map(([, c]) => c.stats));
     return {
-      model: o.model, readMs: o.readMs, sendMs: o.sendMs, minutes: o.minutes,
+      model: o.model, executiveChairWindowMs: o.model === "topic-aware" ? (o.executiveChairWindowMs ?? 0) : 0, readMs: o.readMs, sendMs: o.sendMs, minutes: o.minutes,
       writes, pendingAtEnd,
       refreshes: total.refreshesExecuted, snapshotRpcCalls: total.refreshesExecuted * 2,
       readsPerWrite: writes ? Number((total.refreshesExecuted / writes).toFixed(1)) : 0,
       triggersAttempted: total.triggersAttempted, triggersDropped: total.triggersDropped,
       bySource: total.reads, droppedBySource: total.dropped, byRole: readsByRole, bySourceAndRole: readsBySourceRole,
       maxConcurrentReadsPerDevice: total.maxConcurrentReads,
+      executive: { realtimeEvents: exec.realtimeEvents, chairWindows: exec.chairWindows, chairEventsCoalesced: exec.chairEventsCoalesced, realtimeTriggers: exec.attempted.realtime, refreshes: exec.refreshesExecuted },
     };
   });
 }

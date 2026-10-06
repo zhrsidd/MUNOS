@@ -1,7 +1,7 @@
 // Realistic staging rehearsal. Opt-in, guarded, conservative by default (10 staff, 0 delegates, 5 minutes).
 //   npm run rehearsal:run -- --app https://<preview>.vercel.app [--staff 25 | --stages 25,50,100] [--minutes 5]
 //        [--identities .test-sessions/rehearsal-identities.json] [--fixture .test-sessions/load-fixtures.json]
-//        [--realtime topic-aware|current] [--drain-seconds 120]
+//        [--realtime topic-aware|current] [--executive-chair-window 2000] [--drain-seconds 120]
 //        [--start-window 150] [--delegates 150 --delegate-window 120 --submit-token <token>
 //         --submit-committee <code> --submit-fraction 0.3]
 // Every simulated staff device runs the production client's sync loop (scripts/rehearsal/client-model.ts mirrors
@@ -40,6 +40,8 @@ if (value("--client-reads")) { console.error("--client-reads was removed: every 
 const realtimeModel = (value("--realtime") ?? "topic-aware") as RealtimeModel;
 if (!["topic-aware", "current"].includes(realtimeModel)) { console.error("--realtime must be topic-aware or current"); process.exit(2); }
 const drainMs = Number(value("--drain-seconds") ?? 120) * 1000;
+// Core PR #10: an Executive/Admin-only device coalesces 'chair' events into a fixed window (0 = plain 350 ms debounce).
+const executiveChairWindowMs = realtimeModel === "topic-aware" ? Number(value("--executive-chair-window") ?? 2000) : 0;
 const fixtureFile = value("--fixture") ?? ".test-sessions/load-fixtures.json";
 const submitToken = value("--submit-token");
 // Loaded only after the guards: these enforce the development Supabase project and an authorized test session.
@@ -58,6 +60,12 @@ const scoped = loaded?.scoped ?? null;
 const identities: Partial<Record<StaffRoleKey, Identity>> = loaded?.identities ?? {};
 const identityOf = (role: SimUser["role"]): Identity => scoped && role !== "delegate" ? identities[role]! : { userId: session.user.id, token: session.access_token };
 const { SupabaseTransport } = await import("../lib/supabase/repository");
+// Production (lib/repository-instance.ts) passes the device's granted roles to the transport; core uses them for Realtime
+// topic filtering and, from PR #10, to route an Admin-only identity to executive_snapshot. Older core ignores the extra
+// arguments, so the constructor is called through a widened type to keep this file compiling against either.
+type TransportInstance = InstanceType<typeof SupabaseTransport>;
+const Transport = SupabaseTransport as unknown as new (...args: unknown[]) => TransportInstance;
+const grantedRoles: Record<StaffRoleKey, string[]> = { chair: ["chair"], approval: ["approval"], admins: ["logistics"], executive: ["admin"] };
 const { ConflictError, fingerprint } = await import("../lib/sync/repository");
 type Data = Awaited<ReturnType<InstanceType<typeof SupabaseTransport>["read"]>>;
 type Command = import("../lib/commands").Command;
@@ -103,13 +111,15 @@ async function simulateDelegate(user: SimUser, t0: number) {
 }
 type Mutation = import("../lib/sync/store").Mutation;
 interface Item { action: Action; mutation: Mutation; topic: Topic | null | undefined; retry?: boolean; sends: number }
-interface Device { user: SimUser; transport: InstanceType<typeof SupabaseTransport>; data: Data | null; client: SimClient<Item> }
+interface Device { user: SimUser; transport: TransportInstance; data: Data | null; client: SimClient<Item> }
 const REALTIME_DELIVERY_MS = 100; // server commit → Realtime INSERT event at the device (before the 350 ms debounce)
 const clock: Clock = { now: () => Date.now(), setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>), random: Math.random };
 let devices = new Map<SimUser, Device>();
 function makeDevice(user: SimUser, everyone: SimUser[]): Device {
   const id = identityOf(user.role);
-  const device = { user, transport: new SupabaseTransport(clientFor(id.token), fixture.conference, id.userId), data: null } as unknown as Device;
+  // Role-scoped identities hold exactly one grant, so the device's roles are known; the all-roles worst case passes none.
+  const roles = scoped && user.role !== "delegate" ? grantedRoles[user.role] : [];
+  const device = { user, transport: new Transport(clientFor(id.token), fixture.conference, id.userId, [], false, roles), data: null } as unknown as Device;
   device.client = new SimClient<Item>({
     isConflict: (e) => e instanceof ConflictError,
     read: (source) => measure("refresh", async () => { device.data = await device.transport.read(); }, user.role, source),
@@ -119,9 +129,10 @@ function makeDevice(user: SimUser, everyone: SimUser[]): Device {
       if (item.retry && item.sends === 1) await measure(`${item.action} (retry)`, () => device.transport.send(item.mutation), user.role); // lost response
       if (item.action === "speechScore" || item.action === "poiRecognize") acknowledged.add(item.mutation.id);
       if (!item.topic) return; // e.g. timer: the server emits no operational change
-      for (const r of recipients(realtimeModel, everyone, { topic: item.topic, committee: user.committee })) setTimeout(() => devices.get(r)?.client.notify(), REALTIME_DELIVERY_MS);
+      const topic = item.topic;
+      for (const r of recipients(realtimeModel, everyone, { topic, committee: user.committee })) setTimeout(() => devices.get(r)?.client.notify(topic), REALTIME_DELIVERY_MS);
     },
-  }, clock);
+  }, clock, { executiveChairWindowMs: user.role === "executive" && scoped ? executiveChairWindowMs : 0 });
   return device;
 }
 async function simulate(user: SimUser, t0: number) {
@@ -206,15 +217,17 @@ for (const users of stages) {
   await Promise.all([...devices.values()].map((d) => d.client.close()));
   const byRole = Object.fromEntries(["chair", "approval", "admins", "executive"].map((r) => {
     const s = sumStats([...devices.values()].filter((d) => d.user.role === r).map((d) => d.client.stats));
-    return [r, { devices: [...devices.values()].filter((d) => d.user.role === r).length, refreshesExecuted: s.refreshesExecuted, triggersAttempted: s.triggersAttempted, triggersDropped: s.triggersDropped, bySource: s.reads }];
+    return [r, { devices: [...devices.values()].filter((d) => d.user.role === r).length, refreshesExecuted: s.refreshesExecuted, triggersAttempted: s.triggersAttempted, triggersDropped: s.triggersDropped, bySource: s.reads, realtimeEvents: s.realtimeEvents, chairWindows: s.chairWindows, chairEventsCoalesced: s.chairEventsCoalesced }];
   }));
   const all = sumStats([...devices.values()].map((d) => d.client.stats));
   stageReports.push({ staff: users, delegates: delegateCount, drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose,
-    clientModel: { realtimeModel, triggersAttempted: all.triggersAttempted, triggersDropped: all.triggersDropped, refreshesExecuted: all.refreshesExecuted, attemptedBySource: all.attempted, droppedBySource: all.dropped, refreshesBySource: all.reads, byRole, conflictsDismissed: all.conflicts, sendFailures: all.sendFailures, failedRefreshes: all.failedReads, maxConcurrentRefreshesPerDevice: all.maxConcurrentReads },
+    clientModel: { realtimeModel, executiveChairWindowMs, triggersAttempted: all.triggersAttempted, triggersDropped: all.triggersDropped, refreshesExecuted: all.refreshesExecuted, attemptedBySource: all.attempted, droppedBySource: all.dropped, refreshesBySource: all.reads, byRole, conflictsDismissed: all.conflicts, sendFailures: all.sendFailures, failedRefreshes: all.failedReads, maxConcurrentRefreshesPerDevice: all.maxConcurrentReads },
     ...report(samples.slice(before)) });
 }
 // Exactly-once check: every acknowledged scoring mutation produced exactly one participation event.
-const finalIdentity = identityOf("executive"); // Executive (admin) sees every participation event
+// Executive (admin) sees every participation event through conference_snapshot. No roles are passed, so even PR #10 core
+// keeps this check on the full snapshot (executive_snapshot deliberately omits events).
+const finalIdentity = identityOf("executive");
 const final = await new SupabaseTransport(clientFor(finalIdentity.token), fixture.conference, finalIdentity.userId).read();
 let duplicates = 0, lost = 0;
 for (const id of acknowledged) {

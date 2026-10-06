@@ -1,6 +1,6 @@
 // Measures the RLS payload each staff role actually receives: bytes and sequential (unloaded) latency of both snapshot RPCs.
 //   npx tsx scripts/rehearsal-snapshots.mts --identities .test-sessions/rehearsal-identities.json [--reads 20] [--worst-case]
-//        [--fixture .test-sessions/load-fixtures.json]
+//        [--fixture .test-sessions/load-fixtures.json] [--executive-snapshot]  (core PR #10: Executive reads executive_snapshot)
 // Read-only. Locked to the development project by remote-context.mts. Uses pre-authorized sessions; creates no Auth sessions.
 import { readFile } from "node:fs/promises";
 import { percentile } from "./rehearsal/metrics";
@@ -18,7 +18,10 @@ if (args.includes("--worst-case")) who.push(["worst-case (all roles, one identit
 const results: Record<string, unknown> = {};
 for (const [role, token] of who) {
   const row: Record<string, unknown> = {};
-  for (const rpc of ["conference_snapshot", "operations_snapshot"]) {
+  // Core PR #10 routes an Admin-only identity to executive_snapshot; conference_snapshot is kept for comparison.
+  // A missing function (older core) is reported as failures, not silently replaced.
+  const rpcs = role === "executive" && args.includes("--executive-snapshot") ? ["executive_snapshot", "conference_snapshot", "operations_snapshot"] : ["conference_snapshot", "operations_snapshot"];
+  for (const rpc of rpcs) {
     const ms: number[] = []; let bytes = 0; let failures = 0;
     for (let i = 0; i < reads; i++) {
       const t = performance.now();

@@ -175,3 +175,54 @@ test('fresh fixture: deterministic ids, 14 floors in the scoped Chair committee,
  assert.match(a.sql,/generate_series\(0,419\)/);
  assert.ok(!/auth\.|service_role|sb_secret|access_token|refresh_token/i.test(a.sql),'never touches Auth or embeds credentials');
 });
+// ---- PR #10 Executive Chair-topic window ----------------------------------------------------------------------------
+import {EXECUTIVE_CHAIR_WINDOW_MS} from '../scripts/rehearsal/client-model';
+function execClient(clock:VirtualClock,windowMs=EXECUTIVE_CHAIR_WINDOW_MS){
+ const log:string[]=[];
+ const c=new SimClient<Item>({isConflict:()=>false,read:async source=>{log.push(`${clock.now()} read:${source}`);await clock.sleep(100);},send:async()=>{}},clock,{executiveChairWindowMs:windowMs});
+ return {c,log};
+}
+test('Executive window: first Chair event starts a FIXED 2 s window; later Chair events do not extend it; a later event opens a new window',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=execClient(clock);
+ for(const t of [0,500,1500,1999])at(clock,t,()=>c.notify('chair'));
+ at(clock,2500,()=>c.notify('chair'));
+ await clock.run(10_000);
+ assert.deepEqual(log,['2000 read:realtime','4500 read:realtime'],'one refresh per window, never postponed by sustained Chair traffic');
+ assert.equal(c.stats.chairWindows,2);assert.equal(c.stats.chairEventsCoalesced,3);assert.equal(c.stats.attempted.realtime,2);
+});
+test('Executive window: a non-Chair event cancels the pending Chair window and uses the 350 ms trailing debounce',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=execClient(clock);
+ at(clock,0,()=>c.notify('chair'));          // window would fire at 2000
+ at(clock,1000,()=>c.notify('documents'));   // cancels it → debounce to 1350
+ at(clock,1200,()=>c.notify('configuration'));// resets debounce → 1550
+ await clock.run(10_000);
+ assert.deepEqual(log,['1550 read:realtime'],'no extra refresh at 2000: the fast read reconciles Chair state too');
+ assert.equal(c.stats.attempted.realtime,1);
+});
+test('Executive window: Chair events during a pending fast debounce add no timer; after it fires a new Chair event opens a window',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=execClient(clock);
+ at(clock,0,()=>c.notify('documents'));      // debounce → 350
+ at(clock,100,()=>c.notify('chair'));        // absorbed (debounce pending)
+ at(clock,300,()=>c.notify('chair'));        // absorbed
+ at(clock,1000,()=>c.notify('chair'));       // debounce done → window → 3000
+ await clock.run(10_000);
+ assert.deepEqual(log,['350 read:realtime','3000 read:realtime']);
+ assert.equal(c.stats.chairEventsCoalesced,2);assert.equal(c.stats.chairWindows,1);
+});
+test('Executive window applies only to Executive-only devices; other roles keep the plain trailing debounce for Chair events',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=execClient(clock,0); // window disabled = Chair/mixed/older-core behaviour
+ for(const t of [0,500,1500])at(clock,t,()=>c.notify('chair'));
+ await clock.run(10_000);
+ assert.deepEqual(log,[`${REALTIME_DEBOUNCE_MS} read:realtime`,`${500+REALTIME_DEBOUNCE_MS} read:realtime`,`${1500+REALTIME_DEBOUNCE_MS} read:realtime`],'events further apart than 350 ms each refresh (vs one per 2 s window for Executive)');assert.equal(c.stats.chairWindows,0);
+});
+test('estimate: the PR #10 window materially reduces Executive Chair-triggered refreshes and leaves other roles unchanged',async()=>{
+ const users=buildScenario({staff:100,minutes:5,committees:14});
+ const before=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'topic-aware',executiveChairWindowMs:0});
+ const after=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'topic-aware',executiveChairWindowMs:2000});
+ const again=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'topic-aware',executiveChairWindowMs:2000});
+ assert.deepEqual(after,again,'deterministic');
+ assert.ok(after.executive.realtimeTriggers<before.executive.realtimeTriggers*0.7,'materially fewer Executive Realtime refresh triggers');
+ assert.ok(after.byRole.executive<before.byRole.executive,'fewer Executive refreshes');
+ assert.equal(after.byRole.approval,before.byRole.approval);assert.equal(after.byRole.admins,before.byRole.admins);
+ assert.equal(after.executive.realtimeEvents,before.executive.realtimeEvents,'same events delivered; only coalescing differs');
+});
