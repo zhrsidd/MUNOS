@@ -48,8 +48,12 @@ npm start -- --port 3001
 
 `npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. See [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) and [organizer runbook](docs/OPERATIONS.md).
 
+## Deployment
+
+Vercel Preview for every branch/PR, Production from `main`, CI on every PR, build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL.
+
 ## Deferred
 
-Actual PDFs/Storage, Google Drive mirroring, access-code redemption, production setup, school-network enrollment/load rehearsal and Vercel deployment/rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+Actual PDFs/Storage, Google Drive mirroring, access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.
