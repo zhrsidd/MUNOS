@@ -17,9 +17,10 @@ export function report(samples: Sample[]) {
 }
 /** Readiness thresholds from docs/STAGING_REHEARSAL.md (100-user stage). */
 export function evaluate(r: ReturnType<typeof report>, duplicates: number, lostWrites: number) {
-  const writeActions = ["attendance", "queue", "queueAdvance", "participation", "timer", "approve", "print", "photoAck", "submit"];
+  const writeActions = ["currentSession", "attendance", "queueAdd", "queueOrder", "speechStart", "speechScore", "poiAllowance", "poiAdd", "poiRecognize", "speechFinish", "timer", "approve", "print", "photoAck", "sendToApproval", "submit"];
   const writeP95 = Math.max(0, ...writeActions.map((a) => r.actions[a]?.p95_ms ?? 0));
-  const readP95 = r.actions.read?.p95_ms ?? 0;
+  // Every full refresh a device makes: explicit reads, reads after its own writes, and Realtime-triggered refreshes.
+  const readP95 = Math.max(0, ...["open", "read", "refocus", "postWriteRead", "realtimeRefresh"].map((a) => r.actions[a]?.p95_ms ?? 0));
   const checks = [
     { check: "no duplicate writes after retries", pass: duplicates === 0 },
     { check: "no lost acknowledged writes", pass: lostWrites === 0 },

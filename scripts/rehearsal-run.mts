@@ -1,5 +1,6 @@
 // Realistic staging rehearsal. Opt-in, guarded, conservative by default (10 staff, 0 delegates, 5 minutes).
 //   npm run rehearsal:run -- --app https://<preview>.vercel.app [--staff 25 | --stages 25,50,100] [--minutes 5]
+//        [--client-reads realistic|minimal]
 //        [--start-window 150] [--delegates 150 --delegate-window 120 --submit-token <token>
 //         --submit-committee <code> --submit-fraction 0.3]
 // STAFF stages simulate Chairs/Approval/Admins/Executive with a staff session. DELEGATES are separate:
@@ -9,7 +10,7 @@
 // (scripts/prepare-load.mts, applied to the development project). Never targets production; no override exists.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { checkAppUrl, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
-import { buildScenario, type Action, type SimUser } from "./rehearsal/scenario";
+import { REALTIME_DEBOUNCE_MS, buildScenario, subscribers, type Action, type SimUser } from "./rehearsal/scenario";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
@@ -28,6 +29,8 @@ for (const n of stages) { const g = checkUsers(n); if (!g.ok) { console.error(g.
 const delegateCount = Number(value("--delegates") ?? 0);
 if (delegateCount && !checkUsers(delegateCount).ok) { console.error(checkUsers(delegateCount).reason); process.exit(2); }
 const minutes = Number(value("--minutes") ?? 5);
+// realistic (default): model the client's reads after each write and Realtime fan-out. minimal: one read per write.
+const realisticReads = (value("--client-reads") ?? "realistic") !== "minimal";
 const submitToken = value("--submit-token");
 // Loaded only after the guards: these enforce the development Supabase project and an authorized test session.
 const context = await import("./remote-context.mts").catch((e: Error) => {
@@ -46,7 +49,7 @@ const submitCommittee = fixture.committees.find((c) => c.code === (value("--subm
 const submitters = fixture.delegates.filter((d) => d.committee === submitCommittee?.id);
 if (delegateCount && submitToken && !submitters.length) { console.error("No fixture delegations for --submit-committee."); process.exit(2); }
 const samples: Sample[] = [];
-const acknowledged = new Set<string>(); // participation mutation ids the server accepted
+const acknowledged = new Set<string>(); // speechScore / poiRecognize mutation ids the server accepted
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 const classify = (e: unknown): Sample["outcome"] => {
   if (e instanceof ConflictError) return "conflict";
@@ -75,36 +78,84 @@ async function simulateDelegate(user: SimUser, t0: number) {
       });
   }
 }
+interface Device { user: SimUser; transport: InstanceType<typeof SupabaseTransport>; data: Data | null; pending?: ReturnType<typeof setTimeout>; reading?: Promise<void> }
+let devices: Device[] = [];
+/** One full client refresh (both snapshot RPCs), as lib/supabase/repository.ts read() does. */
+async function refresh(device: Device, action: string) {
+  await timed(action, async () => { device.data = await device.transport.read(); });
+}
+/** Realtime notification: debounced 350 ms per device, like the subscribe() handler in the client. */
+function notify(device: Device) {
+  if (!realisticReads || device.pending) return;
+  device.pending = setTimeout(() => { device.pending = undefined; device.reading = refresh(device, "realtimeRefresh"); }, REALTIME_DEBOUNCE_MS);
+}
 async function simulate(user: SimUser, t0: number) {
   if (user.role === "delegate") return simulateDelegate(user, t0);
   const committee = fixture.committees[user.committee % fixture.committees.length];
-  const transport = new SupabaseTransport(clientFor(), fixture.conference, session.user.id);
-  let data: Data | null = null;
+  const device = devices.find((d) => d.user === user)!;
+  const fanout = subscribers(devices.map((d) => d.user), user).map((u) => devices.find((d) => d.user === u)!);
   let cursor = 0;
   const role = user.role === "approval" ? "approval" : user.role === "admins" ? "logistics" : user.role === "executive" ? "admin" : "chair";
   const send = async (action: Action, command: Command, retry?: boolean, as = role) => {
-    if (!data) return;
-    const mutation = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), actorId: session.user.id, role: as as never, command, expected: fingerprint(data, command), state: "pending" as const };
-    const ok = await timed(action, () => transport.send(mutation));
-    if (ok && retry) await timed(`${action} (retry)`, () => transport.send(mutation)); // same id: must apply once
-    if (ok && command.type === "participation") acknowledged.add(mutation.id);
+    if (!device.data) return;
+    const mutation = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), actorId: session.user.id, role: as as never, command, expected: fingerprint(device.data, command), state: "pending" as const };
+    const ok = await timed(action, () => device.transport.send(mutation));
+    if (ok && retry) await timed(`${action} (retry)`, () => device.transport.send(mutation)); // same id: must apply once
+    if (ok && (command.type === "speechScore" || command.type === "poiRecognize")) acknowledged.add(mutation.id);
+    if (!ok) return;
+    if (realisticReads) {
+      // DurableRepository.flush(): one read after the sent item, one final read; then the device's own
+      // Realtime notification (another flush) and every subscribed device's debounced refresh.
+      await refresh(device, "postWriteRead");
+      await refresh(device, "postWriteRead");
+      notify(device);
+      fanout.forEach(notify);
+    } else await refresh(device, "postWriteRead");
   };
-  const mine = () => data?.delegates.filter((d) => d.committeeId === committee.id) ?? [];
+  const d = () => device.data;
+  const sid = committee.session;
+  const present = () => (d()?.attendance ?? []).filter((a) => a.sessionId === sid && a.status !== "Absent").map((a) => a.delegateId);
+  const active = () => d()?.speeches?.find((s) => s.sessionId === sid && s.state !== "finished");
+  const mine = () => d()?.delegates.filter((x) => x.committeeId === committee.id) ?? [];
   for (const step of user.steps) {
     await sleep(t0 + step.at - Date.now());
-    const delegate = mine()[cursor++ % Math.max(1, mine().length)];
+    const data = d();
+    const here = present();
+    const anyPresent = here[cursor++ % Math.max(1, here.length)];
     switch (step.action) {
-      case "open": case "read": case "refocus": await timed(step.action, async () => { data = await transport.read(); }); break;
-      case "attendance": if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: committee.session, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break;
-      case "queue": if (delegate) await send("queue", { type: "queue", sessionId: committee.session, delegateId: delegate.id }, step.retry); break;
-      case "queueAdvance": await send("queueAdvance", { type: "queue", sessionId: committee.session, advance: true }, step.retry); break;
-      case "participation": if (delegate) await send("participation", { type: "participation", delegateId: delegate.id, sessionId: committee.session, resolutionId: null, categoryId: "speech", points: 2 }, step.retry); break;
-      case "timer": await send("timer", { type: "timer", sessionId: committee.session, remaining: 90, startedAt: Date.now(), duration: 90 }, step.retry); break;
-      case "photoAck": { const slot = data?.photoSlots?.find((s) => s.enabled); if (slot) await send("photoAck", { type: "photoAck", committeeId: committee.id, slotId: slot.id, stage: "warning", revision: slot.revision }, step.retry); break; }
-      case "sendToApproval": { const doc = data?.documents.find((d) => d.committeeId === committee.id && d.status === "Draft"); if (doc) await send("sendToApproval", { type: "document", id: doc.id, status: "Submitted" }, step.retry); break; }
-      case "approve": { const doc = data?.documents.find((d) => d.status === "Submitted"); if (doc) await send("approve", { type: "document", id: doc.id, status: "Approved" }, step.retry, "approval"); break; }
-      case "print": { const doc = data?.documents.find((d) => d.status === "Approved"); if (doc) await send("print", { type: "document", id: doc.id, status: "Printed" }, step.retry, "logistics"); break; }
+      case "open": case "read": case "refocus": await refresh(device, step.action); break;
       case "health": await timed("health", async () => { const r = await appFetch(`${base}/api/health`); if (r.status >= 500) throw Error(`HTTP ${r.status}`); }); break;
+      case "currentSession": await send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
+      case "attendance": { const delegate = mine()[cursor % Math.max(1, mine().length)]; if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
+      case "queueAdd": {
+        const lane = (["open", "for", "against"] as const)[cursor % 3];
+        const queued = new Set(data?.queue.filter((q) => q.sessionId === sid && (q.lane ?? "open") === lane).map((q) => q.delegateId));
+        const delegate = here.find((id) => !queued.has(id));
+        if (delegate) await send("queueAdd", { type: "queueAdd", sessionId: sid, delegateId: delegate, lane }, step.retry);
+        break;
+      }
+      case "queueOrder": {
+        const ids = (data?.queue ?? []).filter((q) => q.sessionId === sid && (q.lane ?? "open") === "open").sort((a, b) => a.position - b.position).map((q) => q.id);
+        if (ids.length > 1) await send("queueOrder", { type: "queueOrder", sessionId: sid, lane: "open", ids: [...ids.slice(1), ids[0]] }, step.retry);
+        break;
+      }
+      case "speechStart": {
+        if (active() || !anyPresent) break;
+        const entry = (data?.queue ?? []).filter((q) => q.sessionId === sid && here.includes(q.delegateId)).sort((a, b) => a.position - b.position)[0];
+        const classification = entry?.lane === "for" ? "For" : entry?.lane === "against" ? "Against" : "Other";
+        await send("speechStart", { type: "speechStart", sessionId: sid, delegateId: entry?.delegateId ?? anyPresent, resolutionId: null, classification, ...(entry ? { entryId: entry.id } : {}) }, step.retry);
+        break;
+      }
+      case "poiAllowance": { const s = active(); if (s) await send("poiAllowance", { type: "poiAllowance", sessionId: sid, speechId: s.id, limit: Math.max(2, s.poiCount + 1) }, step.retry); break; }
+      case "poiAdd": { const s = active(); const asker = here.find((id) => id !== s?.delegateId); if (s && asker) await send("poiAdd", { type: "poiAdd", sessionId: sid, speechId: s.id, delegateId: asker }, step.retry); break; }
+      case "poiRecognize": { const s = active(); const poi = (data?.poiQueue ?? []).filter((p) => p.speechId === s?.id).sort((a, b) => a.position - b.position)[0]; if (s?.state === "pois" && poi) await send("poiRecognize", { type: "poiRecognize", sessionId: sid, speechId: s.id, entryId: poi.id, points: 1 + (cursor % 2) }, step.retry); break; }
+      case "speechScore": { const s = active(); if (s && !data?.events.some((e) => e.speechId === s.id && e.categoryId === "speech")) await send("speechScore", { type: "speechScore", sessionId: sid, speechId: s.id, points: 1 + (cursor % 3) }, step.retry); break; }
+      case "speechFinish": { const s = active(); if (s) await send("speechFinish", { type: "speechFinish", sessionId: sid, speechId: s.id }, step.retry); break; }
+      case "timer": await send("timer", { type: "timer", sessionId: sid, remaining: 90, startedAt: Date.now(), duration: 90 }, step.retry); break;
+      case "photoAck": { const slot = data?.photoSlots?.find((s) => s.enabled); if (slot) await send("photoAck", { type: "photoAck", committeeId: committee.id, slotId: slot.id, stage: "warning", revision: slot.revision }, step.retry); break; }
+      case "sendToApproval": { const doc = data?.documents.find((x) => x.committeeId === committee.id && x.status === "Draft"); if (doc) await send("sendToApproval", { type: "document", id: doc.id, status: "Submitted" }, step.retry); break; }
+      case "approve": { const doc = data?.documents.find((x) => x.status === "Submitted"); if (doc) await send("approve", { type: "document", id: doc.id, status: "Approved" }, step.retry, "approval"); break; }
+      case "print": { const doc = data?.documents.find((x) => x.status === "Approved"); if (doc) await send("print", { type: "document", id: doc.id, status: "Printed" }, step.retry, "logistics"); break; }
     }
   }
 }
@@ -113,11 +164,14 @@ for (const users of stages) {
   const scenario = buildScenario({ staff: users, delegates: delegateCount, minutes, committees: fixture.committees.length, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction: submitToken ? Number(value("--submit-fraction") ?? 0.3) : 0 });
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref})…`);
+  devices = scenario.filter((u) => u.role !== "delegate").map((user) => ({ user, transport: new SupabaseTransport(clientFor(), fixture.conference, session.user.id), data: null }));
   const t0 = Date.now() + 1000;
   await Promise.all(scenario.map((u) => simulate(u, t0)));
+  devices.forEach((d) => clearTimeout(d.pending));
+  await Promise.all(devices.map((d) => d.reading));
   stageReports.push({ staff: users, delegates: delegateCount, ...report(samples.slice(before)) });
 }
-// Exactly-once check: every acknowledged participation mutation produced exactly one event.
+// Exactly-once check: every acknowledged scoring mutation produced exactly one participation event.
 const final = await new SupabaseTransport(clientFor(), fixture.conference, session.user.id).read();
 let duplicates = 0, lost = 0;
 for (const id of acknowledged) {
@@ -126,7 +180,7 @@ for (const id of acknowledged) {
 }
 const overall = report(samples);
 const verdict = evaluate(overall, duplicates, lost);
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, distinctAuthIdentities: 1, note: "Simulated staff share one pre-authorized test identity (operational load, not fresh staff sign-up / shared-NAT; see STAGING_REHEARSAL.md phase D). Delegates use only the public form and create no sessions.", minutes, stages: stageReports, exactlyOnce: { acknowledgedParticipation: acknowledged.size, duplicates, lost }, verdict };
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, distinctAuthIdentities: 1, note: "Simulated staff share one pre-authorized test identity (operational load, not fresh staff sign-up / shared-NAT; see STAGING_REHEARSAL.md phase D). Delegates use only the public form and create no sessions.", minutes, stages: stageReports, clientReads: realisticReads ? "realistic" : "minimal", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });
