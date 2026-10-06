@@ -79,6 +79,28 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Data.** `sessions."endsAt"` (nullable) is the only core schema addition. Imported sessions are `scheduled`; the core's session selection is unchanged. The `sessionImport` command runs through the normal outbox into `apply_operations_mutation`, which notifies each affected committee.
 
+## School group photos and chair reminders
+
+**Model.** `public.photo_slots` (school, start, optional end, location, note, active/cancelled, warning minutes, revision) and `public.photo_acknowledgements` (committee, slot, stage `warning`/`due`, slot revision). Delegate → school → committee comes from the existing delegate records; nothing is duplicated.
+
+**Who is reminded.** For a slot, the committees with at least one delegate from that school. Executive → *Group photos* shows each slot with e.g. `GA1 · 2  WHO · 1  HRC · 3` and acknowledgement status (✓ warned, ✓✓ delegates sent).
+
+**Reminder behaviour (Chair Console, every screen).**
+
+| Time | Banner | Action |
+| --- | --- | --- |
+| before start − warning (default 10 min) | none (listed under *Group photos*) | — |
+| from start − warning | **GROUP PHOTO IN N MINUTES** · school · time · location · "N delegates from this committee should attend" | View delegates · Acknowledge |
+| from start until end (or start + 15 min) | **GROUP PHOTO NOW** · "Please send these delegates to {location}" with country and name | Delegates sent |
+| after end | none (listed as Done) | — |
+| cancelled, during its window | **GROUP PHOTO CANCELLED** · delegates do not need to leave | Dismiss |
+
+Acknowledging the warning hides it until the photo is due; "Delegates sent" hides the due banner. Acknowledgements are per committee and shared by every device in that committee.
+
+**Reliability.** Reminders are **derived on each device** from slot timestamps and the device clock every 15 seconds — no server request, no one-off push. A refreshed, reconnected, offline or late-opened Chair Console computes the same reminders from its cached snapshot. Realtime only makes schedule changes arrive sooner; without it the regular recovery read (≤ 60 s) delivers them. A reschedule increments the slot revision, so earlier acknowledgements stop counting and chairs are alerted again. Acknowledgements go through the normal offline outbox. Times are stored as instants and shown in conference time; only the device's clock (not its time zone) must be right. Browser push notifications are not used.
+
+**Import.** Executive → Group photos → *Import CSV*: `school,date,start_time,end_time,location[,note]`. School names are matched against existing schools after normalizing case, accents, punctuation, `&`/"and" and spacing (`"Doha College "` → Doha College). Near misses (`"Doha Collge"`) are offered as a suggestion that must be confirmed; unknown names must be chosen or the row unticked. Schools are never created by the import. Same school + start time as an existing slot is skipped.
+
 ## CODEX REVIEW REQUIRED
 
 | # | Item | Why it touches shared architecture | Risk / notes |
@@ -96,3 +118,5 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 | 9 | `supabase/migrations/20261006100000_session_schedule_import.sql` — `public.sessions."endsAt"` + check constraint + `(committee_id, "startsAt")` index | Core table column | Nullable; existing commands and snapshot unaffected (snapshot serializes all columns). Also refactors Claude's own `apply_operations_mutation` into per-command handlers. |
 | 10 | `lib/domain.ts` — `Session.endsAt?` | Shared domain type | Optional. |
 | 11 | Imported sessions and the Chair's "current session" | Chair/session state (Codex backlog item) | Imported sessions are `scheduled`. The Workspace still defaults to an `active` session or the first session; Codex's planned "Chair sets current session" should consider `startsAt`/`endsAt` for its default. |
+| 12 | `supabase/migrations/20261006110000_photo_schedule.sql` | New staff-readable tables (`photo_slots`: all staff roles incl. committee-scoped chairs; `photo_acknowledgements`: admin + that committee's chair) and a replacement of Claude's `operations_snapshot` / `apply_operations_mutation` | No core table changes. Chairs can read every photo slot (school, time, location) — not personal data, needed to derive reminders. |
+| 13 | `public/sw.js` — `/chair/photos` added to the offline shell, cache version bumped to `conference-os-0.2.1` | Offline architecture | One extra shell path; old cache is replaced on activation as before. |

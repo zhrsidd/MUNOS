@@ -29,11 +29,14 @@ The example defaults to an isolated local demo. For the development database, se
 | `/` | Role entry; access-code screens are deferred |
 | `/chair` | Debate, speakers, timer, scoring and suggestions |
 | `/chair/{roll-call,participation,documents,voting,awards}` | Chair operations |
+| `/chair/photos` | This committee's school group-photo slots (reminders appear on every Chair screen) |
 | `/approval` | Review inbox |
 | `/logistics` | Print queue |
 | `/admin` | Conference overview |
 | `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,awards,workflow,resources,audit}` | Configuration |
 | `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
+| `/admin/schedule` | Import the conference schedule as sessions |
+| `/admin/photos` | School group-photo slots, CSV import, chair acknowledgements |
 | `/admin/submissions` | Committee resolution-submission links / QR codes |
 | `/submit/{token}` | Public, mobile page where delegates register their Google Doc resolution with the Chair (no account; file upload fallback) |
 | `/submit/{token}/sheet` | Printable committee room sheet with QR code |
@@ -60,6 +63,6 @@ Vercel Preview for every branch/PR, Production from `main`, CI on every PR, buil
 
 Google Drive automation (Approval-folder copies, PDF snapshots, archive), access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
-Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md).
+Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.

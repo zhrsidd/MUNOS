@@ -23,7 +23,28 @@ export interface ResolutionLink {
   submittedAt: string | null;
   revision: number;
 }
+export interface PhotoSlot {
+  id: string;
+  schoolId: string;
+  startsAt: string;
+  endsAt: string | null;
+  location: string;
+  note: string;
+  enabled: boolean;
+  warnMinutes: number;
+  /** Increments on every change; acknowledgements of an older revision no longer silence reminders. */
+  revision: number;
+}
+export interface PhotoAck {
+  slotId: string;
+  committeeId: string;
+  stage: "warning" | "due";
+  revision: number;
+  at: string;
+}
 export interface OperationsData {
   submissionLinks?: SubmissionLink[];
   resolutionLinks?: ResolutionLink[];
+  photoSlots?: PhotoSlot[];
+  photoAcks?: PhotoAck[];
 }

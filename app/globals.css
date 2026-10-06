@@ -3061,6 +3061,28 @@ dd {
 .schedule-result { display:flex; flex-direction:column; gap:4px; min-width:160px; }
 .danger-text { color:#a33320; }
 .schedule-table td:nth-child(3) input { min-width:200px; }
+
+/* ---- Group photo reminders (Claude-owned) ---- */
+.photo-banner { display:grid; gap:10px; margin-bottom:16px; }
+.photo-card { display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:flex-start; padding:16px 18px; border-radius:12px; border:2px solid; }
+.photo-card small { display:block; font-weight:800; letter-spacing:.08em; font-size:12px; }
+.photo-card strong { display:block; font-size:20px; font-family:var(--font-manrope), Arial, sans-serif; }
+.photo-card p { margin:4px 0 0; }
+.photo-card.warning { background:#fff7e5; border-color:#e3b341; color:#5e4306; }
+.photo-card.due { background:#fdeceb; border-color:#d0473a; color:#7c1d14; }
+.photo-card.cancelled { background:#f3f5f8; border-color:#cdd4de; color:#4a5566; }
+.photo-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.photo-delegates { margin:8px 0 0; padding-left:18px; }
+.photo-row.cancelled strong { text-decoration:line-through; }
+.photo-row.past { opacity:.6; }
+.photo-form { display:grid; gap:12px; min-width:min(640px, 80vw); }
+.photo-form label { display:grid; gap:4px; font-weight:600; }
+.photo-form input:not([type=checkbox]), .photo-form select, .photo-form textarea { padding:8px; border:1px solid var(--line); border-radius:7px; font-weight:400; }
+.photo-form .form-row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+.committee-acks { display:flex; flex-wrap:wrap; gap:6px; }
+.committee-acks span { background:var(--blue-soft); border-radius:6px; padding:2px 7px; font-size:12px; white-space:nowrap; }
+.photo-form .schedule-table select { min-width:200px; }
+.modal:has(.photo-form .schedule-table) { max-width:min(1100px, 95vw); }
 /* ---- Google-Doc-first submission (Claude-owned) ---- */
 .share-box { display:grid; gap:6px; padding:14px; border-radius:10px; background:var(--blue-soft); border:1px solid #cbdcf3; }
 .share-address { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
