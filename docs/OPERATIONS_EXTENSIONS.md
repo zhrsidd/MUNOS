@@ -64,6 +64,21 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Operator UI.** Executive → *Submission links* (create missing links with a `{code}@dcmun.org` sharing-address pattern, per-committee sharing address, copy, print sheet, replace, turn off). Chair Console → Documents → *Delegate submissions* and *Submission QR*. Printable A4 room sheet at `/submit/{token}/sheet`.
 
+## Schedule import
+
+**Flow.** Executive → *Schedule import*: upload a CSV/text file or paste rows copied from Excel/Google Sheets → **Preview** → review table (edit date, name, start, end, committees; tick/untick rows) → **Create N sessions** → sessions appear for each committee.
+
+**Supported input.** Comma, semicolon or tab separated (spreadsheet copy-paste), with or without a header row. Columns recognised by header name: Date/Day, Session/Name/Event, Start, End, Time (a single `09:00–10:30` range), Committees. Without a header the order is Date, Session, Start, End, Committees.
+
+- Dates: `2026-11-13`, `13/11/2026` (or `11/13/2026` when *Month/Day/Year* is chosen), `13.11.26`, `Day 2` (counted from the conference date), `Friday`/`Fri 13 Nov`, `13th November 2026`. A blank date repeats the date above; a row with only a date is a day heading.
+- Times: `13:30`, `9:00`, `9.00`, `0900`, `9am`, `1:30 pm`. A bare `9` is rejected as ambiguous.
+- Committees: `All`, or codes/names separated by commas, `;`, `/`, `&` or "and" (`GA1, SC`, `Security Council`). Empty = the default selection chosen on the first screen (all committees, or a chosen list).
+- Not supported: PDF or images. A future parser can produce the same rows.
+
+**Safety.** Lunch, breaks, coffee, registration, prayers, photos and ceremonies are shown but unticked; they are created only if ticked. Unknown committees, unreadable dates/times, end-before-start and missing names block confirmation until fixed or unticked. Duplicates (same committee and start time, or same name on the same day, already in the conference or twice in the import) are skipped and listed. One import creates at most 500 sessions in one atomic command; repeating an import creates nothing new. Times are entered and shown in conference time (`NEXT_PUBLIC_CONFERENCE_TIMEZONE`, default `Asia/Qatar`), independent of a device's own time zone.
+
+**Data.** `sessions."endsAt"` (nullable) is the only core schema addition. Imported sessions are `scheduled`; the core's session selection is unchanged. The `sessionImport` command runs through the normal outbox into `apply_operations_mutation`, which notifies each affected committee.
+
 ## CODEX REVIEW REQUIRED
 
 | # | Item | Why it touches shared architecture | Risk / notes |
@@ -78,3 +93,6 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 | 8a | Delegate submissions enter **Draft** (not Submitted) | Core workflow semantics | Matches the real DCMUN process: Chair reviews, copies to the Approval folder, then uses the existing Chair `Draft → Submitted` transition ("Submit to Approval"). No new states. |
 | 8b | `components/workspace.tsx` — `DelegateSubmissions` panel on Chair → Documents | Existing Chair UI | Additive panel above the existing documents list; only shown when delegate submissions are waiting. |
 | 8 | Session chosen for a delegate submission | Core session semantics | `submit_resolution` picks: active session → latest started → first scheduled. When Codex adds "Chair sets current session", switch this to that value. |
+| 9 | `supabase/migrations/20261006100000_session_schedule_import.sql` — `public.sessions."endsAt"` + check constraint + `(committee_id, "startsAt")` index | Core table column | Nullable; existing commands and snapshot unaffected (snapshot serializes all columns). Also refactors Claude's own `apply_operations_mutation` into per-command handlers. |
+| 10 | `lib/domain.ts` — `Session.endsAt?` | Shared domain type | Optional. |
+| 11 | Imported sessions and the Chair's "current session" | Chair/session state (Codex backlog item) | Imported sessions are `scheduled`. The Workspace still defaults to an `active` session or the first session; Codex's planned "Chair sets current session" should consider `startsAt`/`endsAt` for its default. |

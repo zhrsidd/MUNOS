@@ -10,6 +10,7 @@ import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
+import { ScheduleImport } from "./operations/schedule-import";
 import { DelegateSubmissions } from "./operations/resolution-links";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
@@ -50,6 +51,7 @@ const adminNav = [
   ["conference", "Conference", "settings"],
   ["committees", "Committees", "debate"],
   ["sessions", "Sessions", "clock"],
+  ["schedule", "Schedule import", "clock"],
   ["delegates", "Delegates", "attendance"],
   ["schools", "Schools", "admin"],
   ["staff", "Chairs & staff", "review"],
@@ -326,7 +328,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : <AdminScreen section={section} />
+            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <ScheduleImport /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">
