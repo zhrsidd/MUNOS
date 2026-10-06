@@ -62,8 +62,9 @@ export interface LinkInfo {
   conferenceName: string;
   committeeCode: string;
   committeeName: string;
-  /** Who to share the Google Doc with (edit access). */
+  /** Legacy field retained for rolling compatibility; never presented as Chair access. */
   shareWith: string;
+  chairs?: { name: string; email: string }[];
   submitters: Submitter[];
 }
 export type SubmissionResponse =

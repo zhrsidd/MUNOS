@@ -106,10 +106,10 @@ test('file signatures: pdf, docx, legacy doc',()=>{
  assert.equal(kindFromBytes('a.doc',new Uint8Array([0xd0,0xcf,0x11,0xe0])),'doc');
  assert.equal(kindFromBytes('a.docx',new TextEncoder().encode('%PDF-1.4')),null);
 });
-test('local demo backend resolves seed committees only, shows the sharing address and detects duplicate documents',async()=>{
+test('local demo backend resolves seed committees only, does not invent Chair mailboxes and detects duplicate documents',async()=>{
  const demo=demoSubmissionBackend();
  assert.equal(await demo.linkInfo('demo_nope_0123456789abcdef0123'),null);
- const info=await demo.linkInfo('demo_ga1_0123456789abcdef0123');assert.equal(info?.committeeCode,'GA1');assert.equal(info?.shareWith,'ga1@dcmun.example');
+ const info=await demo.linkInfo('demo_ga1_0123456789abcdef0123');assert.equal(info?.committeeCode,'GA1');assert.equal(info?.shareWith,'');assert.deepEqual(info?.chairs,[]);
  assert.ok(info!.submitters.every(s=>Object.keys(s).join()==='id,country,flag'),'countries only, no names or emails');
  const args={token:'demo_ga1_0123456789abcdef0123',submitterId:'d0',title:'T',googleDocId:docId};
  assert.equal((await demo.submit({...args,submissionId:crypto.randomUUID()})).status,'created');

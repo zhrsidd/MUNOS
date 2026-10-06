@@ -101,7 +101,8 @@ export type Command =
     }
   | { type: "session"; committeeId: string; name: string }
   | { type: "school"; name: string }
-  | { type: "staff"; name: string; role: Role; committeeIds: string[] };
+  | { type: "staff"; name: string; role: Role; committeeIds: string[]; email?: string }
+  | { type: "staffContact"; id: string; email: string };
 export interface ConferenceRepository {
   getSnapshot(): ConferenceData | null;
   subscribe(listener: () => void): () => void;
@@ -166,6 +167,7 @@ const allowed: Record<Command["type"], Role[]> = {
   session: ["admin"],
   school: ["admin"],
   staff: ["admin"],
+  staffContact: ["admin"],
   ...operationsRoles,
   currentSession:["chair"], debateMode:["chair"], queueAdd:["chair"], queueOrder:["chair"], queueRemove:["chair"], speechStart:["chair"], speechYield:["chair"], speechScore:["chair"], speechFinish:["chair"], poiAllowance:["chair"], poiAdd:["chair"], poiOrder:["chair"], poiRecognize:["chair"], voteMode:["chair"], vetoRules:["admin"],
 };
@@ -544,10 +546,19 @@ export function applyCommand(
     case "school":
       d.schools.push({ id: nextId(), name: c.name });
       break;
+    case "staffContact": {
+      const staff = d.staff.find(s=>s.id===c.id);
+      if (!staff) throw Error("Staff member unavailable");
+      staff.email = cleanStaffEmail(c.email);
+      staff.contactRevision = (staff.contactRevision ?? 1) + 1;
+      break;
+    }
     case "staff":
       d.staff.push({
         id: nextId(),
         name: c.name,
+        email: cleanStaffEmail(c.email ?? ""),
+        contactRevision: 1,
         role: c.role,
         committeeIds: c.committeeIds,
       });
@@ -594,4 +605,10 @@ export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
  const c=data.committees.find(c=>c.id===r.committeeId);
  if(!c?.vetoEnabled || r.voteType==="procedural")return [];
  return data.votes.filter(v=>v.resolutionId===r.id && v.sessionId===r.sessionId && v.choice==="Against" && c.vetoDelegateIds?.includes(v.delegateId) && data.attendance.some(a=>a.delegateId===v.delegateId&&a.sessionId===v.sessionId&&a.status!=="Absent")).map(v=>v.delegateId);
+}
+
+function cleanStaffEmail(value: string): string | null {
+  const email=value.trim();
+  if (email && (email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw Error("Enter a valid contact email");
+  return email || null;
 }

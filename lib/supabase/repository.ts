@@ -22,8 +22,10 @@ export class SupabaseTransport implements Transport {
  async send(m:Mutation){
   if(this.recoveryOnly)throw Error("Renew device access before syncing.");
   if(m.actorId!==this.actorId)throw new ConflictError("Saved action belongs to another identity. Export it for recovery.");
-  const {data:{session}}=await this.client.auth.getSession();
-  if(session && session.user.id!==this.actorId)throw new ConflictError("Device identity changed. Export saved actions for recovery.");
+  if(typeof window!=="undefined"){
+   const {data:{session}}=await this.client.auth.getSession();
+   if(session && session.user.id!==this.actorId)throw new ConflictError("Device identity changed. Export saved actions for recovery.");
+  }
   const {error}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:m.command,requested_role:m.role,expected:m.expected,client_time:m.createdAt});
   if(error){
    if(error.code === '40001' || error.code === '42501' || /^(22|23)/.test(error.code))throw new ConflictError(error.code==='42501'?'Access has changed. Ask an administrator to review this saved change.':error.message);

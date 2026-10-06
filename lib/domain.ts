@@ -52,6 +52,9 @@ export interface Delegate {
   email: string;
 }
 export interface Staff {
+  /** Directory contact, not an authentication identity. Published only for assigned Chairs. */
+  email?: string | null;
+  contactRevision?: number;
   id: ID;
   name: string;
   role: Role;

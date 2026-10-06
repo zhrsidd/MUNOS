@@ -429,7 +429,7 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "staff" && (
         <Panel
           title="Staff assignments"
-          subtitle="Access credentials are deliberately not issued in this demo."
+          subtitle="Assigned Chair contact emails are shown on the committee submission form. Directory contacts do not grant app access."
         >
           <div className="table-scroll">
             <table>
@@ -438,7 +438,7 @@ export function AdminScreen({ section }: { section: string }) {
                   <th>Name</th>
                   <th>Role</th>
                   <th>Committee scope</th>
-                  <th>Access</th>
+                  <th>Contact email</th>
                 </tr>
               </thead>
               <tbody>
@@ -456,7 +456,7 @@ export function AdminScreen({ section }: { section: string }) {
                         )
                         .join(", ") || "Conference-wide"}
                     </td>
-                    <td>Demo placeholder</td>
+                    <td><StaffContact key={`${s.id}-${s.contactRevision}`} id={s.id} email={s.email ?? ""} name={s.name} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -1090,4 +1090,13 @@ function ImportFlow({ close }: { close: () => void }) {
       )}
     </>
   );
+}
+
+function StaffContact({id,email,name}:{id:string;email:string;name:string}) {
+  const {act}=useConference();
+  const [draft,setDraft]=useState(email);
+  return <form className="link-field" onSubmit={e=>{e.preventDefault();void act({type:"staffContact",id,email:draft},"admin");}}>
+    <input type="email" maxLength={254} aria-label={`${name} contact email`} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Contact email" />
+    <button disabled={draft.trim()===email}>Save</button>
+  </form>;
 }

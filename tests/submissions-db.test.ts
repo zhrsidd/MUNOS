@@ -31,7 +31,7 @@ test('Google-Doc-first submission: Draft with the Chair, link record, Chair send
   // Server route (service_role).
   await asServer();
   const info=(await query<{i:Record<string,unknown>}>('select public.submission_link_info($1) i',[token]))[0].i;
-  assert.equal(info.committeeId,ids.ga1);assert.equal(info.shareWith,'ga1@dcmun.example');
+  assert.equal(info.committeeId,ids.ga1);assert.equal(info.shareWith,'');
   assert.ok((info.submitters as object[]).every(s=>Object.keys(s).sort().join()==='country,flag,id'),'countries only: no delegate names or emails');
   type R={r:{status:string;code:string}};
   const submit=(id:string,o:Partial<{doc:string|null;key:string|null;sha:string|null;size:number|null;tok:string;submitter:string;title:string}>={})=>query<R>('select public.submit_resolution($1,$2,$3,$4,$5,$6,$7,$8,$9) r',[o.tok??token,id,o.submitter??ids.france,o.title??'Protecting civilians online','doc' in o?o.doc:docId,'draft.pdf','key' in o?o.key:null,'sha' in o?o.sha:null,'size' in o?o.size:null]).then(r=>r[0].r);

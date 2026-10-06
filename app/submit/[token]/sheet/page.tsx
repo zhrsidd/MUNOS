@@ -18,13 +18,11 @@ export default async function SubmissionSheet({ params }: { params: Promise<{ to
       <h1>{link.committeeCode} resolution submission</h1>
       <h2>{link.committeeName}</h2>
       <div className="room-sheet-qr" dangerouslySetInnerHTML={{ __html: renderSVG(url, { ecc: "M", border: 2 }) }} />
-      {link.shareWith && (
-        <p className="room-sheet-share">
-          Share your Google Doc (edit access) with <b>{link.shareWith}</b>
-        </p>
-      )}
+      <p>Preferred sharing: <b>Anyone with the link → Editor</b>.</p>
+      <p>If school restrictions prevent this, share directly with an assigned Chair as an Editor:</p>
+      {(link.chairs ?? []).length ? link.chairs!.map(chair=><p key={chair.email}>{chair.name} · {chair.email}</p>) : <p>Ask your committee Chair for their address.</p>}
       <ol>
-        <li>Write the resolution in Google Docs. Share it with {link.shareWith ? <b>{link.shareWith}</b> : "your Chair"} as an <b>Editor</b>.</li>
+        <li>Write the resolution in Google Docs. Make sure the Chairs can edit it.</li>
         <li>Scan the QR code. Choose your country, enter the title and paste the Google Doc link (Share → Copy link).</li>
         <li>Tap <b>Submit</b> and keep the reference number. Your Chair sends it on to the Approval Panel.</li>
       </ol>

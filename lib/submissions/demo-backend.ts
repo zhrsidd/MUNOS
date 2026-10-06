@@ -15,7 +15,8 @@ export function demoSubmissionBackend(): SubmissionBackend {
       if (prefix !== "demo" || !committee) return null;
       const info: LinkInfo = {
         linkId: token, conferenceId: seed.conference.id, committeeId, conferenceName: seed.conference.name,
-        committeeCode: committee.code, committeeName: committee.name, shareWith: `${committee.code.toLowerCase()}@dcmun.example`,
+        committeeCode: committee.code, committeeName: committee.name, shareWith: "",
+        chairs: seed.staff.filter(s=>s.role==="chair" && s.committeeIds.includes(committeeId) && s.email).map(s=>({name:s.name,email:s.email!})),
         submitters: seed.delegates.filter((d) => d.committeeId === committeeId).map((d) => ({ id: d.id, country: d.country, flag: d.flag })).sort((a, b) => a.country.localeCompare(b.country)),
       };
       return info;
