@@ -95,24 +95,24 @@ test('client model: a trigger while a flush is running is dropped, not queued (n
  assert.deepEqual(log,['0 read:open','61000 read:periodic']);
  assert.equal(max(),1,'never two full refreshes at once on one device');
 });
-test('client model: a write recorded during the final read waits for the next trigger (as production does)',async()=>{
+test('client model: a write recorded during an empty-outbox refresh waits for the next trigger (as production does)',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
- c.open();                                      // final read 0–1000
+ c.open();                                      // recovery read 0–1000 (empty outbox)
  at(clock,500,()=>c.execute({name:'A'}));       // flush() returns immediately: still pending
  await clock.run(30_000);
  assert.equal(c.pending,1,'not sent by the dropped trigger');
  at(clock,10_000,()=>c.notify());               // t=40 s: someone else's change arrives → flush sends A
  await clock.run(45_000);
- assert.deepEqual(log,['0 read:open','40350 send:A','40650 read:postWrite','41650 read:postWrite']);
+ assert.deepEqual(log,['0 read:open','40350 send:A','40650 read:postWrite'],'read-back only: no extra final read after an acknowledged write');
  assert.equal(c.pending,0);
 });
-test('client model: writes recorded while the send loop runs are sent by that loop (send+read per item, then one final read)',async()=>{
+test('client model: writes recorded while the send loop runs are sent by that loop (send + read-back per item, no final read)',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
  c.execute({name:'A'});                         // send 0–300, read 300–1300
  at(clock,100,()=>c.execute({name:'B'}));       // trigger dropped, but the running loop picks B up
  await clock.run(10_000);
- assert.deepEqual(log,['0 send:A','300 read:postWrite','1300 send:B','1600 read:postWrite','2600 read:postWrite']);
- assert.equal(c.stats.reads.postWrite,3);assert.equal(c.stats.dropped.postWrite,1);
+ assert.deepEqual(log,['0 send:A','300 read:postWrite','1300 send:B','1600 read:postWrite']);
+ assert.equal(c.stats.reads.postWrite,2,'one read-back per acknowledged item');assert.equal(c.stats.dropped.postWrite,1);
 });
 test('client model: failed refresh backs off exponentially, then returns to the 60 s recovery timer',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock,{failReads:1});

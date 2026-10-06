@@ -8,8 +8,11 @@
 //  * Triggers: initial open [ready() → flush()], a write [execute() → flush()], a Realtime notification
 //    [transport.subscribe(this.retry) debounced 350 ms, reset on every event], window focus [addEventListener("focus",
 //    this.retry)], and the recovery timer [schedule() after every flush].
-//  * Flush body: for each pending item in order — send, then one full read — then one final full read.
-//    [sync(): while(item) { send; read } ; read]
+//  * Flush body (PR #9): for each pending item in order — send, then one full read-back, then the item is removed.
+//    The final full read runs only when no read-back happened in this flush (empty-outbox recovery/poll) or a
+//    conflict still blocks the head of the outbox. [sync(): while(item) { send; read; readBackCompleted=true } ;
+//    if(!readBackCompleted || item) read]. Under this model's conflict-dismissal assumption (below) the head is never
+//    left blocked, so the final read reduces to "only if nothing was read back".
 //  * A write recorded while a flush is running is NOT sent by a new flush (the trigger is dropped). It is sent only if
 //    the running flush is still inside its send loop when it re-reads the outbox; otherwise it waits for the next
 //    trigger (Realtime, focus or the recovery timer). [item=this.checkpoint?.pending[0] after each read]
@@ -93,7 +96,7 @@ export class SimClient<W> {
   }
   private async flush(source: RefreshSource) {
     this.flushing = true;
-    let sent = false;
+    let readBack = false;
     try {
       while (this.outbox.length) {
         const item = this.outbox[0];
@@ -102,11 +105,12 @@ export class SimClient<W> {
           if (this.io.isConflict(e)) { this.stats.conflicts++; this.outbox.shift(); } else this.stats.sendFailures++;
           throw e;
         }
-        sent = true;
         await this.read("postWrite");
         this.outbox.shift();
+        readBack = true;
       }
-      await this.read(sent ? "postWrite" : source);
+      // The last acknowledged item already read back the server snapshot: no extra final read.
+      if (!readBack) await this.read(source);
       this.attempts = 0;
     } catch { this.attempts++; }
     finally { this.flushing = false; this.schedule(); }

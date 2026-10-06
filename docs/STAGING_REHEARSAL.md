@@ -80,7 +80,7 @@ Reads are not scripted per action. Every simulated staff device runs `scripts/re
 
 - **One flush in flight per device.** A trigger that arrives while a flush runs is dropped — not queued, not replayed — exactly as production returns early when `flushing` is true.
 - Triggers: opening the app; a write (`execute()`); a Realtime notification (350 ms trailing debounce, reset on each event); window focus; the recovery timer (60 s + jitter after every flush, exponential backoff after a failure).
-- Flush body: send each outbox item then one full refresh, then a final full refresh. A write recorded during the final refresh waits for the next trigger, as in production. Failed sends/refreshes keep the item and re-send the same mutation id.
+- Flush body (core PR #9): send each outbox item, read the snapshot back, remove the item; a separate final refresh runs only when nothing was read back (empty-outbox recovery/poll) or a conflict still blocks the outbox. A write recorded during an empty-outbox refresh waits for the next trigger, as in production. Failed sends/refreshes keep the item and re-send the same mutation id.
 - Human assumption (not client behaviour): a conflicting item is dismissed by the Chair before their next action.
 
 Realtime is simulated from the server's real `operational_changes` topics (see `TOPIC_OF` in `scripts/rehearsal/scenario.ts`: procedure, roll-call and photo writes → `chair`; document workflow → `documents`; timer → no event). `--realtime topic-aware` (default; the core read-path change): Chairs refresh for their own committee, Approval and Admins ignore `chair`, Executive keeps all topics. `--realtime current` reproduces `main` before that change (every non-Chair role refreshes on every write).
