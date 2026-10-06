@@ -1,6 +1,6 @@
 # Conference OS integration review and handoff
 
-**Checkpoint: 6 October 2026. Development only.** This integrates the reviewed five-PR operations stack with core conference procedure. It does not certify conference readiness or record completed GitHub merges. PR **#6 must stay draft and unmerged**.
+**Checkpoint: 6 October 2026. Development only.** Latest update: the server key is configured and real public submission HTTP/browser verification passed; see the newest evidence below. This integrates the reviewed five-PR operations stack with core conference procedure. It does not certify conference readiness or record completed GitHub merges. PR **#6 must stay draft and unmerged**.
 
 ## Product decisions implemented
 
@@ -81,3 +81,13 @@ Draft integration PR: https://github.com/zhrsidd/MUNOS/pull/7 (base: `claude/pho
 ### Follow-up verification
 
 GitHub CI passed for `979f946` (run `37432150047`, 1m21s). A 20-second browser network interruption showed YELLOW/live updates unavailable; after reconnect, the same page returned to GREEN/Synced within 20 seconds without a reload and with no runtime errors. On the subsequent server-key check, `SUPABASE_SECRET_KEY` was still absent from this checkout's `.env.local` and inherited process environment; remote public HTTP testing remains blocked until the key's configured location is identified.
+
+### Server-key acceptance gate resolved — 6 October 2026
+
+The key was loaded only from ignored `.env.local` and the local production server was restarted. No key was logged, committed, exposed through browser configuration, or included in page HTML. No migration was replayed and no grants were widened. The server role's direct public-table read was denied; verification used the intended server-only RPCs and independent SQL checks.
+
+Real HTTP verification against `opmydpozhdgkpcnjwpqb` passed: Google Doc registration created `GA1 / 05` as a Draft; three concurrent same-request retries replayed that one resolution; a new request for the same source returned the original reference; changed payload reuse returned 409; invalid host/submitter/file and invalid/revoked links were rejected. PDF fallback `GA1 / 06` was persisted and downloaded byte-for-byte from private Storage, replay created no extra version, and the public Storage URL was denied. SQL confirmed one version for each Draft in GA1. Synthetic rehearsal links test registration, not actual Google Docs edit permission or document contents.
+
+The actual browser form returned “Already received — GA1 / 05” for a duplicate. Its fresh delegate browser had zero Supabase/Auth requests, zero Supabase local-storage keys and zero cookies, with no runtime errors. No delegate Auth session was created. Evidence: [submission-http-results.json](submission-http-results.json); repeatable HTTP verifier: `scripts/verify-submission-http.mts` (requires the ignored development integration fixture). The short-lived revoked-link fixture was removed; clearly labelled development rehearsal Drafts remain for inspection.
+
+Typecheck and lint passed after adding the verifier; application code was unchanged. Prior 68-test/build results remain valid. This resolves the previously recorded missing-key and real public HTTP/Storage gates. Full browser-process restart/two-Chair conflict rehearsal, upload-failure/lost-response browser fault injection, and distinct-device staff versus delegate-burst capacity gates remain outstanding. PR #6 stays draft; no production deployment or main merge occurred.
