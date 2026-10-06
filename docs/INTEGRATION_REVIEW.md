@@ -77,3 +77,7 @@ The existing PR #5 GitHub `verify` job was cancelled at its 15-minute limit, wit
 ### Pass completion
 
 Draft integration PR: https://github.com/zhrsidd/MUNOS/pull/7 (base: `claude/photo-reminders`). Final code commit: `a461def`; no main merge. PR #6 remains draft. Final production browser returned GREEN/Synced after reload with no runtime errors. An ungranted device's attempt to select a session was rejected with “Conference access is unavailable. This device cannot record changes until access is restored,” and the selection remained unchanged. GitHub CI for #7 is pending at handoff. All 68 tests, typecheck, lint and final production build passed locally. Outstanding remote HTTP, full browser-process restart/two-Chair conflict and automatic Realtime-recovery checks remain acceptance gates.
+
+### Follow-up verification
+
+GitHub CI passed for `979f946` (run `37432150047`, 1m21s). A 20-second browser network interruption showed YELLOW/live updates unavailable; after reconnect, the same page returned to GREEN/Synced within 20 seconds without a reload and with no runtime errors. On the subsequent server-key check, `SUPABASE_SECRET_KEY` was still absent from this checkout's `.env.local` and inherited process environment; remote public HTTP testing remains blocked until the key's configured location is identified.
