@@ -26,7 +26,7 @@ class RepositoryController {
     if(!navigator.onLine && pointer){
       const cached=await store.read(pointer.key);
       if(cached){
-        this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId));
+        this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId,[],Number(pointer.validUntil)<=Date.now()));
         if(Number(pointer.validUntil)<=Date.now())this.blockedReason="Reconnect to renew device access. Saved changes remain available for recovery.";
       }
     }
@@ -61,7 +61,7 @@ class RepositoryController {
     const cached=pointer?await store.read(pointer.key):undefined;
     if(pointer && cached && conf){
       this.blockedReason='Reconnect or ask an administrator to restore device access. Your saved conference and outstanding changes are retained.';
-      this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(browserClient(),conf,pointer.actorId));
+      this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(browserClient(),conf,pointer.actorId,[],true));
       this.active.health={...this.active.health,detail:reason};
     }
   }

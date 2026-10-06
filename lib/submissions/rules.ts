@@ -34,6 +34,7 @@ export type SubmissionError =
   | "invalid_title"
   | "invalid_submitter"
   | "rate_limited"
+  | "idempotency_conflict"
   | "no_session"
   | "storage_unavailable"
   | "not_configured"
@@ -47,10 +48,11 @@ export const submissionMessages: Record<SubmissionError, string> = {
   invalid_title: "Enter the resolution title (3 to 200 characters).",
   invalid_submitter: "Choose your country from the list.",
   rate_limited: "Too many submissions for this committee in the last few minutes. Wait a few minutes and try again.",
+  idempotency_conflict: "This submission reference was already used for different details. Check the original submission with your Chair before sending a new one.",
   no_session: "This committee has no session yet. Ask your Chair.",
   storage_unavailable: "File upload is temporarily unavailable. Your resolution was NOT submitted. Submit your Google Doc link instead, or try again in a minute.",
   not_configured: "Online submission is not available right now. Your resolution was NOT submitted.",
-  server_error: "Something went wrong. Your resolution was NOT submitted. Try again.",
+  server_error: "We could not confirm whether your resolution was received. Retry with the same details; the same submission will not be created twice.",
 };
 export interface Submitter { id: string; country: string; flag: string }
 export interface LinkInfo {

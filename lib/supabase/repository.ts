@@ -8,8 +8,9 @@ import type {OperationsData} from '../operations/types';
 // and send() routes extension commands to apply_operations_mutation. Same idempotency contract.
 const missingFunction=(e:{code?:string})=>e.code==='PGRST202'||e.code==='42883';
 export class SupabaseTransport implements Transport {
- constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[]){ }
+ constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false){ }
  async read():Promise<ConferenceData>{
+  if(this.recoveryOnly)throw Error("Renew device access before syncing.");
   const [core,operations]=await Promise.all([this.client.rpc('conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
   const {data,error}=core;
   if(error)throw error;
@@ -19,6 +20,10 @@ export class SupabaseTransport implements Transport {
   return {...(data as ConferenceData),...((operations.data??{}) as OperationsData)};
  }
  async send(m:Mutation){
+  if(this.recoveryOnly)throw Error("Renew device access before syncing.");
+  if(m.actorId!==this.actorId)throw new ConflictError("Saved action belongs to another identity. Export it for recovery.");
+  const {data:{session}}=await this.client.auth.getSession();
+  if(session && session.user.id!==this.actorId)throw new ConflictError("Device identity changed. Export saved actions for recovery.");
   const {error}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:m.command,requested_role:m.role,expected:m.expected,client_time:m.createdAt});
   if(error){
    if(error.code === '40001' || error.code === '42501' || /^(22|23)/.test(error.code))throw new ConflictError(error.code==='42501'?'Access has changed. Ask an administrator to review this saved change.':error.message);
@@ -26,6 +31,7 @@ export class SupabaseTransport implements Transport {
   }
  }
  subscribe(refresh:()=>void,state:(connected:boolean)=>void){
+  if(this.recoveryOnly){state(false);return ()=>{};}
   let debounce:ReturnType<typeof setTimeout>;
   const changed=()=>{clearTimeout(debounce);debounce=setTimeout(refresh,350);};
   // Only the compact notification table, filtered to committee scopes or conference operations.

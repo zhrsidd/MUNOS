@@ -1,4 +1,5 @@
 "use client";
+import {VetoSettings} from "./veto-settings";
 import Link from "next/link";
 import { useState } from "react";
 import { useConference } from "@/lib/context";
@@ -26,10 +27,6 @@ const sections: Record<string, [string, string]> = {
   scoring: [
     "Participation scoring",
     "Configure chair-awarded point values. Counts are derived from events.",
-  ],
-  awards: [
-    "Award criteria",
-    "Define subjective criteria independently of participation points.",
   ],
   workflow: [
     "Workflow & features",
@@ -72,7 +69,7 @@ export function AdminScreen({ section }: { section: string }) {
   return (
     <>
       <PageHeading
-        eyebrow="ADMINISTRATOR"
+        eyebrow="EXECUTIVE"
         title={heading[0]}
         description={heading[1]}
         action={
@@ -123,7 +120,7 @@ export function AdminScreen({ section }: { section: string }) {
                   (d) => d.committeeId === c.id,
                 );
                 const session = data.sessions.find(
-                  (s) => s.committeeId === c.id && s.state === "active",
+                  (s) => s.id === c.currentSessionId,
                 );
                 const present = data.attendance.filter(
                   (a) => a.sessionId === session?.id && a.status !== "Absent",
@@ -165,11 +162,6 @@ export function AdminScreen({ section }: { section: string }) {
                     "Give chairs fast, consistent point entry.",
                   ],
                   [
-                    "awards",
-                    "Define award criteria",
-                    "Separate subjective judgment from participation.",
-                  ],
-                  [
                     "resources",
                     "Connect services later",
                     "Supabase and Drive boundaries are prepared.",
@@ -180,9 +172,7 @@ export function AdminScreen({ section }: { section: string }) {
                       name={
                         slug === "delegates"
                           ? "attendance"
-                          : slug === "awards"
-                            ? "awards"
-                            : "settings"
+                          : "settings"
                       }
                     />
                     <div>
@@ -456,7 +446,7 @@ export function AdminScreen({ section }: { section: string }) {
                   <tr key={s.id}>
                     <td>{s.name}</td>
                     <td>
-                      <Chip tone="blue">{s.role}</Chip>
+                      <Chip tone="blue">{s.role === "admin" ? "Executive" : s.role === "logistics" ? "Admins" : s.role === "approval" ? "Approval Panel" : "Chair"}</Chip>
                     </td>
                     <td>
                       {s.committeeIds
@@ -545,54 +535,12 @@ export function AdminScreen({ section }: { section: string }) {
         </>
       )}
       {section === "awards" && (
-        <Panel
-          title="Subjective award criteria"
-          subtitle="These assessments supplement participation history. They never automatically select Best Delegate."
-        >
-          {data.criteria.map((c) => (
-            <form
-              className="criterion-form"
-              key={c.id}
-              onSubmit={(e) =>
-                void submit(e, (f) => ({
-                  type: "criterion",
-                  id: c.id,
-                  name: String(f.get("name")),
-                  description: String(f.get("description")),
-                  max: Number(f.get("max")),
-                }))
-              }
-            >
-              <div className="form-grid">
-                <label>
-                  Criterion
-                  <input required name="name" defaultValue={c.name} />
-                </label>
-                <label>
-                  Maximum rating
-                  <input
-                    required
-                    name="max"
-                    type="number"
-                    min="1"
-                    max="10"
-                    defaultValue={c.max}
-                  />
-                </label>
-              </div>
-              <label>
-                Description
-                <input
-                  required
-                  name="description"
-                  defaultValue={c.description}
-                />
-              </label>
-              <button>Save criterion</button>
-            </form>
-          ))}
+        <Panel title="Awards are chair decisions">
+          <p>Chairs discuss awards using their judgement and the factual participation history in their workspace. There is no award rubric or automatic ranking.</p>
+          <Link className="card-link" href="/chair/awards">Open chair award discussion →</Link>
         </Panel>
       )}
+      {section === "workflow" && <VetoSettings/>}
       {section === "workflow" && (
         <div className="two-column">
           <Panel
@@ -643,7 +591,7 @@ export function AdminScreen({ section }: { section: string }) {
                         "Chair submits",
                         "Approval Panel reviews",
                         "Review decision",
-                        "Logistics completes",
+                        "Admins complete",
                         "Chair introduces",
                         "Chair confirms outcome",
                       ][i]
@@ -840,7 +788,7 @@ export function AdminScreen({ section }: { section: string }) {
               Role
               <select name="role">
                 {["chair", "approval", "logistics", "admin"].map((r) => (
-                  <option key={r}>{r}</option>
+                  <option key={r} value={r}>{r === "admin" ? "Executive" : r === "logistics" ? "Admins" : r === "approval" ? "Approval Panel" : "Chair"}</option>
                 ))}
               </select>
             </label>

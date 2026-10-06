@@ -529,7 +529,7 @@ export function Logistics() {
   return (
     <>
       <PageHeading
-        eyebrow="LOGISTICS"
+        eyebrow="ADMINS"
         title="Ready. Set. Print."
         description="Only approved versions enter this queue. Mark them printed when the copies are ready."
         action={<Chip tone="blue">{queue.length} pending jobs</Chip>}

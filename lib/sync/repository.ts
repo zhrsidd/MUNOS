@@ -1,3 +1,5 @@
+import {operationsFingerprint} from "../operations/fingerprint";
+import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
 import { applyCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
@@ -15,13 +17,20 @@ export interface Health {
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
   switch (c.type) {
+    case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);
+    case "debateMode": return String(data.debateStates?.find(x=>x.sessionId===c.sessionId)?.revision??0);
+    case "queueOrder": return data.queue.filter(q=>q.sessionId===c.sessionId&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
+    case "poiOrder": return (data.poiQueue??[]).filter(q=>q.speechId===c.speechId).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
+    case "speechStart": return data.speeches?.find(s=>s.sessionId===c.sessionId&&s.state!=="finished")?.id??"empty";
+    case "speechYield": case "speechFinish": case "poiAllowance": case "poiRecognize": return String(data.speeches?.find(s=>s.id===c.speechId)?.revision??0);
+    case "voteMode": return String(data.documents.find(r=>r.id===c.resolutionId)?.revision??0);
     case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
     case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
     case "event": return String(data.events.find(e=>e.id===c.id)?.revision ?? 0);
     case "timer": return String(data.timers[c.sessionId]?.revision ?? 0);
     case "document": case "version": return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
     case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
-    default: return null;
+    default: return isOperationsCommand(c)?operationsFingerprint(data,c):null;
   }
 }
 export function project(checkpoint: Checkpoint): ConferenceData {

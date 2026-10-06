@@ -15,7 +15,7 @@ export interface SubmissionBackend {
   linkInfo(token: string): Promise<LinkInfo | null>;
   upload(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
   remove(path: string): Promise<void>;
-  submit(args: SubmitArgs): Promise<{ status: "created" | "duplicate" | "replayed"; code: string }>;
+  submit(args: SubmitArgs): Promise<{ status: "created" | "duplicate" | "replayed"; code: string; storageKey?: string | null }>;
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (status: number, error: SubmissionError, message = submissionMessages[error]) => ({ status, body: { ok: false, error, message } as SubmissionResponse });
@@ -29,7 +29,7 @@ export function derivedIds(submissionId: string) {
 }
 const rejected = (error: unknown) => {
   if (error instanceof SubmissionRejected) {
-    const status = error.reason === "invalid_link" ? 404 : error.reason === "rate_limited" ? 429 : error.reason === "no_session" ? 409 : 400;
+    const status = error.reason === "invalid_link" ? 404 : error.reason === "rate_limited" ? 429 : error.reason === "no_session" || error.reason === "idempotency_conflict" ? 409 : 400;
     return fail(status, error.reason);
   }
   return fail(500, "server_error");
@@ -64,7 +64,7 @@ export async function handleSubmission(form: FormData, backend: SubmissionBacken
   if (doc?.ok) {
     try {
       const result = await backend.submit({ token, submissionId, submitterId, title, googleDocId: doc.id });
-      return { status: result.status === "created" ? 201 : 200, body: { ok: true, ...result } };
+      return { status: result.status === "created" ? 201 : 200, body: { ok: true, status: result.status, code: result.code } };
     } catch (error) { return rejected(error); }
   }
   const upload = file as File;
@@ -72,15 +72,21 @@ export async function handleSubmission(form: FormData, backend: SubmissionBacken
   const kind = kindFromBytes(upload.name, bytes.subarray(0, 8));
   if (!kind) return fail(400, "invalid_file");
   const { documentId, versionId } = derivedIds(submissionId);
-  const storageKey = `${link.conferenceId}/${link.committeeId}/${documentId}/${versionId}.${kind}`;
+  // Content-bound names prevent a changed retry from silently reusing different stored bytes.
+  const digest = await sha256(bytes);
+  const storageKey = `${link.conferenceId}/${link.committeeId}/${documentId}/${versionId}-${digest}.${kind}`;
   try { await backend.upload(storageKey, bytes, contentTypes[kind]); } catch { return fail(503, "storage_unavailable"); }
   try {
-    const result = await backend.submit({ token, submissionId, submitterId, title, file: { fileName: upload.name.slice(0, 200), storageKey, sha256: await sha256(bytes), size: upload.size } });
-    if (result.status === "duplicate") await backend.remove(storageKey).catch(() => undefined);
-    return { status: result.status === "created" ? 201 : 200, body: { ok: true, ...result } };
+    const result = await backend.submit({ token, submissionId, submitterId, title, file: { fileName: upload.name.slice(0, 200), storageKey, sha256: digest, size: upload.size } });
+    // Only a committed duplicate with a DIFFERENT canonical key proves this upload is redundant.
+    // Derived document ids intentionally omit the UUID suffix, so two request ids can share a path.
+    if (result.status === "duplicate" && result.storageKey && result.storageKey !== storageKey)
+      await backend.remove(storageKey).catch(() => undefined);
+    return { status: result.status === "created" ? 201 : 200, body: { ok: true, status: result.status, code: result.code } };
   } catch (error) {
-    // Nothing was created: remove the orphaned file (best effort) so storage holds only submitted files.
-    await backend.remove(storageKey).catch(() => undefined);
+    // An RPC error can mean the response was lost AFTER commit. Even a rejected changed retry
+    // may point to an earlier accepted upload, so never delete here. Retained unreferenced files
+    // are inaccessible to staff under Storage RLS; later reconciliation may remove true orphans.
     return rejected(error);
   }
 }
