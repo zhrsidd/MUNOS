@@ -370,30 +370,42 @@ export type Database = {
           code: string
           conference_id: string
           created_at: string
+          currentSessionId: string | null
           id: string
           name: string
           room: string
+          sessionRevision: number
           updated_at: string
+          vetoDelegateIds: string[]
+          vetoEnabled: boolean
           voting_rule: string | null
         }
         Insert: {
           code: string
           conference_id: string
           created_at?: string
+          currentSessionId?: string | null
           id?: string
           name: string
           room: string
+          sessionRevision?: number
           updated_at?: string
+          vetoDelegateIds?: string[]
+          vetoEnabled?: boolean
           voting_rule?: string | null
         }
         Update: {
           code?: string
           conference_id?: string
           created_at?: string
+          currentSessionId?: string | null
           id?: string
           name?: string
           room?: string
+          sessionRevision?: number
           updated_at?: string
+          vetoDelegateIds?: string[]
+          vetoEnabled?: boolean
           voting_rule?: string | null
         }
         Relationships: [
@@ -403,6 +415,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conferences"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "committees_currentSessionId_conference_id_id_fkey"
+            columns: ["currentSessionId", "conference_id", "id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id", "conference_id", "committee_id"]
           },
         ]
       }
@@ -480,6 +499,41 @@ export type Database = {
           voting_rule?: string
         }
         Relationships: []
+      }
+      debate_states: {
+        Row: {
+          committee_id: string
+          conference_id: string
+          mode: string
+          phase: string
+          revision: number
+          sessionId: string
+        }
+        Insert: {
+          committee_id: string
+          conference_id: string
+          mode?: string
+          phase?: string
+          revision?: number
+          sessionId: string
+        }
+        Update: {
+          committee_id?: string
+          conference_id?: string
+          mode?: string
+          phase?: string
+          revision?: number
+          sessionId?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_states_sessionId_conference_id_committee_id_fkey"
+            columns: ["sessionId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+        ]
       }
       delegates: {
         Row: {
@@ -677,11 +731,14 @@ export type Database = {
           id: string
           outcome: Database["public"]["Enums"]["document_outcome"] | null
           revision: number
-          sessionId: string
+          sessionId: string | null
           status: Database["public"]["Enums"]["document_state"]
           submitterId: string
           title: string
           updated_at: string
+          vetoedBy: string[]
+          voteMode: string
+          voteType: string
         }
         Insert: {
           code: string
@@ -692,11 +749,14 @@ export type Database = {
           id?: string
           outcome?: Database["public"]["Enums"]["document_outcome"] | null
           revision?: number
-          sessionId: string
+          sessionId?: string | null
           status?: Database["public"]["Enums"]["document_state"]
           submitterId: string
           title: string
           updated_at?: string
+          vetoedBy?: string[]
+          voteMode?: string
+          voteType?: string
         }
         Update: {
           code?: string
@@ -707,11 +767,14 @@ export type Database = {
           id?: string
           outcome?: Database["public"]["Enums"]["document_outcome"] | null
           revision?: number
-          sessionId?: string
+          sessionId?: string | null
           status?: Database["public"]["Enums"]["document_state"]
           submitterId?: string
           title?: string
           updated_at?: string
+          vetoedBy?: string[]
+          voteMode?: string
+          voteType?: string
         }
         Relationships: [
           {
@@ -861,6 +924,7 @@ export type Database = {
         Row: {
           categoryId: string
           chairId: string | null
+          classification: string | null
           committee_id: string
           conference_id: string
           created_at: string
@@ -871,11 +935,14 @@ export type Database = {
           points: number
           resolutionId: string | null
           sessionId: string
+          speechId: string | null
           updated_at: string
+          yieldedFrom: string | null
         }
         Insert: {
           categoryId: string
           chairId?: string | null
+          classification?: string | null
           committee_id: string
           conference_id: string
           created_at?: string
@@ -886,11 +953,14 @@ export type Database = {
           points: number
           resolutionId?: string | null
           sessionId: string
+          speechId?: string | null
           updated_at?: string
+          yieldedFrom?: string | null
         }
         Update: {
           categoryId?: string
           chairId?: string | null
+          classification?: string | null
           committee_id?: string
           conference_id?: string
           created_at?: string
@@ -901,7 +971,9 @@ export type Database = {
           points?: number
           resolutionId?: string | null
           sessionId?: string
+          speechId?: string | null
           updated_at?: string
+          yieldedFrom?: string | null
         }
         Relationships: [
           {
@@ -937,6 +1009,241 @@ export type Database = {
             columns: ["sessionId", "conference_id", "committee_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "participation_events_speechId_conference_id_committee_id_fkey"
+            columns: ["speechId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "speeches"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "participation_events_yieldedFrom_conference_id_committee_i_fkey"
+            columns: ["yieldedFrom", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "speeches"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+        ]
+      }
+      photo_acknowledgements: {
+        Row: {
+          actor_id: string
+          committee_id: string
+          conference_id: string
+          created_at: string
+          id: string
+          slot_id: string
+          slot_revision: number
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          actor_id: string
+          committee_id: string
+          conference_id: string
+          created_at?: string
+          id?: string
+          slot_id: string
+          slot_revision: number
+          stage: string
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string
+          committee_id?: string
+          conference_id?: string
+          created_at?: string
+          id?: string
+          slot_id?: string
+          slot_revision?: number
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_acknowledgements_committee_id_conference_id_fkey"
+            columns: ["committee_id", "conference_id"]
+            isOneToOne: false
+            referencedRelation: "committees"
+            referencedColumns: ["id", "conference_id"]
+          },
+          {
+            foreignKeyName: "photo_acknowledgements_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "conferences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_acknowledgements_slot_id_conference_id_fkey"
+            columns: ["slot_id", "conference_id"]
+            isOneToOne: false
+            referencedRelation: "photo_slots"
+            referencedColumns: ["id", "conference_id"]
+          },
+        ]
+      }
+      photo_slots: {
+        Row: {
+          conference_id: string
+          created_at: string
+          enabled: boolean
+          ends_at: string | null
+          id: string
+          location: string
+          note: string
+          revision: number
+          school_id: string
+          starts_at: string
+          updated_at: string
+          warn_minutes: number
+        }
+        Insert: {
+          conference_id: string
+          created_at?: string
+          enabled?: boolean
+          ends_at?: string | null
+          id?: string
+          location: string
+          note?: string
+          revision?: number
+          school_id: string
+          starts_at: string
+          updated_at?: string
+          warn_minutes?: number
+        }
+        Update: {
+          conference_id?: string
+          created_at?: string
+          enabled?: boolean
+          ends_at?: string | null
+          id?: string
+          location?: string
+          note?: string
+          revision?: number
+          school_id?: string
+          starts_at?: string
+          updated_at?: string
+          warn_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_slots_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "conferences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_slots_school_id_conference_id_fkey"
+            columns: ["school_id", "conference_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id", "conference_id"]
+          },
+        ]
+      }
+      poi_queue: {
+        Row: {
+          committee_id: string
+          conference_id: string
+          delegateId: string
+          id: string
+          position: number
+          speechId: string
+        }
+        Insert: {
+          committee_id: string
+          conference_id: string
+          delegateId: string
+          id: string
+          position: number
+          speechId: string
+        }
+        Update: {
+          committee_id?: string
+          conference_id?: string
+          delegateId?: string
+          id?: string
+          position?: number
+          speechId?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poi_queue_delegateId_conference_id_committee_id_fkey"
+            columns: ["delegateId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "delegates"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "poi_queue_speechId_conference_id_committee_id_fkey"
+            columns: ["speechId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "speeches"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+        ]
+      }
+      resolution_links: {
+        Row: {
+          access: string
+          approval_copy_doc_id: string | null
+          committee_id: string
+          conference_id: string
+          created_at: string
+          document_id: string
+          revision: number
+          submitted_at: string | null
+          updated_at: string
+          working_doc_id: string | null
+        }
+        Insert: {
+          access?: string
+          approval_copy_doc_id?: string | null
+          committee_id: string
+          conference_id: string
+          created_at?: string
+          document_id: string
+          revision?: number
+          submitted_at?: string | null
+          updated_at?: string
+          working_doc_id?: string | null
+        }
+        Update: {
+          access?: string
+          approval_copy_doc_id?: string | null
+          committee_id?: string
+          conference_id?: string
+          created_at?: string
+          document_id?: string
+          revision?: number
+          submitted_at?: string | null
+          updated_at?: string
+          working_doc_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resolution_links_committee_id_conference_id_fkey"
+            columns: ["committee_id", "conference_id"]
+            isOneToOne: false
+            referencedRelation: "committees"
+            referencedColumns: ["id", "conference_id"]
+          },
+          {
+            foreignKeyName: "resolution_links_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "conferences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resolution_links_document_id_conference_id_committee_id_fkey"
+            columns: ["document_id", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id", "conference_id", "committee_id"]
           },
         ]
@@ -1026,6 +1333,7 @@ export type Database = {
           committee_id: string
           conference_id: string
           created_at: string
+          endsAt: string | null
           id: string
           name: string
           startsAt: string
@@ -1036,6 +1344,7 @@ export type Database = {
           committee_id: string
           conference_id: string
           created_at?: string
+          endsAt?: string | null
           id?: string
           name: string
           startsAt: string
@@ -1046,6 +1355,7 @@ export type Database = {
           committee_id?: string
           conference_id?: string
           created_at?: string
+          endsAt?: string | null
           id?: string
           name?: string
           startsAt?: string
@@ -1076,6 +1386,7 @@ export type Database = {
           created_at: string
           delegateId: string
           id: string
+          lane: string
           position: number
           sessionId: string
           state: string
@@ -1087,7 +1398,8 @@ export type Database = {
           created_at?: string
           delegateId: string
           id?: string
-          position?: never
+          lane?: string
+          position?: number
           sessionId: string
           state?: string
           updated_at?: string
@@ -1098,7 +1410,8 @@ export type Database = {
           created_at?: string
           delegateId?: string
           id?: string
-          position?: never
+          lane?: string
+          position?: number
           sessionId?: string
           state?: string
           updated_at?: string
@@ -1134,6 +1447,83 @@ export type Database = {
           },
         ]
       }
+      speeches: {
+        Row: {
+          classification: string
+          committee_id: string
+          conference_id: string
+          createdAt: string
+          delegateId: string
+          id: string
+          poiCount: number
+          poiLimit: number | null
+          resolutionId: string | null
+          revision: number
+          sessionId: string
+          state: string
+          yieldedFrom: string | null
+        }
+        Insert: {
+          classification: string
+          committee_id: string
+          conference_id: string
+          createdAt?: string
+          delegateId: string
+          id: string
+          poiCount?: number
+          poiLimit?: number | null
+          resolutionId?: string | null
+          revision?: number
+          sessionId: string
+          state?: string
+          yieldedFrom?: string | null
+        }
+        Update: {
+          classification?: string
+          committee_id?: string
+          conference_id?: string
+          createdAt?: string
+          delegateId?: string
+          id?: string
+          poiCount?: number
+          poiLimit?: number | null
+          resolutionId?: string | null
+          revision?: number
+          sessionId?: string
+          state?: string
+          yieldedFrom?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speeches_delegateId_conference_id_committee_id_fkey"
+            columns: ["delegateId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "delegates"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "speeches_resolutionId_conference_id_committee_id_fkey"
+            columns: ["resolutionId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "speeches_sessionId_conference_id_committee_id_fkey"
+            columns: ["sessionId", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+          {
+            foreignKeyName: "speeches_yieldedFrom_conference_id_committee_id_fkey"
+            columns: ["yieldedFrom", "conference_id", "committee_id"]
+            isOneToOne: false
+            referencedRelation: "speeches"
+            referencedColumns: ["id", "conference_id", "committee_id"]
+          },
+        ]
+      }
       staff: {
         Row: {
           auth_user_id: string | null
@@ -1162,6 +1552,57 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "staff_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "conferences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submission_links: {
+        Row: {
+          committee_id: string
+          conference_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          revoked_at: string | null
+          share_with: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          committee_id: string
+          conference_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          revoked_at?: string | null
+          share_with?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          committee_id?: string
+          conference_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          revoked_at?: string | null
+          share_with?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_links_committee_id_conference_id_fkey"
+            columns: ["committee_id", "conference_id"]
+            isOneToOne: false
+            referencedRelation: "committees"
+            referencedColumns: ["id", "conference_id"]
+          },
+          {
+            foreignKeyName: "submission_links_conference_id_fkey"
             columns: ["conference_id"]
             isOneToOne: false
             referencedRelation: "conferences"
@@ -1431,7 +1872,34 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_operations_mutation: {
+        Args: {
+          client_time: string
+          command: Json
+          conf: string
+          expected: string
+          mutation: string
+          requested_role: Database["public"]["Enums"]["conference_role"]
+        }
+        Returns: undefined
+      }
       conference_snapshot: { Args: { conf: string }; Returns: Json }
+      operations_snapshot: { Args: { conf: string }; Returns: Json }
+      submission_link_info: { Args: { link_token: string }; Returns: Json }
+      submit_resolution: {
+        Args: {
+          file_name: string
+          file_sha256: string
+          file_size: number
+          google_doc_id: string
+          link_token: string
+          storage_key: string
+          submission: string
+          submitter: string
+          title: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       attendance_state: "Present" | "Present & Voting" | "Absent"
