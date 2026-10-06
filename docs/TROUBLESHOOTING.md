@@ -65,7 +65,7 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 | "This submission link is not valid" | Link replaced or turned off (Administrator → Submission links), or mistyped. Print the current room sheet. |
 | "Too many submissions…" | 20 per link per 10 minutes. Wait, or replace the link if it leaked. |
 | "This committee has no session yet" | Create/import the committee's sessions. |
-| Chair can't open a Doc | Delegate shared with the wrong account or as Viewer. Sharing address is per committee (Administrator → Submission links). |
+| Chair can't open a Doc | Doc still Restricted, set to Viewer, shared with the wrong Chair, or the delegate's school blocks sharing outside it. Ask for *Anyone with the link → Editor*, or a direct share with a Chair; otherwise the file-upload fallback. See [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md) §6. |
 | Uploads fail, Google Docs links work | Storage problem; `/api/health` storage check shows it. Google Doc submissions are unaffected. |
 
 Conference OS stores only the Google Doc id and never calls Google; it cannot see whether sharing is correct.

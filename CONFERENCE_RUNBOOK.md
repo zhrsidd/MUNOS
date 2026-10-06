@@ -21,7 +21,7 @@ Attach: the **known-good release card** (from `docs/RELEASES.md`).
 - **Google Drive** = the Approval Panel's folder where Chairs put a copy of each resolution (by hand, for now).
 
 ```
-Delegate:  write Google Doc → share with the committee address (Editor) → scan QR → paste link → Submit
+Delegate:  write Google Doc → Share: Anyone with the link → Editor (or share with a Chair) → scan QR → paste link → Submit
 Chair:     Documents → Delegate submissions → Open Google Doc → review → copy into Approval folder → Submit to Approval
 Approval:  review the copy → approve → Admins (Logistics) print → debate → vote
 ```
@@ -56,8 +56,9 @@ System health (**Administrator → System health**) shows one colour. Every scre
 - [ ] **Two spare laptops** prepared with Chair access to *every* committee, signed in, Chair Console opened once.
 
 **Resolutions**
-- [ ] **Administrator → Submission links**: every committee has a link and a *Share edit access with* address that its Chair really uses.
-- [ ] For each committee: on a phone, scan the QR, submit a test Google Doc link. Chair → Documents → *Delegate submissions* shows it; *Open Google Doc* works on the Chair laptop; Chair copies it into the Approval folder and clicks *Submit to Approval*; it appears in Approval; Approval approves; Admins mark it printed.
+- [ ] Tell delegations in advance (briefing / handbook): write in Google Docs, set **Share → Anyone with the link → Editor**, then submit the link on the committee QR page. No login.
+- [ ] **Administrator → Submission links**: every committee has a link. In *Share edit access with*, enter that committee's Chairs, e.g. `Chair A — a@…, Chair B — b@…` (addresses they really use). Delegates are told to set *Anyone with the link → Editor*; these addresses are the fallback for schools that block link sharing. (A later update will list assigned Chairs automatically — [details](docs/GOOGLE_WORKSPACE_ACCESS_MODEL.md#11-submission-security-review-current-implementation-prs-35).)
+- [ ] For each committee: on a phone, scan the QR, submit a test Google Doc link (Doc set to *Anyone with the link → Editor*). Chair → Documents → *Delegate submissions* shows it; *Open Google Doc* works on the Chair laptop; Chair copies it into the Approval folder and clicks *Submit to Approval*; it appears in Approval; Approval approves; Admins mark it printed.
 - [ ] Each Chair knows the Approval Panel's Drive folder and how to copy a Google Doc into it (File → Make a copy → choose the folder).
 - [ ] Print the room sheets (Chair Console → Documents → *Print room sheet*).
 
@@ -91,7 +92,7 @@ Not available yet (do not test): Security Council veto, amendment flow.
 | **Database problem** (System health: "Conference database unreachable" on all devices) | Open screens keep saving on their devices. QR submissions stop until it returns. Don't refresh repeatedly. Technical contact checks [status.supabase.com](https://status.supabase.com/). |
 | **Live updates disconnected** (YELLOW) | Nothing to do. Screens refresh at least every minute and when a page is reopened. Photo reminders still appear. |
 | **Google Docs / Drive down** | Conference OS keeps working (see below). Documents can't be opened or copied until Google recovers. |
-| **Chair can't open a submitted Google Doc** | Chair clicks *Can't access* on it and asks the delegate to share with the committee address as **Editor**. When it opens, click *Access fixed*. |
+| **Chair can't open a submitted Google Doc** | Chair clicks *Can't access* on it and asks the delegation to set **Anyone with the link → Editor**, or to share it directly with the Chair as **Editor** (if their school blocks link sharing). When it opens, click *Access fixed*. |
 | **Delegate forgot to share the Doc** | Same as above. Their submission is safe; only access is missing. |
 | **Submission fails** | "Not received" → tap Submit again (safe, no duplicates). "Not a Google Docs link" → copy the link from the Doc's *Share* button. Still failing → see "file fallback". |
 | **QR code doesn't work** | Use the link printed under the QR, or open Chair Console → Documents → *Submission QR*. If the link says "not valid", the Executive replaced it — print the new room sheet. |

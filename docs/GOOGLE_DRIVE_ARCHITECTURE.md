@@ -30,7 +30,7 @@ Drive gives the conference **ownership** of documents (delegates' Docs live in p
 
 ## 3. Google Docs as editable resolution content
 
-Delegates write in Google Docs and share with the committee address. Chairs edit there and later type passed amendments into the working Doc. Conference OS stores **document ids only** (`resolution_links.working_doc_id`, `approval_copy_doc_id`) and never reads, parses or edits text. No structured clause editor, no amendment editing, no clause import — now or in this design.
+Delegates write in Google Docs and set *Anyone with the link → Editor* (or share directly with a Chair). Chairs edit there and later type passed amendments into the working Doc. Conference OS stores **document ids only** (`resolution_links.working_doc_id`, `approval_copy_doc_id`) and never reads, parses or edits text. No structured clause editor, no amendment editing, no clause import — now or in this design.
 
 ## 4. Folder hierarchy (proposed, simplest practical)
 
@@ -65,7 +65,7 @@ Deliberately **not** included from the first sketch:
 
 ```
 Delegate working Google Doc (delegate-owned)
-  → shared with the committee address (Editor)
+  → Anyone with the link → Editor (or shared directly with a Chair)
   → registered in Conference OS via QR (Draft, with the Chair)            ← implemented
   → Chair reviews/edits in Google Docs                                    ← implemented (manual)
   → Chair clicks Submit to Approval (Draft → Submitted)                   ← implemented
@@ -76,7 +76,7 @@ Delegate working Google Doc (delegate-owned)
   → PDF snapshot "Final (Passed|Failed)" of the working Doc               ← FUTURE
 ```
 
-**Access prerequisite.** A service account can only copy a Doc that is shared with it. Recommendation: make each committee's sharing address a **Google Group** (e.g. `ga1@dcmun.org`) whose members are the committee's Chairs **and the Conference OS service account**. Delegates keep doing exactly what they do today ("share with ga1@dcmun.org"); the integration gains read access automatically. No delegate OAuth.
+**Access.** Delegates set their Doc to *Anyone with the link → Editor* (or share directly with a Chair when their school forbids link sharing). Human Chairs and the automation are separate concerns: an authenticated automation identity can read a Doc shared with "anyone with the link", but not a Doc shared only with a Chair or one blocked by the owner's school policy — those become *Needs attention* and the Chair copies manually. No committee mailbox or Google Group is used. Full analysis, identity choice and setup: [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md).
 
 ## 7. Approval copies
 
@@ -124,7 +124,7 @@ Plain-language states shown to staff:
 | Worker is running it | **Syncing** |
 | Done; file id stored | **Synced** |
 | Last attempt failed, will retry | **Failed — will retry** |
-| Retries exhausted / permission problem | **Needs attention** (with a plain reason: "Conference OS can't open the delegate's Doc — check it is shared with ga1@dcmun.org") |
+| Retries exhausted / permission problem | **Needs attention** (with a plain reason: "Conference OS can't open the delegate's Doc — ask the delegation to set Anyone with the link → Editor") |
 
 System health gains a *Drive* row: GREEN when synced, YELLOW when jobs are failing or pending too long — **never RED** (Drive is not required for the conference to run).
 
@@ -145,7 +145,7 @@ Stable Drive ids are authoritative; name search is never the normal mapping.
 
 ## 13. Security and credentials
 
-- **Identity:** a dedicated Google Cloud service account, added as a member (*Content manager*) of the conference Shared Drive and to each committee Group. No domain-wide delegation, no access to anyone's personal Drive beyond what is shared with it.
+- **Identity:** a dedicated Google Cloud service account (preferred) or, if DCMUN policy refuses it as a Shared Drive member, a dedicated Workspace automation user — see [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md) §9. Added to the conference Shared Drive as **Contributor** (create and edit; cannot move or trash). No domain-wide delegation; it reaches only Docs shared with "anyone with the link" and the Shared Drive.
 - **Credential storage:** prefer **Vercel OIDC → Google Workload Identity Federation** (no long-lived key). Fallback: a service-account JSON key in a **Sensitive**, server-only Vercel variable. Never `NEXT_PUBLIC_*`, never in the repository, never sent to browsers.
 - **Scope:** `https://www.googleapis.com/auth/drive` (needed to copy Docs shared with the account), limited in practice by what is shared with the service account.
 - **Server routes** that trigger Drive work verify the caller (Supabase session + Executive/Chair grant, or the Vercel `CRON_SECRET`). No unauthenticated Drive endpoint.
@@ -174,7 +174,7 @@ If DCMUN has no Workspace with Shared Drives, use one dedicated conference Googl
 | Stage | Scope | Needs Codex? |
 | --- | --- | --- |
 | 0 — now | Manual Approval copies; optional copy link stored; `npm run drive:plan` dry run; this document | No |
-| 1 — connect | Shared Drive + service account + Groups; Executive *Set up Drive folders* (idempotent ensure); Drive row in System health | Schema (folder mapping) |
+| 1 — connect | Shared Drive + automation identity (Contributor); Executive *Set up Drive folders* (idempotent ensure); Drive row in System health | Schema (folder mapping) |
 | 2 — Approval copies | Job outbox + worker; copy on *Submit to Approval*; status chip on the resolution; retries | Schema (jobs) |
 | 3 — PDF snapshots | Approved/print and final snapshots | Uses stage-2 jobs |
 | 4 — Exports | Roll call, votes, status, end-of-day, final results; System Backups export | Read-only views |
