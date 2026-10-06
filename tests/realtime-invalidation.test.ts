@@ -40,7 +40,7 @@ function harness(roles: readonly Role[], committeeIds: string[] = [], connectImm
     channel() { const channel = new MockChannel(connectImmediately); channels.push(channel); return channel; },
     async removeChannel(channel: MockChannel) { removed.push(channel); },
     async rpc(name: string) {
-      if (name === 'conference_snapshot') { reads++; return { data: createSeed(), error: null }; }
+      if (name === 'conference_snapshot' || name === 'executive_snapshot') { reads++; return { data: createSeed(), error: null }; }
       assert.equal(name, 'operations_snapshot');
       return { data: {}, error: null };
     },
@@ -125,7 +125,7 @@ test('Chairs retain committee subscriptions and reconcile relevant Chair notific
   } finally { stop(); }
 });
 
-for (const roles of [['admin'], ['admin', 'approval'], ['chair', 'approval'], []] as Role[][]) {
+for (const roles of [['admin', 'approval'], ['chair', 'approval'], ['admin', 'admin'], []] as Role[][]) {
   test(`${roles.join('/') || 'missing role metadata'} keeps all notification topics`, t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness(roles);
@@ -139,6 +139,71 @@ for (const roles of [['admin'], ['admin', 'approval'], ['chair', 'approval'], []
       assert.equal(refreshes, 4);
       assert.equal(h.channels[0].filter, 'conference_id=eq.conference-test');
     } finally { stop(); }
+  });
+}
+
+test('Executive Chair traffic uses a fixed two-second window that cannot be postponed', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(['admin']);
+  let refreshes = 0;
+  const stop = h.transport.subscribe(() => { refreshes++; }, () => {});
+  try {
+    h.emit('chair');
+    t.mock.timers.tick(500);
+    h.emit('chair');
+    t.mock.timers.tick(1000);
+    h.emit('chair');
+    t.mock.timers.tick(499);
+    assert.equal(refreshes, 0);
+    h.emit('chair');
+    t.mock.timers.tick(1);
+    assert.equal(refreshes, 1, 'continuous Chair activity cannot extend the first event deadline');
+    h.emit('chair');
+    t.mock.timers.tick(1999);
+    assert.equal(refreshes, 1);
+    t.mock.timers.tick(1);
+    assert.equal(refreshes, 2, 'the next event after reconciliation starts a fresh window');
+    t.mock.timers.tick(5000);
+    assert.equal(refreshes, 2, 'the Chair window is not a recurring timer');
+  } finally { stop(); }
+});
+
+for (const topic of ['documents', 'configuration', 'future-topic', undefined]) {
+  test(`Executive ${topic ?? 'missing topic'} stays fast and supersedes pending Chair refresh`, t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(['admin']);
+    let refreshes = 0;
+    const stop = h.transport.subscribe(() => { refreshes++; }, () => {});
+    try {
+      h.emit('chair');
+      t.mock.timers.tick(1000);
+      h.emit(topic);
+      t.mock.timers.tick(200);
+      h.emit('chair');
+      t.mock.timers.tick(149);
+      assert.equal(refreshes, 0);
+      t.mock.timers.tick(1);
+      assert.equal(refreshes, 1, 'Chair events neither postpone the fast refresh nor add another timer');
+      t.mock.timers.tick(3000);
+      assert.equal(refreshes, 1, 'both the old and intervening Chair notifications were reconciled by the fast read');
+      h.emit('chair');
+      t.mock.timers.tick(2000);
+      assert.equal(refreshes, 2, 'a later Chair event can start another window');
+    } finally { stop(); }
+  });
+}
+
+for (const topic of ['chair', 'documents']) {
+  test(`Executive unsubscribe clears pending ${topic} timer`, t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(['admin']);
+    let refreshes = 0;
+    const stop = h.transport.subscribe(() => { refreshes++; }, () => {});
+    h.emit(topic);
+    stop();
+    t.mock.timers.tick(5000);
+    assert.equal(refreshes, 0);
+    assert.equal(h.removed.length, 1);
   });
 }
 
