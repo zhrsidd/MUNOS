@@ -1,0 +1,120 @@
+{
+  "project": "opmydpozhdgkpcnjwpqb",
+  "startedAt": "2026-10-06T13:56:06.869Z",
+  "completedAt": "2026-10-06T13:56:15.962Z",
+  "purpose": "Single existing-identity RPC correctness verification, not a staff load/readiness baseline",
+  "cases": [
+    {
+      "name": "attendance",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 127
+    },
+    {
+      "name": "attendance",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 127
+    },
+    {
+      "name": "attendance",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 124
+    },
+    {
+      "name": "queueOrder",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 180
+    },
+    {
+      "name": "queueOrder",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 127
+    },
+    {
+      "name": "queueOrder",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 143
+    },
+    {
+      "name": "speech",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 181
+    },
+    {
+      "name": "speech",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 135
+    },
+    {
+      "name": "speech",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 189
+    },
+    {
+      "name": "document",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 127
+    },
+    {
+      "name": "document",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 122
+    },
+    {
+      "name": "document",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 121
+    },
+    {
+      "name": "vote",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 130
+    },
+    {
+      "name": "vote",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 135
+    },
+    {
+      "name": "vote",
+      "status": 409,
+      "code": "PT409",
+      "milliseconds": 118
+    }
+  ],
+  "successfulWriteUnaffected": true,
+  "idempotentRetryExactlyOnce": true,
+  "clientConflictError": true,
+  "staleWritesChangedNothing": true,
+  "errors40001": 0,
+  "identityScope": "Existing GA1-only Chair; no new Auth users or access grants",
+  "timedRequests": 15,
+  "clientMappingRequests": 5,
+  "totalStaleRequests": 20,
+  "postgresLogPT409": 20,
+  "postgresLog40001": 0,
+  "postgresLogWindow": {
+    "start": "2026-10-06T13:56:06Z",
+    "end": "2026-10-06T13:57:00Z"
+  },
+  "pgStatActivityAfter": {
+    "authenticatorConnections": 3,
+    "idle": 3,
+    "active": 0,
+    "stuck": 0
+  },
+  "corrected25StaffRun": "Blocked: corrected harness and existing per-role session fixtures are not available in this checkout; not run"
+}
