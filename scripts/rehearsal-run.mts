@@ -12,6 +12,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { checkAppUrl, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
 import { REALTIME_DEBOUNCE_MS, buildScenario, subscribers, type Action, type SimUser } from "./rehearsal/scenario";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
+import { loadIdentities, type Identity, type StaffRoleKey } from "./rehearsal/identities";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -38,6 +39,15 @@ const context = await import("./remote-context.mts").catch((e: Error) => {
   process.exit(2);
 });
 const { clientFor, session, ref } = context;
+// Role-scoped identities (--identities <file>): pre-authorized sessions, one per role, each holding ONLY that role's grant,
+// so every simulated device reads the RLS payload a real device of that role would receive. Without it, every device
+// shares the all-roles test identity: a labelled WORST-CASE (admin-sized snapshot for everyone), not a readiness baseline.
+// No Auth session is created during the run; sessions near expiry are refreshed once before the run starts.
+const identitiesFile = value("--identities");
+const loaded = identitiesFile ? await loadIdentities(identitiesFile, context.env).catch((e: Error) => { console.error(e.message); process.exit(2); }) : null;
+const scoped = loaded?.scoped ?? null;
+const identities: Partial<Record<StaffRoleKey, Identity>> = loaded?.identities ?? {};
+const identityOf = (role: SimUser["role"]): Identity => scoped && role !== "delegate" ? identities[role]! : { userId: session.user.id, token: session.access_token };
 const { SupabaseTransport } = await import("../lib/supabase/repository");
 const { ConflictError, fingerprint } = await import("../lib/sync/repository");
 type Data = Awaited<ReturnType<InstanceType<typeof SupabaseTransport>["read"]>>;
@@ -56,10 +66,10 @@ const classify = (e: unknown): Sample["outcome"] => {
   const text = JSON.stringify(e ?? "") + String((e as Error)?.message ?? "");
   return /429|rate.?limit|too many/i.test(text) ? "rate_limited" : "error";
 };
-async function timed(action: string, op: () => Promise<unknown>) {
+async function timed(action: string, op: () => Promise<unknown>, role?: string) {
   const start = performance.now();
-  try { await op(); samples.push({ action, ms: performance.now() - start, outcome: "ok" }); return true; }
-  catch (e) { samples.push({ action, ms: performance.now() - start, outcome: classify(e), detail: e instanceof Error ? e.message.slice(0, 160) : undefined }); return false; }
+  try { await op(); samples.push({ action, role, ms: performance.now() - start, outcome: "ok" }); return true; }
+  catch (e) { samples.push({ action, role, ms: performance.now() - start, outcome: classify(e), detail: e instanceof Error ? e.message.slice(0, 160) : JSON.stringify(e ?? null).slice(0, 160) }); return false; }
 }
 /** A delegate: public page load and (sometimes) a submission. No Supabase client, no session. */
 async function simulateDelegate(user: SimUser, t0: number) {
@@ -82,7 +92,7 @@ interface Device { user: SimUser; transport: InstanceType<typeof SupabaseTranspo
 let devices: Device[] = [];
 /** One full client refresh (both snapshot RPCs), as lib/supabase/repository.ts read() does. */
 async function refresh(device: Device, action: string) {
-  await timed(action, async () => { device.data = await device.transport.read(); });
+  await timed(action, async () => { device.data = await device.transport.read(); }, device.user.role);
 }
 /** Realtime notification: debounced 350 ms per device, like the subscribe() handler in the client. */
 function notify(device: Device) {
@@ -91,16 +101,18 @@ function notify(device: Device) {
 }
 async function simulate(user: SimUser, t0: number) {
   if (user.role === "delegate") return simulateDelegate(user, t0);
-  const committee = fixture.committees[user.committee % fixture.committees.length];
+  // Scoped mode: every simulated committee k is an independent floor (its own session) inside the Chair identity's committee.
+  const committee = scoped ? { id: scoped.chair.committee, session: scoped.chair.sessions[user.committee % scoped.chair.sessions.length], code: `floor-${user.committee}` } : fixture.committees[user.committee % fixture.committees.length];
+  const actorId = identityOf(user.role).userId;
   const device = devices.find((d) => d.user === user)!;
   const fanout = subscribers(devices.map((d) => d.user), user).map((u) => devices.find((d) => d.user === u)!);
   let cursor = 0;
   const role = user.role === "approval" ? "approval" : user.role === "admins" ? "logistics" : user.role === "executive" ? "admin" : "chair";
   const send = async (action: Action, command: Command, retry?: boolean, as = role) => {
     if (!device.data) return;
-    const mutation = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), actorId: session.user.id, role: as as never, command, expected: fingerprint(device.data, command), state: "pending" as const };
-    const ok = await timed(action, () => device.transport.send(mutation));
-    if (ok && retry) await timed(`${action} (retry)`, () => device.transport.send(mutation)); // same id: must apply once
+    const mutation = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), actorId, role: as as never, command, expected: fingerprint(device.data, command), state: "pending" as const };
+    const ok = await timed(action, () => device.transport.send(mutation), user.role);
+    if (ok && retry) await timed(`${action} (retry)`, () => device.transport.send(mutation), user.role); // same id: must apply once
     if (ok && (command.type === "speechScore" || command.type === "poiRecognize")) acknowledged.add(mutation.id);
     if (!ok) return;
     if (realisticReads) {
@@ -125,7 +137,7 @@ async function simulate(user: SimUser, t0: number) {
     switch (step.action) {
       case "open": case "read": case "refocus": await refresh(device, step.action); break;
       case "health": await timed("health", async () => { const r = await appFetch(`${base}/api/health`); if (r.status >= 500) throw Error(`HTTP ${r.status}`); }); break;
-      case "currentSession": await send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
+      case "currentSession": if (scoped && user.committee > 0) break; await send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
       case "attendance": { const delegate = mine()[cursor % Math.max(1, mine().length)]; if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
       case "queueAdd": {
         const lane = (["open", "for", "against"] as const)[cursor % 3];
@@ -164,7 +176,7 @@ for (const users of stages) {
   const scenario = buildScenario({ staff: users, delegates: delegateCount, minutes, committees: fixture.committees.length, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction: submitToken ? Number(value("--submit-fraction") ?? 0.3) : 0 });
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref})…`);
-  devices = scenario.filter((u) => u.role !== "delegate").map((user) => ({ user, transport: new SupabaseTransport(clientFor(), fixture.conference, session.user.id), data: null }));
+  devices = scenario.filter((u) => u.role !== "delegate").map((user) => ({ user, transport: new SupabaseTransport(clientFor(identityOf(user.role).token), fixture.conference, identityOf(user.role).userId), data: null }));
   const t0 = Date.now() + 1000;
   await Promise.all(scenario.map((u) => simulate(u, t0)));
   devices.forEach((d) => clearTimeout(d.pending));
@@ -172,7 +184,8 @@ for (const users of stages) {
   stageReports.push({ staff: users, delegates: delegateCount, ...report(samples.slice(before)) });
 }
 // Exactly-once check: every acknowledged scoring mutation produced exactly one participation event.
-const final = await new SupabaseTransport(clientFor(), fixture.conference, session.user.id).read();
+const finalIdentity = identityOf("executive"); // Executive (admin) sees every participation event
+const final = await new SupabaseTransport(clientFor(finalIdentity.token), fixture.conference, finalIdentity.userId).read();
 let duplicates = 0, lost = 0;
 for (const id of acknowledged) {
   const n = final.events.filter((e) => e.id.startsWith(id.slice(0, 24))).length;
@@ -180,7 +193,7 @@ for (const id of acknowledged) {
 }
 const overall = report(samples);
 const verdict = evaluate(overall, duplicates, lost);
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, distinctAuthIdentities: 1, note: "Simulated staff share one pre-authorized test identity (operational load, not fresh staff sign-up / shared-NAT; see STAGING_REHEARSAL.md phase D). Delegates use only the public form and create no sessions.", minutes, stages: stageReports, clientReads: realisticReads ? "realistic" : "minimal", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, distinctAuthIdentities: scoped ? 4 : 1, identityMode: scoped ? "role-scoped" : "worst-case-superuser", note: scoped ? "Each simulated device reads with a pre-authorized identity holding only its role's grant (Chair scoped to one committee; simulated committees are independent floors/sessions inside it). No Auth sessions were created during the run. Delegates use only the public form." : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Not a readiness baseline.", minutes, stages: stageReports, clientReads: realisticReads ? "realistic" : "minimal", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });
