@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {checkAppUrl,checkHealthEnvironment,checkUsers} from '../scripts/rehearsal/guard';
-import {buildScenario,summarize,assignRoles,HUMAN_FLOOR_SECONDS} from '../scripts/rehearsal/scenario';
+import {buildScenario,summarize,assignStaffRoles,HUMAN_FLOOR_SECONDS} from '../scripts/rehearsal/scenario';
 import {evaluate,percentile,report} from '../scripts/rehearsal/metrics';
 test('rehearsal guard refuses production-looking targets with no override',()=>{
  for(const ok of ['http://localhost:3000','http://127.0.0.1:3001','https://munos-3fk29dk1x-dcmun.vercel.app','https://munos-git-claude-drive-ops-dcmun.vercel.app'])assert.ok(checkAppUrl(ok).ok,ok);
@@ -11,18 +11,33 @@ test('rehearsal guard refuses production-looking targets with no override',()=>{
  assert.ok(checkHealthEnvironment({app:{environment:'preview'}}).ok);
  assert.equal(checkUsers(201).ok,false);assert.equal(checkUsers(0).ok,false);assert.ok(checkUsers(200).ok);
 });
-test('scenario is human-paced, deterministic, bursty at start and role-mixed',()=>{
- const a=buildScenario({users:100,minutes:10,committees:12,seed:7}),b=buildScenario({users:100,minutes:10,committees:12,seed:7});
+test('staff scenario is human-paced, deterministic, bursty at start and staff-only',()=>{
+ const a=buildScenario({staff:50,minutes:10,committees:14,seed:7}),b=buildScenario({staff:50,minutes:10,committees:14,seed:7});
  assert.deepEqual(a,b,'same seed, same plan');
- const roles=assignRoles(100);assert.equal(roles.length,100);assert.equal(roles.filter(r=>r==='chair').length,35);assert.equal(roles.filter(r=>r==='delegate').length,50);
+ const roles=assignStaffRoles(50);assert.equal(roles.length,50);assert.equal(roles.filter(r=>r==='chair').length,35);
+ assert.ok(!(roles as string[]).includes('delegate'),'staff population contains no delegates');
  for(const u of a){
-  assert.ok(u.start<150_000,'everyone opens within the 2.5 minute burst window');
+  assert.ok(u.start<150_000,'every staff device opens within the 2.5 minute burst window');
   const writes=u.steps.filter(s=>!['read','health','submitPage','refocus','open'].includes(s.action));
   for(let i=1;i<writes.length;i++)assert.ok(writes[i].at-writes[i-1].at>=HUMAN_FLOOR_SECONDS*1000,'no machine-speed writes');
   assert.ok(u.steps.every(s=>s.at<10*60_000));
+  assert.ok(u.steps.every(s=>s.action!=='submitPage'&&s.action!=='submit'),'staff never use the public form');
  }
- const s=summarize(a,10);assert.ok(s.maxWritesPerUserPerMinute<=60/HUMAN_FLOOR_SECONDS);assert.ok(s.counts.read>0&&s.counts.participation>0&&s.counts.attendance>0);
- assert.equal(buildScenario({users:1,minutes:1,committees:1})[0].role,'chair','smallest run still exercises a Chair');
+ assert.equal(buildScenario({staff:1,minutes:1,committees:1})[0].role,'chair','smallest run still exercises a Chair');
+});
+test('delegates are a separate public-form population: page load + optional submission, no staff actions, no sessions',()=>{
+ const users=buildScenario({staff:20,delegates:150,minutes:10,committees:14,delegateWindowSeconds:120,submitFraction:0.3,seed:3});
+ const delegates=users.filter(u=>u.role==='delegate');
+ assert.equal(delegates.length,150);
+ for(const d of delegates){
+  assert.equal(d.steps[0].action,'submitPage');assert.ok(d.start<120_000,'all page loads inside the delegate window');
+  assert.ok(d.steps.every(s=>s.action==='submitPage'||s.action==='submit'),'only the public form');
+  if(d.steps[1])assert.ok(d.steps[1].at-d.steps[0].at>=HUMAN_FLOOR_SECONDS*1000,'reads the page before submitting');
+ }
+ const s=summarize(users,10);
+ assert.equal(s.delegatePublicForm.pageLoads,150);assert.equal(s.delegatePublicForm.authSessions,0);
+ assert.ok(s.delegatePublicForm.submissions>20&&s.delegatePublicForm.submissions<75);
+ assert.ok(s.staffApp.requests>0&&s.staffApp.writesPerMinute>0);
 });
 test('metrics: percentiles, outcome classes and readiness verdict',()=>{
  assert.equal(percentile([10,20,30,40,50,60,70,80,90,100],0.95),100);assert.equal(percentile([],0.5),0);

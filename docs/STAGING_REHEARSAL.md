@@ -2,7 +2,14 @@
 
 The complete rehearsal to run **before the conference**, after Codex's integration lands and a staging deployment exists. Nothing here runs against production. Owner: Claude (platform), with the Executive and one Chair per tested committee.
 
-Target: ~100 simultaneous real users, tested to **150–200** simulated users, many arriving within 2–3 minutes behind one school NAT, several committees active, intermittent Wi-Fi, multi-day use.
+Conference OS is **staff software**; delegates are not users. Two load populations are tested **separately**:
+
+| Population | Who | Realistic peak | Rehearsal target (headroom) | Touches |
+| --- | --- | --- | --- | --- |
+| **Staff app** | Chairs, Approval, Admins, Executive | ≈ 45–55 active devices (e.g. 14 committees × 2–3 Chair laptops + ~4 Approval + ~4 Admins + ~3 Executive) | **100, then 150–200** simulated staff devices | Supabase Auth session, snapshot reads, outbox writes, Realtime |
+| **Delegate public form** | Delegations on phones | ≈ 100–150 page loads within a couple of minutes after "submissions open"; a few dozen submissions | **150–200** page loads in 2 minutes + submissions | `/submit/{token}` page and `POST /api/submissions` only — server-mediated, **no Supabase Auth session** |
+
+A 100-person conference does not mean 100 simultaneous staff users; it does mean a delegate burst on the public form. Both must pass.
 
 ## Environments
 
@@ -22,7 +29,7 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 4. Authorized test session: `npx tsx scripts/prepare-session.mts` (stored in ignored `.test-sessions/`).
 5. Synthetic rehearsal conference: `npx tsx scripts/prepare-load.mts`, then apply `.test-sessions/load-fixtures.sql` to the development project (SQL editor). It creates 4 committees, 150 delegates, active sessions, and grants the test identity every role for 4 hours.
 6. Optional: create a submission link for one rehearsal committee (Administrator → Submission links on the Preview) and note its token.
-7. Dry-run the scenario: `npm run rehearsal:plan -- --users 100 --minutes 10`.
+7. Dry-run the scenario: `npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10`.
 
 ## Phase A — Basic staging check (30 min)
 
@@ -30,6 +37,8 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 - [ ] System health: GREEN, *Running version* = the Preview commit, environment `preview`, Supabase reachable, Storage `ok`.
 - [ ] Each role on a separate browser: Chair (two committees), Approval, Admins (Logistics), Executive (Administrator).
 - [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print.
+- [ ] Public form shows only committee, delegation selector, title, link, checkbox and fallback — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
+- [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §12): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).
 - [ ] Schedule import preview/confirm, group-photo slot with a reminder 10 minutes out.
 
 ## Phase B — Functional multi-user test (45 min, real people)
@@ -42,21 +51,23 @@ Verify: both laptops in the shared committee converge within a minute; conflicti
 
 ## Phase C — Load ramp (60 min)
 
-`npm run rehearsal:run -- --app <preview-url> --stages 25,50,100,150,200 --minutes 8 [--submit-token <token>]`
+**C1 — Staff app ramp:** `npm run rehearsal:run -- --app <preview-url> --stages 25,50,100,150,200 --minutes 8`
 
-The harness (`scripts/rehearsal-run.mts`) simulates **people, not requests**:
+**C2 — Staff + delegate burst together (realistic peak):** `npm run rehearsal:run -- --app <preview-url> --staff 50 --delegates 150 --delegate-window 120 --submit-token <token> --submit-committee GA1 --minutes 8`
 
-| Simulated role | Share | Behaviour |
+The harness (`scripts/rehearsal-run.mts`) simulates **people, not requests**, in two populations:
+
+| Simulated role | Share of staff | Behaviour |
 | --- | --- | --- |
-| Chair | 35% | opens committee; roll call (8 delegates, 3–8 s apart); then every 20–60 s one of: add speaker, participation, advance queue, timer, refocus refetch, Submit to Approval, photo acknowledgement; periodic recovery read every ~60 s |
-| Approval | 5% | reads every 30–90 s; approves a Submitted resolution occasionally |
-| Admins | 5% | reads; marks Approved as Printed |
-| Executive | 5% | reads; `/api/health` |
-| Delegate | 50% | opens the QR submission page once during the start window; 10% submit a Google Doc link (if `--submit-token`) |
+| Chair | 70% | opens committee; roll call (8 delegates, 3–8 s apart); then every 20–60 s one of: add speaker, participation, advance queue, timer, refocus refetch, Submit to Approval, photo acknowledgement; recovery read every ~60 s |
+| Approval | 10% | reads every 30–90 s; approves a Submitted resolution occasionally |
+| Admins | 10% | reads; marks Approved as Printed |
+| Executive | 10% | reads; `/api/health` |
+| **Delegate** (separate `--delegates N`) | — | loads the public QR page once inside the delegate window; 30% submit a Google Doc link 30–180 s later (with `--submit-token`). **No Supabase client, no session, no staff navigation**; delegations are picked from the fixture file for `--submit-committee`. |
 
-Safety and realism built in: every person starts within a 2.5-minute window (burst); **no person acts faster than every 3 s**; 10% of writes are immediately re-sent with the same id (simulated lost response); default is 10 users for 5 minutes; maximum 200; refuses custom domains, bare `*.vercel.app` aliases and any target whose `/api/health` reports `production`; the Supabase side is locked to the development project; **no override exists**.
+Safety and realism built in: staff open within a 2.5-minute window (burst); **no person acts faster than every 3 s**; 10% of staff writes are immediately re-sent with the same id (simulated lost response); defaults are 10 staff, 0 delegates, 5 minutes; maximum 200 per population; refuses custom domains, bare `*.vercel.app` aliases and any target whose `/api/health` reports `production`; the Supabase side is locked to the development project; **no override exists**.
 
-`npm run rehearsal:plan -- --users 100 --minutes 10` (dry run) shows the expected load: ≈ 134 requests/min and ≈ 74 writes/min for 100 users, at most ≈ 2 writes per person per minute.
+`npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10` (dry run): ≈ 128 staff requests/min and ≈ 73 staff writes/min for 50 staff devices (≤ 2.1 writes per person per minute), plus 150 public page loads and ≈ 47 submissions with **0 auth sessions**. The 200-staff stage is four times that.
 
 Observe during each stage: harness p50/p95/p99 per action; Supabase *Observability* (CPU, connections, API latency), *Logs* (API errors, 429s, Auth); Vercel *Logs/Functions* (5xx, duration for `/api/*`, `/submit/*`); one real Chair browser kept open — is it still responsive?
 
@@ -64,12 +75,12 @@ Results: `.test-sessions/rehearsal-<time>.json` (ignored; contains samples). Cop
 
 ## Phase D — Burst start and shared NAT (45 min)
 
-**Why it matters.** At the venue most devices share one public IP. Conference OS staff devices authenticate with Supabase Auth (anonymous sign-in, then an explicit access grant). Supabase limits **anonymous sign-ins per IP per hour** (default 30 — check the project's Auth rate-limit settings); token refreshes have their own per-IP limit. Delegates on the QR page do **not** sign in, so they don't count.
+**Why it matters.** At the venue most devices share one public IP. Conference OS staff devices authenticate with Supabase Auth (anonymous sign-in, then an explicit access grant). Supabase limits **anonymous sign-ins per IP per hour** (default 30 — check the project's Auth rate-limit settings); token refreshes have their own per-IP limit. **Delegates on the QR page do not sign in**: verified in code — `/submit/*` skips the staff provider and device storage, and the page and `POST /api/submissions` are served by the server, which uses the server-only secret key without sessions. A delegate burst is therefore **not** an anonymous sign-in burst; shared-NAT auth risk is about **fresh staff devices**.
 
 Test from **one network** (ideally the school Wi-Fi; otherwise one office connection):
 1. **Prepared devices:** 30–60 browser profiles that already have sessions and grants (as on conference morning). Open all within 2–3 minutes. Expect: all reach GREEN; only token refreshes, no sign-ups.
 2. **Fresh devices** (staging only, `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP=true` on the Preview): open N new profiles within 2–3 minutes (Playwright contexts or real laptops), N = 10, 25, 40. Record how many obtain a session, Auth log entries, HTTP 429s, and what the device shows (it must show RED "Not connected to the conference", never silently work locally).
-3. **Delegate burst:** 100 phone opens of the QR page within 2 minutes (harness `submitPage` or real phones) — no auth involved; check page latency and that `/api/submissions` stays fast.
+3. **Delegate burst from one network (separate test):** 150–200 QR page loads within 2 minutes plus a few dozen submissions from the same public IP (`--staff 1 --delegates 200 --submit-token …`, or real phones on the school Wi-Fi). Expect: no auth activity at all in Supabase Auth logs; page p95 ≤ 2 s; submissions succeed (the only limit is 20 accepted submissions per committee link per 10 minutes — spread the test across committee links or expect 429s on one link by design); Vercel function errors 0.
 
 Do **not** weaken security to pass: no blanket anonymous policies, no trusting client-supplied IPs. If fresh sign-ups hit the limit, the plan stands: prepare all staff devices in advance, stagger first sign-in, and set a measured Auth rate limit. Findings go to Codex:
 
@@ -77,7 +88,7 @@ Do **not** weaken security to pass: no blanket anonymous policies, no trusting c
 
 ## Phase E — Failure injection (60 min)
 
-Run with 25–50 simulated users in the background and real people on the devices below.
+Run with 25–50 simulated staff devices in the background and real people on the devices below.
 
 | # | Inject | Expected |
 | --- | --- | --- |
@@ -147,8 +158,9 @@ No extra monitoring platform is needed for this.
 ## Readiness criteria
 
 **PASS (all required):**
-- 100-user stage: error rate < 1% (conflicts excluded), write p95 ≤ 1.5 s, read p95 ≤ 2.5 s, no rate-limit responses; real Chair browsers stay responsive.
-- 150–200-user stages: no systemic failure (no cascading errors, no stuck devices); latency may rise but operations complete.
+- Staff app at **100** simulated staff devices (about twice the realistic peak): error rate < 1% (conflicts excluded), write p95 ≤ 1.5 s, read p95 ≤ 2.5 s, no rate-limit responses; real Chair browsers stay responsive.
+- Staff app at **150–200**: no systemic failure (no cascading errors, no stuck devices); latency may rise but operations complete.
+- Delegate public form: 150–200 page loads in 2 minutes with page p95 ≤ 2 s and no 5xx; submissions succeed apart from the designed per-link limit; **zero Supabase Auth activity** from delegates.
 - Burst start of prepared devices: all reach GREEN within 3 minutes.
 - Zero duplicate and zero lost writes after retries and offline/reconnect.
 - Realtime loss never stops core operations.
@@ -168,17 +180,17 @@ Thresholds are starting points from the current architecture; record actual numb
 - default and maximum 150/200 clients with no conservative default;
 - overwrites the committed `docs/load-test-results.json`.
 
-The new `npm run rehearsal:run` complements it: human-paced role mix, ramp stages, burst start window, page/health/submission requests through the deployed app, retries with exactly-once verification, conservative defaults, production refusal, and results written to ignored `.test-sessions/`. It still shares one identity — Phase D covers identity bursts separately.
+The new `npm run rehearsal:run` complements it: a human-paced staff role mix, a **separate delegate public-form population**, ramp stages, burst start windows, health/page/submission requests through the deployed app, retries with exactly-once verification, conservative defaults, production refusal, and results written to ignored `.test-sessions/`. Simulated staff still share one identity — Phase D covers fresh staff-device sign-in bursts separately.
 
 ## Rehearsal-day checklist
 
-People: technical contact (Vercel + Supabase access), Executive, 3+ Chairs, Approval, Admins, 5 delegate phones, one note-taker.
+People: technical contact (Vercel + Supabase access), Executive, 3+ Chairs, Approval, Admins, 5 phones acting as delegates (public form only), one note-taker.
 
 - [ ] Preview deployment URL (commit noted) and bypass secret in the operator's shell
 - [ ] Staging Vercel project for the rollback drill, with Instant Rollback access
 - [ ] Development Supabase: migrations applied, synthetic rehearsal conference loaded, test identity authorized
 - [ ] `.env.local` for the development project; `npm ci` done on the operator laptop
-- [ ] Test committee data, a submission link, test Google Docs shared with the committee address
+- [ ] Test committee data, a submission link, test Google Docs set to Anyone with the link → Editor, plus one shared only with a Chair and one from a school that blocks link sharing
 - [ ] Multiple browsers/devices: 2 Chair laptops for one committee, spare laptop, phones
 - [ ] School Wi-Fi access (preferred) or one shared office network for the NAT test
 - [ ] Vercel dashboard and Supabase dashboard open (Logs, Observability)
