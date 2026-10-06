@@ -18,7 +18,8 @@ export type Action =
   | "speechStart" | "speechScore" | "poiAllowance" | "poiAdd" | "poiRecognize" | "speechFinish"
   | "timer" | "photoAck" | "sendToApproval" | "approve" | "print"
   | "submitPage" | "submit";
-export interface Step { at: number; action: Action; retry?: boolean }
+/** periodic: the app's own recovery refresh (modelled by the client timer at run time, not as a human step). */
+export interface Step { at: number; action: Action; retry?: boolean; periodic?: boolean }
 export interface SimUser { id: number; role: Role; committee: number; floor?: boolean; start: number; steps: Step[] }
 export interface ScenarioOptions {
   /** Simulated staff devices (Chairs, Approval, Admins, Executive). */
@@ -42,12 +43,48 @@ export const HUMAN_FLOOR_SECONDS = 3;
 /** Staff mix, e.g. 14 committees × 2–3 Chair devices + ~4 Approval + ~4 Admins + ~3 Executive ≈ 45–55 devices. */
 export const STAFF_MIX: Record<StaffRole, number> = { chair: 0.7, approval: 0.1, admins: 0.1, executive: 0.1 };
 export const READS: Action[] = ["open", "read", "refocus", "health", "submitPage"];
-/** Reads a real device performs because of a write. The client (lib/sync/repository.ts flush) reads the full
- *  snapshot after each sent item and once more at the end; its own Realtime notification triggers another
- *  flush ~350 ms later. Every other device subscribed to the scope also refreshes (debounced 350 ms).
- *  Chairs subscribe to their committees; Approval/Admins/Executive subscribe conference-wide. */
+/** LEGACY upper-bound model (kept for before/after comparison only): every write = 3 writer reads + one refresh on every
+ *  other subscribed device, with no one-in-flight limit. The run-time model is scripts/rehearsal/client-model.ts. */
 export const WRITER_READS_PER_WRITE = 3;
-export const REALTIME_DEBOUNCE_MS = 350;
+
+
+// ---- Realtime topics -------------------------------------------------------------------------------------------
+// operational_changes.topic emitted by the server for each simulated write, from the function definitions:
+//  * private.apply_procedure (20261006023111_chair_procedure.sql): every procedure command → 'chair'.
+//  * private.apply_mutation (20261006073442_staff_chair_contacts.sql): default 'chair' (attendance, participation,
+//    queue, vote …); document/version/newDocument → 'documents'; setup/staff commands → 'configuration';
+//    kind = 'timer' emits NOTHING (`if kind<>'timer' then insert …`).
+//  * private.apply_operations_mutation (20261006023108_operations_review_hardening.sql): photoAck → 'chair',
+//    resolutionLink → 'documents', submissionLink/sessionImport/photo* → 'configuration'.
+//  * public.submit_resolution (QR form) → 'documents'.
+// The committee_id of the event is the writer's committee (documents: the document's committee).
+export type Topic = "chair" | "documents" | "configuration";
+export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
+  currentSession: "chair", attendance: "chair", queueAdd: "chair", queueOrder: "chair",
+  speechStart: "chair", speechScore: "chair", poiAllowance: "chair", poiAdd: "chair", poiRecognize: "chair", speechFinish: "chair",
+  photoAck: "chair", timer: null,
+  sendToApproval: "documents", approve: "documents", print: "documents", submit: "documents",
+};
+/**
+ * Which devices refresh when an operational change lands.
+ *  * "topic-aware" (core read-path change in progress): Chairs subscribe to their own committee (every topic for that
+ *    committee); Approval and Admins/Logistics ignore 'chair'; Executive/Admin keeps every topic.
+ *  * "current" (main today): Chairs as above; every non-Chair role refreshes on every conference-wide change.
+ * The writer itself is included when it is subscribed (production does not suppress its own notification).
+ * Documents events written by Approval/Admins are attributed to that device's simulated committee index.
+ */
+export type RealtimeModel = "topic-aware" | "current";
+/** An operational change: its topic and the (simulated) committee it belongs to. */
+export interface ChangeEvent { topic: Topic; committee: number }
+export function receives(model: RealtimeModel, device: SimUser, event: ChangeEvent) {
+  if (device.role === "delegate") return false;
+  if (device.role === "chair") return device.committee === event.committee;
+  if (model === "current") return true;
+  return device.role === "executive" || event.topic !== "chair";
+}
+export function recipients(model: RealtimeModel, users: SimUser[], event: ChangeEvent) {
+  return users.filter((u) => receives(model, u, event));
+}
 function rng(seed: number) {
   let s = seed >>> 0 || 1;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
@@ -97,7 +134,7 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
     else if (role === "admins") while (push(between(45, 120), pick<Action>([["read", 70], ["print", 30]])));
     else while (push(between(45, 90), pick<Action>([["read", 60], ["health", 40]])));
     // Every staff device also does the app's periodic recovery flush (~60 s, jittered).
-    for (let r = start + 60_000; r < end; r += 60_000 + random() * 1000) steps.push({ at: r, action: "read" });
+    for (let r = start + 60_000; r < end; r += 60_000 + random() * 1000) steps.push({ at: r, action: "read", periodic: true });
     steps.sort((a, b) => a.at - b.at);
     return { id, role, committee, floor: floor || undefined, start, steps };
   });
@@ -112,7 +149,7 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
   });
   return [...staff, ...delegates];
 }
-/** Devices that refresh when a write lands in `committee`: other Chairs of that committee + every non-Chair. */
+/** LEGACY: other devices refreshed per write under the old harness model (no topics, writer excluded). */
 export function subscribers(users: SimUser[], writer: SimUser): SimUser[] {
   return users.filter((u) => u !== writer && u.role !== "delegate" && (u.role !== "chair" || u.committee === writer.committee));
 }
@@ -130,14 +167,15 @@ export function summarize(users: SimUser[], minutes: number) {
   }
   const staffSteps = Object.entries(counts).filter(([k]) => k !== "submitPage" && k !== "submit").reduce((n, [, v]) => n + v, 0);
   const staffReads = ["open", "read", "refocus"].reduce((n, k) => n + (counts[k] ?? 0), 0);
-  // Upper bound: the 350 ms debounce merges notifications that arrive close together on one device.
+  // LEGACY harness model (before the one-in-flight client model): kept so before/after estimates stay comparable.
   const snapshotReads = staffReads + writes * WRITER_READS_PER_WRITE + fanoutReads;
   return {
     roles,
     counts,
-    staffApp: {
-      steps: staffSteps,
-      writesPerMinute: Math.round(writes / minutes),
+    staffApp: { steps: staffSteps, writes, writesPerMinute: Math.round(writes / minutes) },
+    legacyHarnessModel: {
+      note: "Old harness: 3 writer reads + a refresh on every other subscribed device per write, scheduled reads, no one-in-flight limit, no topics.",
+      refreshes: snapshotReads,
       snapshotReadsPerMinute: Math.round(snapshotReads / minutes),
       readAmplification: writes ? Number(((writes * WRITER_READS_PER_WRITE + fanoutReads) / writes).toFixed(1)) : 0,
     },

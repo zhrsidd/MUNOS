@@ -26,10 +26,11 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 1. Codex's integration merged to a branch; Preview deployed with development Supabase variables and `SUPABASE_SECRET_KEY` (dev).
 2. All migrations applied to the **development** project (Codex-owned).
 3. `.env.local` points at the development project (the scripts refuse anything else).
-4. Authorized test session: `npx tsx scripts/prepare-session.mts` (stored in ignored `.test-sessions/`).
-5. Synthetic rehearsal conference: `npx tsx scripts/prepare-load.mts`, then apply `.test-sessions/load-fixtures.sql` to the development project (SQL editor). It creates 4 committees, 150 delegates, active sessions, and grants the test identity every role for 4 hours.
+4. Role-scoped identities: an ignored `.test-sessions/rehearsal-identities.json` naming four **existing** pre-authorized sessions (Chair, Approval, Admins, Executive). Rehearsals never create Auth users; sessions near expiry are refreshed before a run. Only one operator may hold these sessions at a time (Supabase rotates refresh tokens).
+5. **A fresh synthetic conference for every performance run** (a reused conference accumulates audit and procedure history and inflates every snapshot): `npx tsx scripts/rehearsal-fixture.mts --identities .test-sessions/rehearsal-identities.json` writes `.test-sessions/fixtures/<conference>/{fixture.json, identities.json, fixture.sql}` — 14 committees, 420 delegations, clean state, 14 Chair floor sessions, and temporary single-role grants for the existing identities (Chair scoped to one committee). Apply `fixture.sql` to the **development** project, then pass `--fixture` and `--identities` from that folder. (The older `scripts/prepare-load.mts` all-roles fixture is kept only for labelled worst-case runs.)
 6. Optional: create a submission link for one rehearsal committee (Executive → Submission links on the Preview) and note its token.
-7. Dry-run the scenario: `npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10`.
+7. Dry-run the scenario: `npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10` (prints the refresh estimate per Realtime model and assumed refresh latency).
+8. Measure the starting payload per role: `npx tsx scripts/rehearsal-snapshots.mts --identities <folder>/identities.json --fixture <folder>/fixture.json`.
 
 ## Phase A — Basic staging check (30 min)
 
@@ -51,7 +52,7 @@ Verify: both laptops in the shared committee converge within a minute; conflicti
 
 ## Phase C — Load ramp (60 min)
 
-**C1 — Staff app ramp:** `npm run rehearsal:run -- --app <preview-url> --stages 25,50,100,150,200 --minutes 8`
+**C1 — Staff app ramp:** `npm run rehearsal:run -- --app <preview-url> --identities <folder>/identities.json --fixture <folder>/fixture.json --stages 50 --minutes 5` (one stage per fresh fixture; escalate only after reviewing the previous stage).
 
 **C2 — Staff + delegate burst together (realistic peak):** `npm run rehearsal:run -- --app <preview-url> --staff 50 --delegates 150 --delegate-window 120 --submit-token <token> --submit-committee GA1 --minutes 8`
 
@@ -59,10 +60,10 @@ The harness (`scripts/rehearsal-run.mts`) simulates **people, not requests**, in
 
 | Simulated role | Share of staff | Behaviour |
 | --- | --- | --- |
-| Chair | 70% | opens committee; roll call (8 delegates, 3–8 s apart); then every 20–60 s one of: add speaker, participation, advance queue, timer, refocus refetch, Submit to Approval, photo acknowledgement; recovery read every ~60 s |
-| Approval | 10% | reads every 30–90 s; approves a Submitted resolution occasionally |
-| Admins | 10% | reads; marks Approved as Printed |
-| Executive | 10% | reads; `/api/health` |
+| Chair | 70% | one *floor* device per committee sets the Current session, adds to lane queues, starts speeches from the queue, scores, runs POIs, finishes; other Chair devices take roll call, add to queues and refocus |
+| Approval | 10% | returns to the tab every 30–90 s (window focus); approves a Submitted resolution occasionally |
+| Admins | 10% | returns to the tab; marks Approved as Printed |
+| Executive | 10% | returns to the tab; `/api/health` |
 | **Delegate** (separate `--delegates N`) | — | loads the public QR page once inside the delegate window; 30% submit a Google Doc link 30–180 s later (with `--submit-token`). **No Supabase client, no session, no staff navigation**; delegations are picked from the fixture file for `--submit-committee`. |
 
 Safety and realism built in: staff open within a 2.5-minute window (burst); **no person acts faster than every 3 s**; 10% of staff writes are immediately re-sent with the same id (simulated lost response); defaults are 10 staff, 0 delegates, 5 minutes; maximum 200 per population; refuses custom domains, bare `*.vercel.app` aliases and any target whose `/api/health` reports `production`; the Supabase side is locked to the development project; **no override exists**.
@@ -72,6 +73,19 @@ Safety and realism built in: staff open within a 2.5-minute window (burst); **no
 Observe during each stage: harness p50/p95/p99 per action; Supabase *Observability* (CPU, connections, API latency), *Logs* (API errors, 429s, Auth); Vercel *Logs/Functions* (5xx, duration for `/api/*`, `/submit/*`); one real Chair browser kept open — is it still responsive?
 
 Results: `.test-sessions/rehearsal-<time>.json` (ignored; contains samples). Copy the summary into `docs/VERIFICATION.md` by hand.
+
+### Client and Realtime model used by the harness
+
+Reads are not scripted per action. Every simulated staff device runs `scripts/rehearsal/client-model.ts`, a line-for-line model of the production sync loop (`DurableRepository.flush()` in `lib/sync/repository.ts`):
+
+- **One flush in flight per device.** A trigger that arrives while a flush runs is dropped — not queued, not replayed — exactly as production returns early when `flushing` is true.
+- Triggers: opening the app; a write (`execute()`); a Realtime notification (350 ms trailing debounce, reset on each event); window focus; the recovery timer (60 s + jitter after every flush, exponential backoff after a failure).
+- Flush body: send each outbox item then one full refresh, then a final full refresh. A write recorded during the final refresh waits for the next trigger, as in production. Failed sends/refreshes keep the item and re-send the same mutation id.
+- Human assumption (not client behaviour): a conflicting item is dismissed by the Chair before their next action.
+
+Realtime is simulated from the server's real `operational_changes` topics (see `TOPIC_OF` in `scripts/rehearsal/scenario.ts`: procedure, roll-call and photo writes → `chair`; document workflow → `documents`; timer → no event). `--realtime topic-aware` (default; the core read-path change): Chairs refresh for their own committee, Approval and Admins ignore `chair`, Executive keeps all topics. `--realtime current` reproduces `main` before that change (every non-Chair role refreshes on every write).
+
+The report separates triggers attempted, triggers dropped because the device was busy, refreshes executed (by role and by source: open, post-write reconciliation, Realtime, periodic recovery, refocus), reads per write and snapshot RPC calls (2 per refresh).
 
 ## Phase D — Burst start and shared NAT (45 min)
 
@@ -170,6 +184,22 @@ No extra monitoring platform is needed for this.
 **FAIL (any):** sign-in/auth burst breaks prepared devices · duplicated queue/participation entries · offline changes disappear · database latency makes chairing impractical (several seconds per action) · any Drive or Google dependency blocks core workflow · rollback cannot be completed confidently.
 
 Thresholds are starting points from the current architecture; record actual numbers and adjust with Codex if the data says otherwise. The earlier single-identity burst test (`docs/load-test-results.json`) showed high burst read latency, so read p95 under burst is the number to watch first.
+
+## Measured results so far — 6 October 2026 (local production build → development Supabase)
+
+Not a Preview: the harness ran in one Node process in a cloud container (~250 ms round trip to `ap-south-1`) against a local `next start` used only for the health guard. **All runs below used the earlier harness, which let one simulated device run overlapping full refreshes** (the Realtime debounce flag cleared before its read finished, and scripted reads ignored an in-flight refresh). They therefore overstate client concurrency once refreshes become slow; they are kept as evidence, not as a baseline.
+
+| Run | Identity / fixture | Writes | Full refreshes | Reads/write | Read p50 / p95 | Write p50 / p95 | Errors | Duplicates / lost |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 25 staff | WORST CASE: one all-roles identity; reused fixture | 234 | 2,377 | 10.2 | 1.3 / 4.1 s | 0.5 / 2.4 s | 0 | 0 / 0 |
+| 50 staff | WORST CASE; reused fixture | 390 | 3,310 | 8.5 | ≈ 25 / 93 s | ≈ 13 / 86 s | 52% (40001 retry loops, below) | 0 / 0 |
+| 25 staff | role-scoped; reused fixture | 221 | 2,184 | 9.9 | 1.1 / 3.2 s | 0.5 / 1.8 s | 0 | 0 / 0 |
+| 25 staff | role-scoped; reused fixture (grown: Chair 79.5 KB, Executive 580 KB); PT409 client | 212 | 2,323 | 11.0 | 4.3 / 15.2 s | 2.4 / 14.7 s | 2 timeouts | 0 / 0 |
+| 50 staff | role-scoped; **fresh** fixture; PT409 client | 410 | 5,786 | 14.1 | 6.9 / 85.4 s | 3.1 / 75.2 s | 10% (257 PGRST003 pool waits, 162 statement timeouts, 205 gateway timeouts) | 0 / 0 |
+
+Fresh-fixture starting payloads (`conference_snapshot`, unloaded, 20 sequential reads): Chair 11.9 KB (p50 288 ms), Approval 10.8 KB (283 ms), Admins 10.8 KB (283 ms), Executive 121 KB (500 ms); `operations_snapshot` 81 bytes (~240 ms, network floor).
+
+Findings: (1) explicit stale-write conflicts raised SQLSTATE 40001, which PostgREST retries; under load these became server-side retry loops that held every API connection for ~45 minutes after the client stopped — fixed by PT409 (PR #8), verified with 14 clean 409s and zero 40001 in the fresh 50-staff run; (2) the database stays correct under overload (no duplicate or lost writes in any run) and recovers on its own; (3) refresh volume, not write volume, saturates the 10-connection API pool — the core read path is being reduced (Codex), and the harness now models the production client exactly so the next fresh 50-staff run is comparable.
 
 ## Existing load tooling — findings
 

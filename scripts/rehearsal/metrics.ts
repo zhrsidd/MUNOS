@@ -1,6 +1,9 @@
-export interface Sample { action: string; role?: string; ms: number; outcome: "ok" | "conflict" | "rate_limited" | "error"; detail?: string }
-/** Every full client refresh (each = conference_snapshot + operations_snapshot RPCs). */
-export const READ_ACTIONS = ["open", "read", "refocus", "postWriteRead", "realtimeRefresh"];
+/** source: for "refresh" samples, which client trigger caused the full refresh (see client-model.ts). */
+export interface Sample { action: string; role?: string; source?: string; ms: number; outcome: "ok" | "conflict" | "rate_limited" | "error"; detail?: string }
+/** Every full client refresh (each = conference_snapshot + operations_snapshot RPCs). Older reports used per-trigger
+ *  action names; they are still recognised so earlier result files can be re-summarised. */
+export const READ_ACTIONS = ["refresh", "open", "read", "refocus", "postWriteRead", "realtimeRefresh"];
+const NOT_WRITES = ["health", "submitPage", "submit"];
 export function percentile(sorted: number[], p: number) {
   if (!sorted.length) return 0;
   return Math.round(sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))]);
@@ -14,9 +17,14 @@ export function report(samples: Sample[]) {
   }));
   const stats = (list: Sample[]) => { const ok = list.filter((s) => s.outcome === "ok").map((s) => s.ms).sort((a, b) => a - b); return { requests: list.length, errors: list.filter((s) => s.outcome === "error").length, p50_ms: percentile(ok, 0.5), p95_ms: percentile(ok, 0.95), p99_ms: percentile(ok, 0.99) }; };
   const reads = samples.filter((s) => READ_ACTIONS.includes(s.action));
-  const writes = samples.filter((s) => !READ_ACTIONS.includes(s.action) && !["health", "submitPage", "submit"].includes(s.action) && !s.action.endsWith("(retry)"));
-  const readsByRole = Object.fromEntries([...new Set(reads.map((s) => s.role ?? "unknown"))].map((role) => [role, stats(reads.filter((s) => (s.role ?? "unknown") === role))]));
-  const summary = { writes: stats(writes), reads: stats(reads), readsByRole, snapshotRpcCalls: reads.length * 2, readsPerWrite: writes.length ? Number((reads.length / writes.length).toFixed(1)) : 0 };
+  // First attempt of each write only (lost-response retries and re-sends of the same mutation id are separate).
+  const writes = samples.filter((s) => !READ_ACTIONS.includes(s.action) && !NOT_WRITES.includes(s.action) && !/\((retry|resend)\)$/.test(s.action));
+  const group = (key: (s: Sample) => string) => Object.fromEntries([...new Set(reads.map(key))].map((k) => [k, stats(reads.filter((s) => key(s) === k))]));
+  const summary = {
+    writes: stats(writes), reads: stats(reads),
+    readsByRole: group((s) => s.role ?? "unknown"), readsBySource: group((s) => s.source ?? s.action),
+    snapshotRpcCalls: reads.length * 2, readsPerWrite: writes.length ? Number((reads.length / writes.length).toFixed(1)) : 0,
+  };
   const total = samples.length;
   const errors = samples.filter((s) => s.outcome === "error").length;
   const rateLimited = samples.filter((s) => s.outcome === "rate_limited").length;

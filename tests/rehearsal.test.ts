@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {checkAppUrl,checkHealthEnvironment,checkUsers} from '../scripts/rehearsal/guard';
-import {buildScenario,summarize,assignStaffRoles,subscribers,HUMAN_FLOOR_SECONDS,READS} from '../scripts/rehearsal/scenario';
+import {buildScenario,summarize,assignStaffRoles,subscribers,recipients,receives,TOPIC_OF,HUMAN_FLOOR_SECONDS,READS,type SimUser} from '../scripts/rehearsal/scenario';
+import {SimClient,RECOVERY_MS,REALTIME_DEBOUNCE_MS} from '../scripts/rehearsal/client-model';
+import {VirtualClock,estimate} from '../scripts/rehearsal/estimate';
 import {evaluate,percentile,report} from '../scripts/rehearsal/metrics';
 test('rehearsal guard refuses production-looking targets with no override',()=>{
  for(const ok of ['http://localhost:3000','http://127.0.0.1:3001','https://munos-3fk29dk1x-dcmun.vercel.app','https://munos-git-claude-drive-ops-dcmun.vercel.app'])assert.ok(checkAppUrl(ok).ok,ok);
@@ -38,15 +40,15 @@ test('chair procedure: one floor device per committee drives speeches; others ne
  }
  assert.ok(chairs.some(u=>u.steps.some(s=>s.action==='poiRecognize')),'POIs are exercised');
 });
-test('read amplification: every write fans out to the committee Chairs and all conference-wide staff',()=>{
+test('legacy model (kept for comparison): every write fanned out to committee Chairs and all conference-wide staff',()=>{
  const users=buildScenario({staff:50,minutes:10,committees:14,seed:5});
  const writer=users.find(u=>u.floor)!;
  const fan=subscribers(users,writer);
  assert.ok(fan.every(u=>u!==writer&&(u.role!=='chair'||u.committee===writer.committee)));
  assert.equal(fan.filter(u=>u.role!=='chair').length,users.filter(u=>u.role!=='chair').length,'every non-Chair device refreshes on every write');
  const s=summarize(users,10);
- assert.ok(s.staffApp.readAmplification>=3,'at least the writer\'s own three reads per write');
- assert.ok(s.staffApp.snapshotReadsPerMinute>s.staffApp.writesPerMinute*3);
+ assert.ok(s.legacyHarnessModel.readAmplification>=3,'legacy: three writer reads per write');
+ assert.ok(s.legacyHarnessModel.snapshotReadsPerMinute>s.staffApp.writesPerMinute*3);
 });
 test('delegates are a separate public-form population: page load + optional submission, no staff actions, no sessions',()=>{
  const users=buildScenario({staff:20,delegates:150,minutes:10,committees:14,delegateWindowSeconds:120,submitFraction:0.3,seed:3});
@@ -69,4 +71,107 @@ test('metrics: percentiles, outcome classes and readiness verdict',()=>{
  assert.ok(evaluate(r,0,0).pass);
  assert.equal(evaluate(r,1,0).pass,false,'duplicates fail');
  assert.equal(evaluate(report([{action:'read',ms:1,outcome:'rate_limited'}]),0,0).pass,false,'rate limits fail');
+});
+
+// ---- Production client model (mirrors lib/sync/repository.ts DurableRepository) ----------------------------------
+type Item={name:string};
+function client(clock:VirtualClock,o:{readMs?:number;sendMs?:number;failReads?:number}={}){
+ const log:string[]=[];let fail=o.failReads??0;let inFlight=0,maxInFlight=0;
+ const c=new SimClient<Item>({isConflict:()=>false,
+  read:async source=>{inFlight++;maxInFlight=Math.max(maxInFlight,inFlight);log.push(`${clock.now()} read:${source}`);await clock.sleep(o.readMs??1000);inFlight--;if(fail>0){fail--;throw Error('timeout');}},
+  send:async item=>{log.push(`${clock.now()} send:${item.name}`);await clock.sleep(o.sendMs??300);}},clock);
+ return {c,log,max:()=>maxInFlight};
+}
+const at=(clock:VirtualClock,ms:number,fn:()=>void)=>clock.setTimeout(fn,ms);
+test('client model: a trigger while a flush is running is dropped, not queued (no dirty flag, no follow-up)',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log,max}=client(clock);
+ c.open();                                      // read 0–1000
+ at(clock,100,()=>c.focus());                   // dropped
+ at(clock,200,()=>c.notify());                  // realtime trigger at 550 → dropped
+ await clock.run(59_000);
+ assert.deepEqual(log,['0 read:open'],'exactly one refresh; the dropped triggers did not run later');
+ assert.equal(c.stats.dropped.refocus,1);assert.equal(c.stats.dropped.realtime,1);
+ await clock.run(RECOVERY_MS+1000+1000);        // recovery timer: 60 s after the flush ended (+jitter 0 here)
+ assert.deepEqual(log,['0 read:open','61000 read:periodic']);
+ assert.equal(max(),1,'never two full refreshes at once on one device');
+});
+test('client model: a write recorded during the final read waits for the next trigger (as production does)',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
+ c.open();                                      // final read 0–1000
+ at(clock,500,()=>c.execute({name:'A'}));       // flush() returns immediately: still pending
+ await clock.run(30_000);
+ assert.equal(c.pending,1,'not sent by the dropped trigger');
+ at(clock,10_000,()=>c.notify());               // t=40 s: someone else's change arrives → flush sends A
+ await clock.run(45_000);
+ assert.deepEqual(log,['0 read:open','40350 send:A','40650 read:postWrite','41650 read:postWrite']);
+ assert.equal(c.pending,0);
+});
+test('client model: writes recorded while the send loop runs are sent by that loop (send+read per item, then one final read)',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
+ c.execute({name:'A'});                         // send 0–300, read 300–1300
+ at(clock,100,()=>c.execute({name:'B'}));       // trigger dropped, but the running loop picks B up
+ await clock.run(10_000);
+ assert.deepEqual(log,['0 send:A','300 read:postWrite','1300 send:B','1600 read:postWrite','2600 read:postWrite']);
+ assert.equal(c.stats.reads.postWrite,3);assert.equal(c.stats.dropped.postWrite,1);
+});
+test('client model: failed refresh backs off exponentially, then returns to the 60 s recovery timer',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=client(clock,{failReads:1});
+ c.open();await clock.run(70_000);
+ assert.deepEqual(log.slice(0,3),['0 read:open','3000 read:periodic','64000 read:periodic'],'retry 2 s after the failed flush ended, then 60 s');
+});
+test('client model: Realtime notifications use a trailing 350 ms debounce that resets on every event',async()=>{
+ const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
+ for(const t of [0,200,400])at(clock,t,()=>c.notify());
+ await clock.run(5_000);
+ assert.deepEqual(log,[`${400+REALTIME_DEBOUNCE_MS} read:realtime`]);assert.equal(c.stats.attempted.realtime,1);
+});
+// ---- Realtime topics --------------------------------------------------------------------------------------------
+const dev=(id:number,role:SimUser['role'],committee:number):SimUser=>({id,role,committee,start:0,steps:[]});
+test('topics: the server emits chair/documents events per the function definitions; timer emits none',()=>{
+ for(const a of ['currentSession','attendance','queueAdd','queueOrder','speechStart','speechScore','poiAllowance','poiAdd','poiRecognize','speechFinish','photoAck'] as const)assert.equal(TOPIC_OF[a],'chair',a);
+ for(const a of ['sendToApproval','approve','print','submit'] as const)assert.equal(TOPIC_OF[a],'documents',a);
+ assert.equal(TOPIC_OF.timer,null,'apply_mutation skips operational_changes for timer');
+});
+test('topic-aware Realtime: Chair stays committee-scoped; Approval/Admins ignore chair; Executive receives chair',()=>{
+ const chairA=dev(0,'chair',3),chairA2=dev(1,'chair',3),chairB=dev(2,'chair',4),approval=dev(3,'approval',0),admins=dev(4,'admins',1),exec=dev(5,'executive',2),delegate=dev(6,'delegate',3);
+ const all=[chairA,chairA2,chairB,approval,admins,exec,delegate];
+ assert.deepEqual(recipients('topic-aware',all,{topic:'chair',committee:3}),[chairA,chairA2,exec],'chair event: same-committee Chairs (incl. the writer) + Executive only');
+ assert.ok(!receives('topic-aware',chairB,{topic:'chair',committee:3}),'other committee never notified');
+ assert.ok(!receives('topic-aware',approval,{topic:'chair',committee:3}));assert.ok(!receives('topic-aware',admins,{topic:'chair',committee:3}));
+ assert.deepEqual(recipients('topic-aware',all,{topic:'documents',committee:3}),[chairA,chairA2,approval,admins,exec],'documents reach the committee Chairs and every workflow role');
+ assert.deepEqual(recipients('topic-aware',all,{topic:'configuration',committee:4}),[chairB,approval,admins,exec],'configuration reaches the scoped Chair and every non-Chair role');
+ assert.deepEqual(recipients('current',all,{topic:'chair',committee:3}),[chairA,chairA2,approval,admins,exec],'current main: non-Chair roles refresh on every change');
+ assert.ok(all.every(u=>!receives('current',delegate,{topic:'documents',committee:u.committee})),'delegates never subscribe');
+});
+test('estimate: deterministic, one refresh in flight per device, and topic-aware removes Approval/Admins chair refreshes',async()=>{
+ const users=buildScenario({staff:50,minutes:5,committees:14});
+ const a=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'topic-aware'}),b=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'topic-aware'});
+ assert.deepEqual(a,b,'same scenario, same counts');
+ const cur=await estimate(users,{minutes:5,readMs:600,sendMs:300,model:'current'});
+ assert.equal(a.maxConcurrentReadsPerDevice,1);assert.equal(cur.maxConcurrentReadsPerDevice,1);
+ assert.ok(a.byRole.approval<cur.byRole.approval/5&&a.byRole.admins<cur.byRole.admins/5,'Approval/Admins no longer refresh on chair events');
+ assert.ok(Math.abs(a.byRole.executive-cur.byRole.executive)/cur.byRole.executive<0.05,'Executive keeps every topic');
+ assert.equal(a.writes,cur.writes,'same writes either way');
+ const slow=await estimate(users,{minutes:5,readMs:7000,sendMs:300,model:'topic-aware'});
+ assert.ok(slow.triggersDropped>a.triggersDropped&&slow.refreshes<a.refreshes,'slower refreshes drop more triggers instead of stacking reads');
+ const legacy=summarize(users,5).legacyHarnessModel.refreshes;
+ assert.ok(cur.refreshes<legacy,'one-in-flight model issues fewer refreshes than the legacy overlapping model');
+});
+// ---- Fresh fixture ----------------------------------------------------------------------------------------------
+import {buildFixture,derivedUuid} from '../scripts/rehearsal/fixture';
+test('fresh fixture: deterministic ids, 14 floors in the scoped Chair committee, single-role grants, no Auth users',()=>{
+ const users={chair:'00000000-0000-4000-8000-0000000000c1',approval:'00000000-0000-4000-8000-0000000000a1',admins:'00000000-0000-4000-8000-0000000000l1',executive:'00000000-0000-4000-8000-0000000000e1'};
+ const o={conference:'11111111-1111-4111-8111-111111111111',committees:14,delegates:420,floors:14,grantHours:3,users};
+ const a=buildFixture(o),b=buildFixture(o);
+ assert.deepEqual(a,b,'same conference id → identical committees, sessions and floors');
+ assert.equal(a.committees.length,14);assert.equal(a.floors.length,14);assert.equal(new Set(a.floors).size,14);
+ assert.equal(a.floors[0],a.committees[0].session,'floor 0 is the Chair committee\'s own session');
+ assert.match(derivedUuid('x'),/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+ const grants=a.sql.slice(a.sql.indexOf('insert into public.user_access')).split('\n').filter(l=>l.startsWith(' ('));
+ assert.equal(grants.length,4,'exactly one grant per identity');
+ assert.ok(grants[0].includes(`'chair','${a.committees[0].id}'`),'Chair scoped to one committee');
+ for(const [g,role] of [[grants[1],'approval'],[grants[2],'logistics'],[grants[3],'admin']])assert.ok(g.includes(`'${role}',null`),role);
+ assert.equal((a.sql.match(/'active'\)/g)??[]).length,14+13,'14 committee sessions + 13 extra floors');
+ assert.match(a.sql,/generate_series\(0,419\)/);
+ assert.ok(!/auth\.|service_role|sb_secret|access_token|refresh_token/i.test(a.sql),'never touches Auth or embeds credentials');
 });

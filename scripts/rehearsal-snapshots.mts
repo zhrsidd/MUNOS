@@ -1,5 +1,6 @@
 // Measures the RLS payload each staff role actually receives: bytes and sequential (unloaded) latency of both snapshot RPCs.
 //   npx tsx scripts/rehearsal-snapshots.mts --identities .test-sessions/rehearsal-identities.json [--reads 20] [--worst-case]
+//        [--fixture .test-sessions/load-fixtures.json]
 // Read-only. Locked to the development project by remote-context.mts. Uses pre-authorized sessions; creates no Auth sessions.
 import { readFile } from "node:fs/promises";
 import { percentile } from "./rehearsal/metrics";
@@ -7,7 +8,7 @@ import { loadIdentities } from "./rehearsal/identities";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const { env, session, ref } = await import("./remote-context.mts");
-const fixture = JSON.parse(await readFile(".test-sessions/load-fixtures.json", "utf8")) as { conference: string };
+const fixture = JSON.parse(await readFile(value("--fixture") ?? ".test-sessions/load-fixtures.json", "utf8")) as { conference: string };
 const file = value("--identities");
 if (!file) { console.error("Pass --identities <file> (see docs/STAGING_REHEARSAL.md)."); process.exit(2); }
 const { identities } = await loadIdentities(file, env);
