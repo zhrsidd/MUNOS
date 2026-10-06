@@ -1528,7 +1528,9 @@ export type Database = {
         Row: {
           auth_user_id: string | null
           conference_id: string
+          contactRevision: number
           created_at: string
+          email: string | null
           id: string
           name: string
           updated_at: string
@@ -1536,7 +1538,9 @@ export type Database = {
         Insert: {
           auth_user_id?: string | null
           conference_id: string
+          contactRevision?: number
           created_at?: string
+          email?: string | null
           id?: string
           name: string
           updated_at?: string
@@ -1544,7 +1548,9 @@ export type Database = {
         Update: {
           auth_user_id?: string | null
           conference_id?: string
+          contactRevision?: number
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
           updated_at?: string

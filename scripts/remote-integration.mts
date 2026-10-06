@@ -13,7 +13,7 @@ const send=async(command:Command,role:Role='chair')=>{const d=await transport.re
 if(process.argv.includes('--prepare')){
  await send({type:'currentSession',committeeId:ids.ga1,sessionId:ids.session});
  const token=randomUUID().replaceAll('-',''),submission=randomUUID();
- await send({type:'submissionLink',action:'create',committeeId:ids.ga1,token,shareWith:'ga1@dcmun.example'},'admin');
+ await send({type:'submissionLink',action:'create',committeeId:ids.ga1,token,shareWith:''},'admin');
  const googleDocId='verification_'+randomUUID().replaceAll('-','');
  const fixture={token,submission,documentId:submission.slice(0,24)+'000000000001',googleDocId};await writeFile(fixtureFile,JSON.stringify(fixture),{mode:0o600});
  await writeFile('.test-sessions/submit-integration.sql',`begin; set local role service_role; select public.submit_resolution('${token}','${submission}','${ids.france}','Remote integration rehearsal','${googleDocId}',null,null,null,null); commit;`,{mode:0o600});

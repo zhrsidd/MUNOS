@@ -14,7 +14,7 @@ For conference organizers. No technical knowledge needed. Keep a printed copy in
 Known-good release card: attach the printed card from `docs/RELEASES.md`.
 Health page: **Executive → System health** (`/admin/health`).
 
-**How resolutions flow.** Delegates write resolutions in **Google Docs** and share them with their Chair (edit access). Conference OS tracks the workflow around the document — who submitted it, when, whether the Chair has sent it to Approval, approval, printing, debate and voting. Conference OS never edits the document text; amendments are typed into the Google Doc by the Chair.
+**How resolutions flow.** Delegates write resolutions in **Google Docs** and use **Anyone with the link → Editor** where permitted. If school rules prevent that, they share directly with the actual assigned Chairs shown on the form. Conference OS tracks the workflow around the document — who submitted it, when, whether the Chair has sent it to Approval, approval, printing, debate and voting. Conference OS never edits the document text; amendments are typed into the Google Doc by the Chair.
 
 ```
 Delegate: Google Doc → share with Chair → scan committee QR → paste link → Submit
@@ -43,6 +43,8 @@ Common messages:
 
 ---
 
+**Development status:** this is a preparation runbook, not evidence of production readiness. No production Supabase project exists. Complete the release gates in [the integration review](docs/INTEGRATION_REVIEW.md) before conference use. Delegates only use the QR form; they do not sign in to the staff app.
+
 ## Before the conference (one week to 48 hours before)
 
 - [ ] **Known-good release.** System health → *Running version* matches the printed known-good card. Production is frozen 48 hours before opening (no changes except emergencies).
@@ -50,8 +52,8 @@ Common messages:
 - [ ] **Committees.** Every committee exists with the right code, name and room.
 - [ ] **Delegates.** Delegate import complete; spot-check five delegates per committee (country, school, committee).
 - [ ] **Sessions.** Executive → Sessions → *Import schedule*; review the preview and confirm. Each committee shows the right sessions with correct times.
-- [ ] **Resolution submission.** For each committee, open its submission QR link on a phone, confirm the page shows the right "share edit access with" email, and submit a test Google Doc link. It must appear in that Chair's *Delegate submissions*. The Chair opens the Google Doc, then clicks *Submit to Approval*; it must appear in the Approval inbox. Withdraw the test afterwards.
-- [ ] **Chair sharing addresses.** Each committee's sharing email (Executive → Submission links → *Share with*) is an account the Chair actually uses. Test that a document shared to it opens on the Chair's laptop.
+- [ ] **Resolution submission.** For each committee, open its submission QR link on a phone, confirm it shows the preferred link-sharing instruction and the correct assigned Chair names/contact emails for the restricted-sharing fallback, and submit a test Google Doc link. It must appear in that Chair's *Delegate submissions*. The Chair opens the Google Doc, then clicks *Submit to Approval*; it must appear in the Approval inbox. Withdraw the test afterwards.
+- [ ] **Chair contacts.** Executive → Chairs/Staff: confirm assigned Chairs have their actual contact email recorded. Test that a document shared directly to those accounts opens for editing on the Chairs’ laptops. Do not assume a committee mailbox. Future Drive automation access does not replace human Chair access.
 - [ ] **Approval folder.** Each Chair knows the Approval Panel's Google Drive folder and how to make a copy into it.
 - [ ] **Approval workflow.** Approval Panel approves the test resolution.
 - [ ] **Admin print workflow.** Admins/print team marks it printed.
@@ -70,7 +72,7 @@ Common messages:
 - [ ] **Resolution submission test.** Scan one committee's QR code with a phone and submit a test Google Doc link. The Chair opens it from *Delegate submissions* and clicks *Submit to Approval*. Confirm it appears in Approval.
 - [ ] **Approval test.** Approve the test resolution.
 - [ ] **Admin print test.** Mark it printed.
-- [ ] **SC voting test** (once Security Council veto handling exists): run one practice vote in SC.
+- [ ] **SC voting test.** Check the configured permanent-member delegates, then rehearse a substantive veto and a procedural vote where veto does not apply.
 - [ ] **No unsynced changes.** Every Chair laptop: sidebar shows GREEN / "Synced". Any device showing unsynced or "need review" → Executive resolves it before sessions start.
 - [ ] Today's group photos: check the list for today in Executive → Group photos.
 
@@ -92,7 +94,7 @@ YELLOW *"Live updates temporarily unavailable"*. Nothing to do. Screens refresh 
 
 1. **"Not received"** — nothing was submitted. Ask the delegate to tap Submit once more (it is safe; duplicates are detected).
 2. **"That is not a Google Docs link"** — the delegate must copy the link from the Google Doc's *Share* button (it starts `https://docs.google.com/document/d/…`). Drive file links, "Publish to the web" links and other sites are refused.
-3. **Chair can't open the document** — the Chair clicks *Can't access* on that submission and asks the delegate to share edit access with the committee's sharing email. When it opens, the Chair clicks *Access fixed*.
+3. **Chair can't open the document** — the Chair clicks *Can't access* on that submission and asks the delegate to choose “Anyone with the link → Editor”, or share directly with the assigned Chair emails shown on the form if school rules prevent link sharing. When it opens, the Chair clicks *Access fixed*.
 4. **Google Docs unavailable** — the delegate taps *Upload a file instead* and uploads a PDF or Word file. If System health shows *Document storage* YELLOW, uploads are also unavailable: the delegate gives the file to the Chair and submits later.
 
 ### Supabase (database) outage

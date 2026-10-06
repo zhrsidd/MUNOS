@@ -65,6 +65,7 @@ class RepositoryController {
       this.active.health={...this.active.health,detail:reason};
     }
   }
+  if(!this.active && process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase') this.blockedReason='Conference access is unavailable. This device cannot record changes until access is restored.';
   if(!this.active)this.active=new DurableRepository('local-demo',()=>{
    const saved=localStorage.getItem('conference-os-demo-v2');
    return saved?JSON.parse(saved):createSeed();
