@@ -16,7 +16,7 @@ Keep chairing. Changes save on each laptop (YELLOW) and sync when Wi-Fi returns.
 Conference OS keeps working: roll call, speakers, timer, participation, votes, resolution workflow. Only opening or copying documents waits. Check [Google Workspace status](https://www.google.com/appsstatus/dashboard/).
 
 **A Chair laptop died**
-Take a spare laptop (already given access to every committee) → Chair Console → choose the committee → check *Working session*, roll call and speaker queue → continue. Changes the dead laptop had **not synced** stay on it. If it comes back: **before** reconnecting it, open `/admin/health` on it, *Export device recovery file*, and give it to the technical contact.
+Take a spare laptop (already given access to every committee) → Chair Console → choose the committee → check *Current session*, roll call and speaker queue → continue. Changes the dead laptop had **not synced** stay on it. If it comes back: **before** reconnecting it, open `/admin/health` on it, *Export device recovery file*, and give it to the technical contact.
 
 **A deployment is broken** (errors after an update, wrong version shown)
 Return to the known-good release (below). Do not try to fix forward during the conference.
@@ -25,7 +25,7 @@ Return to the known-good release (below). Do not try to fix forward during the c
 1. vercel.com → Conference OS project → **Deployments**.
 2. Find the deployment whose commit matches the **known-good card**.
 3. **⋯ → Instant Rollback → Continue → Confirm Rollback**.
-4. On one device: Administrator → System health → *Running version* matches the card.
+4. On one device: Executive → System health → *Running version* matches the card.
 5. Only then ask Chairs to refresh — and only laptops showing **0 unsynced**.
 
 Rollback changes the application only. It never changes the database or anything saved on laptops.

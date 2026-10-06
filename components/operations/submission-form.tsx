@@ -21,9 +21,8 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
   // returns the original resolution instead of creating a second one.
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID());
   const [state, setState] = useState<State>({ phase: "idle" });
-  const [copied, setCopied] = useState(false);
-  const shareWith = link.shareWith;
-  const help = shareWith ? ` If it keeps failing, tell your Chair (${shareWith}).` : " If it keeps failing, tell your Chair.";
+  const chairs = link.chairs ?? [];
+  const help = " If it keeps failing, tell your Chair.";
   const parsedDoc = parseGoogleDocLink(docLink);
   const docError = docLink.trim() && !parsedDoc.ok ? googleDocMessages[parsedDoc.problem] : "";
 
@@ -43,7 +42,7 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
     const form = new FormData();
     if (mode === "doc") {
       if (!parsedDoc.ok) return setState({ phase: "error", message: googleDocMessages[parsedDoc.problem] });
-      if (!shared) return setState({ phase: "error", message: `Share the Google Doc with ${shareWith || "your Chair"} (edit access) first, then tick the box.` });
+      if (!shared) return setState({ phase: "error", message: "Make sure the Chairs can edit this document, then tick the box." });
       form.set("googleDoc", parsedDoc.url);
     } else {
       if (!file || !kindFromName(file.name)) return setState({ phase: "error", message: submissionMessages.invalid_file });
@@ -101,20 +100,10 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
       {mode === "doc" && (
         <div className="share-box">
           <strong>Before you submit</strong>
-          {shareWith ? (
-            <>
-              <span>Share your Google Doc with edit access with:</span>
-              <span className="share-address">
-                <b>{shareWith}</b>
-                <button type="button" className="button" onClick={() => void navigator.clipboard?.writeText(shareWith).then(() => setCopied(true), () => undefined)}>
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </span>
-            </>
-          ) : (
-            <span>Share your Google Doc with your committee Chair with edit access. Ask your Chair for the address.</span>
-          )}
-          <small>In Google Docs: Share → add the address → Editor → Send. Then Share → Copy link.</small>
+          <span>In Google Docs: Share → General access → <b>Anyone with the link</b> → <b>Editor</b>.</span>
+          <span>If your school restricts link sharing, share directly with an assigned Chair as an Editor:</span>
+          {chairs.length ? chairs.map(chair=><span className="share-address" key={chair.email}><b>{chair.name}</b><span>{chair.email}</span></span>) : <span>Chair contact emails have not been configured. Ask your committee Chair for their address.</span>}
+          <small>Then Share → Copy link. Keep edit access enabled during review and debate.</small>
         </div>
       )}
       <ol className="submit-steps">
@@ -153,7 +142,7 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
               {docError || (parsedDoc.ok ? "✓ Google Doc link recognised." : "Paste the link from Share → Copy link.")}
             </small>
             <label className="inline share-confirm">
-              <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} /> I have shared this document with {shareWith || "my Chair"} as an editor.
+              <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} /> I have made sure the Chairs can edit this document.
             </label>
           </li>
         ) : (
@@ -175,7 +164,7 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
       <button type="button" className="link-button" onClick={() => { setMode(mode === "doc" ? "file" : "doc"); fresh(); setState({ phase: "idle" }); }}>
         {mode === "doc" ? "Can't use Google Docs? Upload a file instead" : "Use a Google Doc link instead"}
       </button>
-      <p className="muted submit-note">Only the main submitter submits. No email is needed — your Chair is notified automatically.</p>
+      <p className="muted submit-note">Only the main submitter submits. No account is needed — your Chair is notified automatically.</p>
     </form>
   );
 }

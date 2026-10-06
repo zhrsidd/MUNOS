@@ -1,6 +1,6 @@
 # DCMUN Conference OS
 
-Next.js App Router, TypeScript and Supabase conference operations. The DCMUN-branded frontend provides Chair, Approval, Logistics and Administrator workspaces. This is a **development baseline, not a conference-ready production release**.
+Next.js App Router, TypeScript and Supabase conference operations. The DCMUN-branded frontend provides Chair, Approval, Admins and Executive workspaces. This is a **development baseline, not a conference-ready production release**.
 
 ## Start
 
@@ -15,11 +15,14 @@ The example defaults to an isolated local demo. For the development database, se
 ## Current implementation
 
 - Remote normalized schema, strict RLS, explicit read grants and validated transactional command RPCs.
+- Explicit, shared current-session selection; independent open/for/against speaker queues, recognized POIs, Main/Co-Submitter speech flow, Divide the House and configurable Security Council veto rules.
 - Attendance per session; event-derived opportunities and quality points; configurable scoring; immutable participation corrections and document versions.
 - Resolution workflow around Google Docs: delegates register their Google Doc via a committee QR link, the Chair reviews it in Google Docs and submits it to Approval; review, approval, printing, debate, attendance-aware voting, configured majority outcome and audit records. Conference OS does not edit document text.
 - IndexedDB saves before optimistic rendering. Cloud writes use a durable mutation outbox with stable UUIDs, retry receipts and explicit revision conflicts.
 - Local countdown calculation; timer transitions alone are persisted. Realtime is limited to operational notifications; ordinary reads/writes and periodic recovery work independently.
-- Production-only service worker caches the Chair shell. Administrator System health shows connection, latency, pending changes and recovery export.
+- Production-only service worker caches the Chair shell. Executive System health shows connection, latency, pending changes and recovery export.
+- MUNOS is staff-only. Delegates use the isolated, server-mediated QR submission form without creating Supabase Auth sessions. Prefer Google Docs “Anyone with the link → Editor”; assigned Chair contacts provide the sharing fallback.
+- Award rubric controls are retired; alphabetical participation context supports a human Chair decision.
 - Local demo data is separate from cloud data and is never automatically uploaded.
 
 ## Routes
@@ -33,7 +36,7 @@ The example defaults to an isolated local demo. For the development database, se
 | `/approval` | Review inbox |
 | `/logistics` | Print queue |
 | `/admin` | Conference overview |
-| `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,awards,workflow,resources,audit}` | Configuration |
+| `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,workflow,resources,audit}` | Configuration |
 | `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
 | `/admin/schedule` | Import the conference schedule as sessions |
 | `/admin/photos` | School group-photo slots, CSV import, chair acknowledgements |
@@ -53,7 +56,7 @@ npm run build
 npm start -- --port 3001
 ```
 
-`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. See [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) , the [organizer runbook](CONFERENCE_RUNBOOK.md), [emergency sheet](docs/EMERGENCY_RECOVERY.md) and [troubleshooting](docs/TROUBLESHOOTING.md).
+`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. The public submission server additionally requires `SUPABASE_SECRET_KEY`, kept server-only. Its real HTTP/Storage path was verified against the development project (see the integration review). See [integration review](docs/INTEGRATION_REVIEW.md), [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) , the [organizer runbook](CONFERENCE_RUNBOOK.md), [emergency sheet](docs/EMERGENCY_RECOVERY.md) and [troubleshooting](docs/TROUBLESHOOTING.md).
 
 ## Deployment
 

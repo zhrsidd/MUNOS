@@ -12,7 +12,7 @@ One-page emergency sheet: [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.m
 
 Attach: the **known-good release card** (from `docs/RELEASES.md`).
 
-**Names in the app today.** *Executive* screens are labelled **Administrator**; the *Admins* (print team) workspace is labelled **Logistics**. The renaming is planned.
+**Development status:** this is a preparation runbook, not evidence of production readiness. Complete the release gates in [docs/INTEGRATION_REVIEW.md](docs/INTEGRATION_REVIEW.md) and the rehearsal in [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) before conference use. Conference OS is staff software (Chair, Approval, Admins, Executive); delegates only use the QR form and never sign in.
 
 ## How it fits together
 
@@ -23,12 +23,12 @@ Attach: the **known-good release card** (from `docs/RELEASES.md`).
 ```
 Delegate:  write Google Doc → Share: Anyone with the link → Editor (or share with a Chair) → scan QR → paste link → Submit
 Chair:     Documents → Delegate submissions → Open Google Doc → review → copy into Approval folder → Submit to Approval
-Approval:  review the copy → approve → Admins (Logistics) print → debate → vote
+Approval:  review the copy → approve → Admins print → debate → vote
 ```
 
 ## The three colours
 
-System health (**Administrator → System health**) shows one colour. Every screen shows a strip at the top when it is not GREEN.
+System health (**Executive → System health**) shows one colour. Every screen shows a strip at the top when it is not GREEN.
 
 | | Meaning | Do |
 | --- | --- | --- |
@@ -47,17 +47,18 @@ System health (**Administrator → System health**) shows one colour. Every scre
 - [ ] Committees: right code, name and room.
 - [ ] Schools: every school exists once (no near-duplicates).
 - [ ] Delegates: spot-check five per committee (country, school, committee).
-- [ ] Sessions: **Administrator → Schedule import**, preview, confirm. Each committee shows the right sessions and times.
-- [ ] Group photos: **Administrator → Group photos** — every school has its slot, time and place; affected committees look right.
+- [ ] Sessions: **Executive → Schedule import**, preview, confirm. Each committee shows the right sessions and times.
+- [ ] Group photos: **Executive → Group photos** — every school has its slot, time and place; affected committees look right.
 
 **Access** (technical contact grants it; there is no access-code login yet)
 - [ ] Every Chair laptop opens its committee in Chair Console.
-- [ ] Approval Panel, Admins (Logistics) and Executive (Administrator) devices open their workspaces.
+- [ ] Approval Panel, Admins and Executive devices open their workspaces.
 - [ ] **Two spare laptops** prepared with Chair access to *every* committee, signed in, Chair Console opened once.
 
 **Resolutions**
 - [ ] Tell delegations in advance (briefing / handbook): write in Google Docs, set **Share → Anyone with the link → Editor**, then submit the link on the committee QR page. No login.
-- [ ] **Administrator → Submission links**: every committee has a link. In *Share edit access with*, enter that committee's Chairs, e.g. `Chair A — a@…, Chair B — b@…` (addresses they really use). Delegates are told to set *Anyone with the link → Editor*; these addresses are the fallback for schools that block link sharing. (A later update will list assigned Chairs automatically — [details](docs/GOOGLE_WORKSPACE_ACCESS_MODEL.md#11-submission-security-review-current-implementation-prs-35).)
+- [ ] **Executive → Chairs & staff**: every Chair is assigned to the right committee with a contact email they really use. The QR form lists these assigned Chairs as the fallback for schools that block link sharing (contacts are not app access; no committee mailboxes).
+- [ ] **Executive → Submission links**: every committee has a link; its *Assigned Chair contacts* column is complete.
 - [ ] For each committee: on a phone, scan the QR, submit a test Google Doc link (Doc set to *Anyone with the link → Editor*). Chair → Documents → *Delegate submissions* shows it; *Open Google Doc* works on the Chair laptop; Chair copies it into the Approval folder and clicks *Submit to Approval*; it appears in Approval; Approval approves; Admins mark it printed.
 - [ ] Each Chair knows the Approval Panel's Drive folder and how to copy a Google Doc into it (File → Make a copy → choose the folder).
 - [ ] Print the room sheets (Chair Console → Documents → *Print room sheet*).
@@ -74,13 +75,15 @@ System health (**Administrator → System health**) shows one colour. Every scre
 ## Every conference morning (45 minutes before sessions)
 
 - [ ] Executive opens System health: **GREEN**, version matches the card.
-- [ ] Each Chair opens their committee and checks the **Working session** selector shows today's session.
+- [ ] Each Chair opens their committee and sets the committee's **Current session** (shared by every Chair device in that committee; the app only suggests by time).
 - [ ] One committee: mark a delegate present, add a speaker, record one participation point, start/stop the timer (undo the point afterwards).
 - [ ] One test submission by QR → Chair opens the Google Doc → *Submit to Approval* → Approval approves → Admins mark printed.
-- [ ] Today's group photos look right (Administrator → Group photos).
+- [ ] Today's group photos look right (Executive → Group photos).
 - [ ] Every Chair laptop: sidebar GREEN / "Synced" and **0 unsynced**. Fix anything else before sessions start.
 
-Not available yet (do not test): Security Council veto, amendment flow.
+- [ ] Security Council: check the configured permanent members; rehearse one substantive vote with a veto and one procedural vote (no veto).
+
+Not available yet (do not test): amendment flow.
 
 ## During the conference
 
@@ -99,7 +102,7 @@ Not available yet (do not test): Security Council veto, amendment flow.
 | **File fallback needed** | On the submission page tap *Upload a file instead* (PDF or Word, up to 4 MB). If uploads are also unavailable, the delegate gives the file to the Chair and submits later. |
 | **A device shows unsynced changes** | Normal while offline. Keep it open and connected. If RED for over 15 minutes, call the Executive. Never clear the browser. |
 | **A Chair laptop dies** | Follow *Chair device failure* below. |
-| **Photo reminder didn't appear** | Check the laptop's clock is automatic and correct. Chair Console → Group photos lists the committee's slots. The Executive can see who acknowledged in Administrator → Group photos and send a runner if needed. |
+| **Photo reminder didn't appear** | Check the laptop's clock is automatic and correct. Chair Console → Group photos lists the committee's slots. The Executive can see who acknowledged in Executive → Group photos and send a runner if needed. |
 
 ### Google Docs/Drive down vs Conference OS down
 
@@ -110,7 +113,7 @@ Not available yet (do not test): Security Council veto, amendment flow.
 ### Chair device failure
 
 1. Take a **spare laptop** (prepared with access to every committee). Open Conference OS → Chair Console.
-2. Choose the committee in the top bar and check the **Working session**.
+2. Choose the committee in the top bar and check the **Current session**.
 3. Check roll call, the speaker queue and recent participation. Only changes the old laptop had **already synced** are there.
 4. The status strip must be GREEN with 0 unsynced. Continue chairing.
 
@@ -134,4 +137,4 @@ If the old laptop had **unsynced changes**: they exist only on that laptop. They
 - **Paper fallback** (only if absolutely necessary): printed attendance sheet and speakers list; record times and names; one person enters them afterwards. Never record the same thing in two systems at once.
 - **Emergency fix during the freeze:** only for something blocking the conference — small, tested, checked on a Preview first, with the known-good release ready for rollback ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#production-freeze)).
 
-Planned, not yet available: automatic Approval-folder copies, PDF snapshots and Drive archive exports ([docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md)), access-code login, Security Council veto, amendment tracking.
+Planned, not yet available: automatic Approval-folder copies, PDF snapshots and Drive archive exports ([docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md)), access-code login, amendment tracking.

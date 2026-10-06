@@ -1,0 +1,339 @@
+{
+  "date": "2026-10-05T15:23:35.919Z",
+  "project": "opmydpozhdgkpcnjwpqb",
+  "conference": "c1d82e66-fea3-4f60-a46f-ae58c66268af",
+  "concurrency": 150,
+  "distinctAuthIdentities": 1,
+  "authNote": "150 simulated operational clients reuse one explicitly authorized test identity. This is not a 150-person anonymous enrollment/NAT burst test.",
+  "requests": 1085,
+  "errorRate": 0.060829493087557605,
+  "errors": [
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "attendance",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "participation",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "duplicate_retry",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    },
+    {
+      "phase": "burst_read",
+      "message": "{\"code\":\"PGRST003\",\"details\":null,\"hint\":null,\"message\":\"Timed out acquiring connection from connection pool.\"}"
+    }
+  ],
+  "writes": {
+    "expectedParticipation": 150,
+    "actualParticipation": 91,
+    "duplicateParticipation": 0,
+    "attendance": 98,
+    "printed": 84
+  },
+  "realtime": {
+    "connections": 150,
+    "reconnections": 150,
+    "disconnects": 0
+  },
+  "latency": {
+    "realtime_connect": {
+      "requests": 150,
+      "p50_ms": 1121,
+      "p95_ms": 1583,
+      "p99_ms": 1605
+    },
+    "burst_read": {
+      "requests": 150,
+      "p50_ms": 21835,
+      "p95_ms": 114559,
+      "p99_ms": 119432
+    },
+    "attendance": {
+      "requests": 110,
+      "p50_ms": 31671,
+      "p95_ms": 109048,
+      "p99_ms": 115463
+    },
+    "participation": {
+      "requests": 98,
+      "p50_ms": 4949,
+      "p95_ms": 78786,
+      "p99_ms": 116886
+    },
+    "duplicate_retry": {
+      "requests": 91,
+      "p50_ms": 3404,
+      "p95_ms": 36204,
+      "p99_ms": 115987
+    },
+    "newDocument": {
+      "requests": 84,
+      "p50_ms": 1162,
+      "p95_ms": 26056,
+      "p99_ms": 76264
+    },
+    "document": {
+      "requests": 252,
+      "p50_ms": 363,
+      "p95_ms": 26641,
+      "p99_ms": 68274
+    },
+    "realtime_reconnect": {
+      "requests": 150,
+      "p50_ms": 60,
+      "p95_ms": 188,
+      "p99_ms": 189
+    }
+  },
+  "databaseCpu": "Not available from Data API; inspect Supabase Observability for this time window."
+}

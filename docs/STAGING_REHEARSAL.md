@@ -28,14 +28,14 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 3. `.env.local` points at the development project (the scripts refuse anything else).
 4. Authorized test session: `npx tsx scripts/prepare-session.mts` (stored in ignored `.test-sessions/`).
 5. Synthetic rehearsal conference: `npx tsx scripts/prepare-load.mts`, then apply `.test-sessions/load-fixtures.sql` to the development project (SQL editor). It creates 4 committees, 150 delegates, active sessions, and grants the test identity every role for 4 hours.
-6. Optional: create a submission link for one rehearsal committee (Administrator → Submission links on the Preview) and note its token.
+6. Optional: create a submission link for one rehearsal committee (Executive → Submission links on the Preview) and note its token.
 7. Dry-run the scenario: `npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10`.
 
 ## Phase A — Basic staging check (30 min)
 
 - [ ] Preview URL opens; `npm run verify:deployment -- <preview-url> <commit>` passes.
 - [ ] System health: GREEN, *Running version* = the Preview commit, environment `preview`, Supabase reachable, Storage `ok`.
-- [ ] Each role on a separate browser: Chair (two committees), Approval, Admins (Logistics), Executive (Administrator).
+- [ ] Each role on a separate browser: Chair (two committees), Approval, Admins, Executive.
 - [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print.
 - [ ] Public form shows only committee, delegation selector, title, link, checkbox and fallback — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
 - [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §12): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).

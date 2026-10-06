@@ -1,5 +1,7 @@
 # Operations documentation
 
+**Development baseline only.** No production project or known-good Vercel deployment has been established yet. Name a lead administrator and deputy before the rehearsal and record their contact details and authorized accounts in the runbook.
+
 This page used to hold the conference-day notes. They now live in:
 
 - [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md) — organizer checklists and procedures (print this).

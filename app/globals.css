@@ -3104,3 +3104,48 @@ dd {
 .submission-card-head p { margin:2px 0 0; }
 .approval-copy { display:grid; gap:4px; font-weight:600; font-size:12px; }
 .approval-copy input { padding:7px 8px; border:1px solid var(--line); border-radius:7px; font-weight:400; }
+
+/* Chair-led debate procedure: queues remain separate from contribution records. */
+.procedure-console { display:grid; gap:22px; }
+.procedure-context { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:22px 24px; border:1px solid var(--line); border-radius:12px; background:var(--blue-soft); }
+.procedure-context h2 { margin:6px 0; font-size:21px; line-height:1.4; }
+.procedure-context p { color:var(--muted); margin:0; }
+.procedure-context > .button { flex-shrink:0; }
+.procedure-live-grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(270px,1fr); gap:22px; }
+.procedure-live-grid > .timer { align-self:start; }
+.procedure-active, .procedure-pois { padding:20px 24px; display:grid; gap:20px; }
+.procedure-active > .primary { justify-self:start; }
+.procedure-active p { margin:0; color:var(--muted); line-height:1.6; }
+.procedure-score { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-block:1px solid var(--line); }
+.procedure-score p { font-size:12px; margin-top:4px; }
+.procedure-buttons { display:flex; flex-wrap:wrap; gap:7px; }
+.procedure-console button[aria-pressed="true"] { background:var(--blue); color:white; border-color:var(--blue); }
+.procedure-console button:focus-visible, .procedure-console select:focus-visible, .procedure-console input:focus-visible { outline:3px solid #8cb3ed; outline-offset:3px; }
+.procedure-inline-form { display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.procedure-inline-form label { min-width:160px; flex:1; }
+.procedure-console label { display:grid; gap:7px; font-weight:600; font-size:12px; }
+.procedure-console select, .procedure-console input { min-width:0; max-width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:white; font:inherit; font-weight:400; }
+.procedure-custom label { flex:0 1 130px; min-width:100px; }
+.procedure-controls { padding:20px 24px; display:flex; align-items:end; flex-wrap:wrap; gap:24px; border-bottom:1px solid var(--line); }
+.procedure-console fieldset { border:0; padding:0; margin:0; min-width:0; }
+.procedure-console legend { padding:0; margin-bottom:8px; font-size:12px; font-weight:600; }
+.procedure-queue-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr)); }
+.procedure-lane { min-width:0; padding:20px 24px; }
+.procedure-lane + .procedure-lane { border-left:1px solid var(--line); }
+.procedure-lane-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; }
+.procedure-lane-heading h3 { font-size:14px; margin:0; }
+.procedure-queue { padding:0; margin:18px 0 0; list-style:none; }
+.procedure-queue > li { padding:13px 0; border-top:1px solid var(--line); display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; }
+.procedure-queue > li.is-dragging { opacity:.45; }
+.procedure-queue-identity { display:flex; align-items:center; gap:8px; min-width:0; }
+.procedure-position { color:var(--muted); font-variant-numeric:tabular-nums; min-width:16px; font-size:12px; }
+.procedure-drag { cursor:grab; color:var(--muted); padding:9px 5px; font-size:22px; user-select:none; }
+.procedure-drag:active { cursor:grabbing; }
+.procedure-row-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.procedure-row-actions button { min-height:36px; padding:6px 10px; font-size:12px; }
+.procedure-order { display:flex; gap:3px; }
+.procedure-suggestions { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; padding:20px 24px; }
+.procedure-suggestions > div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.procedure-console .footnote { line-height:1.6; }
+@media(max-width:900px) { .procedure-live-grid { grid-template-columns:1fr; } .procedure-lane + .procedure-lane { border-left:0; border-top:1px solid var(--line); } }
+@media(max-width:550px) { .procedure-context { align-items:start; flex-direction:column; } .procedure-active,.procedure-pois,.procedure-controls,.procedure-lane,.procedure-suggestions { padding:16px; } .procedure-score { align-items:start; flex-direction:column; } .procedure-context h2 { font-size:18px; } .procedure-row-actions button { min-height:42px; } .procedure-lane-heading { flex-wrap:wrap; } }

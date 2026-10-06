@@ -62,7 +62,7 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 | --- | --- |
 | "Online submission is not available right now" | `SUPABASE_SECRET_KEY` missing on that Vercel environment. Add it (Sensitive), redeploy. |
 | "Submission is temporarily unavailable" on the page | The server could not reach Supabase. Check Supabase status. |
-| "This submission link is not valid" | Link replaced or turned off (Administrator → Submission links), or mistyped. Print the current room sheet. |
+| "This submission link is not valid" | Link replaced or turned off (Executive → Submission links), or mistyped. Print the current room sheet. |
 | "Too many submissions…" | 20 per link per 10 minutes. Wait, or replace the link if it leaked. |
 | "This committee has no session yet" | Create/import the committee's sessions. |
 | Chair can't open a Doc | Doc still Restricted, set to Viewer, shared with the wrong Chair, or the delegate's school blocks sharing outside it. Ask for *Anyone with the link → Editor*, or a direct share with a Chair; otherwise the file-upload fallback. See [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md) §6. |

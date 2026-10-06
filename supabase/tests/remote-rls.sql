@@ -10,7 +10,7 @@ do $$ begin
 end $$;
 reset role;
 insert into public.user_access(conference_id,user_id,role,committee_id,expires_at)
-select conference_id,'eeeeeeee-0000-4000-8000-000000000001','chair',id,now()+interval '10 minutes' from public.committees where code='GA1';
+select conference_id,'eeeeeeee-0000-4000-8000-000000000001','chair',id,now()+interval '10 minutes' from public.committees where code='GA1' and conference_id='10000000-0000-4000-8000-000000000001';
 set local role authenticated;
 do $$ declare cid uuid; sid uuid; did uuid; before_count integer; m uuid:=gen_random_uuid(); c jsonb; begin
  if (select count(*) from public.committees)<>1 then raise exception 'FAIL: committee isolation';end if;

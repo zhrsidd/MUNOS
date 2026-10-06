@@ -6,10 +6,11 @@ const token='A'.repeat(10)+'b_c-'+'9'.repeat(10);
 const docId='1aBcD_efGhIjKlMnOpQrStUvWxYz0123456789-xyz';
 const sha=(c:string)=>c.repeat(64);
 test('Google-Doc-first submission: Draft with the Chair, link record, Chair sends to Approval; fallback file; safety',async()=>{
- const {db,ids,query,as,asServer,asOwner,grant}=await freshDatabase();
+ const {db,ids,query,as,asServer,asOwner,grant,operationsExpected}=await freshDatabase();
  try{
   await grant(executive,'admin');await grant(chair,'chair',ids.ga1);await grant(otherChair,'chair',ids.who);await grant(approver,'approval');
-  const ops=(user:string,command:unknown,id=crypto.randomUUID(),role='admin')=>as(user).then(()=>db.query('select public.apply_operations_mutation($1,$2,$3,$4,null,$5)',[ids.conference,id,JSON.stringify(command),role,'2026-11-12T08:00:00Z']));
+  const receipts=new Map<string,string|null>();
+  const ops=async(user:string,command:unknown,id=crypto.randomUUID(),role='admin')=>{await as(user);const expected=receipts.has(id)?receipts.get(id):await operationsExpected(command);receipts.set(id,expected??null);return db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,id,JSON.stringify(command),role,expected,'2026-11-12T08:00:00Z']);};
   // Executive creates the link (chairs cannot); the sharing address can change without a new token.
   await assert.rejects(()=>ops(chair,{type:'submissionLink',action:'create',committeeId:ids.ga1,token,shareWith:'x'},crypto.randomUUID(),'chair'),/Executive access/);
   const create=crypto.randomUUID();
@@ -30,7 +31,7 @@ test('Google-Doc-first submission: Draft with the Chair, link record, Chair send
   // Server route (service_role).
   await asServer();
   const info=(await query<{i:Record<string,unknown>}>('select public.submission_link_info($1) i',[token]))[0].i;
-  assert.equal(info.committeeId,ids.ga1);assert.equal(info.shareWith,'ga1@dcmun.example');
+  assert.equal(info.committeeId,ids.ga1);assert.equal(info.shareWith,'');
   assert.ok((info.submitters as object[]).every(s=>Object.keys(s).sort().join()==='country,flag,id'),'countries only: no delegate names or emails');
   type R={r:{status:string;code:string}};
   const submit=(id:string,o:Partial<{doc:string|null;key:string|null;sha:string|null;size:number|null;tok:string;submitter:string;title:string}>={})=>query<R>('select public.submit_resolution($1,$2,$3,$4,$5,$6,$7,$8,$9) r',[o.tok??token,id,o.submitter??ids.france,o.title??'Protecting civilians online','doc' in o?o.doc:docId,'draft.pdf','key' in o?o.key:null,'sha' in o?o.sha:null,'size' in o?o.size:null]).then(r=>r[0].r);
@@ -41,7 +42,7 @@ test('Google-Doc-first submission: Draft with the Chair, link record, Chair send
   const submission=crypto.randomUUID(), doc=submission.slice(0,24)+'000000000001';
   const created=await submit(submission);assert.equal(created.status,'created');assert.match(created.code,/^GA1 \/ \d{2}$/);
   assert.deepEqual(await submit(submission),{status:'replayed',code:created.code},'lost-response retry');
-  assert.deepEqual(await submit(crypto.randomUUID()),{status:'duplicate',code:created.code},'same Google Doc twice');
+  assert.deepEqual(await submit(crypto.randomUUID()),{status:'duplicate',code:created.code,storageKey:null},'same Google Doc twice');
   // Workflow: Draft (with the Chair), link record visible to the GA1 chair and approval, not to WHO.
   await asOwner();assert.equal((await query('select status from public.documents where id=$1',[doc]))[0].status,'Draft');
   const mine=(await snap(chair)).resolutionLinks.find(l=>l.documentId===doc)!;

@@ -44,7 +44,7 @@ export function systemStatus(i: StatusInput): SystemStatus {
   if (storage && storage !== "not_configured")
     add("storage", "Document storage", storage === "ok" ? "green" : "yellow", storage === "ok" ? "Available" : "Temporarily unavailable");
 
-  if (health.state === "error") add("device", "This device", "red", "Cannot save changes. Browser storage is unavailable.");
+  if (health.state === "error") add("device", "This device", "red", "Recording is paused on this device. Check Technical details or renew device access.");
   else if (health.conflicts) add("device", "This device", "red", `${changes(health.conflicts)} need review`);
   else if (health.pending && staleMinutes >= STALE_MINUTES) add("device", "This device", "red", `${changes(health.pending)} not synced for ${Math.floor(staleMinutes)} minutes`);
   else if (health.pending) add("device", "This device", "yellow", `${changes(health.pending)} saved here · will sync automatically`);

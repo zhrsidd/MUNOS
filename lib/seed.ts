@@ -62,6 +62,10 @@ export function createSeed(): ConferenceData {
       email: "camille@example.com",
     },
   );
+  delegates.push(...[
+    ["d16","China","🇨🇳","Lin Chen"], ["d17","Russian Federation","🇷🇺","Alex Ivanov"],
+    ["d18","United Kingdom","🇬🇧","Sam Taylor"], ["d19","United States","🇺🇸","Jordan Miller"],
+  ].map(([id,country,flag,name])=>({id,country,flag,name,committeeId:"sc",schoolId:"school2",email:`${id}@example.com`})));
   const docs = [
     {
       id: "r1",
@@ -145,6 +149,7 @@ export function createSeed(): ConferenceData {
         id: "sc",
         conferenceId: "conf1",
         code: "SC",
+        vetoEnabled: true, vetoDelegateIds: ["d15","d16","d17","d18","d19"],
         name: "Security Council",
         room: "Room 301",
       },
@@ -259,26 +264,7 @@ export function createSeed(): ConferenceData {
       { id: "amendment", label: "Amendment", values: [3] },
       { id: "submitter", label: "Main Submitter", values: [5] },
     ],
-    criteria: [
-      {
-        id: "diplomacy",
-        name: "Diplomacy",
-        description: "Builds consensus and engages respectfully.",
-        max: 5,
-      },
-      {
-        id: "research",
-        name: "Research & substance",
-        description: "Demonstrates understanding and well-supported reasoning.",
-        max: 5,
-      },
-      {
-        id: "leadership",
-        name: "Constructive leadership",
-        description: "Moves the committee toward useful outcomes.",
-        max: 5,
-      },
-    ],
+    criteria: [],
     awardScores: [],
     audit: [
       {

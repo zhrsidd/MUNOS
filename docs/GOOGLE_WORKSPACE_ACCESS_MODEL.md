@@ -1,6 +1,6 @@
 # Google Workspace access model
 
-Status: research and design. **Nothing here is implemented** beyond the existing Google-Doc-first submission form (PR #3). No Google resources or credentials exist. Sources are listed at the end; items Google does not document precisely are marked **verify in setup** and appear in the setup checklist.
+Status: research and design for future Drive automation. The human-facing parts are **implemented on `main` (#7)**: the QR form recommends *Anyone with the link → Editor*, lists the committee's **assigned Chairs and their contact emails** (Executive → Chairs & staff; migration `20261006073442_staff_chair_contacts`), and uses the checkbox "I have made sure the Chairs can edit this document." No Google resources, credentials or Drive API code exist. Sources are listed at the end; items Google does not document precisely are marked **verify in setup** and appear in the setup checklist.
 
 ## 1. Product model: staff software with one public form
 
@@ -8,7 +8,7 @@ Conference OS is **staff operations software**. Its users are Chairs, the Approv
 
 The only delegate-facing surface is the **isolated resolution submission form** reached by a committee QR code (`/submit/{token}`). Think of it as a small public form attached to Conference OS.
 
-Verified in the current code (PR #3):
+Verified in the current code (`main`), and re-verified over real HTTP against the development project (docs/INTEGRATION_REVIEW.md, docs/submission-http-results.json):
 - `/submit/*` renders **without** the staff workspace provider, device storage (IndexedDB) or the service worker (`components/conference-shell.tsx`, `components/offline-shell.tsx`).
 - The page and `POST /api/submissions` are **server-mediated**. The browser never talks to Supabase. The server uses `SUPABASE_SECRET_KEY` with `persistSession: false` to call two `service_role`-only functions.
 - **No Supabase Auth session, anonymous sign-in or cookie is created for a delegate.** A burst of delegate submissions therefore does not consume Supabase Auth's per-IP anonymous sign-in limit.
@@ -144,16 +144,16 @@ Conference OS never pretends access exists. Supabase state is independent: a Dri
 
 | ID | Severity | File / area | Why it matters | Recommended fix | Owner |
 | --- | --- | --- | --- | --- | --- |
-| S-1 | **Medium** (product correctness) | `submission_links.share_with`, form copy in `components/operations/submission-form.tsx`, room sheet, Executive *Submission links* | One free-text "share with" address per committee implies a committee mailbox, duplicates Chair assignments that already live in `committee_staff`, and tells delegates to share with a single address instead of "Anyone with the link → Editor" | Form: lead with Anyone-with-link → Editor, list the committee's assigned Chairs as fallback, change the checkbox to "I have made sure the Chairs can edit this document." Source Chairs from `committee_staff` → `staff`. **Interim with no code change:** the Executive enters "Chair A — a@…, Chair B — b@…" in the existing field. | CLAUDE (form, room sheet, Executive screen) + CODEX (data, see S-2) |
-| S-2 | **Medium** (data model) | Core `public.staff` | Staff records have a name but **no email**, so the public form cannot list Chair contacts from authoritative data | **CODEX REVIEW REQUIRED — DESIGN ONLY:** add an optional contact email to staff (or `committee_staff`), editable by the Executive, and expose `{name, email}` of that committee's Chairs through `public.submission_link_info` (service_role only) | CODEX (schema/RLS), CLAUDE (link-info + form) |
-| S-3 | Low | Chair *Delegate submissions* card (`components/operations/resolution-links.tsx`) | The *Can't access* hint says "share with {sharing address} as an Editor", which repeats the committee-address assumption | Change to "Ask the delegation to set Anyone with the link → Editor, or share it with you as Editor." | CLAUDE |
-| S-4 | Low | `lib/submissions/google-doc.ts` | The `resourcekey` query parameter is dropped. Older link-shared files that need a resource key would open as "Request access" for Chairs and fail for automation. Rare for new resolutions. | Accept and validate `resourcekey` (`[A-Za-z0-9_-]{1,100}`), store it next to the id, append it to the rebuilt URL and send it as `X-Goog-Drive-Resource-Keys` | CLAUDE (+ one nullable column in Claude's `resolution_links`/`resolution_submissions` migration) |
+| S-1 | ~~Medium~~ **Resolved in #7** | `submission_links.share_with`, form copy in `components/operations/submission-form.tsx`, room sheet, Executive *Submission links* | One free-text "share with" address per committee implies a committee mailbox, duplicates Chair assignments that already live in `committee_staff`, and tells delegates to share with a single address instead of "Anyone with the link → Editor" | Form: lead with Anyone-with-link → Editor, list the committee's assigned Chairs as fallback, change the checkbox to "I have made sure the Chairs can edit this document." Source Chairs from `committee_staff` → `staff`. **Interim with no code change:** the Executive enters "Chair A — a@…, Chair B — b@…" in the existing field. | CLAUDE (form, room sheet, Executive screen) + CODEX (data, see S-2) |
+| S-2 | ~~Medium~~ **Resolved in #7** (`staff` contact email; assigned Chairs exposed only via the service-only lookup) | Core `public.staff` | Staff records have a name but **no email**, so the public form cannot list Chair contacts from authoritative data | **CODEX REVIEW REQUIRED — DESIGN ONLY:** add an optional contact email to staff (or `committee_staff`), editable by the Executive, and expose `{name, email}` of that committee's Chairs through `public.submission_link_info` (service_role only) | CODEX (schema/RLS), CLAUDE (link-info + form) |
+| S-3 | Low — **still open** | Chair *Delegate submissions* card (`components/operations/resolution-links.tsx`) | The *Can't access* hint says "share with {sharing address} as an Editor", which repeats the committee-address assumption | Change to "Ask the delegation to set Anyone with the link → Editor, or share it with you as Editor." | CLAUDE |
+| S-4 | Low — **still open** (in docs/BACKLOG.md) | `lib/submissions/google-doc.ts` | The `resourcekey` query parameter is dropped. Older link-shared files that need a resource key would open as "Request access" for Chairs and fail for automation. Rare for new resolutions. | Accept and validate `resourcekey` (`[A-Za-z0-9_-]{1,100}`), store it next to the id, append it to the rebuilt URL and send it as `X-Goog-Drive-Resource-Keys` | CLAUDE (+ one nullable column in Claude's `resolution_links`/`resolution_submissions` migration) |
 | S-5 | Low (accepted) | Public form delegation selector | Anyone holding a committee's link can submit as any delegation of that committee | Acceptable for a conference: the Chair reviews every submission and the link is room-scoped, rate-limited and rotatable. Mention in Chair training. | — |
 | S-6 | Info | Duplicate detection | The same Doc id twice for one committee returns the original reference; the same Doc can be submitted to two committees | Intended. | — |
 | S-7 | Info | Token, scoping, URL handling | Verified: 128-bit tokens; committee-scoped; the delegation must belong to that committee; only the Doc id is stored and the URL is rebuilt, so no open redirect or arbitrary URL rendering; idempotent retries; file fallback validates signature, size and path; `/submit` sends `no-referrer` and `noindex`; no delegate auth sessions | — | — |
 | S-8 | Info | Approval copy link | Only validated Google Doc ids are accepted and links are rebuilt; no arbitrary URLs | — | — |
 
-No code was changed in this workstream; S-1, S-3 and S-4 are small Claude follow-ups for PR #3 once review allows.
+S-1 and S-2 were implemented by Codex in #7 (legacy `share_with` is retained only for compatibility and is not shown as Chair access). S-3 (the Chair's *Can't access* hint in `components/operations/resolution-links.tsx` still names the legacy sharing address) and S-4 (resource keys) remain small follow-ups; neither blocks the rehearsal.
 
 ## 12. Admin setup checklist (future — do not create anything yet)
 
@@ -174,8 +174,8 @@ No code was changed in this workstream; S-1, S-3 and S-4 are small Claude follow
 
 ## 13. CODEX REVIEW REQUIRED — DESIGN ONLY
 
-- **Chair contacts (S-2):** an optional contact email on `staff` (or `committee_staff`), editable by the Executive. Expose the committee's Chair names and emails only through the service_role-only `submission_link_info`, never through authenticated or anon table reads. Then retire `submission_links.share_with` (Claude migration).
-- **Resource key (S-4):** one nullable text column in Claude's `resolution_links` / `resolution_submissions` (Claude-owned, but schema → review).
+- ~~Chair contacts (S-2)~~ — done in #7.
+- **Resource key (S-4):** one nullable text column next to the stored Doc id (Claude's `resolution_links` / `resolution_submissions`), validated and appended to rebuilt URLs.
 - **Drive folder mapping and jobs:** unchanged from GOOGLE_DRIVE_ARCHITECTURE.md §17, except the identity (above) and the Contributor role.
 
 ## Sources

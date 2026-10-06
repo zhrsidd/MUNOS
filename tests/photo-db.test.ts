@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {freshDatabase} from './helpers/database';
 const executive='50000000-0000-4000-8000-000000000001', ga1Chair='50000000-0000-4000-8000-000000000002', whoChair='50000000-0000-4000-8000-000000000003';
 test('photo slots: executive writes, chairs read and acknowledge only their committee, targeted notifications',async()=>{
- const {db,ids,query,as,asOwner,grant}=await freshDatabase();
+ const {db,ids,query,as,asOwner,grant,operationsExpected}=await freshDatabase();
  try{
   await grant(executive,'admin');await grant(ga1Chair,'chair',ids.ga1);await grant(whoChair,'chair',ids.who);
   await asOwner();const school=(await query<{id:string;n:number}>('select "schoolId" id,count(*)::int n from public.delegates where committee_id=$1 group by 1 order by 2 desc limit 1',[ids.ga1]))[0].id;
-  const send=async(user:string,command:unknown,role='admin',id=crypto.randomUUID())=>{await as(user);return db.query('select public.apply_operations_mutation($1,$2,$3,$4,null,$5)',[ids.conference,id,JSON.stringify(command),role,'2026-11-01T00:00:00Z']);};
+  const send=async(user:string,command:unknown,role='admin',id=crypto.randomUUID())=>{await as(user);return db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,id,JSON.stringify(command),role,await operationsExpected(command),'2026-11-01T00:00:00Z']);};
   const slot={schoolId:school,startsAt:'2026-11-12T10:30:00Z',endsAt:null,location:'Main Courtyard',note:''};
   await assert.rejects(()=>send(ga1Chair,{type:'photoSlot',action:'create',...slot},'chair'),/Executive access/);
   const create=crypto.randomUUID();await send(executive,{type:'photoSlot',action:'create',...slot},'admin',create);
