@@ -5,7 +5,11 @@ import {
   Role,
   Vote,
 } from "./domain";
+import { applyOperationsCommand, isOperationsCommand, operationsRoles, type OperationsCommand } from "./operations/commands";
+// CODEX REVIEW REQUIRED: extension commands (OperationsCommand) join the union and are
+// delegated to lib/operations; core command handling is unchanged.
 export type Command =
+  | OperationsCommand
   | {
       type: "attendance";
       delegateId: string;
@@ -159,6 +163,7 @@ const allowed: Record<Command["type"], Role[]> = {
   session: ["admin"],
   school: ["admin"],
   staff: ["admin"],
+  ...operationsRoles,
 };
 export function applyCommand(
   previous: ConferenceData,
@@ -569,6 +574,8 @@ export function applyCommand(
         committeeIds: c.committeeIds,
       });
       break;
+    default:
+      if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
   }
   d.audit.unshift({
     id: nextId(),

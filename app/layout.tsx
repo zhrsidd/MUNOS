@@ -12,7 +12,7 @@ const manrope = localFont({
   display: "swap",
 });
 import { OfflineShell } from "@/components/offline-shell";
-import { ConferenceProvider } from "@/lib/context";
+import { ConferenceShell } from "@/components/conference-shell";
 export const metadata: Metadata = {
   title: "Conference OS · A calmer conference day",
   description: "One conference. Every team in sync.",
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${dmSans.variable} ${manrope.variable}`}>
-        <ConferenceProvider>{children}</ConferenceProvider>
+        <ConferenceShell>{children}</ConferenceShell>
         <OfflineShell />
       </body>
     </html>

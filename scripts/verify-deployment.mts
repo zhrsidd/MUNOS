@@ -22,5 +22,11 @@ for (const path of ["/chair", "/approval", "/logistics", "/admin/health", "/proj
     return "200";
   });
 }
+await check("Unknown submission link is rejected", async () => {
+  const response = await fetch(`${root}/submit/not-a-real-link-000000000000`);
+  const text = await response.text();
+  if (!/not valid/i.test(text)) throw Error(`unexpected response (HTTP ${response.status})`);
+  return "rejected";
+});
 for (const [name, ok, detail] of results) console.log(`${ok ? "PASS" : "FAIL"}  ${name.padEnd(36)} ${detail}`);
 process.exit(results.every(r => r[1]) ? 0 : 1);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useConference } from "@/lib/context";
 import { Resolution } from "@/lib/domain";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel, Timeline } from "./ui";
+import { ResolutionSources } from "./operations/resolution-links";
 export function DocumentPreview({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
   const [versionId, setVersionId] = useState("");
@@ -48,7 +49,7 @@ export function DocumentPreview({ resolution }: { resolution: Resolution }) {
         </div>
       </div>
       <div className="preview-caption">
-        {version?.fileName} · Text preview only · File storage not connected
+        <ResolutionSources resolution={resolution} storageKey={version?.storageKey ?? null} fileName={version?.fileName ?? ""} />
       </div>
     </div>
   );

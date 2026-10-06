@@ -16,7 +16,7 @@ The example defaults to an isolated local demo. For the development database, se
 
 - Remote normalized schema, strict RLS, explicit read grants and validated transactional command RPCs.
 - Attendance per session; event-derived opportunities and quality points; configurable scoring; immutable participation corrections and document versions.
-- Resolution submission, review, approval, printing, debate, attendance-aware voting, configured majority outcome and audit records.
+- Resolution workflow around Google Docs: delegates register their Google Doc via a committee QR link, the Chair reviews it in Google Docs and submits it to Approval; review, approval, printing, debate, attendance-aware voting, configured majority outcome and audit records. Conference OS does not edit document text.
 - IndexedDB saves before optimistic rendering. Cloud writes use a durable mutation outbox with stable UUIDs, retry receipts and explicit revision conflicts.
 - Local countdown calculation; timer transitions alone are persisted. Realtime is limited to operational notifications; ordinary reads/writes and periodic recovery work independently.
 - Production-only service worker caches the Chair shell. Administrator System health shows connection, latency, pending changes and recovery export.
@@ -33,7 +33,11 @@ The example defaults to an isolated local demo. For the development database, se
 | `/logistics` | Print queue |
 | `/admin` | Conference overview |
 | `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,awards,workflow,resources,audit}` | Configuration |
-| `/admin/health` | Connection and recovery |
+| `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
+| `/admin/submissions` | Committee resolution-submission links / QR codes |
+| `/submit/{token}` | Public, mobile page where delegates register their Google Doc resolution with the Chair (no account; file upload fallback) |
+| `/submit/{token}/sheet` | Printable committee room sheet with QR code |
+| `/api/health` | Build identity and Supabase/Storage reachability (JSON) |
 | `/projector` | Lightweight display |
 
 ## Verify
@@ -54,6 +58,8 @@ Vercel Preview for every branch/PR, Production from `main`, CI on every PR, buil
 
 ## Deferred
 
-Actual PDFs/Storage, Google Drive mirroring, access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+Google Drive automation (Approval-folder copies, PDF snapshots, archive), access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+
+Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.
