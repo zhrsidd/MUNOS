@@ -1,4 +1,6 @@
-# Conference-day runbook
+# Conference-day technical notes
+
+> The organizer-facing runbook is [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md). Deployment, freeze and rollback detail is in [DEPLOYMENT.md](DEPLOYMENT.md). This page keeps the original technical notes for the technical contact.
 
 **Development baseline only.** No production project or known-good Vercel deployment has been established. Name a lead administrator and deputy before the rehearsal; record their contact details and exact authorized accounts here.
 

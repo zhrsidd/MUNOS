@@ -7,7 +7,7 @@ import { Role } from "@/lib/domain";
 import { Icon, Chip, Timer } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { SystemHealth, SyncStatus } from "./health";
+import { StatusStrip, SystemHealth, SyncStatus } from "./health";
 import { AdminScreen } from "./admin";
 const roles: { id: Role; name: string; description: string; icon: string }[] = [
   {
@@ -217,10 +217,7 @@ export function Workspace({ path }: { path: string }) {
         </nav>
         <div className="sidebar-bottom">
           <div className="local-state">
-            <span className="dot" />
-            <span>
-              <SyncStatus />
-            </span>
+            <SyncStatus />
           </div>
           <Link href="/" className="switch-role">
             <Icon name="arrow" />
@@ -279,6 +276,7 @@ export function Workspace({ path }: { path: string }) {
           </div>
         </header>
         <main className="workspace-content">
+          {!(role === "admin" && section === "health") && <StatusStrip />}
           {role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId).length >
               1 && (
