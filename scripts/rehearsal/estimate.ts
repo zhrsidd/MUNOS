@@ -3,6 +3,9 @@
 // scheduled write step is assumed to produce a write (the live run skips some when its precondition is not met).
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./client-model";
 import { READS, TOPIC_OF, recipients, type RealtimeModel, type SimUser, type Step } from "./scenario";
+/** Snapshot RPCs per logical refresh on current core: one bundled state-snapshot RPC (PR #11). The run harness measures
+ *  the real count instead (rpc-counter.ts); 2 would apply only if core fell back to the separate snapshot RPCs. */
+export const SNAPSHOT_RPCS_PER_REFRESH = 1;
 export interface EstimateOptions {
   minutes: number;
   /** Fixed latency of one full refresh (both snapshot RPCs in parallel). */
@@ -83,7 +86,7 @@ export function estimate(users: SimUser[], o: EstimateOptions) {
     return {
       model: o.model, executiveChairWindowMs: o.model === "topic-aware" ? (o.executiveChairWindowMs ?? 0) : 0, readMs: o.readMs, sendMs: o.sendMs, minutes: o.minutes,
       writes, pendingAtEnd,
-      refreshes: total.refreshesExecuted, snapshotRpcCalls: total.refreshesExecuted * 2,
+      refreshes: total.refreshesExecuted, snapshotRpcCalls: total.refreshesExecuted * SNAPSHOT_RPCS_PER_REFRESH,
       readsPerWrite: writes ? Number((total.refreshesExecuted / writes).toFixed(1)) : 0,
       triggersAttempted: total.triggersAttempted, triggersDropped: total.triggersDropped,
       bySource: total.reads, droppedBySource: total.dropped, byRole: readsByRole, bySourceAndRole: readsBySourceRole,

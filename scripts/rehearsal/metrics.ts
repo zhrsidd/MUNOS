@@ -1,6 +1,7 @@
-/** source: for "refresh" samples, which client trigger caused the full refresh (see client-model.ts). */
-export interface Sample { action: string; role?: string; source?: string; ms: number; outcome: "ok" | "conflict" | "rate_limited" | "error"; detail?: string }
-/** Every full client refresh (each = conference_snapshot + operations_snapshot RPCs). Older reports used per-trigger
+/** source: for "refresh" samples, which client trigger caused the full refresh (see client-model.ts).
+ *  rpcs: snapshot RPCs that refresh actually sent (rpc-counter.ts) — 1 on bundled core, 2 only on the fallback path. */
+export interface Sample { action: string; role?: string; source?: string; ms: number; outcome: "ok" | "conflict" | "rate_limited" | "error"; rpcs?: number; detail?: string }
+/** Every full client refresh (one logical refresh; see Sample.rpcs for the RPCs it took). Older reports used per-trigger
  *  action names; they are still recognised so earlier result files can be re-summarised. */
 export const READ_ACTIONS = ["refresh", "open", "read", "refocus", "postWriteRead", "realtimeRefresh"];
 const NOT_WRITES = ["health", "submitPage", "submit"];
@@ -19,11 +20,14 @@ export function report(samples: Sample[]) {
   const reads = samples.filter((s) => READ_ACTIONS.includes(s.action));
   // First attempt of each write only (lost-response retries and re-sends of the same mutation id are separate).
   const writes = samples.filter((s) => !READ_ACTIONS.includes(s.action) && !NOT_WRITES.includes(s.action) && !/\((retry|resend)\)$/.test(s.action));
+  const snapshotRpcCalls = reads.reduce((n, s) => n + (s.rpcs ?? 1), 0);
   const group = (key: (s: Sample) => string) => Object.fromEntries([...new Set(reads.map(key))].map((k) => [k, stats(reads.filter((s) => key(s) === k))]));
   const summary = {
     writes: stats(writes), reads: stats(reads),
     readsByRole: group((s) => s.role ?? "unknown"), readsBySource: group((s) => s.source ?? s.action),
-    snapshotRpcCalls: reads.length * 2, readsPerWrite: writes.length ? Number((reads.length / writes.length).toFixed(1)) : 0,
+    // Measured, not assumed: each refresh sample carries the snapshot RPCs it sent. Samples without a count (result files
+    // written before the counter existed) are counted as 1, the bundled-core behaviour; those older runs actually made 2.
+    snapshotRpcCalls, snapshotRpcsPerRefresh: reads.length ? Number((snapshotRpcCalls / reads.length).toFixed(2)) : 0, readsPerWrite: writes.length ? Number((reads.length / writes.length).toFixed(1)) : 0,
   };
   const total = samples.length;
   const errors = samples.filter((s) => s.outcome === "error").length;

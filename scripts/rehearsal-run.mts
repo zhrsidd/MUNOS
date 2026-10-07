@@ -18,6 +18,7 @@ import { checkAppUrl, checkHealthEnvironment, checkUsers } from "./rehearsal/gua
 import { TOPIC_OF, buildScenario, recipients, type Action, type RealtimeModel, type SimUser, type Topic } from "./rehearsal/scenario";
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./rehearsal/client-model";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
+import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
 import { loadIdentities, type Identity, type StaffRoleKey } from "./rehearsal/identities";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
@@ -84,10 +85,10 @@ const classify = (e: unknown): Sample["outcome"] => {
   return /429|rate.?limit|too many/i.test(text) ? "rate_limited" : "error";
 };
 /** Records one timed request and rethrows its error (the client model needs to see failures). */
-async function measure(action: string, op: () => Promise<unknown>, role?: string, source?: RefreshSource) {
+async function measure(action: string, op: () => Promise<unknown>, role?: string, source?: RefreshSource, rpcs?: () => number) {
   const start = performance.now();
-  try { await op(); samples.push({ action, role, source, ms: performance.now() - start, outcome: "ok" }); }
-  catch (e) { samples.push({ action, role, source, ms: performance.now() - start, outcome: classify(e), detail: e instanceof Error ? e.message.slice(0, 160) : JSON.stringify(e ?? null).slice(0, 160) }); throw e; }
+  try { await op(); samples.push({ action, role, source, ms: performance.now() - start, outcome: "ok", ...(rpcs ? { rpcs: rpcs() } : {}) }); }
+  catch (e) { samples.push({ action, role, source, ms: performance.now() - start, outcome: classify(e), ...(rpcs ? { rpcs: rpcs() } : {}), detail: e instanceof Error ? e.message.slice(0, 160) : JSON.stringify(e ?? null).slice(0, 160) }); throw e; }
 }
 async function timed(action: string, op: () => Promise<unknown>, role?: string) {
   try { await measure(action, op, role); return true; } catch { return false; }
@@ -115,14 +116,18 @@ interface Device { user: SimUser; transport: TransportInstance; data: Data | nul
 const REALTIME_DELIVERY_MS = 100; // server commit → Realtime INSERT event at the device (before the 350 ms debounce)
 const clock: Clock = { now: () => Date.now(), setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>), random: Math.random };
 let devices = new Map<SimUser, Device>();
+let stageSnapshotRpcs: Record<string, number> = {}; // snapshot RPCs actually sent this stage, by function name
 function makeDevice(user: SimUser, everyone: SimUser[]): Device {
   const id = identityOf(user.role);
   // Role-scoped identities hold exactly one grant, so the device's roles are known; the all-roles worst case passes none.
   const roles = scoped && user.role !== "delegate" ? grantedRoles[user.role] : [];
-  const device = { user, transport: new Transport(clientFor(id.token), fixture.conference, id.userId, [], false, roles), data: null } as unknown as Device;
+  // Count the snapshot RPCs this device really sends: one per refresh on bundled core, two only if the fallback runs.
+  // A device has at most one refresh in flight (client-model.ts), so the delta around read() is that refresh's count.
+  const rpcCounter: RpcCounter = { snapshot: 0, byName: stageSnapshotRpcs };
+  const device = { user, transport: new Transport(countSnapshotRpcs(clientFor(id.token), rpcCounter), fixture.conference, id.userId, [], false, roles), data: null } as unknown as Device;
   device.client = new SimClient<Item>({
     isConflict: (e) => e instanceof ConflictError,
-    read: (source) => measure("refresh", async () => { device.data = await device.transport.read(); }, user.role, source),
+    read: (source) => { const before = rpcCounter.snapshot; return measure("refresh", async () => { device.data = await device.transport.read(); }, user.role, source, () => rpcCounter.snapshot - before); },
     send: async (item) => {
       // A re-send of the SAME mutation id after a failed send/read is what production does on the next flush.
       await measure(item.sends++ ? `${item.action} (resend)` : item.action, () => device.transport.send(item.mutation), user.role);
@@ -207,6 +212,7 @@ for (const users of stages) {
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref}, realtime model ${realtimeModel})…`);
   const staffUsers = scenario.filter((u) => u.role !== "delegate");
+  stageSnapshotRpcs = {};
   devices = new Map(staffUsers.map((user) => [user, makeDevice(user, staffUsers)]));
   const t0 = Date.now() + 1000;
   await Promise.all(scenario.map((u) => simulate(u, t0)));
@@ -221,12 +227,13 @@ for (const users of stages) {
   }));
   const all = sumStats([...devices.values()].map((d) => d.client.stats));
   stageReports.push({ staff: users, delegates: delegateCount, drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose,
+    snapshotRpcsByName: stageSnapshotRpcs,
     clientModel: { realtimeModel, executiveChairWindowMs, triggersAttempted: all.triggersAttempted, triggersDropped: all.triggersDropped, refreshesExecuted: all.refreshesExecuted, attemptedBySource: all.attempted, droppedBySource: all.dropped, refreshesBySource: all.reads, byRole, conflictsDismissed: all.conflicts, sendFailures: all.sendFailures, failedRefreshes: all.failedReads, maxConcurrentRefreshesPerDevice: all.maxConcurrentReads },
     ...report(samples.slice(before)) });
 }
 // Exactly-once check: every acknowledged scoring mutation produced exactly one participation event.
-// Executive (admin) sees every participation event through conference_snapshot. No roles are passed, so even PR #10 core
-// keeps this check on the full snapshot (executive_snapshot deliberately omits events).
+// Executive (admin) sees every participation event through the full conference snapshot. No roles are passed, so core
+// reads conference_state_snapshot (conference_snapshot before PR #11), never executive_snapshot, which omits events.
 const finalIdentity = identityOf("executive");
 const final = await new SupabaseTransport(clientFor(finalIdentity.token), fixture.conference, finalIdentity.userId).read();
 let duplicates = 0, lost = 0;
