@@ -1,3 +1,5 @@
+import {batchFingerprint} from '../batch/commands';
+import {isBatchCommand} from '../batch/types';
 import {operationsFingerprint} from "../operations/fingerprint";
 import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
@@ -16,6 +18,7 @@ export interface Health {
   message: string; detail: string; actorId?: string; lastSynced?: string;
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
+  if(isBatchCommand(c))return batchFingerprint(data,c);
   switch (c.type) {
     case "staffContact": return String(data.staff.find(s=>s.id===c.id)?.contactRevision ?? 1);
     case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);

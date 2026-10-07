@@ -10,7 +10,7 @@ const unassigned='74000000-0000-4000-8000-000000000005';
 const denied=(error:unknown)=>{assert.equal((error as {code:string}).code,'42501');return true;};
 type Snapshot=Record<string,unknown>;
 
-test('bundled state snapshots equal {...core, ...operations} for every role, under the caller\'s RLS',async()=>{
+test('bundled state snapshots compose core, operations and staff batch under each role RLS',async()=>{
  const {db,ids,query,as,asOwner,grant}=await freshDatabase();
  try{
   await grant(executive,'admin');await grant(chair,'chair',ids.ga1);await grant(approval,'approval');await grant(logistics,'logistics');
@@ -20,8 +20,8 @@ test('bundled state snapshots equal {...core, ...operations} for every role, und
    await as(user);
    const operations=await call('operations_snapshot');
    assert.ok(Object.keys(operations).length>0,'fixture has operations data to merge');
-   assert.deepEqual(await call('conference_state_snapshot'),{...await call('conference_snapshot'),...operations},'conference_state_snapshot = conference_snapshot || operations_snapshot');
-   assert.deepEqual(await call('executive_state_snapshot'),{...await call('executive_snapshot'),...operations},'executive_state_snapshot = executive_snapshot || operations_snapshot');
+   assert.deepEqual(await call('conference_state_snapshot'),{...await call('conference_snapshot'),...operations,...await call('staff_batch_snapshot')},'conference_state_snapshot = conference_snapshot || operations_snapshot');
+   assert.deepEqual(await call('executive_state_snapshot'),{...await call('executive_snapshot'),...operations,...await call('staff_batch_snapshot')},'executive_state_snapshot = executive_snapshot || operations_snapshot');
   }
   await as(chair);
   const chairState=await call('conference_state_snapshot');
@@ -45,14 +45,14 @@ test('bundled state snapshots: right-hand (operations) precedence, NULL operatio
   await as(executive);
   for(const [bundled,core] of [['conference_state_snapshot','conference_snapshot'],['executive_state_snapshot','executive_snapshot']]){
    const merged=await call(bundled);
-   assert.equal(merged.audit,'from operations','right-hand key wins, like {...core, ...operations}');
-   assert.deepEqual(merged,{...await call(core),audit:'from operations',photoSlots:[]});
+   assert.equal(merged.audit,'from operations','operations keys retain their precedence');
+   assert.deepEqual(merged,{...await call(core),audit:'from operations',photoSlots:[],...await call('staff_batch_snapshot')});
   }
   await asOwner();
   await db.exec(`create or replace function public.operations_snapshot(conf uuid) returns jsonb language sql stable security invoker set search_path='' as $$ select null::jsonb $$`);
   await as(executive);
-  assert.deepEqual(await call('conference_state_snapshot'),await call('conference_snapshot'),'NULL operations keeps the core snapshot (client used operations.data ?? {})');
-  assert.deepEqual(await call('executive_state_snapshot'),await call('executive_snapshot'));
+  assert.deepEqual(await call('conference_state_snapshot'),{...await call('conference_snapshot'),...await call('staff_batch_snapshot')},'NULL operations keeps the core snapshot (client used operations.data ?? {})');
+  assert.deepEqual(await call('executive_state_snapshot'),{...await call('executive_snapshot'),...await call('staff_batch_snapshot')});
   await asOwner();
   const definitions=await query<{proname:string;prosecdef:boolean;provolatile:string;proconfig:string[];definition:string}>(`select p.proname,p.prosecdef,p.provolatile,p.proconfig,pg_get_functiondef(p.oid) definition from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('conference_state_snapshot','executive_state_snapshot') order by p.proname`);
   assert.equal(definitions.length,2);

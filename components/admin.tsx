@@ -1,5 +1,7 @@
 "use client";
 import {VetoSettings} from "./veto-settings";
+import { CentralSessions } from "./central-sessions";
+import { CommitteeManagement } from "./committee-management";
 import Link from "next/link";
 import { useState } from "react";
 import { useConference } from "@/lib/context";
@@ -66,6 +68,8 @@ export function AdminScreen({ section }: { section: string }) {
       setSaveError("");
     }
   }
+  if (section === "committees") return <CommitteeManagement />;
+  if (section === "sessions" || section === "schedule") return <CentralSessions />;
   return (
     <>
       <PageHeading
@@ -77,7 +81,7 @@ export function AdminScreen({ section }: { section: string }) {
             <button className="primary" onClick={() => setModal("import")}>
               ↥ Import delegates
             </button>
-          ) : ["committees", "sessions", "schools", "staff"].includes(
+          ) : ["schools", "staff"].includes(
               section,
             ) ? (
             <button className="primary" onClick={() => setModal(section)}>
@@ -90,7 +94,7 @@ export function AdminScreen({ section }: { section: string }) {
       {!section && (
         <>
           <div className="metrics">
-            <Metric value={data.committees.length} label="Committees" />
+            <Metric value={data.committees.filter(c => !c.archived).length} label="Active committees" />
             <Metric
               value={data.delegates.length}
               label="Registered delegates"
@@ -115,7 +119,7 @@ export function AdminScreen({ section }: { section: string }) {
               title="Committee readiness"
               subtitle="One model, independent committee sessions."
             >
-              {data.committees.map((c) => {
+              {data.committees.filter(c => !c.archived).map((c) => {
                 const delegates = data.delegates.filter(
                   (d) => d.committeeId === c.id,
                 );
@@ -258,92 +262,6 @@ export function AdminScreen({ section }: { section: string }) {
           </Panel>
         </div>
       )}
-      {section === "committees" && (
-        <Panel
-          title="Committee directory"
-          subtitle="Dynamic committees, with shared defaults and optional overrides."
-        >
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Committee</th>
-                  <th>Room</th>
-                  <th>Delegates</th>
-                  <th>Scoring</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.committees.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <strong>{c.code}</strong>
-                    </td>
-                    <td>{c.name}</td>
-                    <td>{c.room}</td>
-                    <td>
-                      {
-                        data.delegates.filter((d) => d.committeeId === c.id)
-                          .length
-                      }
-                    </td>
-                    <td>
-                      <Chip tone="neutral">
-                        {c.scoringOverrides
-                          ? "Committee override"
-                          : "Conference defaults"}
-                      </Chip>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      )}
-      {section === "sessions" && (
-        <Panel
-          title="Sessions"
-          subtitle="Roll call, queue, votes, and participation reference the same session ID."
-        >
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Session</th>
-                  <th>Committee</th>
-                  <th>State</th>
-                  <th>Start</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.sessions.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.name}</td>
-                    <td>
-                      {
-                        data.committees.find((c) => c.id === s.committeeId)
-                          ?.code
-                      }
-                    </td>
-                    <td>
-                      <Chip tone={s.state === "active" ? "green" : "neutral"}>
-                        {s.state}
-                      </Chip>
-                    </td>
-                    <td>
-                      {new Date(s.startsAt).toLocaleString("en-GB", {
-                        timeZone: "Asia/Qatar",
-                      })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      )}
       {section === "delegates" && (
         <>
           <Panel
@@ -474,7 +392,7 @@ export function AdminScreen({ section }: { section: string }) {
                 onChange={(e) => setScoreScope(e.target.value)}
               >
                 <option value="conference">Conference defaults</option>
-                {data.committees.map((c) => (
+                {data.committees.filter(c => !c.archived).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code} · Committee override
                   </option>
@@ -690,64 +608,6 @@ export function AdminScreen({ section }: { section: string }) {
           </div>
         </Panel>
       )}
-      {modal === "committees" && (
-        <Modal title="Add committee" onClose={() => setModal(null)}>
-          <form
-            onSubmit={(e) =>
-              void submit(e, (f) => ({
-                type: "committee",
-                code: String(f.get("code")),
-                name: String(f.get("name")),
-                room: String(f.get("room")),
-              }))
-            }
-          >
-            <div className="form-grid">
-              <label>
-                Committee code
-                <input name="code" required placeholder="GA2" />
-              </label>
-              <label>
-                Room
-                <input name="room" required placeholder="Room 205" />
-              </label>
-            </div>
-            <label>
-              Committee name
-              <input name="name" required placeholder="Economic & Financial" />
-            </label>
-            <p className="footnote">
-              New committees inherit conference defaults. No fixed committee
-              limit.
-            </p>
-            <button className="primary">Create committee</button>
-          </form>
-        </Modal>
-      )}
-      {modal === "sessions" && (
-        <Modal title="Add session" onClose={() => setModal(null)}>
-          <form
-            onSubmit={(e) =>
-              void submit(e, (f) => ({
-                type: "session",
-                name: String(f.get("name")),
-                committeeId: String(f.get("committeeId")),
-              }))
-            }
-          >
-            <CommitteeSelect />
-            <label>
-              Session name
-              <input
-                name="name"
-                required
-                placeholder="Session 3 · Afternoon debate"
-              />
-            </label>
-            <button className="primary">Create session</button>
-          </form>
-        </Modal>
-      )}
       {modal === "schools" && (
         <Modal title="Add school" onClose={() => setModal(null)}>
           <form
@@ -867,7 +727,7 @@ function CommitteeSelect({ optional = false }: { optional?: boolean }) {
       Committee scope
       <select name="committeeId">
         {optional && <option value="">Conference-wide</option>}
-        {data.committees.map((c) => (
+        {data.committees.filter(c => !c.archived).map((c) => (
           <option key={c.id} value={c.id}>
             {c.code} · {c.name}
           </option>
@@ -979,7 +839,7 @@ function ImportFlow({ close }: { close: () => void }) {
                 value={committeeId}
                 onChange={(e) => setCommitteeId(e.target.value)}
               >
-                {data.committees.map((c) => (
+                {data.committees.filter(c => !c.archived).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
                   </option>
