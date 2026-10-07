@@ -15,6 +15,10 @@ alter table private.access_credentials
 
 create unique index access_credentials_digest_unique
   on private.access_credentials(credential_hash);
+-- NULL committee is one real conference-wide scope, including expired but unrevoked codes.
+create unique index access_credentials_one_active_scope
+  on private.access_credentials(conference_id, role, committee_id) nulls not distinct
+  where revoked_at is null;
 create index access_credentials_scope_lookup
   on private.access_credentials(conference_id, role, committee_id, created_at desc);
 create index access_credentials_active_expiry
@@ -102,7 +106,9 @@ begin
       and a.credential_hash = digest
       and a.revoked_at is null
       and a.expires_at > now()
-    limit 1;
+    limit 1 for update;
+    -- Held until commit: concurrent revoke/rotate either precedes this lookup
+    -- (the revoked predicate is rechecked) or waits until its grant/source exists.
   end if;
 
   if credential.id is null then
@@ -208,7 +214,7 @@ begin
   end if;
   if requested_role = 'chair' then
     if committee is null or not exists(
-      select 1 from public.committees c where c.id = committee and c.conference_id = conf
+      select 1 from public.committees c where c.id = committee and c.conference_id = conf for update
     ) then
       raise exception 'Choose a valid committee' using errcode='22023';
     end if;
@@ -218,6 +224,11 @@ begin
   if expires_at is null or expires_at <= now() then
     raise exception 'Access-code expiry must be in the future' using errcode='22023';
   end if;
+
+  -- Serialize even the first rotation, when there is no credential row to lock.
+  -- Committee row (for Chair scopes) precedes this lock, matching lifecycle operations.
+  perform pg_advisory_xact_lock(hashtextextended(
+    'access-code:'||conf::text||':'||requested_role::text||':'||coalesce(committee::text,'conference'),0));
 
   update private.access_credentials a
     set revoked_at = coalesce(a.revoked_at,now()), updated_at = now()
@@ -282,7 +293,8 @@ begin
 
   select a.* into rec
   from private.access_credentials a
-  where a.id = credential and a.conference_id = conf;
+  where a.id = credential and a.conference_id = conf
+  for update; -- Same credential lock as redemption, before examining grant sources.
 
   if rec.id is null then
     raise exception 'Access code unavailable' using errcode='22023';
