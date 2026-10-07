@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshDatabase} from './helpers/database';
-import type {Command} from '../lib/commands';
+import {applyCommand,type Command} from '../lib/commands';
 import {fingerprint} from '../lib/sync/repository';
 import type {ConferenceData} from '../lib/domain';
 const admin='75000000-0000-4000-8000-000000000001',chair='75000000-0000-4000-8000-000000000002',other='75000000-0000-4000-8000-000000000003';
@@ -13,7 +13,7 @@ async function setup(){
   const time=new Date().toISOString();const exp=expected===undefined?fingerprint(await snapshot(),c):expected;
   const args=[f.ids.conference,id,c,role,exp,time];
   const run=()=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',args);
-  await run();return {run,id};
+  await run();return {run,id,time};
  };return {...f,snapshot,mutate};
 }
 test('central slots preserve local identities and history; committee/session deletion is conservative and transactional',async()=>{
@@ -21,6 +21,8 @@ test('central slots preserve local identities and history; committee/session del
   await f.as(admin);const original=await f.snapshot();assert.ok(original.sessions.every(s=>s.slotId===null));
   const create:Command={type:'sessionSlot',action:'create',name:'Friday morning',startsAt:'2026-11-06T06:00:00Z',endsAt:'2026-11-06T09:00:00Z'};
   const receipt=await f.mutate(create);await receipt.run();let data=await f.snapshot();assert.equal(data.sessionSlots?.length,1);
+  const predicted=applyCommand(original,create,'admin',{id:receipt.id,createdAt:receipt.time});
+  assert.deepEqual(data.sessions.filter(s=>s.slotId).map(s=>[s.id,s.committeeId,s.slotId]),predicted.sessions.filter(s=>s.slotId).map(s=>[s.id,s.committeeId,s.slotId]),'optimistic materialized identities match PostgreSQL for chained outbox commands');
   const slot=data.sessionSlots![0];const copies=data.sessions.filter(s=>s.slotId===slot.id);assert.equal(copies.length,data.committees.length);
   await f.mutate({...create,action:'update',id:slot.id,name:'Morning plenary'});data=await f.snapshot();assert.deepEqual(data.sessions.filter(s=>s.slotId===slot.id).map(s=>s.id),copies.map(s=>s.id));assert.ok(data.sessions.filter(s=>s.slotId===slot.id).every(s=>s.name==='Morning plenary'));
   await assert.rejects(()=>f.mutate({...create,action:'update',id:slot.id},'admin','1'),code('PT409'));
@@ -57,15 +59,21 @@ test('amendment links, public submission, limits, lifecycle, RLS and token-safe 
   for(let i=0;i<4;i++)await submit(crypto.randomUUID(),delegate.id,doc.id,'Different wording '+i);
   await assert.rejects(()=>submit(crypto.randomUUID(),delegate.id,doc.id,'Beyond per-delegate limit'),/rate_limited/);
   await f.as(other);assert.equal((await f.query<{n:number}>('select count(*)::int n from public.amendments'))[0].n,0);
+  await f.as(admin);assert.deepEqual((await f.query<{s:ConferenceData}>('select public.executive_state_snapshot($1) s',[f.ids.conference]))[0].s.amendments,[],'Executive projection does not load amendment wording');
   await f.as(chair);data=await f.snapshot();assert.equal(data.amendments!.length,5);
   await f.mutate({type:'amendmentStatus',id,status:'Accepted for Debate'},'chair');await assert.rejects(()=>f.mutate({type:'amendmentStatus',id,status:'In Debate'},'chair','1'),code('PT409'));
   await f.mutate({type:'amendmentStatus',id,status:'In Debate'},'chair');const second=data.amendments!.find(a=>a.id!==id)!;
   await f.mutate({type:'amendmentStatus',id:second.id,status:'Accepted for Debate'},'chair');await assert.rejects(()=>f.mutate({type:'amendmentStatus',id:second.id,status:'In Debate'},'chair'),/Close the current amendment/);
   await f.mutate({type:'amendmentStatus',id,status:'Closed',outcome:'Passed'},'chair');assert.equal((await f.snapshot()).amendments!.find(a=>a.id===id)?.outcome,'Passed');
   await f.mutate({type:'amendmentStatus',id:second.id,status:'Closed',outcome:'Ruled Out'},'chair');
+  const additional=data.delegates.filter(d=>d.committeeId===f.ids.ga1&&d.id!==delegate.id).slice(0,4);assert.equal(additional.length,4);
+  await f.asServer();for(const person of additional.slice(0,3))for(let i=0;i<5;i++)await submit(crypto.randomUUID(),person.id,doc.id,`Link limit ${person.id} ${i}`);
+  await assert.rejects(()=>submit(crypto.randomUUID(),additional[3].id,doc.id,'Beyond per-link limit'),/rate_limited/);
+  await f.asOwner();await f.query(`update public.documents set status='Closed',outcome='Passed' where id=$1`,[doc.id]);await f.asServer();await assert.rejects(()=>submit(crypto.randomUUID(),delegate.id,doc.id,'After closure'),/not_open/);
+  await f.asOwner();await f.query(`update public.documents set status='In Debate',outcome=null where id=$1`,[doc.id]);
   await f.as(admin);await f.mutate({type:'amendmentLink',action:'rotate',committeeId:f.ids.ga1,token:'replacement_token_123456789012345'});await f.asServer();await assert.rejects(()=>submit(),/invalid_link/);
   await f.as(admin);await f.mutate({type:'amendmentLink',action:'revoke',committeeId:f.ids.ga1});await f.asServer();assert.equal((await f.query<{s:unknown}>('select public.amendment_link_info($1) s',['replacement_token_123456789012345']))[0].s,null);
   await f.asOwner();assert.ok(!(await f.query<{details:unknown}>('select details from public.audit_log')).some(a=>JSON.stringify(a.details).includes(token)));
-  await f.query(`update public.documents set status='Closed',outcome='Passed' where id=$1`,[doc.id]);await f.as(chair);assert.deepEqual((await f.snapshot()).amendments,[]);assert.equal((await f.query<{n:number}>('select count(*)::int n from public.amendments'))[0].n,5,'closed resolution history stays stored');
+  await f.query(`update public.documents set status='Closed',outcome='Passed' where id=$1`,[doc.id]);await f.as(chair);assert.deepEqual((await f.snapshot()).amendments,[]);assert.equal((await f.query<{n:number}>('select count(*)::int n from public.amendments'))[0].n,20,'closed resolution history stays stored');
  }finally{await f.db.close();}
 });

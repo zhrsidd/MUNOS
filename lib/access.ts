@@ -15,7 +15,7 @@ export function activeStaffGrants(rows:AccessGrant[],now=Date.now()):AccessGrant
 export function grantAccess(rows:AccessGrant[],actorId:string,email?:string,now=Date.now()):StaffAccess {
  const grants=activeStaffGrants(rows,now);
  if(!grants.length)return{status:'noAccess',roles:[],committeeIds:[],actorId,email,message:NO_CONFERENCE_ACCESS};
- return{status:'active',actorId,email,roles:[...new Set(grants.map(a=>a.role))],committeeIds:grants.every(a=>a.role==='chair')?[...new Set(grants.map(a=>a.committee_id!))]:[],validUntil:Math.min(now+48*3600000,...grants.map(a=>Date.parse(a.expires_at)))};
+ return{status:'active',actorId,email,roles:[...new Set(grants.map(a=>a.role))],committeeIds:[...new Set(grants.filter(a=>a.role==='chair').map(a=>a.committee_id!))],validUntil:Math.min(now+48*3600000,...grants.map(a=>Date.parse(a.expires_at)))};
 }
 export function cachedStaffAccess(pointer:Record<string,string>|undefined,actorId:string,email?:string,now=Date.now()):StaffAccess|null {
  if(!pointer||pointer.actorId!==actorId||!Number.isFinite(Number(pointer.validUntil))||Number(pointer.validUntil)<=now)return null;

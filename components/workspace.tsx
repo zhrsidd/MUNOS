@@ -10,6 +10,7 @@ import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
+import { AccessCodes } from "./access-codes";
 import { CentralSessions } from "./central-sessions";
 import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
@@ -60,6 +61,7 @@ const adminNav = [
   ["schools", "Schools", "admin"],
   ["photos", "Group photos", "clock"],
   ["staff", "Chairs & staff", "review"],
+  ["access-codes", "Access codes", "settings"],
   ["scoring", "Scoring", "log"],
   ["workflow", "Workflow & features", "settings"],
   ["submissions", "Resolution links", "documents"],
@@ -80,7 +82,7 @@ export function Workspace({ path }: { path: string }) {
   const [menu, setMenu] = useState(false);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
-  const activeCommittees = data.committees.filter(c => !c.archived);
+  const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair'||path==='projector') || access.status!=='active' || access.committeeIds.includes(c.id)));
   const availableRoles = access.status === "active" ? roles.filter(r => access.roles.includes(r.id)) : roles;
   const committee =
     activeCommittees.find((c) => c.id === requestedCommitteeId) ||
@@ -334,7 +336,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
+            section === "access-codes" ? <AccessCodes /> : section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

@@ -21,6 +21,7 @@ const paths = [
   "admin/schools",
   "admin/photos",
   "admin/staff",
+  "admin/access-codes",
   "admin/scoring",
   "admin/awards",
   "admin/workflow",

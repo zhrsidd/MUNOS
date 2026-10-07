@@ -1,3 +1,4 @@
+import {redeemStaffCode,CODE_INVALID,CODE_LIMITED} from './access-codes';
 import {DurableRepository,type Health} from './sync/repository';
 import {DurableStore} from './sync/store';
 import {createSeed} from './seed';
@@ -55,7 +56,7 @@ export class RepositoryController {
   const client=browserClient();
   client.auth.onAuthStateChange((event,session)=>{
    // Never await Supabase calls from the auth callback (its internal lock is held).
-   if(event==='SIGNED_OUT')this.deny('signedOut','Sign in to your staff account.',undefined,undefined);
+   if(event==='SIGNED_OUT')this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);
    else if(session?.user.id!==this.access.actorId&&event!=='INITIAL_SESSION')this.deny('loading','Checking staff access…',session?.user.id,session?.user.email);
    if(event!=='INITIAL_SESSION')setTimeout(()=>{void this.retryAccess();},0);
   });
@@ -79,12 +80,16 @@ export class RepositoryController {
   if(this.signingOut||this.explicitSignOut)return;
   const client=browserClient(),conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
   const epoch=this.generation;
-  const {data:{session},error:sessionError}=await client.auth.getSession();
+  const legacyPointer=await this.store.readPreferences(`last-authorized:${conf}`);
+  const offlineActor=!navigator.onLine?legacyPointer?.actorId:undefined;
+  // Even an expired prepared device can export its retained outbox offline.
+  // Authorization is checked separately below; never refresh an Auth token to open recovery.
+  const {data:{session},error:sessionError}=offlineActor?{data:{session:{user:{id:offlineActor!,email:undefined}}},error:null}:await client.auth.getSession();
   if(epoch!==this.generation)return;
-  if(!session||session.user.is_anonymous){this.deny('signedOut','Sign in with your staff email and password.',undefined,undefined);return;}
+  if(!session){this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);return;}
   const actorId=session.user.id,email=session.user.email;
   const key=`supabase:${conf}:${actorId}`;this.recoveryKey=key;
-  const pointer=await this.store.readPreferences(`staff-authorized:${conf}:${actorId}`);
+  const pointer=await this.store.readPreferences(`staff-authorized:${conf}:${actorId}`)??(legacyPointer?.actorId===actorId?legacyPointer:undefined);
   const cached=await this.store.read(key);
   const cachedAccess=()=>this.rejectedActors.has(actorId)?null:cachedStaffAccess(pointer,actorId,email);
   let next:StaffAccess|null=null;
@@ -101,11 +106,11 @@ export class RepositoryController {
   if(!next){this.deny('unavailable','Reconnect to verify your staff access. Saved changes remain on this device.',actorId,email);return;}
   if(next.status!=='active'){await this.store.savePreferences(`staff-authorized:${conf}:${actorId}`,{validUntil:'0'});this.deny('noAccess',NO_CONFERENCE_ACCESS,actorId,email);return;}
   if(this.active&&this.access.actorId===actorId&&JSON.stringify(this.access.roles)===JSON.stringify(next.roles)&&JSON.stringify(this.access.committeeIds)===JSON.stringify(next.committeeIds)){
-   await this.store.savePreferences(`staff-authorized:${conf}:${actorId}`,{key,actorId,roles:JSON.stringify(next.roles),committeeIds:JSON.stringify(next.committeeIds),validUntil:String(next.validUntil)});
+   await this.saveAccessLease(conf,actorId,{key,actorId,roles:JSON.stringify(next.roles),committeeIds:JSON.stringify(next.committeeIds),validUntil:String(next.validUntil)});
    if(epoch!==this.generation)return;this.setAccess(next);this.scheduleExpiry();return;
   }
   this.stop();const generation=this.generation;this.setAccess(next);this.scheduleExpiry();
-  const transport=new AccessGatedTransport(new SupabaseTransport(client,conf,actorId,next.committeeIds,false,next.roles),()=>this.generation===generation&&this.access.status==='active'&&this.access.actorId===actorId&&Date.now()<(this.access.validUntil??0));
+  const transport=new AccessGatedTransport(new SupabaseTransport(client,conf,actorId,next.roles.every(r=>r==='chair')?next.committeeIds:[],false,next.roles),()=>this.generation===generation&&this.access.status==='active'&&this.access.actorId===actorId&&Date.now()<(this.access.validUntil??0));
   let initial=cached?.base;
   if(navigator.onLine){try{initial=await transport.read();}catch(error){
    const denied=error&&typeof error==='object'&&'code'in error&&(error.code==='42501'||error.code==='PGRST301');
@@ -114,7 +119,7 @@ export class RepositoryController {
   }}
   if(generation!==this.generation)return;
   if(!initial){this.deny('unavailable','Connect once to prepare this staff workspace on this device.',actorId,email);return;}
-  await this.store.savePreferences(`staff-authorized:${conf}:${actorId}`,{key,actorId,roles:JSON.stringify(next.roles),committeeIds:JSON.stringify(next.committeeIds),validUntil:String(next.validUntil)});
+  await this.saveAccessLease(conf,actorId,{key,actorId,roles:JSON.stringify(next.roles),committeeIds:JSON.stringify(next.committeeIds),validUntil:String(next.validUntil)});
   if(generation!==this.generation)return;
   this.active=new DurableRepository(key,()=>initial!,this.store,transport);await this.connectActive();
  }
@@ -123,18 +128,23 @@ export class RepositoryController {
   const delay=(this.access.validUntil??0)-Date.now();
   this.expiryTimer=setTimeout(()=>{this.deny('noAccess',NO_CONFERENCE_ACCESS);void this.retryAccess();},Math.max(0,Math.min(delay,2147483647)));
  }
- signIn=async(email:string,password:string)=>{
-  const {error}=await browserClient().auth.signInWithPassword({email:email.trim(),password});
-  if(error)throw Error('Sign-in failed. Check your staff email and password, then try again.');
+ private async saveAccessLease(conf:string,actorId:string,pointer:Record<string,string>){
+  await this.store.savePreferences(`staff-authorized:${conf}:${actorId}`,pointer);
+  await this.store.savePreferences(`last-authorized:${conf}`,pointer);
+ }
+ redeemCode=async(code:string)=>{
+  const status=await redeemStaffCode(browserClient(),process.env.NEXT_PUBLIC_CONFERENCE_ID!,code);
+  if(status==='invalid')throw Error(CODE_INVALID);
+  if(status==='rate_limited')throw Error(CODE_LIMITED);
   this.explicitSignOut=false;
-  // The auth event may invalidate an in-flight check; run once more after it finishes.
   await this.retryAccess();await this.retryAccess();
  };
  signOut=async()=>{
   this.signingOut=true;this.explicitSignOut=true;
-  this.deny('signedOut','Sign in to your staff account.',undefined,undefined);
+  const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID,actor=this.access.actorId;
+  this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);
   // Signing out never deletes the actor-keyed checkpoint or unsent mutations.
-  try{const {error}=await browserClient().auth.signOut({scope:'local'});if(error)throw error;}
+  try{await this.store.savePreferences(`last-authorized:${conf}`,{actorId:'',validUntil:'0'});if(actor)await this.store.savePreferences(`staff-authorized:${conf}:${actor}`,{validUntil:'0'});const {error}=await browserClient().auth.signOut({scope:'local'});if(error)throw error;}
   catch{const message='Unable to finish signing out. Reconnect and retry; saved changes are retained.';this.setAccess({...this.access,status:'signedOut',message});throw Error(message);}
   finally{this.signingOut=false;}
  };

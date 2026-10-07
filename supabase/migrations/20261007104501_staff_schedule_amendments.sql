@@ -74,6 +74,14 @@ begin
 end $$;
 revoke all on function private.batch_has_references(regclass,uuid,regclass[]) from public,anon,authenticated;
 
+-- Historical JSON receipts also preserve session references after mutable state is cleared.
+create function private.batch_session_used(sid uuid) returns boolean language sql set search_path='' as $$
+ select private.batch_has_references('public.sessions',sid)
+ or exists(select 1 from public.audit_log where details->>'sessionId'=sid::text)
+ or exists(select 1 from private.mutation_receipts where payload->'command'->>'sessionId'=sid::text)
+$$;
+revoke all on function private.batch_session_used(uuid) from public,anon,authenticated;
+
 -- The core committee-create command already locks the conference, serializing slot materialization.
 create function private.materialize_new_committee_slots() returns trigger language plpgsql set search_path='' as $$
 declare slot public.conference_session_slots;n integer:=1;
@@ -130,7 +138,7 @@ begin
   elsif action='delete' then
    if private.batch_has_references('public.committees',cid,array['public.sessions'::regclass]) then raise exception 'Committee has linked records. Archive it to preserve history.' using errcode='22023';end if;
    for sid in select id from public.sessions where committee_id=cid loop
-    if private.batch_has_references('public.sessions',sid) then raise exception 'Committee sessions have history. Archive the committee instead.' using errcode='22023';end if;
+    if private.batch_session_used(sid) then raise exception 'Committee sessions have history. Archive the committee instead.' using errcode='22023';end if;
    end loop;
    delete from public.sessions where committee_id=cid;delete from public.committees where id=cid;
   else raise exception 'Unknown committee action' using errcode='22023';end if;
@@ -153,7 +161,7 @@ begin
    update public.committees set "currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id);
   elsif action='delete' then
    for sid in select id from public.sessions where "slotId"=slot.id loop
-    if private.batch_has_references('public.sessions',sid) then raise exception 'Session has operational history. Archive the slot instead.' using errcode='22023';end if;
+    if private.batch_session_used(sid) then raise exception 'Session has operational history. Archive the slot instead.' using errcode='22023';end if;
    end loop;
    delete from public.sessions where "slotId"=slot.id;delete from public.conference_session_slots where id=slot.id;
   else raise exception 'Unknown session action' using errcode='22023';end if;
@@ -236,19 +244,19 @@ revoke all on function public.submit_amendment(text,uuid,uuid,uuid,text,text,tex
 grant execute on function public.submit_amendment(text,uuid,uuid,uuid,text,text,text) to service_role;
 
 -- Current amendment work only; complete history stays queryable under table RLS.
-create function public.staff_batch_snapshot(conf uuid) returns jsonb language sql stable security invoker set search_path='' as $$
+create function public.staff_batch_snapshot(conf uuid,include_amendments boolean default true) returns jsonb language sql stable security invoker set search_path='' as $$
  select jsonb_build_object(
  'sessionSlots',(select coalesce(jsonb_agg(to_jsonb(s)-'conference_id'-'created_at' order by s."startsAt",s.id),'[]') from public.conference_session_slots s where conference_id=conf),
  'amendmentLinks',(select coalesce(jsonb_agg(jsonb_build_object('id',l.id,'committeeId',l.committee_id,'token',l.token,'createdAt',l.created_at)),'[]') from public.amendment_links l where conference_id=conf and revoked_at is null),
- 'amendments',(select coalesce(jsonb_agg(to_jsonb(a)-'conference_id'-'committee_id'||jsonb_build_object('committeeId',a.committee_id) order by a."createdAt",a.id),'[]') from
-  (select a.* from public.amendments a join public.documents d on d.id=a."resolutionId" where a.conference_id=conf and d.status='In Debate' order by a."createdAt" desc,a.id desc limit 200) a)
+ 'amendments',case when include_amendments then (select coalesce(jsonb_agg(to_jsonb(a)-'conference_id'-'committee_id'||jsonb_build_object('committeeId',a.committee_id) order by a."createdAt",a.id),'[]') from
+  (select a.* from public.amendments a join public.documents d on d.id=a."resolutionId" where a.conference_id=conf and d.status='In Debate' order by a."createdAt" desc,a.id desc limit 200) a) else '[]'::jsonb end
  );
 $$;
-revoke all on function public.staff_batch_snapshot(uuid) from public,anon;
-grant execute on function public.staff_batch_snapshot(uuid) to authenticated;
+revoke all on function public.staff_batch_snapshot(uuid,boolean) from public,anon;
+grant execute on function public.staff_batch_snapshot(uuid,boolean) to authenticated;
 create or replace function public.conference_state_snapshot(conf uuid) returns jsonb language sql stable security invoker set search_path='' as $$
  select public.conference_snapshot(conf)||coalesce(public.operations_snapshot(conf),'{}')||public.staff_batch_snapshot(conf)
 $$;
 create or replace function public.executive_state_snapshot(conf uuid) returns jsonb language sql stable security invoker set search_path='' as $$
- select public.executive_snapshot(conf)||coalesce(public.operations_snapshot(conf),'{}')||public.staff_batch_snapshot(conf)
+ select public.executive_snapshot(conf)||coalesce(public.operations_snapshot(conf),'{}')||public.staff_batch_snapshot(conf,false)
 $$;
