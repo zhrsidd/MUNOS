@@ -9,9 +9,10 @@ import type {OperationsData} from '../operations/types';
 const missingFunction=(e:{code?:string})=>e.code==='PGRST202'||e.code==='42883';
 export class SupabaseTransport implements Transport {
  constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false,private authenticatedRoles:readonly Role[]=[]){ }
+ private isExecutive(){return this.authenticatedRoles.length===1 && this.authenticatedRoles[0]==='admin';}
  async read():Promise<ConferenceData>{
   if(this.recoveryOnly)throw Error("Renew device access before syncing.");
-  const [core,operations]=await Promise.all([this.client.rpc('conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
+  const [core,operations]=await Promise.all([this.client.rpc(this.isExecutive()?'executive_snapshot':'conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
   const {data,error}=core;
   if(error)throw error;
   if(!data?.conference?.id)throw Error('Conference access has not been granted.');
@@ -34,8 +35,18 @@ export class SupabaseTransport implements Transport {
  }
  subscribe(refresh:()=>void,state:(connected:boolean)=>void){
   if(this.recoveryOnly){state(false);return ()=>{};}
-  let debounce:ReturnType<typeof setTimeout>;
-  const changed=()=>{clearTimeout(debounce);debounce=setTimeout(refresh,350);};
+  let debounce:ReturnType<typeof setTimeout>|undefined;
+  let chairWindow:ReturnType<typeof setTimeout>|undefined;
+  const changed=()=>{
+   // The fast read includes Chair state too; avoid a second pending refresh.
+   clearTimeout(chairWindow);chairWindow=undefined;
+   clearTimeout(debounce);debounce=setTimeout(()=>{debounce=undefined;refresh();},350);
+  };
+  const executiveChairChanged=()=>{
+   if(debounce!==undefined || chairWindow!==undefined)return;
+   // Fixed window: sustained Chair traffic cannot postpone reconciliation.
+   chairWindow=setTimeout(()=>{chairWindow=undefined;refresh();},2000);
+  };
   // Only the compact notification table, filtered to committee scopes or conference operations.
   const scopes=this.committeeIds.length?this.committeeIds.map(id=>`committee_id=eq.${id}`):[`conference_id=eq.${this.conferenceId}`];
   const connected=new Set<string>();
@@ -44,10 +55,11 @@ export class SupabaseTransport implements Transport {
     // These roles consume document/configuration changes, not Chair-only activity.
     // Unknown or broader grants keep all notifications; this is not authorization.
     if(payload.new.topic==='chair' && this.authenticatedRoles.length>0 && this.authenticatedRoles.every(role=>role==='approval'||role==='logistics'))return;
+    if(payload.new.topic==='chair' && this.isExecutive()){executiveChairChanged();return;}
     changed();
    })
    .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);}else connected.delete(filter);state(connected.size===scopes.length);}));
-  return ()=>{clearTimeout(debounce);channels.forEach(c=>{void this.client.removeChannel(c);});};
+  return ()=>{clearTimeout(debounce);clearTimeout(chairWindow);channels.forEach(c=>{void this.client.removeChannel(c);});};
  }
 }
 export class SupabaseConferenceRepository extends DurableRepository {
