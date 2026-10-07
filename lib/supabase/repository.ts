@@ -69,16 +69,30 @@ export class SupabaseTransport implements Transport {
   // Only the compact notification table, filtered to committee scopes or conference operations.
   const scopes=this.committeeIds.length?this.committeeIds.map(id=>`committee_id=eq.${id}`):[`conference_id=eq.${this.conferenceId}`];
   const connected=new Set<string>();
-  const channels=scopes.map((filter,i)=>this.client.channel(`operations:${this.conferenceId}:${this.actorId}:${i}`)
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'operational_changes',filter},payload=>{
-    // These roles consume document/configuration changes, not Chair-only activity.
-    // Unknown or broader grants keep all notifications; this is not authorization.
-    if(payload.new.topic==='chair' && this.authenticatedRoles.length>0 && this.authenticatedRoles.every(role=>role==='approval'||role==='logistics'))return;
-    if(payload.new.topic==='chair' && this.isExecutive()){executiveChairChanged();return;}
-    changed();
-   })
-   .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);}else connected.delete(filter);state(connected.size===scopes.length);}));
-  return ()=>{clearTimeout(debounce);clearTimeout(chairWindow);channels.forEach(c=>{void this.client.removeChannel(c);});};
+  const channels:ReturnType<SupabaseClient["channel"]>[]=[];
+  let cancelled=false;
+  const startChannels=()=>{
+   if(cancelled)return;
+   for(const [i,filter] of scopes.entries()){
+    const channel=this.client.channel(`operations:${this.conferenceId}:${this.actorId}:${i}`)
+     .on('postgres_changes',{event:'INSERT',schema:'public',table:'operational_changes',filter},payload=>{
+      // These roles consume document/configuration changes, not Chair-only activity.
+      // Unknown or broader grants keep all notifications; this is not authorization.
+      if(payload.new.topic==='chair' && this.authenticatedRoles.length>0 && this.authenticatedRoles.every(role=>role==='approval'||role==='logistics'))return;
+      if(payload.new.topic==='chair' && this.isExecutive()){executiveChairChanged();return;}
+      changed();
+     })
+     .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);}else connected.delete(filter);state(connected.size===scopes.length);});
+    channels.push(channel);
+   }
+  };
+  // Supabase Realtime builds the first channel join payload from its cached access token.
+  // Explicitly refresh that cache before creating/subscribing channels so the first join is
+  // RLS-authenticated. Passing no token keeps Supabase's accessToken callback/auth events as
+  // the source of truth for later refreshes. If preparation itself fails, retain the existing
+  // degraded Realtime behavior; the minute recovery read remains the correctness fallback.
+  void this.client.realtime.setAuth().catch(()=>undefined).then(startChannels);
+  return ()=>{cancelled=true;clearTimeout(debounce);clearTimeout(chairWindow);channels.forEach(c=>{void this.client.removeChannel(c);});};
  }
 }
 export class SupabaseConferenceRepository extends DurableRepository {
