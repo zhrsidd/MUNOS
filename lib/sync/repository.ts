@@ -63,7 +63,7 @@ export class DurableRepository implements ConferenceRepository {
     const conflicts = checkpoint.pending.filter(m=>m.state==="conflict").length;
     this.health = { ...this.health, pending: checkpoint.pending.length, conflicts,
       state: conflicts ? "conflict" : checkpoint.pending.length ? "waiting" : "saved",
-      message: conflicts ? `${conflicts} change(s) need review in System health. Your changes are retained.` : checkpoint.pending.length ? "Saved on this device — waiting for connection" : this.transport ? "Synced" : "Saved on this device · local demo" };
+      message: conflicts ? `${conflicts} ${conflicts === 1 ? "change needs" : "changes need"} review in System health. Your changes are retained.` : checkpoint.pending.length ? "Saved on this device — waiting for connection" : this.transport ? "Synced" : "Saved on this device · local demo" };
     this.emit();
   }
   initialize = () => { void this.ready().catch(e=>{ this.health={...this.health,state:"error",message:"Device storage is unavailable. Changes cannot be saved.",detail:String(e)}; this.emit(); }); };
