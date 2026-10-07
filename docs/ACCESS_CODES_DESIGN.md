@@ -77,9 +77,10 @@ All new private tables must have RLS enabled and explicit no-browser-access poli
 - Apply failed-attempt rate limiting before expensive/lookup work (suggestion: 8 failures per 10 minutes per user+conference).
 - Normalize and hash the supplied code.
 - Match exactly one non-revoked, unexpired credential for the conference.
-- On failure return the same generic invalid-code error for wrong/expired/revoked credentials.
+- On wrong/expired/revoked credentials, persist a failed attempt and return the same generic `{status: "invalid"}` result. Do not raise after recording the attempt, because a PostgreSQL exception would roll the rate-limit row back.
+- Once the failure threshold is reached, return `{status: "rate_limited"}` without trying a credential.
 - On success upsert `public.user_access` for `auth.uid()`, using role/committee/expiry from the credential.
-- Return safe metadata only: role, committee id, expiry.
+- Return `{status: "ok"}` plus safe metadata only: role, committee id, expiry.
 - Never return the hash, credential internals, or raw code.
 
 Anonymous Supabase Auth users still use the database role `authenticated`; a fresh anonymous identity has no access because all existing RLS paths require `user_access`.
