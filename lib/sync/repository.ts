@@ -115,6 +115,7 @@ export class DurableRepository implements ConferenceRepository {
       this.health={...this.health,state:"syncing",message:"Syncing…"}; this.emit();
       // Stop at a conflict, preserving subsequent intent until an operator resolves it.
       let item=this.checkpoint?.pending[0];
+      let readBackCompleted=false;
       while(item && item.state!=="conflict") {
         try { await this.transport!.send(item); }
         catch(error) {
@@ -127,11 +128,16 @@ export class DurableRepository implements ConferenceRepository {
         const start=performance.now(); const base=await this.transport!.read();
         this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
         this.publish(await this.store.update(this.key,old=>({...old!,base,pending:old!.pending.filter(m=>m.id!==item!.id),savedAt:new Date().toISOString()})));
+        readBackCompleted=true;
         item=this.checkpoint?.pending[0];
       }
-      const start=performance.now(); const base=await this.transport!.read();
-      this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
-      this.publish(await this.store.update(this.key,old=>({...old!,base})));
+      // The last acknowledged mutation already read back and persisted the server snapshot.
+      // Empty-outbox polling and an existing conflict still reconcile as before.
+      if(!readBackCompleted || item) {
+        const start=performance.now(); const base=await this.transport!.read();
+        this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
+        this.publish(await this.store.update(this.key,old=>({...old!,base})));
+      }
       this.attempts=0; this.channel?.postMessage("synced");
     };
     try {

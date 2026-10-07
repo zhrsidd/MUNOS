@@ -5,6 +5,15 @@ import type {Command} from './commands';
 import type {Role} from './domain';
 import {browserClient} from './supabase/client';
 import {SupabaseConferenceRepository,SupabaseTransport} from './supabase/repository';
+// Cached authenticated grants affect notification volume only; RLS still authorizes access.
+function cachedNotificationAccess(pointer?:Record<string,string>):{roles:Role[];committeeIds:string[]} {
+ try {
+  const roles:unknown=JSON.parse(pointer?.roles ?? '[]');
+  const committeeIds:unknown=JSON.parse(pointer?.committeeIds ?? '[]');
+  if(Array.isArray(roles) && roles.every(r=>['chair','approval','logistics','admin'].includes(r)) && Array.isArray(committeeIds) && committeeIds.every(id=>typeof id==='string'))return {roles,committeeIds};
+ } catch {}
+ return {roles:[],committeeIds:[]};
+}
 class RepositoryController {
  private active?:DurableRepository;
  private listeners=new Set<()=>void>();
@@ -23,10 +32,11 @@ class RepositoryController {
    if(process.env.NEXT_PUBLIC_DATA_BACKEND==='supabase'){
     const client=browserClient();const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
     const pointer=await store.readPreferences(`last-authorized:${conf}`);
+    const cachedAccess=cachedNotificationAccess(pointer);
     if(!navigator.onLine && pointer){
       const cached=await store.read(pointer.key);
       if(cached){
-        this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId,[],Number(pointer.validUntil)<=Date.now()));
+        this.active=new SupabaseConferenceRepository(pointer.key,cached.base,store,new SupabaseTransport(client,conf,pointer.actorId,cachedAccess.committeeIds,Number(pointer.validUntil)<=Date.now(),cachedAccess.roles));
         if(Number(pointer.validUntil)<=Date.now())this.blockedReason="Reconnect to renew device access. Saved changes remain available for recovery.";
       }
     }
@@ -37,20 +47,22 @@ class RepositoryController {
     }
     if(!session)throw Error('No authorized session. Access setup is pending.');
     const key=`supabase:${conf}:${session.user.id}`;
+    const notificationAccess=pointer?.key===key?cachedAccess:{roles:[],committeeIds:[]};
     const cached=await store.read(key);
     // Offline recovery never merges the separate local-demo database into Supabase.
     const {data:access,error}=await client.from('user_access').select('role,committee_id,expires_at').eq('conference_id',conf);
     let initial=cached?.base;
     if(error && !initial)throw error;
     if(!error && !access?.length)throw Error(`Access setup required for device user ${session.user.id}.`);
-    const scopes=access?.every(a=>a.role==='chair')?access.map(a=>a.committee_id):[];
-    const transport=new SupabaseTransport(client,conf,session.user.id,scopes);
+    const scopes=access ? (access.every(a=>a.role==='chair')?access.map(a=>a.committee_id):[]) : notificationAccess.committeeIds;
+    const roles:Role[]=access?.map(a=>a.role) ?? notificationAccess.roles;
+    const transport=new SupabaseTransport(client,conf,session.user.id,scopes,false,roles);
     try {initial=await transport.read();} catch(error){
       if(!cached || Date.now()-Date.parse(cached.savedAt)>48*3600000)throw error;
       if(error && typeof error==='object' && 'code' in error && error.code==='42501')throw error;
     }
     if(!initial)throw Error('Connect once to prepare the conference on this device.');
-    if(access?.length)await store.savePreferences(`last-authorized:${conf}`,{key,actorId:session.user.id,validUntil:String(Math.min(Date.now()+48*3600000,...access.map(a=>Date.parse(a.expires_at))))});
+    if(access?.length)await store.savePreferences(`last-authorized:${conf}`,{key,actorId:session.user.id,roles:JSON.stringify(roles),committeeIds:JSON.stringify(scopes),validUntil:String(Math.min(Date.now()+48*3600000,...access.map(a=>Date.parse(a.expires_at))))});
     this.active=new SupabaseConferenceRepository(key,initial,store,transport);
     }
    }
