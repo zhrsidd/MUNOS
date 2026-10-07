@@ -4,14 +4,33 @@ import {ConflictError,DurableRepository,type Transport} from '../sync/repository
 import {DurableStore,type Mutation} from '../sync/store';
 import {isOperationsCommand} from '../operations/commands';
 import type {OperationsData} from '../operations/types';
-// CODEX REVIEW REQUIRED: read() also fetches operations_snapshot (extension data, RLS-scoped) in parallel,
-// and send() routes extension commands to apply_operations_mutation. Same idempotency contract.
+// CODEX REVIEW REQUIRED: read() normally makes ONE RPC — conference_state_snapshot, or executive_state_snapshot for
+// an Admin-only identity — which returns the core snapshot merged with operations_snapshot (right-hand precedence,
+// same as the previous client-side merge). Only when that bundled function is missing (PGRST202/42883, e.g. a
+// database without the 20261006211039 migration) does it fall back to the previous parallel two-RPC read.
+// send() routes extension commands to apply_operations_mutation. Same idempotency contract.
 const missingFunction=(e:{code?:string})=>e.code==='PGRST202'||e.code==='42883';
 export class SupabaseTransport implements Transport {
  constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false,private authenticatedRoles:readonly Role[]=[]){ }
  private isExecutive(){return this.authenticatedRoles.length===1 && this.authenticatedRoles[0]==='admin';}
+ // Set once the bundled RPC is known to be missing on this database; later reads go straight to the two-RPC path.
+ private bundledUnavailable=false;
  async read():Promise<ConferenceData>{
   if(this.recoveryOnly)throw Error("Renew device access before syncing.");
+  if(!this.bundledUnavailable){
+   const {data,error}=await this.client.rpc(this.isExecutive()?'executive_state_snapshot':'conference_state_snapshot',{conf:this.conferenceId});
+   if(!error){
+    if(!data?.conference?.id)throw Error('Conference access has not been granted.');
+    return data as ConferenceData;
+   }
+   // Never fall back on authorization, timeout or any other failure: only a missing bundled function.
+   if(!missingFunction(error))throw error;
+   this.bundledUnavailable=true;
+  }
+  return this.readSeparately();
+ }
+ /** Previous read path: core snapshot and operations_snapshot in parallel, merged {...core, ...operations}. */
+ private async readSeparately():Promise<ConferenceData>{
   const [core,operations]=await Promise.all([this.client.rpc(this.isExecutive()?'executive_snapshot':'conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
   const {data,error}=core;
   if(error)throw error;

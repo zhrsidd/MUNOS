@@ -64,7 +64,7 @@ for(const code of ['PT409','40001'])test(`SupabaseTransport maps ${code} to reta
  const second:Mutation={...first,id:crypto.randomUUID(),expected:null,command:{type:'participation',sessionId:'s1',resolutionId:'r1',delegateId:'d1',categoryId:'speech',points:2}};
  const client={rpc:async(name:string,args?:{mutation?:string})=>{
   if(name.startsWith('apply_')){calls.push(args!.mutation!);return {data:null,error:{code,message:'Another chair changed attendance'}};}
-  return {data:name==='conference_snapshot'?structuredClone(data):{},error:null};
+  return {data:name==='conference_snapshot'||name==='conference_state_snapshot'?structuredClone(data):{},error:null};
  }} as unknown as SupabaseClient;
  const transport=new SupabaseTransport(client,data.conference.id,actor);
  await assert.rejects(()=>transport.send(first),ConflictError);calls.length=0;

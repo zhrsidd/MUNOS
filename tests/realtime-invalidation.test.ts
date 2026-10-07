@@ -40,7 +40,7 @@ function harness(roles: readonly Role[], committeeIds: string[] = [], connectImm
     channel() { const channel = new MockChannel(connectImmediately); channels.push(channel); return channel; },
     async removeChannel(channel: MockChannel) { removed.push(channel); },
     async rpc(name: string) {
-      if (name === 'conference_snapshot' || name === 'executive_snapshot') { reads++; return { data: createSeed(), error: null }; }
+      if (['conference_state_snapshot', 'executive_state_snapshot', 'conference_snapshot', 'executive_snapshot'].includes(name)) { reads++; return { data: createSeed(), error: null }; }
       assert.equal(name, 'operations_snapshot');
       return { data: {}, error: null };
     },

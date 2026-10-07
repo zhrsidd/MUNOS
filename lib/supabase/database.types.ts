@@ -1891,6 +1891,8 @@ export type Database = {
       }
       conference_snapshot: { Args: { conf: string }; Returns: Json }
       operations_snapshot: { Args: { conf: string }; Returns: Json }
+      conference_state_snapshot: { Args: { conf: string }; Returns: Json }
+      executive_state_snapshot: { Args: { conf: string }; Returns: Json }
       submission_link_info: { Args: { link_token: string }; Returns: Json }
       submit_resolution: {
         Args: {
