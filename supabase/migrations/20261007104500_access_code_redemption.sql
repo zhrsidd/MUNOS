@@ -81,11 +81,11 @@ begin
     and a.created_at > now() - interval '10 minutes';
 
   if recent_failures >= 8 then
-    raise exception 'too_many_attempts' using errcode='P0001';
+    return jsonb_build_object('status','rate_limited');
   end if;
 
   if not exists(select 1 from public.conferences c where c.id = conf) then
-    raise exception 'invalid_access_code' using errcode='P0001';
+    return jsonb_build_object('status','invalid');
   end if;
 
   if length(coalesce(code,'')) > 80 then
@@ -108,7 +108,7 @@ begin
   if credential.id is null then
     insert into private.access_redemption_attempts(conference_id,user_id,success)
     values(conf,actor,false);
-    raise exception 'invalid_access_code' using errcode='P0001';
+    return jsonb_build_object('status','invalid');
   end if;
 
   insert into public.user_access(conference_id,user_id,role,committee_id,expires_at,revoked_at)
@@ -129,6 +129,7 @@ begin
   values(conf,actor,true);
 
   return jsonb_build_object(
+    'status', 'ok',
     'role', credential.role,
     'committeeId', credential.committee_id,
     'expiresAt', credential.expires_at
