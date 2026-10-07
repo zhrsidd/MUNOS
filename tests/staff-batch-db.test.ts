@@ -37,6 +37,7 @@ test('central slots preserve local identities and history; committee/session del
   await assert.rejects(()=>f.mutate({...create,name:'unauthorized'},'admin'),code('42501'));
   await f.as(admin);await assert.rejects(()=>f.mutate({type:'sessionSlot',action:'delete',id:slot.id}),/operational history/);
   await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});data=await f.snapshot();assert.ok(data.sessionSlots!.find(s=>s.id===slot.id)?.archived);assert.equal(data.attendance.find(a=>a.sessionId===local.id)?.status,'Present');assert.ok(data.sessions.filter(s=>s.slotId===slot.id).every(s=>s.archived&&s.state==='closed'));
+  await f.as(chair);for(const doc of (await f.snapshot()).documents.filter(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate'))await f.mutate({type:'document',id:doc.id,status:'Closed',outcome:'Withdrawn'},'chair');await f.as(admin);
   await f.mutate({type:'committeeLifecycle',id:f.ids.ga1,action:'archive'});assert.ok((await f.snapshot()).committees.find(c=>c.id===f.ids.ga1)?.archived);
   assert.equal((await f.snapshot()).sessions.filter(s=>original.sessions.some(o=>o.id===s.id)).length,original.sessions.length,'legacy IDs retained');
   await f.mutate({...create,name:'Unused'});data=await f.snapshot();const unused=data.sessionSlots!.find(s=>s.name==='Unused')!;assert.equal(data.sessions.filter(s=>s.slotId===unused.id).length,original.committees.length-1,'archived committee excluded');

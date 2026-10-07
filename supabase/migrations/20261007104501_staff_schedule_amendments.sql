@@ -16,6 +16,52 @@ revoke all on public.conference_session_slots from public,anon,authenticated;
 grant select on public.conference_session_slots to authenticated;
 create policy read_authorized on public.conference_session_slots for select to authenticated using(private.has_access(conference_id,null,array['admin','chair','approval','logistics','observer']::public.conference_role[]));
 
+-- Case-fold committee codes at the database boundary, including direct writes.
+create unique index committees_code_casefold_unique on public.committees(conference_id,lower(code));
+
+-- Rotate locks the committee before its credential scope; reject post-archive issuance too.
+create function private.reject_archived_chair_credential() returns trigger language plpgsql set search_path='' as $$
+declare is_archived boolean;
+begin
+ if new.role='chair' and new.revoked_at is null then
+  select archived into is_archived from public.committees where id=new.committee_id and conference_id=new.conference_id for update;
+  if is_archived then raise exception 'Committee is archived; Chair access cannot be issued.' using errcode='22023';end if;
+ end if;
+ return new;
+end $$;
+revoke all on function private.reject_archived_chair_credential() from public,anon,authenticated;
+create trigger guard_archived_chair_credential before insert or update on private.access_credentials
+ for each row execute function private.reject_archived_chair_credential();
+
+-- Called after the existing committee lock and after idempotent receipt replay checks.
+-- Holding the session row through commit also prevents archive from overtaking the write.
+create function private.require_operational_session(conf uuid,sid uuid) returns void language plpgsql set search_path='' as $$
+declare s public.sessions;
+begin
+ if sid is null then return;end if;
+ select * into s from public.sessions where id=sid and conference_id=conf for share;
+ if s.archived or exists(select 1 from public.committees where id=s.committee_id and archived) then
+  raise exception 'This session or committee is archived. Saved changes need review.' using errcode='PT409';
+ end if;
+end $$;
+revoke all on function private.require_operational_session(uuid,uuid) from public,anon,authenticated;
+
+-- Add the guard to the two existing authorized mutation paths without copying/redesigning
+-- their command dispatch, receipt semantics or role checks. Fail closed if the base changes.
+do $patch$
+declare definition text;marker text;
+begin
+ definition:=pg_get_functiondef('private.apply_mutation(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
+ marker:=' if command ? ''delegateId'' then';
+ if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Core session guard anchor changed';end if;
+ execute replace(definition,marker,' perform private.require_operational_session(conf,sid);'||chr(10)||
+  ' if kind=''document'' and target=''In Debate'' then perform private.require_operational_session(conf,(select "currentSessionId" from public.committees where id=cid));end if;'||chr(10)||marker);
+ definition:=pg_get_functiondef('private.apply_procedure(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
+ marker:=' if did is not null and not exists';
+ if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Procedure session guard anchor changed';end if;
+ execute replace(definition,marker,' perform private.require_operational_session(conf,sid);'||chr(10)||marker);
+end $patch$;
+
 create table public.amendment_links (
  id uuid primary key default gen_random_uuid(),conference_id uuid not null references public.conferences(id),committee_id uuid not null,
  token text not null unique check(token ~ '^[A-Za-z0-9_-]{22,64}$'),created_at timestamptz not null default now(),revoked_at timestamptz,
@@ -117,7 +163,8 @@ begin
  elsif kind='amendmentLink' then cid:=(command->>'committeeId')::uuid;end if;
  if requested_role is distinct from (case when kind='amendmentStatus' then 'chair'::public.conference_role else 'admin'::public.conference_role end)
  or not private.has_access(conf,cid,array[requested_role]) then raise exception 'Access denied' using errcode='42501';end if;
- if kind<>'amendmentStatus' then perform 1 from public.conferences where id=conf for update;end if;
+ -- Serialize configuration without blocking grant/audit foreign-key KEY SHARE locks.
+ if kind<>'amendmentStatus' then perform 1 from public.conferences where id=conf for no key update;end if;
  if cid is not null then select * into committee from public.committees where id=cid and conference_id=conf for update;
   if not found then raise exception 'Committee unavailable' using errcode='42501';end if;
  else perform 1 from public.committees where conference_id=conf order by id for update;end if;
@@ -134,12 +181,21 @@ begin
   if coalesce(length(btrim(command->>'code')),0) not between 1 and 30 or coalesce(length(btrim(command->>'name')),0) not between 1 and 200 or coalesce(length(command->>'room'),0)>200 then raise exception 'Enter a valid committee code, name and room' using errcode='22023';end if;
   update public.committees set code=btrim(command->>'code'),name=btrim(command->>'name'),room=btrim(command->>'room'),revision=revision+1 where id=cid;
  when 'committeeLifecycle' then
-  if action='archive' then update public.committees set archived=true,revision=revision+1,"currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where id=cid;
+  if action='archive' then
+   if exists(select 1 from public.documents where committee_id=cid and status='In Debate') then raise exception 'Close the current resolution debate before archiving this committee.' using errcode='22023';end if;
+   update public.committees set archived=true,revision=revision+1,"currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where id=cid;
+   -- The committee lock serializes rotation. Credential locks serialize redemption;
+   -- revoke grants only after all in-flight successful redemptions have committed.
+   update private.access_credentials set revoked_at=now(),updated_at=now() where conference_id=conf and committee_id=cid and role='chair' and revoked_at is null;
+   update public.user_access set revoked_at=now(),updated_at=now() where conference_id=conf and committee_id=cid and role='chair' and revoked_at is null;
   elsif action='delete' then
-   if private.batch_has_references('public.committees',cid,array['public.sessions'::regclass]) then raise exception 'Committee has linked records. Archive it to preserve history.' using errcode='22023';end if;
+   if private.batch_has_references('public.committees',cid,array['public.sessions'::regclass,'public.operational_changes'::regclass,'public.audit_log'::regclass]) then raise exception 'Committee has linked records. Archive it to preserve history.' using errcode='22023';end if;
    for sid in select id from public.sessions where committee_id=cid loop
     if private.batch_session_used(sid) then raise exception 'Committee sessions have history. Archive the committee instead.' using errcode='22023';end if;
    end loop;
+   -- Invalidation rows are transient; audit content survives with its entity UUID.
+   delete from public.operational_changes where conference_id=conf and committee_id=cid;
+   update public.audit_log set committee_id=null where conference_id=conf and committee_id=cid;
    delete from public.sessions where committee_id=cid;delete from public.committees where id=cid;
   else raise exception 'Unknown committee action' using errcode='22023';end if;
   -- Audit references the preserved entity UUID without retaining a FK to a deleted committee.
@@ -156,6 +212,7 @@ begin
    update public.conference_session_slots set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz,revision=revision+1 where id=slot.id;
    update public.sessions set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz where "slotId"=slot.id;
   elsif action='archive' then
+   if exists(select 1 from public.documents d where d.status='In Debate' and (d."sessionId" in (select id from public.sessions where "slotId"=slot.id) or d.committee_id in (select id from public.committees where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id)))) then raise exception 'Close the current resolution debate before archiving this session.' using errcode='22023';end if;
    update public.conference_session_slots set archived=true,revision=revision+1 where id=slot.id;
    update public.sessions set archived=true,state='closed' where "slotId"=slot.id;
    update public.committees set "currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id);
@@ -172,7 +229,7 @@ begin
   update public.amendment_links set revoked_at=now() where committee_id=cid and revoked_at is null;
   if action<>'revoke' then insert into public.amendment_links(id,conference_id,committee_id,token) values(new_id,conf,cid,command->>'token');end if;
  when 'amendmentStatus' then
-  entity:=amend.id;topic:='documents';
+  entity:=amend.id;topic:='documents';perform private.require_operational_session(conf,amend."sessionId");
   if committee.archived or not exists(select 1 from public.documents where id=amend."resolutionId" and status='In Debate') then raise exception 'Amendments are not currently open in this committee.' using errcode='22023';end if;
   if not coalesce((amend.status='Submitted' and target='Accepted for Debate' and outcome_value is null) or (amend.status='Accepted for Debate' and target='In Debate' and outcome_value is null) or (amend.status<>'Closed' and target='Closed' and (outcome_value in ('Ruled Out','Withdrawn') or (amend.status='In Debate' and outcome_value in ('Passed','Failed')))),false) then raise exception 'Invalid amendment transition' using errcode='22023';end if;
   if target='In Debate' and exists(select 1 from public.amendments where committee_id=cid and status='In Debate' and id<>amend.id) then raise exception 'Close the current amendment debate first' using errcode='22023';end if;

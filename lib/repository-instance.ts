@@ -1,6 +1,6 @@
 import {redeemStaffCode,CODE_INVALID,CODE_LIMITED} from './access-codes';
 import {DurableRepository,type Health} from './sync/repository';
-import {DurableStore} from './sync/store';
+import {DurableStore,type Checkpoint} from './sync/store';
 import {createSeed} from './seed';
 import type {Command} from './commands';
 import type {Role} from './domain';
@@ -20,7 +20,9 @@ export class RepositoryController {
  private signingOut=false;
  private explicitSignOut=false;
  private rejectedActors=new Set<string>();
- private store=new DurableStore();
+ private writes=new Set<Promise<void>>();
+ private exportedRecovery?:{key:string;pending:string};
+ constructor(private store=new DurableStore(),private client=browserClient){}
  private recoveryKey?:string;
  private access:StaffAccess={status:'loading',roles:[],committeeIds:[]};
  private health:Health={mode:'local',state:'syncing',pending:0,conflicts:0,realtime:false,latency:null,message:'Opening conference…',detail:''};
@@ -53,7 +55,7 @@ export class RepositoryController {
    this.active=new DurableRepository('local-demo',()=>{const saved=localStorage.getItem('conference-os-demo-v2');return saved?JSON.parse(saved):createSeed();},this.store);
    await this.connectActive();return;
   }
-  const client=browserClient();
+  const client=this.client();
   client.auth.onAuthStateChange((event,session)=>{
    // Never await Supabase calls from the auth callback (its internal lock is held).
    if(event==='SIGNED_OUT')this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);
@@ -78,7 +80,7 @@ export class RepositoryController {
  };
  private async checkAccess(){
   if(this.signingOut||this.explicitSignOut)return;
-  const client=browserClient(),conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
+  const client=this.client(),conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
   const epoch=this.generation;
   const legacyPointer=await this.store.readPreferences(`last-authorized:${conf}`);
   const offlineActor=!navigator.onLine?legacyPointer?.actorId:undefined;
@@ -133,24 +135,50 @@ export class RepositoryController {
   await this.store.savePreferences(`last-authorized:${conf}`,pointer);
  }
  redeemCode=async(code:string)=>{
-  const status=await redeemStaffCode(browserClient(),process.env.NEXT_PUBLIC_CONFERENCE_ID!,code);
+  const status=await redeemStaffCode(this.client(),process.env.NEXT_PUBLIC_CONFERENCE_ID!,code);
   if(status==='invalid')throw Error(CODE_INVALID);
   if(status==='rate_limited')throw Error(CODE_LIMITED);
   this.explicitSignOut=false;
   await this.retryAccess();await this.retryAccess();
  };
- signOut=async()=>{
-  this.signingOut=true;this.explicitSignOut=true;
-  const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID,actor=this.access.actorId;
-  this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);
-  // Signing out never deletes the actor-keyed checkpoint or unsent mutations.
-  try{await this.store.savePreferences(`last-authorized:${conf}`,{actorId:'',validUntil:'0'});if(actor)await this.store.savePreferences(`staff-authorized:${conf}:${actor}`,{validUntil:'0'});const {error}=await browserClient().auth.signOut({scope:'local'});if(error)throw error;}
-  catch{const message='Unable to finish signing out. Reconnect and retry; saved changes are retained.';this.setAccess({...this.access,status:'signedOut',message});throw Error(message);}
-  finally{this.signingOut=false;}
+ private recoveryMatches(checkpoint:Checkpoint){return this.exportedRecovery?.key===checkpoint.key&&this.exportedRecovery.pending===JSON.stringify(checkpoint.pending);}
+ private hasActiveAccess(){return this.access.status==='active'&&Date.now()<(this.access.validUntil??0);}
+ signOut=async(confirmExportedRecovery=false)=>{
+  if(this.signingOut)return;
+  this.signingOut=true;
+  try{
+   // Finish local saves already started, and refuse new ones while deciding whether
+   // destroying this device identity would strand its pending or conflict actions.
+   await Promise.allSettled([...this.writes]);
+   const conf=process.env.NEXT_PUBLIC_CONFERENCE_ID,actor=this.access.actorId;
+   const key=actor?`supabase:${conf}:${actor}`:undefined;
+   const checkpoint=key?await this.store.read(key):undefined;
+   if(checkpoint?.pending.length){
+    if(this.hasActiveAccess())throw Error('Sync or resolve your saved changes before signing out. This device identity is needed to send them.');
+    if(!this.recoveryMatches(checkpoint))throw Error('Export your saved changes successfully before signing out. Your current device identity is needed to recover them.');
+    if(!confirmExportedRecovery)throw Error('Confirm sign-out after recovery export. Exported actions belong to this device identity and cannot automatically sync under a new identity.');
+   }
+   this.explicitSignOut=true;
+   this.deny('signedOut','Enter your staff access code to prepare this device.',undefined,undefined);
+   // Signing out never deletes the actor-keyed checkpoint or unsent mutations.
+   try{
+    await this.store.savePreferences(`last-authorized:${conf}`,{actorId:'',validUntil:'0'});
+    if(actor)await this.store.savePreferences(`staff-authorized:${conf}:${actor}`,{validUntil:'0'});
+    const {error}=await this.client().auth.signOut({scope:'local'});if(error)throw error;
+    this.exportedRecovery=undefined;
+   }catch{
+    const message='Unable to finish signing out. Reconnect and retry; saved changes are retained.';
+    this.setAccess({...this.access,status:'signedOut',message});throw Error(message);
+   }
+  }finally{this.signingOut=false;}
  };
  execute=(c:Command,r:Role)=>{
+  if(this.signingOut)return Promise.reject(Error('Sign-out is being checked. Please wait before recording another change.'));
   if(this.isCloud()&&(this.access.status!=='active'||!this.access.roles.includes(r)||Date.now()>=(this.access.validUntil??0)))return Promise.reject(Error(NO_CONFERENCE_ACCESS));
-  if(!this.active)return Promise.reject(Error('Workspace is loading.'));return this.active.execute(c,r);
+  if(!this.active)return Promise.reject(Error('Workspace is loading.'));
+  this.exportedRecovery=undefined;
+  const write=this.active.execute(c,r);this.writes.add(write);
+  void write.then(()=>this.writes.delete(write),()=>this.writes.delete(write));return write;
  };
  reset=()=>this.active?.reset();
  retry=()=>{void this.retryAccess().then(()=>this.active?.retry());};
@@ -158,6 +186,15 @@ export class RepositoryController {
   // A new/signed-out user cannot export a previous person's local records.
   if(this.isCloud()&&(!this.access.actorId||!this.recoveryKey?.endsWith(`:${this.access.actorId}`)))return undefined;
   return this.active?.exportRecovery()??(this.recoveryKey?JSON.stringify(await this.store.read(this.recoveryKey),null,2):undefined);
+ };
+ // Called only after the UI successfully initiates the recovery-file download.
+ // Serializing a checkpoint alone never authorizes identity destruction.
+ confirmRecoveryExport=async(json:string)=>{
+  const actor=this.access.actorId,key=this.recoveryKey;
+  if(!actor||!key?.endsWith(`:${actor}`))throw Error('The staff identity changed. Export recovery data again.');
+  const exported=JSON.parse(json) as Checkpoint,current=await this.store.read(key);
+  if(!current||exported.key!==key||JSON.stringify(exported.pending)!==JSON.stringify(current.pending))throw Error('Saved changes changed during export. Export the latest recovery data before signing out.');
+  this.exportedRecovery={key,pending:JSON.stringify(current.pending)};
  };
  getPending=()=>this.active?.getPending()??[];
  resolveConflict=(id:string)=>this.access.status==='active'||this.access.status==='demo'?this.active?.resolveConflict(id):undefined;

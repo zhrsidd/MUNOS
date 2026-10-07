@@ -40,3 +40,53 @@ PR #12's access-code migration, RPC implementation, Realtime fix and grammar fix
 Review focus: `lib/repository-instance.ts`, `lib/access.ts`, `lib/access-codes.ts`, access gate/Executive UI, the new migration, `lib/batch/*`, public amendment server boundaries and new database/recovery tests. After review/base integration, Claude can coordinate shared-development migration application and a real Preview two-device/offline/public-form rehearsal. That remote end-to-end acceptance remains pending by instruction; local tests do not claim it is complete.
 
 No shared-development schema/data writes, Vercel configuration changes, deployments, main merge or load test occurred in this feature pass. PR #6 is outside this feature branch. The new feature stays draft until review.
+
+## Review blockers completed — 8 October 2026
+
+This section supersedes the original base/verification checkpoint above. PR #13 is rebased onto PR #12 head `77744f8375a06ea1857bf9e2c0b6f7dcbc3a689f`. Both PRs remain draft. Neither migration has been applied to shared development.
+
+### Exact patch scope
+
+PR #12:
+- `.github/workflows/ci.yml`: disposable PostgreSQL 17 service and loopback test connection; install the PostgreSQL client only if unavailable.
+- `supabase/migrations/20261007104500_access_code_redemption.sql`: unique active scope index with `NULLS NOT DISTINCT`; scope advisory lock for rotation; credential row locks and revalidation for redemption/revocation; consistent committee-before-credential lock order for Chair scopes.
+- `tests/access-codes-concurrency.test.ts`: real independent-connection races, including deterministic barriers that reproduced Chair grant/audit FK deadlocks before the fix.
+- `tests/helpers/postgres.ts`: bounded psql harness; loopback hosts only; uniquely named disposable test databases and cleanup. No new runtime dependencies.
+
+PR #13 blocker patch (beyond the rebase):
+- `supabase/migrations/20261007104501_staff_schedule_amendments.sql`
+- `lib/repository-instance.ts`
+- `components/staff-access.tsx`
+- `tests/archive-blockers.test.ts`
+- `tests/archive-concurrency.test.ts`
+- `tests/signout-recovery.test.ts`
+- `tests/staff-batch-db.test.ts`
+- `docs/STAFF_FEATURE_BATCH_REPORT.md`
+
+### Invariants and migration edits
+
+1. **Credentials:** the database allows at most one non-revoked credential per conference/role/committee, with null committee treated as a scope. Rotation serializes even an empty scope using a transaction advisory lock. Redemption/revocation lock and revalidate the credential. Chair operations acquire a committee lock first, preventing FK lock inversions while creating grants or audits. Raw-code storage, rate limits, role/RLS rules and one-time secret return are unchanged.
+2. **Committee archive:** the same transaction archives/clears current session and revokes all unrevoked Chair credentials and Chair grants for that committee. Approval, logistics and admin grants remain intact. A trigger refuses issuing a new active Chair credential for an archived committee. Both real archive/redemption race orderings leave no active Chair grant.
+3. **Archived sessions:** a private guard is inserted into the existing core/procedure mutation implementations after committee locking and after receipt replay checks. It also guards amendment status changes. This covers attendance, participation/corrections, old/new queues, speeches/POIs, ballots/vote mode, timers, procedure state, current-session selection and indirect document/version targets. Archived session/committee writes fail with `PT409`, retaining offline mutation UUIDs for review. The migration asserts its exact function-body anchors rather than silently changing an unknown base. Already-acknowledged receipts keep their existing idempotency behavior.
+4. **Active debate:** committee and central-slot archives reject any affected In Debate resolution before clearing state. Slot protection also covers a committee whose current selection would be cleared while its active resolution still references an earlier session. Closing the debate permits archival.
+5. **Sign-out:** clean devices sign out normally. Active pending/conflict work refuses sign-out. With revoked/expired/unavailable access, successful recovery download initiation plus an explicit warned final-sign-out action is required. Export authorization is runtime-only and tied to exact actor/checkpoint/pending contents; new work or changed pending state invalidates it. In-flight local saves settle before the decision. Checkpoints and UUIDs remain stored; a new identity cannot send the old actor's mutations.
+6. **Safe delete:** actual committee-owned records/FKs and session history still block deletion. Only transient operational invalidations and audit FK scope are excluded from the committee usage scan. Invalidation rows are removed; audit `committee_id` is nulled while all other fields remain byte-for-byte equivalent. Unused central materializations/configuration bookkeeping no longer prevent deletion.
+7. **Codes:** a unique `(conference_id, lower(code))` index rejects case-insensitive duplicates even through direct SQL. The prior unique constraint remains.
+8. **Archive locking:** configuration uses a conference `FOR NO KEY UPDATE` lock, preserving writer serialization while allowing grant/audit FK `KEY SHARE`. A barrier regression reproduced the archive/grant deadlock with `FOR UPDATE`; the revised lock passes it.
+
+### Final local verification
+
+PR #12: **154 tests passed**, zero skipped; typecheck, lint and production build passed.
+
+PR #13: **234 tests passed**, zero skipped; typecheck, lint and production build passed. This includes 10 real credential concurrency checks, three real archive/redemption checks, 20 explicit core/procedure archived-session paths, lifecycle/RLS/delete/uniqueness tests, eight sign-out recovery tests, and the existing offline/exactly-once/Realtime regressions.
+
+Full local concurrency-enabled test command:
+
+```sh
+PSQL_BIN=/opt/homebrew/opt/postgresql@17/bin/psql \
+TEST_POSTGRES_URL=postgresql://zuhayrs@127.0.0.1:55439/postgres npm test
+```
+
+The loopback PostgreSQL 17.11 cluster is disposable, separate from Supabase development, and is stopped after verification. CI runs the same suite against its disposable PostgreSQL 17 service. Consult the current PR checks for the final pushed heads.
+
+No shared-development migration application or replay, main merge, Production deployment, Vercel environment/configuration change, PR #6 change, or load test. Git pushes may trigger the existing automatic Vercel branch Preview; no manual deployment is performed. The public amendment boundary, QR routes, snapshot design, Docs workflow, RLS policies and Realtime architecture are unchanged by these blocker fixes.
