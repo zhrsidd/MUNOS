@@ -62,6 +62,57 @@ test('PostgreSQL 17 credential concurrency', {skip:!localUrl,timeout:60000},asyn
    assert.equal(await owner.query(`select count(*) from private.access_credentials where conference_id=${conf} and role='chair' and revoked_at is null;`),'2');
   });
 
+  await t.test('Chair redemption and rotation retain committee-before-credential lock order',async()=>{
+   const executive=await adminConnection('chair_rotate');
+   const credential=await executive.json<Credential>(rotate('chair',ids.ga1));
+   const device=await deviceConnection('chair_redeem');
+   const barrier=connect('grant_barrier');
+   // Pause after redemption has locked its credential but before its grant FK check.
+   // Without the committee KEY SHARE first, rotation grabs committee FOR UPDATE,
+   // then waits on that credential, producing a genuine two-transaction deadlock.
+   await owner.query(`create function public.test_pause_grant_insert() returns trigger language plpgsql as $$begin
+    if new.user_id=${literal(device.id)}::uuid then perform pg_advisory_xact_lock(76123456); end if;
+    return new;
+   end$$;
+   create trigger test_pause_grant before insert on public.user_access for each row execute function public.test_pause_grant_insert();`);
+   await barrier.query('begin;select pg_advisory_xact_lock(76123456);');
+   const redemption=device.connection.json<Redemption>(redeem(credential.code));
+   await waitForLock(owner,`${name}_chair_redeem`);
+   const rotation=executive.json<Credential>(rotate('chair',ids.ga1));
+   const results=Promise.allSettled([redemption,rotation]);
+   await waitForLock(owner,`${name}_chair_rotate`);
+   await barrier.query('commit;');
+   const completed=await results;
+   assert.ok(completed.every(result=>result.status==='fulfilled'),completed.map(result=>result.status==='rejected'?String(result.reason):result.status).join('\n'));
+   assert.equal((completed[0] as PromiseFulfilledResult<Redemption>).value.status,'ok');
+   assert.equal(await activeGrants(device.id),'1');
+   await owner.query('drop trigger test_pause_grant on public.user_access;drop function public.test_pause_grant_insert();');
+  });
+
+  await t.test('Chair revocation and rotation retain committee-before-credential lock order',async()=>{
+   const revoker=await adminConnection('chair_revoke');
+   const rotator=await adminConnection('rotate_revoke');
+   const credential=await revoker.json<Credential>(rotate('chair',ids.ga1));
+   const barrier=connect('audit_barrier');
+   // The audit FK needs the same committee lock as the user_access FK.
+   await owner.query(`create function public.test_pause_revoke_audit() returns trigger language plpgsql as $$begin
+    if new.action='Access code revoked' and new."entityId"=${literal(credential.id)}::uuid then perform pg_advisory_xact_lock(76123457); end if;
+    return new;
+   end$$;
+   create trigger test_pause_audit before insert on public.audit_log for each row execute function public.test_pause_revoke_audit();`);
+   await barrier.query('begin;select pg_advisory_xact_lock(76123457);');
+   const revocation=revoker.json<{revokedDevices:number}>(revoke(credential.id));
+   await waitForLock(owner,`${name}_chair_revoke`);
+   const rotation=rotator.json<Credential>(rotate('chair',ids.ga1));
+   const results=Promise.allSettled([revocation,rotation]);
+   await waitForLock(owner,`${name}_rotate_revoke`);
+   await barrier.query('commit;');
+   const completed=await results;
+   assert.ok(completed.every(result=>result.status==='fulfilled'),completed.map(result=>result.status==='rejected'?String(result.reason):result.status).join('\n'));
+   assert.equal(await owner.query(`select count(*) from private.access_credentials where conference_id=${conf} and role='chair' and committee_id=${literal(ids.ga1)} and revoked_at is null;`),'1');
+   await owner.query('drop trigger test_pause_audit on public.audit_log;drop function public.test_pause_revoke_audit();');
+  });
+
   for(const winningAction of ['revoke','rotate'] as const){
    await t.test(`${winningAction} wins its credential lock: waiting old-code redemption fails`,async()=>{
     const executive=await adminConnection(`${winningAction}_wins`);

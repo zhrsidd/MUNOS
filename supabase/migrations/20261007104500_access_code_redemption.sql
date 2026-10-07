@@ -70,6 +70,7 @@ declare
   normalized text;
   digest text;
   credential private.access_credentials;
+  committee_scope uuid;
   grant_id uuid;
   recent_failures integer;
 begin
@@ -100,6 +101,17 @@ begin
 
   if normalized ~ '^[0-9A-F]{24}$' then
     digest := encode(sha256(convert_to(normalized,'UTF8')),'hex');
+    -- Match rotation/lifecycle lock order. The grant's committee FK also needs
+    -- KEY SHARE, so acquire it before locking the credential, not during insert.
+    -- This first lookup is only a scope hint; the locked lookup below revalidates.
+    select a.committee_id into committee_scope
+    from private.access_credentials a
+    where a.conference_id = conf and a.credential_hash = digest
+      and a.revoked_at is null and a.expires_at > now();
+    if committee_scope is not null then
+      perform 1 from public.committees c
+      where c.id = committee_scope and c.conference_id = conf for key share;
+    end if;
     select a.* into credential
     from private.access_credentials a
     where a.conference_id = conf
@@ -282,6 +294,7 @@ language plpgsql security definer set search_path='' as $$
 declare
   actor uuid := auth.uid();
   rec private.access_credentials;
+  committee_scope uuid;
   revoked_devices integer := 0;
   audit_mutation uuid := gen_random_uuid();
 begin
@@ -289,6 +302,15 @@ begin
     conf, null, array['admin']::public.conference_role[]
   ) then
     raise exception 'Executive access required' using errcode='42501';
+  end if;
+
+  -- The audit row also references committee: preserve the same committee-first
+  -- lock order as rotation/redemption and re-read the credential under its lock.
+  select a.committee_id into committee_scope
+  from private.access_credentials a where a.id = credential and a.conference_id = conf;
+  if committee_scope is not null then
+    perform 1 from public.committees c
+    where c.id = committee_scope and c.conference_id = conf for key share;
   end if;
 
   select a.* into rec
