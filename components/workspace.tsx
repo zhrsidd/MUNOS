@@ -4,13 +4,15 @@ import Image from "next/image";
 import { useState } from "react";
 import { useConference } from "@/lib/context";
 import { Role } from "@/lib/domain";
-import { Icon, Chip, Timer } from "./ui";
+import { Icon, Chip, Timer, Panel } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
-import { ScheduleImport } from "./operations/schedule-import";
+import { AccessCodes } from "./access-codes";
+import { CentralSessions } from "./central-sessions";
+import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
 import { DelegateSubmissions } from "./operations/resolution-links";
@@ -45,6 +47,7 @@ const chairNav = [
   ["roll-call", "Roll call", "attendance"],
   ["participation", "Participation", "log"],
   ["documents", "Documents", "documents"],
+  ["amendments", "Amendments", "documents"],
   ["voting", "Voting", "voting"],
   ["photos", "Group photos", "clock"],
   ["awards", "Award discussion", "awards"],
@@ -54,14 +57,15 @@ const adminNav = [
   ["conference", "Conference", "settings"],
   ["committees", "Committees", "debate"],
   ["sessions", "Sessions", "clock"],
-  ["schedule", "Schedule import", "clock"],
   ["delegates", "Delegates", "attendance"],
   ["schools", "Schools", "admin"],
   ["photos", "Group photos", "clock"],
   ["staff", "Chairs & staff", "review"],
+  ["access-codes", "Access codes", "settings"],
   ["scoring", "Scoring", "log"],
   ["workflow", "Workflow & features", "settings"],
-  ["submissions", "Submission links", "documents"],
+  ["submissions", "Resolution links", "documents"],
+  ["amendment-links", "Amendment links", "documents"],
   ["resources", "Resources & Drive", "documents"],
   ["audit", "Audit log", "log"],
   ["health", "System health", "settings"],
@@ -72,17 +76,20 @@ export function Workspace({ path }: { path: string }) {
     committeeId: requestedCommitteeId,
     setCommitteeId,
     act,
+    access,
   } = useConference();
   const [now] = useState(()=>Date.now());
   const [menu, setMenu] = useState(false);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
+  const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair'||path==='projector') || access.status!=='active' || access.committeeIds.includes(c.id)));
+  const availableRoles = access.status === "active" ? roles.filter(r => access.roles.includes(r.id)) : roles;
   const committee =
-    data.committees.find((c) => c.id === requestedCommitteeId) ||
-    data.committees.find(c=>c.code === "GA1") || data.committees[0];
+    activeCommittees.find((c) => c.id === requestedCommitteeId) ||
+    activeCommittees.find(c=>c.code === "GA1") || activeCommittees[0];
   const committeeId = committee?.id ?? "";
-  const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId);
-  const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
+  const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId && !s.archived);
+  const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && !s.archived && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
   const current = data.documents.find(
     (d) => d.committeeId === committeeId && d.status === "In Debate",
   );
@@ -102,7 +109,7 @@ export function Workspace({ path }: { path: string }) {
               DCMUN<span className="brand-os"> / OS</span>
             </span>
           </Link>
-          <Chip tone="neutral">Interactive demo</Chip>
+          <Chip tone="neutral">{access.status === "active" ? "Staff workspace" : "Interactive demo"}</Chip>
         </header>
         <div className="landing-content">
           <div className="eyebrow">ONE CONFERENCE. EVERY TEAM IN SYNC.</div>
@@ -117,7 +124,7 @@ export function Workspace({ path }: { path: string }) {
             Choose your workspace to get started.
           </p>
           <div className="role-grid">
-            {roles.map((r, i) => (
+            {availableRoles.map((r, i) => (
               <Link className="role-card" key={r.id} href={`/${r.id}`}>
                 <div className={`role-icon color-${i}`}>
                   <Icon name={r.icon} />
@@ -150,16 +157,16 @@ export function Workspace({ path }: { path: string }) {
           </div>
         </div>
         <footer>
-          Illustrative data, not official conference records. Access-code entry is deferred. Database access requires an explicit grant.
+          {access.status === "active" ? "Choose one of your assigned workspaces. Conference access is controlled by your staff grant." : "Illustrative data, not official conference records. Local demo roles are for exploration."}
         </footer>
       </main>
     );
   if (path === "projector")
     return (
       <main className="projector">
-        <div className="eyebrow">{committee.code} · LIVE DEBATE</div>
+        <div className="eyebrow">{committee?.code ?? "No active committee"} · LIVE DEBATE</div>
         <h1>{current?.title || "General debate"}</h1>
-        <Timer readonly sessionId={session?.id || ""} />
+        {session && <Timer readonly sessionId={session.id} />}
         <Link href="/chair">Return to Chair Console</Link>
       </main>
     );
@@ -193,7 +200,7 @@ export function Workspace({ path }: { path: string }) {
         </Link>
         <div className="conference-label">
           <span>DCMUN</span>
-          <small>Conference operations · Demo</small>
+          <small>Conference operations</small>
         </div>
         <div className="workspace-label">{roleInfo.name}</div>
         <nav>
@@ -238,7 +245,7 @@ export function Workspace({ path }: { path: string }) {
             <div>
               <strong>{data.staff.find((s) => s.role === role)?.name}</strong>
               <small>
-                {role === "chair" ? "Head chair · Demo access" : "Demo access"}
+                {access.status === "active" ? roleInfo.name : "Demo access"}
               </small>
             </div>
           </div>
@@ -262,7 +269,7 @@ export function Workspace({ path }: { path: string }) {
                 value={committeeId}
                 onChange={(e) => setCommitteeId(e.target.value)}
               >
-                {data.committees.map((c) => (
+                {activeCommittees.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code} · {c.room}
                   </option>
@@ -273,15 +280,15 @@ export function Workspace({ path }: { path: string }) {
             )}
           </div>
           <div className="topbar-right">
-            <Chip tone="neutral">DEMO</Chip>
+            <Chip tone="neutral">{access.status === "active" ? "STAFF" : "DEMO"}</Chip>
             <span>Monday, 5 October</span>
           </div>
         </header>
         <main className="workspace-content">
           {!(role === "admin" && section === "health") && <StatusStrip />}
-          {role === "chair" && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
+          {role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
           {role === "chair" &&
-            data.sessions.filter((s) => s.committeeId === committeeId).length >
+            data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
               0 && (
               <div className="session-selector">
                 <label>
@@ -293,7 +300,7 @@ export function Workspace({ path }: { path: string }) {
                   >
                     <option value="">Select current session{suggestedSession?` · suggested ${suggestedSession.name}`:""}</option>
                     {data.sessions
-                      .filter((s) => s.committeeId === committeeId)
+                      .filter((s) => s.committeeId === committeeId && !s.archived)
                       .map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
@@ -304,7 +311,7 @@ export function Workspace({ path }: { path: string }) {
               </div>
             )}
           {role === "chair" ? (
-            section === "photos" ? (
+            !committee ? <Panel title="No active committee"><p>No active committee is currently available for this workspace. Executive staff can check committee access and archived records.</p></Panel> : section === "photos" ? (
               <ChairPhotos committeeId={committeeId} />
             ) : section === "documents" ? (
               <>
@@ -329,7 +336,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <ScheduleImport /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
+            section === "access-codes" ? <AccessCodes /> : section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

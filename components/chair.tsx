@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { AmendmentInbox } from "./amendments/inbox";
 import {DebateConsole} from "./debate-console";
 import {VotingConsole} from "./voting-console";
 import { useState } from "react";
@@ -94,6 +95,7 @@ export function ChairScreen({
   const voteList = data.votes.filter(
     (v) => v.resolutionId === resolution?.id && v.sessionId === sessionId,
   );
+  if (section === "amendments") return <AmendmentInbox committeeId={committeeId} />;
   if (!session)
     return (
       <>

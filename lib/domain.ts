@@ -1,3 +1,4 @@
+import type {BatchData} from './batch/types';
 import type { DebateState, Speech, PoiEntry, Lane, SpeechKind } from "./procedure/types";
 export type ID = string;
 export type Role = "chair" | "approval" | "logistics" | "admin";
@@ -26,6 +27,8 @@ export interface ScoringDefinition {
   values: number[];
 }
 export interface Committee {
+  archived?: boolean;
+  revision?: number;
   currentSessionId?: ID | null;
   sessionRevision?: number;
   vetoEnabled?: boolean;
@@ -61,6 +64,8 @@ export interface Staff {
   committeeIds: ID[];
 }
 export interface Session {
+  slotId?: string | null;
+  archived?: boolean;
   id: ID;
   committeeId: ID;
   name: string;
@@ -180,7 +185,7 @@ export interface TimerState {
 }
 import type { OperationsData } from "./operations/types";
 // CODEX REVIEW REQUIRED: OperationsData adds optional, extension-owned fields only.
-export interface ConferenceData extends OperationsData {
+export interface ConferenceData extends OperationsData, BatchData {
   debateStates?: DebateState[];
   speeches?: Speech[];
   poiQueue?: PoiEntry[];
