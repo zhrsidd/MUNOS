@@ -51,6 +51,7 @@ const chairNav = [
   ["voting", "Voting", "voting"],
   ["photos", "Group photos", "clock"],
   ["awards", "Award discussion", "awards"],
+  ["health", "System health", "settings"],
 ];
 const adminNav = [
   ["", "Overview", "admin"],
@@ -182,6 +183,7 @@ export function Workspace({ path }: { path: string }) {
               role === "approval" ? "Review inbox" : "Print queue",
               role === "approval" ? "review" : "print",
             ],
+            ["health", "System health", "settings"],
           ];
   return (
     <div className="app-shell">
@@ -285,9 +287,9 @@ export function Workspace({ path }: { path: string }) {
           </div>
         </header>
         <main className="workspace-content">
-          {!(role === "admin" && section === "health") && <StatusStrip />}
-          {role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
-          {role === "chair" &&
+          {section !== "health" && <StatusStrip />}
+          {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
+          {section !== "health" && role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
               0 && (
               <div className="session-selector">
@@ -310,7 +312,7 @@ export function Workspace({ path }: { path: string }) {
                 </label>
               </div>
             )}
-          {role === "chair" ? (
+          {section === "health" ? <SystemHealth /> : role === "chair" ? (
             !committee ? <Panel title="No active committee"><p>No active committee is currently available for this workspace. Executive staff can check committee access and archived records.</p></Panel> : section === "photos" ? (
               <ChairPhotos committeeId={committeeId} />
             ) : section === "documents" ? (
@@ -336,7 +338,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics />
           ) : (
-            section === "access-codes" ? <AccessCodes /> : section === "health" ? <SystemHealth /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
+            section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">
