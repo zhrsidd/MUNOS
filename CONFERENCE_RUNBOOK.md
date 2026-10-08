@@ -202,7 +202,7 @@ There is no "force my version" button — by design. **Never clear browser stora
 | Admins | `/logistics/health` | sidebar → *System health* |
 | Executive | `/admin/health` | Executive sidebar → *System health* |
 
-Each shows **that device's** state: unsynced changes, items needing review, **Export device recovery file**. A Chair cannot open the Executive address (it returns to the Chair Console) — use the Chair one. **While offline, open System health from the sidebar link; don't type the address or refresh that page** (the offline copy of the Chair Console works, but the health page itself only opens from inside the app when offline).
+Each shows **that device's** state — unsynced changes, items needing review, **Export device recovery file** — and only that device's: another laptop never shows or clears them. Each role opens only its own address: a Chair cannot open the Executive one (it returns to the Chair Console). A **prepared** device (opened online once since the last update) can also open or reload its own System health page **while offline**, so a recovery export works without a network. Offline, the app opens only from what is already saved on the device; anything that needs the conference database waits until it reconnects.
 
 ### Moving to a replacement device
 

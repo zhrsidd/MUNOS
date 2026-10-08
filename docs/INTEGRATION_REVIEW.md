@@ -1,5 +1,7 @@
 # Conference OS integration review and handoff
 
+> **Historical checkpoint (6 October 2026).** Since then staff access codes (PR #12/#13), central sessions and the amendment QR workflow (PR #13), staff batch hardening (PR #14) and System health in every staff workspace, available offline (PR #15/#16) have landed; items below described as deferred for those features are out of date. Current operations: [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md); release gates: [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
 **Checkpoint: 6 October 2026. Development only.** Latest update: the server key is configured and real public submission HTTP/browser verification passed; see the newest evidence below. This integrates the reviewed five-PR operations stack with core conference procedure. It does not certify conference readiness or record completed GitHub merges. PR **#6 must stay draft and unmerged**.
 
 ## Product decisions implemented

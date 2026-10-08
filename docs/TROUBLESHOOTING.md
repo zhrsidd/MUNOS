@@ -12,7 +12,7 @@ System health shows **that device's** view, in every staff workspace: Chair `/ch
 | Sync state / Last error | Outbox state and the last transport error (raw). |
 | Database latency | Time of the last snapshot read. > 3 s shows YELLOW "slow". |
 | Unsynced / conflicts | Outbox length / changes the server rejected (RED until reviewed). |
-| Device user | The Supabase auth user id of this device — needed to grant access. |
+| Device user | The Supabase auth user id of this device (its identity for grants and audit; useful when revoking a single device's grant). |
 | Build | Version, commit, branch, environment, deployment id — compare with the known-good card. |
 | Service check | `/api/health`: Supabase Auth reachability and (if `SUPABASE_SECRET_KEY` is set) the `resolutions` Storage bucket. |
 
@@ -62,7 +62,7 @@ The client marks a saved action "needs review" when the server answers `PT409` (
 | "Submission is temporarily unavailable" on the page | The server could not reach Supabase. Check Supabase status. |
 | "This submission link is not valid" | Link replaced or turned off (Executive → Submission links), or mistyped. Print the current room sheet. |
 | "Too many submissions…" | 20 per link per 10 minutes. Wait, or replace the link if it leaked. |
-| "This committee has no session yet" | Create/import the committee's sessions. |
+| "This committee has no session yet" | Create the conference sessions in Executive → **Sessions** (they are created for every active committee). |
 | Chair can't open a Doc | Doc still Restricted, set to Viewer, shared with the wrong Chair, or the delegate's school blocks sharing outside it. Ask for *Anyone with the link → Editor*, or a direct share with a Chair; otherwise the file-upload fallback. See [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md) §6. |
 | Uploads fail, Google Docs links work | Storage problem; `/api/health` storage check shows it. Google Doc submissions are unaffected. |
 
@@ -84,7 +84,7 @@ Derived on each device from slot times and the **device clock** every 15 seconds
 
 ## Offline shell
 
-The production service worker caches Chair Console pages (`/chair…`, `/admin/health`) after one online visit; Supabase responses are never cached by it. Data comes from the device's IndexedDB. Prepare each device online once; after a deployment, a refresh picks up the new version (the version-mismatch notice in System health tells you when). Note: `/chair/health` is not in the offline shell list (`public/sw.js`), so offline it opens only through in-app navigation (sidebar link), not by a full reload; `/approval` and `/logistics` have no offline shell.
+The production service worker (`public/sw.js`) prepares a fixed set of static pages after one online visit: the Chair Console pages (`/chair`, roll call, participation, documents, amendments, voting, photos) and every staff System health page (`/chair/health`, `/approval/health`, `/logistics/health`, `/admin/health`). Navigation is network-first; only when the network fails does it serve the prepared page. API, Auth, Supabase and form submissions are never cached or served by it. Data comes from the device's IndexedDB. Approval inbox and Print queue pages are not in the offline set. Prepare each device online once; after a deployment, a refresh picks up the new version (the version-mismatch notice in System health tells you when).
 
 ## After the conference
 

@@ -8,7 +8,7 @@ Extensions retain separate read/write RPCs while sharing the core durable outbox
 
 | Layer | Core (Codex) | Extension (Claude) |
 | --- | --- | --- |
-| Read | `public.conference_snapshot(conf)` | `public.operations_snapshot(conf)` — SECURITY INVOKER, table RLS decides visibility. The transport calls both in parallel and merges the result into `ConferenceData` (optional fields). |
+| Read | `public.conference_snapshot(conf)` | `public.operations_snapshot(conf)` — SECURITY INVOKER, table RLS decides visibility. Since PR #11 the app reads both through **one** bundled `conference_state_snapshot` / `executive_state_snapshot` RPC (which also includes `staff_batch_snapshot`); the separate parallel calls remain only as a fallback when the bundled function is missing. |
 | Write | `public.apply_conference_mutation(...)` | `public.apply_operations_mutation(...)` — identical signature and contract: caller authorization via `private.has_access`, idempotent receipt in `private.mutation_receipts`, committee/conference row lock, `audit_log` entry and `operational_changes` notification in one transaction. |
 | Client commands | `Command` union in `lib/commands.ts` | `OperationsCommand` in `lib/operations/commands.ts`, joined to the union; `applyCommand` delegates unknown types to `applyOperationsCommand` for optimistic/offline projection. |
 | Outbox | `DurableRepository` + `SupabaseTransport` | Unchanged outbox. `SupabaseTransport.send` chooses the RPC by command type. Same UUIDs, same retry, same conflict semantics. |
@@ -65,6 +65,8 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 **Operator UI.** Executive → *Submission links* (create missing links, view assigned Chair contacts, copy, print sheet, replace, turn off). Configure contact emails under *Chairs/Staff*. Chair Console → Documents → *Delegate submissions* and *Submission QR*. Printable A4 room sheet at `/submit/{token}/sheet`.
 
 ## Schedule import
+
+> **Superseded.** Since PR #13 sessions are created centrally in Executive → **Sessions** (`/admin/sessions`) for every active committee; the schedule-import screen below is no longer reachable from the app. Kept as a record of the original review.
 
 **Flow.** Executive → *Schedule import*: upload a CSV/text file or paste rows copied from Excel/Google Sheets → **Preview** → review table (edit date, name, start, end, committees; tick/untick rows) → **Create N sessions** → sessions appear for each committee.
 

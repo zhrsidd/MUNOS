@@ -6,7 +6,7 @@ Target: ~100 simultaneous users, 150–200 headroom, one school network, no IT t
 
 | Source | Network cost | Notes |
 | --- | --- | --- |
-| Snapshot read | +1 small RPC per existing read (`operations_snapshot`, in parallel with `conference_snapshot`) | Reads already happen after a sync, on focus/online, on a Realtime notification and every ~60 s. Extension tables are small (≤ a few thousand rows). RLS-scoped: chairs read only their committee's acknowledgements and links. |
+| Snapshot read | No extra request since PR #11: `operations_snapshot` is folded into the one bundled state-snapshot RPC (originally +1 small parallel RPC) | Reads already happen after a sync, on focus/online, on a Realtime notification and every ~60 s. Extension tables are small (≤ a few thousand rows). RLS-scoped: chairs read only their committee's acknowledgements and links. |
 | Health indicator / status strip | none | Derived from the device's own sync state and `navigator.onLine`; re-evaluated locally every 30 s. |
 | System health screen | `GET /api/health` once a minute **only while that screen is visible**, plus on reconnect | Response is CDN-cacheable for 15 s and each server instance probes Supabase at most once per 15 s. |
 | Photo reminders | none | Derived from cached slot timestamps every 15 s on the device. No polling, no WebSocket dependency, no timer ticks over the network. |

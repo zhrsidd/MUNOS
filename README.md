@@ -68,6 +68,6 @@ Vercel Preview for every branch/PR **and for `main`**; Production only from the 
 
 Google Drive automation (Approval-folder copies, PDF snapshots, archive), production Supabase setup, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
-Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
+Operations extensions (resolution submission, group-photo reminders; the earlier schedule import is superseded by central sessions) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.

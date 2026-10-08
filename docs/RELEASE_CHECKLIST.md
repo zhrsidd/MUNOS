@@ -4,7 +4,7 @@ One page of gates. Work top to bottom. **Do not start a section until every box 
 
 Release model ([DEPLOYMENT.md](DEPLOYMENT.md)): `main` → automatic **Preview** (development Supabase). Production is built **only** from the `production` branch, which is moved deliberately. Merging to `main` never deploys Production.
 
-State at the time of writing (8 October 2026): `main` = `723147a` (PR #15: System health in every staff workspace); development Supabase has every migration through `20261008135032` applied once; development acceptance passed; `production` = `c0a6a65`; **no Production deployment and no production Supabase project exist**; the Supabase upgrade and load rehearsal are deliberately deferred to conference week.
+State at the time of writing (8 October 2026): `main` = `6160f27` (PR #15: System health in every staff workspace; PR #16: those pages available offline); development Supabase has every migration through `20261008135032` applied once; development acceptance passed; `production` = `c0a6a65`; **no Production deployment and no production Supabase project exist**; the Supabase upgrade and load rehearsal are deliberately deferred to conference week.
 
 ---
 
@@ -14,7 +14,7 @@ State at the time of writing (8 October 2026): `main` = `723147a` (PR #15: Syste
 - [ ] Runbook and emergency sheet reviewed by the Executive and printed drafts marked up. — Executive
 - [ ] Only bug fixes merged to `main`; every merge has green CI and a checked `main` Preview. — Codex / Claude
 - [x] ~~System health on every staff device~~ — **resolved by PR #15** (merged `723147a`): Chair `/chair/health`, Approval `/approval/health`, Admins `/logistics/health`, Executive `/admin/health`; verified on the `main` Preview with each role (Chair still cannot open `/admin/health`). — Codex, verified by Claude
-- [ ] Optional follow-up (Codex, small): add `/chair/health` to the offline shell list in `public/sw.js`. Today it opens offline only through the sidebar link, not by a full reload.
+- [x] ~~Offline reload of staff health pages~~ — **resolved by PR #16** (merged `6160f27`): `public/sw.js` now prepares `/chair/health`, `/approval/health`, `/logistics/health` and `/admin/health`; verified in a real browser with the network cut (each role reloads its own page offline). — Codex, verified by Claude
 - [x] First-Executive bootstrap procedure written ([FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), `scripts/bootstrap-first-executive.sql`) and **tested on development on 8 October 2026** through the normal app flow (redeem → Executive → rotate → bootstrap code rejected on a new device → bootstrapped device still valid). — Claude
 
 ## 1. Conference week (T-7 days) — capacity gate
