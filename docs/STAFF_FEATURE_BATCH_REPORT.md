@@ -90,3 +90,14 @@ TEST_POSTGRES_URL=postgresql://zuhayrs@127.0.0.1:55439/postgres npm test
 The loopback PostgreSQL 17.11 cluster is disposable, separate from Supabase development, and is stopped after verification. CI runs the same suite against its disposable PostgreSQL 17 service. Consult the current PR checks for the final pushed heads.
 
 No shared-development migration application or replay, main merge, Production deployment, Vercel environment/configuration change, PR #6 change, or load test. Git pushes may trigger the existing automatic Vercel branch Preview; no manual deployment is performed. The public amendment boundary, QR routes, snapshot design, Docs workflow, RLS policies and Realtime architecture are unchanged by these blocker fixes.
+
+## Final narrow archive boundary patch — 8 October 2026
+
+Only PR #13 changes; PR #12 remains at `77744f8375a06ea1857bf9e2c0b6f7dcbc3a689f`. This supersedes the broader document/event session guard described above.
+
+- In the still-unapplied `20261007104501_staff_schedule_amendments.sql`, `submission_link_info` filters archived committees without returning their committee, delegate or Chair projection. `submit_resolution` rechecks committee archival under its existing committee transaction lock, after accepted UUID replay and before duplicate-source receipt creation or any new document writes. Fresh requests fail with `invalid_link`; accepted identical retries remain replayable. Historical links and submission records are retained. Existing server-only grants, rate limiting and delegate-without-Auth boundary remain unchanged.
+- The core archived-session guard now exempts document transitions, draft versions and historical event corrections. All existing live session/procedure guards remain, including new documents targeting archived sessions. Entry into debate still checks the current session, rejects missing/archived selection, and moves the document to the selected active session through the existing core workflow.
+- `tests/archive-blockers.test.ts` adds QR archival/history/replay coverage and the complete archived Session 1 → version → Submitted → Review → Approved → Printed → active Session 2 debate/close workflow. It now verifies append-only historical correction and undo instead of rejecting them. The 20 live-command rejection paths and retained offline PT409 regression remain.
+- Final local checks: **236 tests passed, zero skipped** (including real PostgreSQL concurrency); typecheck, lint and production build passed. A targeted independent read-only review found no concrete issue.
+
+Changed files in this narrow pass: the existing feature migration, `tests/archive-blockers.test.ts`, and this report. No shared-development migration applied/replayed, main merge, Production/manual deployment, Vercel configuration/environment change, PR #6 change, or load test.

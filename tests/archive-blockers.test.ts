@@ -12,7 +12,7 @@ async function fixture(){
  const f=await freshDatabase();await f.grant(executive,'admin');await f.grant(chair,'chair',f.ids.ga1);await f.as(executive);
  const snapshot=async()=>(await f.query<{s:ConferenceData}>('select public.conference_state_snapshot($1) s',[f.ids.conference]))[0].s;
  const mutate=async(c:Command,role='admin')=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,crypto.randomUUID(),c,role,fingerprint(await snapshot(),c),new Date().toISOString()]);
- const slot=async()=>{await mutate({type:'sessionSlot',action:'create',name:'Archive test',startsAt:'2026-11-08T06:00:00Z',endsAt:null});const s=await snapshot();return{slot:s.sessionSlots![0],session:s.sessions.find(x=>x.slotId&&x.committeeId===f.ids.ga1)!};};
+ const slot=async()=>{const name='Archive test '+crypto.randomUUID();await mutate({type:'sessionSlot',action:'create',name,startsAt:'2026-11-08T06:00:00Z',endsAt:null});const s=await snapshot(),created=s.sessionSlots!.find(x=>x.name===name)!;return{slot:created,session:s.sessions.find(x=>x.slotId===created.id&&x.committeeId===f.ids.ga1)!};};
  return {...f,snapshot,mutate,slot};
 }
 
@@ -52,7 +52,7 @@ test('slot archive refuses In Debate until Chair closes it, preserving document/
  }finally{await f.db.close();}
 });
 
-test('all core/procedure session paths reject archived sessions, including indirect document/event targets',async t=>{
+test('live core/procedure paths reject archived sessions while historical event corrections remain possible',async t=>{
  const f=await fixture();try{
   const {slot,session}=await f.slot();let data=await f.snapshot();const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;
   await f.as(chair);await f.mutate({type:'participation',sessionId:session.id,delegateId:delegate.id,categoryId:'speech',points:1,resolutionId:null},'chair');
@@ -64,9 +64,66 @@ test('all core/procedure session paths reject archived sessions, including indir
    const command={type:kind,sessionId:session.id,committeeId:f.ids.ga1,delegateId:delegate.id,resolutionId:doc.id,points:1};
    await assert.rejects(()=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,crypto.randomUUID(),command,'chair',null,new Date().toISOString()]),sqlCode('PT409'));
   });
-  for(const command of [{type:'event',id:event.id,undo:true},{type:'version',id:doc.id,fileName:'replacement',text:'test'},{type:'document',id:doc.id,status:'Submitted'}])await assert.rejects(()=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,crypto.randomUUID(),command,'chair',null,new Date().toISOString()]),sqlCode('PT409'));
-  // A legitimately acknowledged UUID may still replay successfully; it makes no new write.
+  await f.mutate({type:'event',id:event.id,points:2},'chair');
+  await f.mutate({type:'event',id:event.id,undo:true},'chair');
+  assert.deepEqual(await f.query('select points,voided from public.participation_corrections where event_id=$1 order by created_at,id',[event.id]),[{points:2,voided:false},{points:null,voided:true}]);
+  assert.equal((await f.query<{points:number}>('select points from public.participation_events where id=$1',[event.id]))[0].points,1,'original event remains unchanged');
   assert.equal((await f.snapshot()).events.filter(e=>e.sessionId===session.id).length,1);
+ }finally{await f.db.close();}
+});
+
+test('resolution workflow survives its archived origin and enters debate only in an active current session',async()=>{
+ const f=await fixture();const approval=crypto.randomUUID(),logistics=crypto.randomUUID();try{
+  await f.grant(approval,'approval');await f.grant(logistics,'logistics');await f.as(executive);
+  const {slot,session}=await f.slot();await f.as(chair);
+  const seeded=(await f.snapshot()).documents.find(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate')!;
+  await f.mutate({type:'document',id:seeded.id,status:'Closed',outcome:'Withdrawn'},'chair');
+  await f.mutate({type:'currentSession',committeeId:f.ids.ga1,sessionId:session.id},'chair');
+  await f.mutate({type:'newDocument',committeeId:f.ids.ga1,sessionId:session.id,title:'Cross-session resolution',submitterId:f.ids.france},'chair');
+  const doc=(await f.snapshot()).documents.find(d=>d.title==='Cross-session resolution')!;
+  await f.as(executive);await f.mutate({type:'sessionSlot',id:slot.id,action:'archive'});
+  await f.as(chair);await f.mutate({type:'version',id:doc.id,fileName:'revision.txt',text:'Revised after session closure'},'chair');
+  assert.equal((await f.query<{n:number}>('select count(*)::int n from public.document_versions where "documentId"=$1',[doc.id]))[0].n,2);
+  await f.mutate({type:'document',id:doc.id,status:'Submitted'},'chair');
+  await f.as(approval);await f.mutate({type:'document',id:doc.id,status:'Review'},'approval');
+  await f.mutate({type:'document',id:doc.id,status:'Approved'},'approval');
+  await f.as(logistics);await f.mutate({type:'document',id:doc.id,status:'Printed'},'logistics');
+  await f.as(chair);await assert.rejects(()=>f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair'),/Select the current session first/);
+  // Direct setup simulates a stale archived selection; even this cannot bypass the DB guard.
+  await f.asOwner();await f.query('update public.committees set "currentSessionId"=$2 where id=$1',[f.ids.ga1,session.id]);await f.as(chair);
+  await assert.rejects(()=>f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair'),sqlCode('PT409'));
+  assert.equal((await f.snapshot()).documents.find(d=>d.id===doc.id)?.status,'Printed');
+  await f.as(executive);const next=await f.slot();await f.as(chair);
+  await f.mutate({type:'currentSession',committeeId:f.ids.ga1,sessionId:next.session.id},'chair');
+  await f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair');
+  const debated=(await f.snapshot()).documents.find(d=>d.id===doc.id)!;assert.equal(debated.status,'In Debate');assert.equal(debated.sessionId,next.session.id);
+  await f.mutate({type:'document',id:doc.id,status:'Closed',outcome:'Withdrawn'},'chair');
+  assert.equal((await f.snapshot()).documents.find(d=>d.id===doc.id)?.status,'Closed');
+ }finally{await f.db.close();}
+});
+
+test('committee archive closes resolution QR without removing history or breaking accepted replay',async()=>{
+ const f=await fixture();try{
+  const token='archive_resolution_link_123456789',accepted=crypto.randomUUID();
+  const command={type:'submissionLink',action:'create',committeeId:f.ids.ga1,token,shareWith:''};
+  await f.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,now())',[f.ids.conference,crypto.randomUUID(),command,'admin',await f.operationsExpected(command)]);
+  const info=async()=>(await f.query<{r:{committeeId:string;submitters:unknown[];chairs:unknown[]}|null}>('select public.submission_link_info($1) r',[token]))[0].r;
+  const submit=async(id:string,source='a'.repeat(30))=>(await f.query<{r:{status:string;code:string}}>('select public.submit_resolution($1,$2,$3,$4,$5,null,null,null,null) r',[token,id,f.ids.france,'Historical public submission',source]))[0].r;
+  await f.asServer();const active=await info();assert.equal(active?.committeeId,f.ids.ga1);assert.ok(active?.submitters.length);assert.ok(Array.isArray(active?.chairs));
+  const created=await submit(accepted);assert.equal(created.status,'created');
+  await f.as(chair);const debate=(await f.snapshot()).documents.find(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate')!;
+  await f.mutate({type:'document',id:debate.id,status:'Closed',outcome:'Withdrawn'},'chair');
+  const history=async()=>{
+   await f.asOwner();const records:Record<string,unknown>={};
+   for(const table of ['public.submission_links','public.documents','public.document_versions','public.resolution_links','private.resolution_submissions'])records[table]=await f.query(`select * from ${table} where committee_id=$1 order by 1`,[f.ids.ga1]);
+   return records;
+  };
+  const before=await history();await f.as(executive);await f.mutate({type:'committeeLifecycle',id:f.ids.ga1,action:'archive'});
+  await f.asServer();assert.equal(await info(),null,'no committee/delegate/Chair projection');
+  for(const source of ['a'.repeat(30),'b'.repeat(30)])await assert.rejects(()=>submit(crypto.randomUUID(),source),/invalid_link/,'both duplicate-source and fresh-source requests must create nothing');
+  assert.deepEqual(await submit(accepted),{status:'replayed',code:created.code});
+  await assert.rejects(()=>submit(accepted,'c'.repeat(30)),/idempotency_conflict/);
+  assert.deepEqual(await history(),before,'all historical rows survive unchanged; no document/version/link/receipt is created');
  }finally{await f.db.close();}
 });
 

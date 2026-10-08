@@ -54,12 +54,32 @@ begin
  definition:=pg_get_functiondef('private.apply_mutation(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
  marker:=' if command ? ''delegateId'' then';
  if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Core session guard anchor changed';end if;
- execute replace(definition,marker,' perform private.require_operational_session(conf,sid);'||chr(10)||
+ -- A resolution can outlive its originating session, and event corrections are historical.
+ -- Only entry into debate needs the current live session; the core still rejects no selection.
+ execute replace(definition,marker,' if kind not in (''document'',''version'',''event'') then perform private.require_operational_session(conf,sid);end if;'||chr(10)||
   ' if kind=''document'' and target=''In Debate'' then perform private.require_operational_session(conf,(select "currentSessionId" from public.committees where id=cid));end if;'||chr(10)||marker);
  definition:=pg_get_functiondef('private.apply_procedure(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
  marker:=' if did is not null and not exists';
  if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Procedure session guard anchor changed';end if;
  execute replace(definition,marker,' perform private.require_operational_session(conf,sid);'||chr(10)||marker);
+end $patch$;
+
+-- Resolution QR predates committee archival. Keep the existing server-only grants,
+-- committee transaction lock, accepted UUID replay, rate limits and token-safe boundary.
+do $patch$
+declare definition text;marker text;
+begin
+ definition:=pg_get_functiondef('public.submission_link_info(text)'::regprocedure);
+ marker:='where l.token=link_token and l.revoked_at is null';
+ if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Resolution link info archive anchor changed';end if;
+ execute replace(definition,marker,marker||' and not c.archived');
+ definition:=pg_get_functiondef('public.submit_resolution(text,uuid,uuid,text,text,text,text,text,integer)'::regprocedure);
+ -- This unique anchor follows accepted replay and the existing committee FOR UPDATE.
+ -- It precedes duplicate detection, which can itself create a new submission receipt.
+ marker:=' select * into existing from private.resolution_submissions s where s.committee_id = link.committee_id';
+ if length(definition)-length(replace(definition,marker,''))<>length(marker) then raise exception 'Resolution submission archive anchor changed';end if;
+ execute replace(definition,marker,
+  ' if not exists(select 1 from public.committees where id=link.committee_id and conference_id=link.conference_id and not archived) then raise exception ''invalid_link'' using errcode=''P0001'';end if;'||chr(10)||marker);
 end $patch$;
 
 create table public.amendment_links (
