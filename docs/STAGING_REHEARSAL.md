@@ -1,13 +1,13 @@
 # Staging rehearsal plan
 
-The complete rehearsal to run **before the conference**, after Codex's integration lands and a staging deployment exists. Nothing here runs against production. Owner: Claude (platform), with the Executive and one Chair per tested committee.
+The technical performance and failure rehearsal. **Scheduled for conference week**, after the Supabase project is upgraded to Pro with Small compute (see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) → *Conference week*). Do **not** run the load phases (C, D) on the current development Nano instance: earlier runs there are kept below as evidence only. The non-load staff familiarisation rehearsal is a separate document: [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md). Nothing here runs against production. Owner: Claude (platform), with the Executive and one Chair per tested committee.
 
 Conference OS is **staff software**; delegates are not users. Two load populations are tested **separately**:
 
 | Population | Who | Realistic peak | Rehearsal target (headroom) | Touches |
 | --- | --- | --- | --- | --- |
 | **Staff app** | Chairs, Approval, Admins, Executive | ≈ 45–55 active devices (e.g. 14 committees × 2–3 Chair laptops + ~4 Approval + ~4 Admins + ~3 Executive) | **100, then 150–200** simulated staff devices | Supabase Auth session, snapshot reads, outbox writes, Realtime |
-| **Delegate public form** | Delegations on phones | ≈ 100–150 page loads within a couple of minutes after "submissions open"; a few dozen submissions | **150–200** page loads in 2 minutes + submissions | `/submit/{token}` page and `POST /api/submissions` only — server-mediated, **no Supabase Auth session** |
+| **Delegate public forms** | Delegations on phones | ≈ 100–150 page loads within a couple of minutes after "submissions open"; a few dozen submissions | **150–200** page loads in 2 minutes + submissions | resolution QR (`/submit/{token}`, `POST /api/submissions`) and amendment QR (`/amend/{token}`, `POST /api/amendments`) only — server-mediated, **no Supabase Auth session** |
 
 A 100-person conference does not mean 100 simultaneous staff users; it does mean a delegate burst on the public form. Both must pass.
 
@@ -16,28 +16,30 @@ A 100-person conference does not mean 100 simultaneous staff users; it does mean
 | | Used for | Database |
 | --- | --- | --- |
 | **Vercel Preview** (any PR/branch) | Phases A–E | Development Supabase `opmydpozhdgkpcnjwpqb` |
-| **Staging project** (a second Vercel project, e.g. `munos-staging`, production branch `staging`) | Phase F rollback drill — Instant Rollback only exists for a project's *production* deployments | Development Supabase |
-| Production | **Never** used for load or failure tests | Production Supabase |
+| **Staging project** (optional second Vercel project, e.g. `munos-staging`, production branch `staging`) | Phase F rollback drill before Production exists — Instant Rollback only exists for a project's *production* deployments | Development Supabase |
+| Production (built only from the `production` branch) | **Never** used for load or failure tests. The rollback drill may be repeated there once, before the freeze, with a harmless change | Production Supabase |
 
 Previews have Vercel Authentication on; scripts use a *Protection Bypass for Automation* secret (`VERCEL_AUTOMATION_BYPASS_SECRET`, set only in the operator's shell).
 
 ## Preparation
 
-1. Codex's integration merged to a branch; Preview deployed with development Supabase variables and `SUPABASE_SECRET_KEY` (dev).
-2. All migrations applied to the **development** project (Codex-owned).
+1. The release candidate is a `main` commit; its automatic Preview uses development Supabase variables and `SUPABASE_SECRET_KEY` (dev).
+2. All migrations applied to the **development** project exactly once (Codex-owned; through `20261008135032` at the time of writing).
 3. `.env.local` points at the development project (the scripts refuse anything else).
-4. Role-scoped identities: an ignored `.test-sessions/rehearsal-identities.json` naming four **existing** pre-authorized sessions (Chair, Approval, Admins, Executive). Rehearsals never create Auth users; sessions near expiry are refreshed before a run. Only one operator may hold these sessions at a time (Supabase rotates refresh tokens).
-5. **A fresh synthetic conference for every performance run** (a reused conference accumulates audit and procedure history and inflates every snapshot): `npx tsx scripts/rehearsal-fixture.mts --identities .test-sessions/rehearsal-identities.json` writes `.test-sessions/fixtures/<conference>/{fixture.json, identities.json, fixture.sql}` — 14 committees, 420 delegations, clean state, 14 Chair floor sessions, and temporary single-role grants for the existing identities (Chair scoped to one committee). Apply `fixture.sql` to the **development** project, then pass `--fixture` and `--identities` from that folder. (The older `scripts/prepare-load.mts` all-roles fixture is kept only for labelled worst-case runs.)
+4. Role-scoped identities: an ignored `.test-sessions/rehearsal-identities.json` naming four **existing** pre-authorized sessions (Chair, Approval, Admins, Executive). Rehearsals never create Auth users; sessions near expiry are refreshed before a run. Only one operator may hold these sessions at a time (Supabase rotates refresh tokens). The harness grants these identities directly through the fixture SQL instead of redeeming staff access codes: code redemption is a one-off per device and is exercised by real people in Phase A/B and Phase D, not in the load loop.
+5. **A fresh synthetic conference for every performance run** (a reused conference accumulates audit and procedure history and inflates every snapshot): `npx tsx scripts/rehearsal-fixture.mts --identities .test-sessions/rehearsal-identities.json` writes `.test-sessions/fixtures/<conference>/{fixture.json, identities.json, fixture.sql}` — 14 committees, 420 delegations, clean state, 14 Chair floor sessions, and temporary single-role grants for the existing identities (Chair scoped to one committee). The fixture conference has no central session slots, so the `materialize_central_sessions` trigger adds nothing when its committees are inserted. Apply `fixture.sql` to the **development** project, then pass `--fixture` and `--identities` from that folder. (The older `scripts/prepare-load.mts` all-roles fixture is kept only for labelled worst-case runs.)
 6. Optional: create a submission link for one rehearsal committee (Executive → Submission links on the Preview) and note its token.
 7. Dry-run the scenario: `npm run rehearsal:plan -- --staff 50 --delegates 150 --minutes 10` (prints the refresh estimate per Realtime model and assumed refresh latency).
-8. Measure the starting payload per role: `npx tsx scripts/rehearsal-snapshots.mts --identities <folder>/identities.json --fixture <folder>/fixture.json`.
+8. Measure the starting payload per role: `npx tsx scripts/rehearsal-snapshots.mts --identities <folder>/identities.json --fixture <folder>/fixture.json` (measures the one bundled snapshot RPC each role's device sends; add `--components` to see its parts).
 
 ## Phase A — Basic staging check (30 min)
 
 - [ ] Preview URL opens; `npm run verify:deployment -- <preview-url> <commit>` passes.
 - [ ] System health: GREEN, *Running version* = the Preview commit, environment `preview`, Supabase reachable, Storage `ok`.
-- [ ] Each role on a separate browser: Chair (two committees), Approval, Admins, Executive.
-- [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print.
+- [ ] Each role on a separate browser, signed in **with a staff access code** (Executive → Access codes): Chair (two committees), Approval, Admins, Executive.
+- [ ] Executive → Sessions: one central session exists and appears in every active committee; each Chair selects it as the current session.
+- [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print → In Debate.
+- [ ] Amendment QR end to end: amendment page shows the resolution in debate → submit → Chair amendment inbox → Accepted for Debate → In Debate → Closed (Passed) → Chair edits the Google Doc by hand.
 - [ ] Public form shows only committee, delegation selector, title, link, checkbox and fallback — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
 - [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §12): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).
 - [ ] Schedule import preview/confirm, group-photo slot with a reminder 10 minutes out.
@@ -83,7 +85,9 @@ Reads are not scripted per action. Every simulated staff device runs `scripts/re
 - Flush body (core PR #9): send each outbox item, read the snapshot back, remove the item; a separate final refresh runs only when nothing was read back (empty-outbox recovery/poll) or a conflict still blocks the outbox. A write recorded during an empty-outbox refresh waits for the next trigger, as in production. Failed sends/refreshes keep the item and re-send the same mutation id.
 - Human assumption (not client behaviour): a conflicting item is dismissed by the Chair before their next action.
 
-Executive/Admin-only devices mirror core PR #10: a `chair` event starts a fixed 2 s window (later Chair events never extend it; one refresh at expiry); any other topic cancels a pending window and uses the 350 ms debounce, and Chair events arriving while that debounce is pending add nothing (`--executive-chair-window 2000`, default; `0` reproduces earlier core). The harness passes each device's granted roles to the transport, as production does, so PR #10 core reads `executive_snapshot` for the Executive identity; the snapshot probe measures it with `--executive-snapshot`.
+Executive/Admin-only devices mirror core PR #10: a `chair` event starts a fixed 2 s window (later Chair events never extend it; one refresh at expiry); any other topic cancels a pending window and uses the 350 ms debounce, and Chair events arriving while that debounce is pending add nothing (`--executive-chair-window 2000`, default; `0` reproduces earlier core). The harness uses the production `SupabaseTransport` and passes each device's granted roles to it, as production does, so the Executive identity reads `executive_state_snapshot` and every other role `conference_state_snapshot`; the snapshot probe measures the same function per role.
+
+**Not modelled by the load loop** (exercised by people in Phases A, B and E instead): access-code redemption, central-session edits, amendment QR submissions and the amendment lifecycle, committee/session archive. Their server cost is small relative to snapshot reads; the amendment data rides inside the same bundled snapshot (`staff_batch_snapshot`, bounded to 200 current amendments).
 
 Realtime is simulated from the server's real `operational_changes` topics (see `TOPIC_OF` in `scripts/rehearsal/scenario.ts`: procedure, roll-call and photo writes → `chair`; document workflow → `documents`; timer → no event). `--realtime topic-aware` (default; the core read-path change): Chairs refresh for their own committee, Approval and Admins ignore `chair`, Executive keeps all topics. `--realtime current` reproduces `main` before that change (every non-Chair role refreshes on every write).
 
@@ -93,16 +97,14 @@ The report separates triggers attempted, triggers dropped because the device was
 
 ## Phase D — Burst start and shared NAT (45 min)
 
-**Why it matters.** At the venue most devices share one public IP. Conference OS staff devices authenticate with Supabase Auth (anonymous sign-in, then an explicit access grant). Supabase limits **anonymous sign-ins per IP per hour** (default 30 — check the project's Auth rate-limit settings); token refreshes have their own per-IP limit. **Delegates on the QR page do not sign in**: verified in code — `/submit/*` skips the staff provider and device storage, and the page and `POST /api/submissions` are served by the server, which uses the server-only secret key without sessions. A delegate burst is therefore **not** an anonymous sign-in burst; shared-NAT auth risk is about **fresh staff devices**.
+**Why it matters.** At the venue most devices share one public IP. A staff device gets its identity when someone types a **staff access code**: the gate reuses an existing session or creates **one** anonymous Supabase identity, then redeems the code (`redeem_access_code`). Opening the app without submitting a code creates nothing. Supabase limits **anonymous sign-ins per IP per hour** (default 30 — check the project's Auth rate-limit settings); token refreshes have their own per-IP limit, and code redemption has its own attempt limit. **Delegates on either QR page do not sign in**: `/submit/*` and `/amend/*` skip the staff provider and device storage, and their POST routes are served by the server with the server-only secret key. A delegate burst is therefore **not** an anonymous sign-in burst; shared-NAT auth risk is about **fresh staff devices entering codes at the same time**.
 
 Test from **one network** (ideally the school Wi-Fi; otherwise one office connection):
 1. **Prepared devices:** 30–60 browser profiles that already have sessions and grants (as on conference morning). Open all within 2–3 minutes. Expect: all reach GREEN; only token refreshes, no sign-ups.
-2. **Fresh devices** (staging only, `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP=true` on the Preview): open N new profiles within 2–3 minutes (Playwright contexts or real laptops), N = 10, 25, 40. Record how many obtain a session, Auth log entries, HTTP 429s, and what the device shows (it must show RED "Not connected to the conference", never silently work locally).
+2. **Fresh devices entering codes:** open N new browser profiles within 2–3 minutes (Playwright contexts or real laptops), N = 10, 25, 40, and enter a valid staff access code on each. Record how many obtain a session and a grant, Auth log entries, HTTP 429s / rate-limit messages, and what a failed device shows (the access gate with a clear message — never a silently local workspace).
 3. **Delegate burst from one network (separate test):** 150–200 QR page loads within 2 minutes plus a few dozen submissions from the same public IP (`--staff 1 --delegates 200 --submit-token …`, or real phones on the school Wi-Fi). Expect: no auth activity at all in Supabase Auth logs; page p95 ≤ 2 s; submissions succeed (the only limit is 20 accepted submissions per committee link per 10 minutes — spread the test across committee links or expect 429s on one link by design); Vercel function errors 0.
 
-Do **not** weaken security to pass: no blanket anonymous policies, no trusting client-supplied IPs. If fresh sign-ups hit the limit, the plan stands: prepare all staff devices in advance, stagger first sign-in, and set a measured Auth rate limit. Findings go to Codex:
-
-> **CODEX REVIEW REQUIRED — DESIGN ONLY:** the future access-code exchange must give each staff device one stable identity, must not create a new anonymous user per navigation or refresh, must handle replacement laptops deliberately, and should be measured against the per-IP limits above from a single NAT.
+Do **not** weaken security to pass: no blanket anonymous policies, no trusting client-supplied IPs. If fresh sign-ups hit the limit, the plan stands: prepare all staff devices in advance (the day before), stagger code entry, and set a measured Auth rate limit. The access-code design (PR #12/#13) already gives each device one stable identity, creates none per navigation or refresh, and handles replacement laptops by entering a code on the new device; this phase measures it against the per-IP limits from a single NAT.
 
 ## Phase E — Failure injection (60 min)
 
@@ -122,6 +124,9 @@ Run with 25–50 simulated staff devices in the background and real people on th
 | E10 | Browser closed and reopened (online and offline) | Reopens to the same committee; offline reopen works within the 48-hour lease |
 | E11 | Supabase unreachable for the Preview (temporarily wrong URL on a test device, or network block) | Health YELLOW "database unreachable"; device keeps saving; QR submissions show "NOT submitted" |
 | E12 | Photo reminder while offline / after refresh / device time zone changed | Reminder appears on time from cached data; wrong *clock* shifts it (documented) |
+| E13 | Chair offline records attendance; meanwhile the Executive archives that central session | On reconnect the change returns `PT409` and shows "needs review" (kept, not lost); export → keep conference value |
+| E14 | Executive revokes a Chair's access code **with** device revocation while the Chair has unsynced work | Device loses access; pending work is retained; sign-out is refused until a recovery export is downloaded; the export contains the pending changes |
+| E15 | Executive rotates the amendment link while a delegate has the old QR open | Old link → "not valid"; new printed sheet works; no duplicate amendment from a retried submit |
 
 ## Offline / reconnect rehearsal (exact steps)
 
@@ -178,12 +183,13 @@ No extra monitoring platform is needed for this.
 **PASS (all required):**
 - Staff app at **100** simulated staff devices (about twice the realistic peak): error rate < 1% (conflicts excluded), write p95 ≤ 1.5 s, read p95 ≤ 2.5 s, no rate-limit responses; real Chair browsers stay responsive.
 - Staff app at **150–200**: no systemic failure (no cascading errors, no stuck devices); latency may rise but operations complete.
-- Delegate public form: 150–200 page loads in 2 minutes with page p95 ≤ 2 s and no 5xx; submissions succeed apart from the designed per-link limit; **zero Supabase Auth activity** from delegates.
+- Delegate public forms (resolution and amendment QR): 150–200 page loads in 2 minutes with page p95 ≤ 2 s and no 5xx; submissions succeed apart from the designed limits (resolutions 20 per link / 10 min; amendments 20 per link and 5 per delegation / 10 min); **zero Supabase Auth activity** from delegates.
 - Burst start of prepared devices: all reach GREEN within 3 minutes.
 - Zero duplicate and zero lost writes after retries and offline/reconnect.
 - Realtime loss never stops core operations.
 - Rollback completed and verified in under 5 minutes.
-- No critical security/RLS findings (Supabase Advisors clean; no anonymous grants).
+- Zero unexplained HTTP 5xx, zero `PGRST003` (connection-pool wait) errors, zero `40001` retry loops, zero statement timeouts in Supabase/Vercel logs for the run window.
+- No critical security/RLS findings (Supabase Advisors: no new findings beyond the accepted list in RELEASE_CHECKLIST.md; no anonymous grants).
 
 **FAIL (any):** sign-in/auth burst breaks prepared devices · duplicated queue/participation entries · offline changes disappear · database latency makes chairing impractical (several seconds per action) · any Drive or Google dependency blocks core workflow · rollback cannot be completed confidently.
 
@@ -230,7 +236,7 @@ People: technical contact (Vercel + Supabase access), Executive, 3+ Chairs, Appr
 
 - [ ] Preview deployment URL (commit noted) and bypass secret in the operator's shell
 - [ ] Staging Vercel project for the rollback drill, with Instant Rollback access
-- [ ] Development Supabase: migrations applied, synthetic rehearsal conference loaded, test identity authorized
+- [ ] Supabase project on **Pro with Small compute** (conference-week gate); migrations applied once; synthetic rehearsal conference loaded; test identities authorized
 - [ ] `.env.local` for the development project; `npm ci` done on the operator laptop
 - [ ] Test committee data, a submission link, test Google Docs set to Anyone with the link → Editor, plus one shared only with a Chair and one from a school that blocks link sharing
 - [ ] Multiple browsers/devices: 2 Chair laptops for one committee, spare laptop, phones

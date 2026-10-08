@@ -8,7 +8,7 @@ Organizer runbook: [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md). One-page e
 
 | Field | Meaning |
 | --- | --- |
-| Data mode | `Conference database` = connected to Supabase. `Local fallback (cloud expected)` = this device has no authorized session → RED; grant access (below). `Local demo` = demo build. |
+| Data mode | `Conference database` = connected to Supabase. `Local fallback (cloud expected)` = this device has no authorized session → RED; enter a staff access code (below). `Local demo` = demo build. |
 | Sync state / Last error | Outbox state and the last transport error (raw). |
 | Database latency | Time of the last snapshot read. > 3 s shows YELLOW "slow". |
 | Unsynced / conflicts | Outbox length / changes the server rejected (RED until reviewed). |
@@ -20,20 +20,13 @@ Organizer runbook: [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md). One-page e
 
 ## Access for a device
 
-There is no access-code login yet. A device signs in anonymously (when `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP=true`) or reuses its session; it gets data only after an explicit grant in `public.user_access`.
+Staff devices get access with **staff access codes** (Executive → Access codes). The gate creates the device's anonymous Supabase identity only when a code is submitted, then `redeem_access_code` turns the code into a normal `public.user_access` grant (role and committee come from the code, never from the device). Each device that uses a code gets its own identity and grant.
 
-1. On the device: System health → *Technical details* → copy **Device user**.
-2. Supabase dashboard → SQL editor (production project), as an authorized administrator:
-
-```sql
--- One row per role; Chair rows need a committee. Short expiry; revoke afterwards.
-insert into public.user_access (conference_id, user_id, role, committee_id, expires_at)
-values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', now() + interval '4 days');
-```
-
-3. Reload Conference OS on the device.
-
-**Spare laptops:** add one `chair` row per committee for the spare device's user id. Prepare them before the conference and open Chair Console once online (this also caches the offline shell). Never add blanket or anonymous policies to work around access problems.
+- Code scopes: Chair (per committee), Approval Panel (`approval`), Admins (`logistics`), Executive (`admin`). One active code per scope; *Rotate* replaces it (devices already prepared keep their grants until expiry); *Revoke* stops new redemptions, and with *Also revoke devices using this code* also revokes the grants created from it.
+- Prepared devices keep working offline until the earlier of 48 hours after their last access check or grant expiry; then they show "Conference access" and can still export pending work.
+- Archiving a committee revokes its Chair codes **and** Chair grants in the same transaction; new Chair codes for an archived committee are refused. There is no unarchive in the app.
+- Redemption is rate limited ("Too many attempts. Please wait 10 minutes…"). Anonymous sign-ins are also limited per IP by Supabase Auth: prepare devices the day before, a few at a time.
+- **First Executive on a new project:** the app cannot issue the first code (issuing requires an Executive grant). Follow the procedure recorded in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) section 0 (open item, Codex-owned). Only as a last resort, an authorized administrator can insert a short-lived grant with SQL for a device's user id; never add blanket or anonymous policies to work around access problems.
 
 ## Unsynced changes and conflicts
 
@@ -42,6 +35,10 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 - Unsynced changes **never leave the device** by themselves. A replacement laptop only sees server-confirmed work.
 - Recovering a dead laptop: keep it **offline**, open `/admin/health`, export the recovery file, then decide whether to let it sync (duplicates are possible if the same changes were re-entered elsewhere). The file is JSON: `pending[]` lists each unsynced command.
 - A device that has not been online for 48 hours (or whose grant expired) stops opening the cached conference offline.
+
+## Conflicts (`PT409`) and other "needs review" codes
+
+The client marks a saved action "needs review" when the server answers `PT409` (stale revision, archived session/committee, the item changed elsewhere), `40001`, `42501` (access changed) or a `22xxx`/`23xxx` validation error. The action stays in the device outbox and blocks later actions until the Executive exports and dismisses it in System health. There is no server-side retry of a rejected action; re-entering it creates a new action. Sign-out is refused while such actions exist unless access is gone and a recovery export has been downloaded.
 
 ## Supabase
 
@@ -52,7 +49,8 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 
 ## Vercel
 
-- Deployments → the production deployment → *Logs* / *Functions* for server errors (`/api/health`, `/api/submissions`, `/submit/*`).
+- Production is built only from the `production` branch; pushes to `main` create Previews ([DEPLOYMENT.md](DEPLOYMENT.md)).
+- Deployments → the production deployment → *Logs* / *Functions* for server errors (`/api/health`, `/api/submissions`, `/submit/*`, `/api/amendments`, `/amend/*`).
 - Verify a deployment: `npm run verify:deployment -- <url> [expected-commit]`.
 - Rollback: [DEPLOYMENT.md](DEPLOYMENT.md#rollback). After rollback, new builds stop auto-promoting until you undo it.
 
@@ -70,6 +68,16 @@ values ('<conference-uuid>', '<device-user-id>', 'chair', '<committee-uuid>', no
 
 Conference OS stores only the Google Doc id and never calls Google; it cannot see whether sharing is correct.
 
+## Amendment submission
+
+| Symptom | Cause / fix |
+| --- | --- |
+| "Amendments are not currently open in this committee." | No resolution is In Debate in that committee's current session. Expected between debates. |
+| "This amendment link is not valid" | Link replaced or turned off (Executive → Amendment links), or the committee was archived. Print the current sheet. |
+| "Online amendments are temporarily unavailable" | Server cannot reach Supabase or `SUPABASE_SECRET_KEY` missing on that Vercel environment. |
+| Rate-limited | 20 per link and 5 per delegation per 10 minutes. Replace the link if it leaked. |
+| Same amendment submitted twice | Retries with the same submission are replayed, identical wording from the same delegation returns the existing amendment; nothing is duplicated. |
+
 ## Group-photo reminders
 
 Derived on each device from slot times and the **device clock** every 15 seconds; no server push. Wrong time on a laptop = wrong reminder timing (time zone doesn't matter, the clock does). A changed slot (time/place) re-alerts chairs who had acknowledged. Executive sees acknowledgements per committee (✓ warned, ✓✓ sent).
@@ -80,4 +88,4 @@ The production service worker caches Chair Console pages (`/chair…`, `/admin/h
 
 ## After the conference
 
-Connect every device and confirm 0 unsynced. Then clear confirmed conference data from shared laptops (each browser profile), delete device recovery files once reconciled, revoke `user_access` grants, and remove the production freeze flag.
+Connect every device and confirm 0 unsynced. Then revoke every access code with *Also revoke devices using this code*, clear confirmed conference data from shared laptops (each browser profile), delete device recovery files once reconciled, and remove the production freeze flag.

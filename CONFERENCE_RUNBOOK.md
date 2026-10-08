@@ -1,7 +1,11 @@
 # Conference runbook
 
-For conference organizers. No technical knowledge needed. Print it and keep it in the operations room.
-One-page emergency sheet: [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.md). Technical detail for the technical contact: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+For the Executive team, Chairs, the Approval Panel and Admins. **No technical knowledge needed.** Print it and keep a copy in the operations room and one per committee room.
+
+- One-page emergency sheet: [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.md)
+- Release gates (technical lead): [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+- Practice session for staff: [docs/STAFF_REHEARSAL.md](docs/STAFF_REHEARSAL.md)
+- Technical detail for the technical contact: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 | Role | Name | Phone |
 | --- | --- | --- |
@@ -10,131 +14,221 @@ One-page emergency sheet: [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.m
 | Technical contact (Vercel + Supabase access) | | |
 | School IT / Wi-Fi | | |
 
-Attach: the **known-good release card** (from `docs/RELEASES.md`).
+Attach: the **known-good release card** (from [docs/RELEASES.md](docs/RELEASES.md)).
 
-**Development status:** this is a preparation runbook, not evidence of production readiness. Complete the release gates in [docs/INTEGRATION_REVIEW.md](docs/INTEGRATION_REVIEW.md) and the rehearsal in [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) before conference use. Conference OS is staff software (Chair, Approval, Admins, Executive); delegates only use the QR form and never sign in.
+> **Status:** the conference system has passed testing on the development system. The conference (Production) system does not exist yet; it is created in conference week after the checks in the release checklist. Until then, everything in this runbook can be practised on the development system only.
 
-## How it fits together
+## The golden rules
 
-- **Conference OS** = who is present, speakers, timer, participation, votes, resolution workflow (submitted → with Chair → Approval → printed → debate → result), group photos. It is the record for all of these.
-- **Google Docs** = the resolution text. Delegates write it; Chairs edit it and type in passed amendments. Conference OS never edits the text.
-- **Google Drive** = the Approval Panel's folder where Chairs put a copy of each resolution (by hand, for now).
+1. **Never clear browser data, "reset" the browser, use a private/incognito window, or swap laptops on a device that shows unsynced changes or "needs review".** Unsynced work lives only on that laptop.
+2. **Never sign out to "fix" something.** Signing out is only for the end of the conference, or when the Executive asks.
+3. **If a screen turns RED, stop recording on that device and call the Executive.** YELLOW means carry on.
+4. **One record, one place.** If you go to paper, the paper is the record until one person types it in afterwards. Never record the same thing in two places at once.
+5. **Access codes are passwords.** Never post them in a group chat, on a slide, or on a printed sheet in a room.
+
+## How the pieces fit together
+
+- **Conference OS** is the record for attendance, speakers, timer, participation, votes, the resolution workflow, amendments, sessions and group photos. Only staff use it: Chairs, Approval Panel, Admins, Executive.
+- **Delegates never sign in.** They only use two QR forms on their phones: the **resolution QR** (to submit their Google Doc) and the **amendment QR** (to propose an amendment while a resolution is in debate).
+- **Google Docs** hold the resolution text. Delegates write it; Chairs edit it — including typing in passed amendments **by hand**. Conference OS never changes a Google Doc.
+- **Google Drive** holds the Approval Panel's folder, where Chairs put a copy of each resolution.
 
 ```
-Delegate:  write Google Doc → Share: Anyone with the link → Editor (or share with a Chair) → scan QR → paste link → Submit
-Chair:     Documents → Delegate submissions → Open Google Doc → review → copy into Approval folder → Submit to Approval
-Approval:  review the copy → approve → Admins print → debate → vote
+Resolution:  delegate writes Google Doc → resolution QR → Chair: Documents → Submit to Approval
+             → Approval Panel: approve → Admins: Mark printed → Chair: Open debate → Voting → result
+Amendment:   resolution is In Debate → delegate scans amendment QR → Chair: Amendments → Accept for debate
+             → Start amendment debate → Passed / Failed → if Passed, Chair edits the Google Doc
 ```
+
+## Who uses what
+
+| Staff role | Workspace in the app | What they do |
+| --- | --- | --- |
+| **Chair** (one code per committee) | *Chair Console*: Debate, Roll call, Participation, Documents, Amendments, Voting, Group photos | Runs the committee |
+| **Approval Panel** | *Approval Panel*: Review inbox | Reviews and approves resolutions |
+| **Admins** | *Admins*: Print queue | Prints approved resolutions, marks them printed |
+| **Executive** | *Executive*: Overview, Committees, Sessions, Access codes, Resolution links, Amendment links, System health … | Sets everything up, watches health, handles incidents |
 
 ## The three colours
 
-System health (**Executive → System health**) shows one colour. Every screen shows a strip at the top when it is not GREEN.
+Every screen shows a strip at the top when things are not GREEN. Full detail: **Executive → System health**.
 
-| | Meaning | Do |
+| Colour | What it means | What to do |
 | --- | --- | --- |
 | **GREEN** | Everything normal. | Carry on. |
-| **YELLOW** | Something is slow or unavailable, but the committee can continue. Changes are kept on the device and sync automatically. | Carry on. Don't close the laptop or clear the browser. If it lasts 15 minutes, use the matching procedure below. |
-| **RED** | Action needed: this device can't save, changes need review, changes have waited over 15 minutes, or the device isn't connected to the conference. | Stop recording on that device. Call the Executive. Don't clear the browser or swap laptops. |
+| **YELLOW** | Something is slow or temporarily unavailable (for example *"Internet unavailable"*, *"Live updates temporarily unavailable"*, *"Connection is slow"*, *"Syncing changes"*). The committee can continue; changes are kept on the device and sync automatically. | Carry on. Keep the laptop open and on Wi-Fi. If it lasts 15 minutes, call the Executive. |
+| **RED** | This device needs a person: *"N changes need review"*, *"Changes are waiting too long"* (over 15 minutes), *"This device cannot save changes"* or *"Not connected to the conference"*. | Stop recording on that device. Call the Executive. Do not clear the browser, sign out or swap laptops. |
 
-## Before the conference (by 48 hours before)
+---
 
-**Release and systems** (technical contact)
-- [ ] System health → *Running version* matches the known-good card. Production is frozen from 48 hours before opening.
-- [ ] System health is GREEN. Supabase dashboard shows the production project healthy and a backup exists.
-- [ ] Rollback rehearsed once on staging; the person who will do it has Vercel access.
+## BEFORE THE CONFERENCE
 
-**Conference data** (Executive)
-- [ ] Committees: right code, name and room.
-- [ ] Schools: every school exists once (no near-duplicates).
-- [ ] Delegates: spot-check five per committee (country, school, committee).
-- [ ] Sessions: **Executive → Schedule import**, preview, confirm. Each committee shows the right sessions and times.
-- [ ] Group photos: **Executive → Group photos** — every school has its slot, time and place; affected committees look right.
+Owner: Executive (with the technical contact). Start one week before; finish by **48 hours before** (the freeze).
 
-**Access** (technical contact grants it; there is no access-code login yet)
-- [ ] Every Chair laptop opens its committee in Chair Console.
-- [ ] Approval Panel, Admins and Executive devices open their workspaces.
-- [ ] **Two spare laptops** prepared with Chair access to *every* committee, signed in, Chair Console opened once.
+### Conference data — Executive
 
-**Resolutions**
-- [ ] Tell delegations in advance (briefing / handbook): write in Google Docs, set **Share → Anyone with the link → Editor**, then submit the link on the committee QR page. No login.
-- [ ] **Executive → Chairs & staff**: every Chair is assigned to the right committee with a contact email they really use. The QR form lists these assigned Chairs as the fallback for schools that block link sharing (contacts are not app access; no committee mailboxes).
-- [ ] **Executive → Submission links**: every committee has a link; its *Assigned Chair contacts* column is complete.
-- [ ] For each committee: on a phone, scan the QR, submit a test Google Doc link (Doc set to *Anyone with the link → Editor*). Chair → Documents → *Delegate submissions* shows it; *Open Google Doc* works on the Chair laptop; Chair copies it into the Approval folder and clicks *Submit to Approval*; it appears in Approval; Approval approves; Admins mark it printed.
-- [ ] Each Chair knows the Approval Panel's Drive folder and how to copy a Google Doc into it (File → Make a copy → choose the folder).
-- [ ] Print the room sheets (Chair Console → Documents → *Print room sheet*).
+- [ ] **Committees** (Executive → Committees): every committee has the right code, name and room. Remove test committees (*Delete* only works for unused ones; otherwise *Archive* — see the warning below).
+- [ ] **Delegates and schools** (Executive → Delegates, Schools): every school exists once; spot-check five delegates per committee (country, school, committee).
+- [ ] **Staff** (Executive → Chairs & staff): every Chair is assigned to the right committee with an email they actually read.
+- [ ] **Session schedule** (Executive → **Sessions**): click **+ Add session** for each conference session (for example "Session 1", start and end in Qatar time) → **Create for all committees**. Each session is created in every active committee. Check two committees show the full list.
+- [ ] **Group photos** (Executive → Group photos): every school has its slot, time and place.
 
-**Rooms and devices**
+> **Archive is one-way.** *Archive* on a committee hides it from Chairs **and immediately cancels that committee's Chair access codes and Chair devices**. There is no "unarchive" button. Archive only test committees, and never during the conference.
+
+### Access codes — Executive
+
+Executive → **Access codes** ("Staff access codes"). One code per scope:
+
+- [ ] **Chair · <committee>** — one for each committee.
+- [ ] **Approval Panel** — one for the panel.
+- [ ] **Admins** — one for the print/admin team.
+- [ ] **Executive** — one for the Executive team.
+
+For each: set **New code expires** to the end of the conference (Qatar time) → **Create** (or **Rotate** if one exists). The dialog "*… copy this code now*" shows the code **once**: **Copy code**, store it in the Executive password manager or a sealed envelope per committee, then **Done**. It cannot be shown again; if lost, *Rotate* to get a new one (devices already prepared keep working).
+
+- [ ] Test codes from rehearsals are **Revoked**.
+- [ ] Codes are handed to people privately — never displayed in a room or sent to a group chat.
+
+### QR sheets — Executive / Admins
+
+- [ ] **Resolution QR** (Executive → **Resolution links**, page "Submission links"): every committee has a link → **Print sheet**. Also save each sheet as PDF in the operations folder.
+- [ ] **Amendment QR** (Executive → **Amendment links**): **Create N missing links** → **Print sheet** for every committee; save as PDF too. The amendment QR stays the same all conference; it only accepts amendments while a resolution is *In Debate*.
+- [ ] Each committee room gets both sheets. Spare copies stay in the operations room.
+- [ ] Test each committee once from a phone **on mobile data**: resolution QR opens the committee's form; amendment QR says *"Amendments are not currently open in this committee."* (correct when nothing is in debate).
+
+### Google Docs and Drive — Executive with every Chair
+
+- [ ] Delegations told in advance: write in Google Docs, **Share → Anyone with the link → Editor**, submit the link on the resolution QR. No login.
+- [ ] Each Chair opens a test delegate Doc on their Chair laptop and can edit it.
+- [ ] Each Chair knows the Approval Panel's Drive folder and how to copy a Doc into it (File → Make a copy → choose the folder).
+- [ ] Each Chair has practised typing a passed amendment into a Google Doc (the app reminds them; it never edits the Doc).
+
+### Devices and fallback — Executive
+
+- [ ] Every staff device prepared (see **Staff device setup** below), including **two spare Chair laptops**.
+- [ ] Every device: date and time set **automatically** (photo reminders use the device clock).
+- [ ] Every device uses a **normal** browser window (not private/incognito) and a browser profile nobody else uses. Note on each laptop: *"Conference device — do not clear browser data."*
+- [ ] **Do not clear browser storage** on any prepared device from now until the end of the conference.
+- [ ] **Recovery practised:** on one prepared laptop, Executive → System health → **Export device recovery file** works and downloads a file. Delete the test file.
+- [ ] **Paper fallback per committee** (in a labelled envelope): delegate list, blank attendance sheet, blank speakers list, both QR sheets, and this runbook's *During the conference* page.
 - [ ] Wi-Fi tested in every committee room (System health GREEN). Note weak rooms.
-- [ ] Every conference device has **date and time set automatically** (photo reminders use the device clock).
-- [ ] Each Chair laptop: open Chair Console and Group photos, then Wi-Fi off → refresh → Chair Console still opens → Wi-Fi on → GREEN, 0 unsynced.
 
-**Fallback**
-- [ ] Per committee, printed: delegate list, blank attendance sheet, blank speakers list, room sheet.
-- [ ] Approval folder copies are readable by the Executive (so documents are reachable even if Conference OS is down).
+---
 
-## Every conference morning (45 minutes before sessions)
+## STAFF DEVICE SETUP
 
-- [ ] Executive opens System health: **GREEN**, version matches the card.
-- [ ] Each Chair opens their committee and sets the committee's **Current session** (shared by every Chair device in that committee; the app only suggests by time).
-- [ ] One committee: mark a delegate present, add a speaker, record one participation point, start/stop the timer (undo the point afterwards).
-- [ ] One test submission by QR → Chair opens the Google Doc → *Submit to Approval* → Approval approves → Admins mark printed.
-- [ ] Today's group photos look right (Executive → Group photos).
-- [ ] Every Chair laptop: sidebar GREEN / "Synced" and **0 unsynced**. Fix anything else before sessions start.
+Do this the day before, on the school Wi-Fi, one device at a time (preparing many devices in the same few minutes from one network can hit a sign-in limit). Allow 5 minutes per device.
 
-- [ ] Security Council: check the configured permanent members; rehearse one substantive vote with a veto and one procedural vote (no veto).
+1. **Open the app** in a normal browser window: the conference address from the Executive.
+2. You see **"Enter staff access code"**. Type the code into **Staff access code** → **Open staff workspace**.
+   - *"That code is invalid or expired"* → check it with the Executive (codes are 24 characters; dashes don't matter).
+   - *"Too many attempts. Please wait 10 minutes…"* → wait; don't keep trying.
+3. **Confirm the role.** The strip at the top shows your role (*Chair*, *Approval Panel*, *Admins* or *Executive*). Chairs: the top-bar **Select committee** list shows your committee (`CODE · Room`). Wrong role or committee → tell the Executive now.
+4. **Confirm the device is prepared.** Status strip gone (GREEN). Chairs: open Debate, Roll call, Documents and Amendments once. Open **System health** (Executive → System health, or `/admin/health`) once — it shows GREEN.
+5. **Test offline once** (Chairs): turn Wi-Fi off → refresh the page → the Chair Console still opens and the strip says *"Internet unavailable"* → mark one delegate present → turn Wi-Fi on → within a minute the strip disappears (GREEN). Undo the test mark.
+6. **Test recovery export once:** System health → **Export device recovery file** → a file downloads. Give it to the Executive to delete.
+7. Close the lid. **Do not sign out.** The device stays prepared.
 
-Not available yet (do not test): amendment flow.
+**Spare laptops:** prepare them like Chair laptops with the Chair code of a committee, then leave them closed. On the day, a spare can join any committee by entering that committee's Chair code.
 
-## During the conference
+**Prepared devices stay usable offline for up to 48 hours** after their last connection (or until their code expires). Connect every device to Wi-Fi at least once a day.
+
+### What not to do on conference day
+
+- Don't clear browser data, cookies or "site data". Don't use private/incognito windows.
+- Don't sign out, switch browser profiles or reinstall the browser.
+- Don't open the same committee's Chair Console in two tabs on one laptop.
+- Don't share access codes or take photos of them.
+- Don't update the laptop's operating system or browser during sessions.
+
+---
+
+## DURING THE CONFERENCE
+
+### Every morning (45 minutes before sessions)
+
+- [ ] Executive: System health **GREEN**, *Version* matches the known-good card.
+- [ ] Each Chair: select the committee, then set **Current session** (top bar) to today's first session. Every Chair device in that committee shares this choice.
+- [ ] Each Chair laptop: strip GREEN, **0 unsynced**.
+- [ ] One committee: mark a delegate present, add a speaker, start/stop the timer (undo afterwards).
+
+### Using the amendment QR
+
+1. The resolution must be **In Debate** (Chair → Documents → **Open debate →**). The amendment form opens automatically.
+2. Delegates scan the amendment QR in the room, choose their delegation, type (Add / Strike / Replace), clause and **exact wording**, tick the confirmation → **Submit amendment** → they see *"Amendment received"* and a reference.
+3. Chair → **Amendments**: each submission appears as *Submitted*. **Accept for debate** (or **Rule out** / **Withdraw**).
+4. **Start amendment debate** — only one amendment can be in debate at a time.
+5. After the vote: **Passed** or **Failed**.
+6. **If Passed: the Chair edits the working Google Doc by hand** (the app shows *"Apply the passed amendment to the working Google Doc."*). Conference OS does not change the Doc.
+7. When the resolution's debate closes, the amendment form closes again by itself.
+
+If a delegate sees *"This amendment link is not valid"*, the Executive replaced the link: use the newly printed sheet.
+
+### Situations
 
 | Situation | What to do |
 | --- | --- |
-| **A Chair loses internet** | Keep chairing. Attendance, speakers, timer, participation and votes save on the laptop (YELLOW) and sync when back online. Don't close the laptop or switch devices. |
-| **School Wi-Fi fails everywhere** | Same as above in every room. Delegates keep writing in Google Docs and submit links when Wi-Fi returns. If it lasts long, phones on mobile data can still submit. |
-| **Conference OS page won't load** | Laptops already open keep working — don't close them. Check on a phone with mobile data. Call the technical contact. See the emergency sheet. |
-| **Database problem** (System health: "Conference database unreachable" on all devices) | Open screens keep saving on their devices. QR submissions stop until it returns. Don't refresh repeatedly. Technical contact checks [status.supabase.com](https://status.supabase.com/). |
-| **Live updates disconnected** (YELLOW) | Nothing to do. Screens refresh at least every minute and when a page is reopened. Photo reminders still appear. |
-| **Google Docs / Drive down** | Conference OS keeps working (see below). Documents can't be opened or copied until Google recovers. |
-| **Chair can't open a submitted Google Doc** | Chair clicks *Can't access* on it and asks the delegation to set **Anyone with the link → Editor**, or to share it directly with the Chair as **Editor** (if their school blocks link sharing). When it opens, click *Access fixed*. |
-| **Delegate forgot to share the Doc** | Same as above. Their submission is safe; only access is missing. |
-| **Submission fails** | "Not received" → tap Submit again (safe, no duplicates). "Not a Google Docs link" → copy the link from the Doc's *Share* button. Still failing → see "file fallback". |
-| **QR code doesn't work** | Use the link printed under the QR, or open Chair Console → Documents → *Submission QR*. If the link says "not valid", the Executive replaced it — print the new room sheet. |
-| **File fallback needed** | On the submission page tap *Upload a file instead* (PDF or Word, up to 4 MB). If uploads are also unavailable, the delegate gives the file to the Chair and submits later. |
-| **A device shows unsynced changes** | Normal while offline. Keep it open and connected. If RED for over 15 minutes, call the Executive. Never clear the browser. |
-| **A Chair laptop dies** | Follow *Chair device failure* below. |
-| **Photo reminder didn't appear** | Check the laptop's clock is automatic and correct. Chair Console → Group photos lists the committee's slots. The Executive can see who acknowledged in Executive → Group photos and send a runner if needed. |
+| **Wi-Fi drops (one room or everywhere)** | Keep chairing. Attendance, speakers, timer, participation, votes and amendment decisions save on the laptop (YELLOW *"Internet unavailable — N changes saved on this device"*) and sync when Wi-Fi returns. Don't close the laptop or switch devices. Delegates keep writing in Google Docs; phones on mobile data can still use both QR forms. After 15 minutes the strip turns RED as a reminder — still safe, keep it open, tell the Executive. |
+| **"Live updates temporarily unavailable"** (Realtime) | Nothing to do. Everything still saves. Other screens refresh at least once a minute and whenever you click back into the window. |
+| **RED "N changes need review"** (a conflict — technically a *PT409*) | Another device changed the same thing first, the session was archived, or access changed. **Nothing is lost.** Stop using that device for that item and call the Executive, who handles it in System health (below). Carry on chairing on the same device for other things only if the Executive says so. |
+| **A Chair laptop dies or is lost** | Follow *Moving to a replacement device* below. |
+| **Two Chairs see different things** | Each clicks into the window once (refresh happens on focus). Still different after a minute → call the Executive. |
+| **Wrong current session selected** | Chair → top bar → **Current session** → pick the right one. Records already made stay in the session they were made in; tell the Executive so they can note it. |
+| **A session was archived by mistake** | Don't create a duplicate. Call the Executive. Records made in it are kept; Chairs select another current session. See *Incidents*. |
+| **Chair can't open a delegate's Google Doc** | Chair → Documents → **Can't access** on that submission; ask the delegation to set *Anyone with the link → Editor*. When it opens, **Access fixed**. |
+| **Resolution QR / amendment QR doesn't work** | Use the printed link under the QR, or Chair → Documents → *Open submission page* / Chair → Amendments → *Open amendment form*. *"not valid"* means the Executive replaced it — print the new sheet. |
+| **Photo reminder didn't appear** | Check the laptop clock is automatic. Chair → Group photos lists the slots. |
 
-### Google Docs/Drive down vs Conference OS down
+### Handling "needs review" (Executive)
 
-**Google Docs/Drive down, Conference OS working:** attendance, speakers, timer, participation (including POI points), votes and the resolution workflow all continue. Only opening, editing or copying documents waits. Vote on resolutions already printed; pause document editing until Google recovers.
+On the device that shows it (don't move it):
 
-**Conference OS down, Google working:** Chairs use the Approval-folder copies and the delegates' Google Docs to keep debate going, and record attendance, speakers and votes **on paper**. Don't create a parallel digital record (no new spreadsheet). When Conference OS returns, one person per committee enters the paper record.
+1. Executive → **System health**. Each item reads *"Review saved … change"*.
+2. **Export device recovery file** first (the dismiss button stays disabled until you do).
+3. Read the item's message and check the current value in the app (for example the delegate's attendance).
+4. **Keep conference value · dismiss exported action** → confirm.
+5. If the change is still needed, enter it again normally.
+6. Give the recovery file to the technical contact; delete it once the day is reconciled (it contains delegate details).
 
-### Chair device failure
+There is no "force my version" button — by design.
 
-1. Take a **spare laptop** (prepared with access to every committee). Open Conference OS → Chair Console.
-2. Choose the committee in the top bar and check the **Current session**.
-3. Check roll call, the speaker queue and recent participation. Only changes the old laptop had **already synced** are there.
-4. The status strip must be GREEN with 0 unsynced. Continue chairing.
+### Moving to a replacement device
 
-If the old laptop had **unsynced changes**: they exist only on that laptop. They do not transfer.
-- If it can be revived, give it to the Executive. **Before connecting it to Wi-Fi**, open System health on it (`/admin/health`) and **Export device recovery file**, then let the technical contact decide whether to let it sync. This avoids the same thing being recorded twice.
-- If it cannot be revived, those changes are lost. Re-enter anything important on the new laptop and note it in the incident log.
+1. Take a **spare laptop**. If it shows the code screen, enter the **Chair code for this committee** (from the Executive).
+2. Select the committee and check **Current session**, roll call and the speaker queue. Only changes the old laptop had **already synced** are there.
+3. Strip GREEN, 0 unsynced → continue chairing.
+4. **The old laptop:** if it can be revived, give it to the Executive **before connecting it to Wi-Fi**. On it: System health → **Export device recovery file**, then the technical contact decides whether to let it sync (avoids recording things twice). If its access was revoked, the code screen offers **Export saved changes** then **Sign out after recovery export** — export first.
+5. If the old laptop is gone for good, its unsynced changes are lost: re-enter anything important and note it in the incident log. If it was **lost or stolen**, see *Incidents*.
 
-## End of each day
+---
 
-- [ ] Every laptop: GREEN, **0 unsynced**. Leave any laptop with unsynced changes open and connected until it syncs.
-- [ ] Any RED "need review": Executive opens System health on that device, exports the recovery file, then resolves it.
-- [ ] Resolution states look right: nothing stuck in *Delegate submissions*; Approval inbox and print queue understood.
-- [ ] The day's important Google Docs and Approval copies open for the Executive.
-- [ ] Technical contact confirms a database backup exists for today.
-- [ ] Tomorrow's sessions and group-photo slots are correct (cancelled slots marked cancelled).
-- [ ] Final check: System health GREEN on the Executive device. Write down any incidents.
+## AFTER EACH DAY
 
-## Emergency
+- [ ] Every staff device: strip GREEN, **0 unsynced**. A device with unsynced changes stays open and on Wi-Fi until it syncs.
+- [ ] Every device: **0 "needs review"**. Anything left: Executive handles it (export → dismiss) and keeps the file.
+- [ ] Executive → Overview / Documents: nothing stuck in *Delegate submissions*; Approval inbox and Print queue understood; no amendment left *In Debate*.
+- [ ] Each Chair: close any resolution still *In Debate* if its debate is finished (so the amendment form closes overnight).
+- [ ] **Sessions:** do not archive today's sessions unless the Executive decides to; archiving is not required at the end of a day. Never archive a session that still has a resolution in debate (the app refuses).
+- [ ] Recovery files from the day: reconciled, then deleted.
+- [ ] Tomorrow's sessions and group photos correct.
+- [ ] **Do not clear browser storage on any device.** That happens only after the conference, once the Executive confirms every device is at 0 unsynced.
+- [ ] Executive: System health GREEN. Write down any incidents.
 
-- **Return to the known-good release, Supabase checks, broken deployment:** [docs/EMERGENCY_RECOVERY.md](docs/EMERGENCY_RECOVERY.md).
-- **Paper fallback** (only if absolutely necessary): printed attendance sheet and speakers list; record times and names; one person enters them afterwards. Never record the same thing in two systems at once.
-- **Emergency fix during the freeze:** only for something blocking the conference — small, tested, checked on a Preview first, with the known-good release ready for rollback ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#production-freeze)).
+---
 
-Planned, not yet available: automatic Approval-folder copies, PDF snapshots and Drive archive exports ([docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md)), access-code login, amendment tracking.
+## INCIDENTS
+
+Write every incident down: time, room, what happened, what was done.
+
+| Incident | What to do |
+| --- | --- |
+| **Database unavailable** (System health: *Conference database* down on every device; Supabase outage) | Open screens keep saving on their devices — don't close or refresh them. QR forms say *"temporarily unavailable"* — delegates wait or give the Chair a copy. Technical contact checks [status.supabase.com](https://status.supabase.com/). If it lasts over 30 minutes, go to paper (below). |
+| **App not loading** (Vercel unavailable) | Laptops already open keep working — don't close them. Check on a phone with mobile data. Technical contact checks [vercel-status.com](https://www.vercel-status.com/). If a change was deployed recently, the technical contact returns to the known-good release ([emergency sheet](docs/EMERGENCY_RECOVERY.md)). |
+| **Live updates unavailable** (Realtime) | Nothing to do (YELLOW). Screens refresh at least every minute. |
+| **Google Docs / Drive unavailable** | Conference OS keeps working: roll call, speakers, timer, participation, votes, amendments. Only opening, editing or copying Docs waits. Vote on resolutions already printed; type passed amendments into the Doc once Google is back (note them on paper meanwhile). |
+| **A staff access code leaked** | Executive → Access codes → that scope → **Rotate** (old code stops working for new devices) → hand the new code privately. If unknown devices may already have used it: **Revoke** with **Also revoke devices using this code**, then re-prepare the real devices with the new code (their unsynced work stays on them — export before signing out). |
+| **Wrong committee archived** | Stop. The committee disappeared from Chair laptops and its **Chair codes and devices were cancelled**. Don't create a replacement committee. Call the technical contact: restoring needs a database fix (there is no unarchive button). Meanwhile that committee runs on paper. After the fix, the Executive issues a new Chair code and the Chairs enter it. |
+| **Lost or stolen laptop** | Executive → Access codes → that laptop's scope → **Revoke** with **Also revoke devices using this code** → **Rotate** to create a new code → prepare the replacement and the other devices of that scope again. Its unsynced work is lost; re-enter from notes. |
+| **QR link leaked or abused** (spam submissions) | Executive → Resolution links or Amendment links → **Replace** (the old QR stops immediately) → print and post the new sheet. Chairs **Rule out** spam amendments. Built-in limits also stop floods (20 per link per 10 minutes; 5 amendments per delegation per 10 minutes). |
+| **Offline device with unsent work** (can't reconnect, or its access expired) | Keep it powered and do not sign out. Executive: System health → **Export device recovery file** (or on the code screen: **Export saved changes**). The technical contact decides how the work is entered. Only then **Sign out after recovery export**. |
+| **Paper fallback** (Conference OS unusable for a long time) | Each committee uses its envelope: attendance sheet, speakers list. One person per committee enters the paper record afterwards, once. Don't start a spreadsheet. |
