@@ -71,10 +71,11 @@ Runbook: *Staff device setup*, steps 1–4.
 - [ ] **Chair B** (online): mark the **same** delegate **D** → **Present**.
 - [ ] **Chair A:** Wi-Fi on. The speaker syncs; the attendance change for D turns **RED "1 change needs review"** — because Chair B changed D first. Point out: *nothing is lost*.
 - [ ] **Executive, on Chair A's laptop:** **System health** → **Export device recovery file** → check D's attendance in Roll call → **Keep conference value · dismiss exported action** → confirm. Strip back to GREEN. Decide with the Chairs whether D is present and enter it once.
+  - *Until the System-health routing fix lands, a Chair-only laptop cannot open System health (it returns to the Chair Console). If so, record that as the expected finding, move Chair A to the spare (step 8 order is fine), and have the technical contact demonstrate the interim procedure in TROUBLESHOOTING.md.*
 
-### 7. Recovery export — 2 min (every staff device)
+### 7. Recovery export — 2 min
 
-- [ ] Each person: **System health** → **Export device recovery file** → a file downloads. Executive collects and deletes them (they contain delegate details).
+- [ ] Executive device: **System health** → **Export device recovery file** → a file downloads. (Other roles: only after the routing fix; until then their export path is the code screen after revocation, practised in step 9.) Executive deletes the files afterwards (they contain delegate details).
 
 ### 8. Access-code rotation and replacement device — 5 min
 

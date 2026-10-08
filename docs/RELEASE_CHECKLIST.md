@@ -13,6 +13,7 @@ State at the time of writing (8 October 2026): `main` = `e91d3d9`; development S
 - [ ] Staff familiarisation rehearsal run on development: [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md) (no load). — Executive
 - [ ] Runbook and emergency sheet reviewed by the Executive and printed drafts marked up. — Executive
 - [ ] Only bug fixes merged to `main`; every merge has green CI and a checked `main` Preview. — Codex / Claude
+- [ ] **Blocker — application fix (Codex):** System health (`/admin/health`: recovery export and "needs review" dismissal) must open on **every** staff device, not only Executive ones. Today `staffRoleForPath` treats it as an Executive route and redirects Chair/Approval/Admins devices, while a conflicted item blocks that device's later changes. Fix, test, merge to `main`, re-verify on the Preview, then remove the "known gap" notes from the runbook, emergency sheet and staff rehearsal. — Codex, Claude to verify
 - [ ] **Open item:** procedure for the very first Executive grant on a brand-new production project is written down and tried on development with a fresh conference. (The app cannot issue the first code itself: issuing codes requires an existing Executive grant.) — Codex, Claude to verify
 
 ## 1. Conference week (T-7 days) — capacity gate

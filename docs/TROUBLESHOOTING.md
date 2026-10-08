@@ -40,6 +40,18 @@ Staff devices get access with **staff access codes** (Executive → Access codes
 
 The client marks a saved action "needs review" when the server answers `PT409` (stale revision, archived session/committee, the item changed elsewhere), `40001`, `42501` (access changed) or a `22xxx`/`23xxx` validation error. The action stays in the device outbox and blocks later actions until the Executive exports and dismisses it in System health. There is no server-side retry of a rejected action; re-entering it creates a new action. Sign-out is refused while such actions exist unless access is gone and a recovery export has been downloaded.
 
+### Needs review on a non-Executive device (interim, until the routing fix)
+
+`/admin/health` is routed as an Executive page: a device without an `admin` grant is redirected to its own workspace, and neither the status strip nor the access gate offers export/dismiss while access is active. A conflicted item blocks every later outbox item on that device. Interim procedure, no data loss:
+
+1. Move the person to a spare device (enter their code there). Keep the stuck device **open and powered**.
+2. The stuck device's *Device user* id is shown only in System health, so identify its grant instead: Supabase SQL editor (authorized administrator) → `select id, user_id, role, committee_id, created_at from public.user_access where conference_id='<conf>' and role='chair' and committee_id='<committee>' and revoked_at is null order by created_at;` — match by time the device was prepared (or ask Codex for help).
+3. Revoke **only that grant**: `update public.user_access set revoked_at=now() where id='<grant-id>';`
+4. On the stuck device: refresh → the code screen shows **Export saved changes** → download → **Sign out after recovery export**. The pending actions stay in the file (and on the device under the old identity); they are never sent by the next identity.
+5. Enter the Chair code again on that device if it should return to service. Re-enter any still-needed actions from the export by hand.
+
+Do not use *Revoke* with device revocation on the whole access code for this: that revokes every device prepared with the code.
+
 ## Supabase
 
 - Status: [status.supabase.com](https://status.supabase.com/). Project dashboard → *Logs* (API, Auth, Realtime, Postgres) and *Observability* for CPU/connections; *Advisors* for security/performance findings.
