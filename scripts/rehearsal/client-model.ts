@@ -48,7 +48,7 @@ export interface Clock {
 export interface ClientIO<W> {
   /** Send one outbox item (may resolve a retried/lost-response double send internally). Throws on failure. */
   send(item: W): Promise<void>;
-  /** One full refresh (production: conference_snapshot + operations_snapshot). Throws on failure. */
+  /** One full refresh (production: one bundled conference_state_snapshot / executive_state_snapshot RPC). Throws on failure. */
   read(source: RefreshSource): Promise<void>;
   isConflict(error: unknown): boolean;
 }

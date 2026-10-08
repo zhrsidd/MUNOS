@@ -8,7 +8,7 @@ import { READS, TOPIC_OF, recipients, type RealtimeModel, type SimUser, type Ste
 export const SNAPSHOT_RPCS_PER_REFRESH = 1;
 export interface EstimateOptions {
   minutes: number;
-  /** Fixed latency of one full refresh (both snapshot RPCs in parallel). */
+  /** Fixed latency of one full refresh (one bundled snapshot RPC). */
   readMs: number;
   /** Fixed latency of one mutation RPC. */
   sendMs: number;

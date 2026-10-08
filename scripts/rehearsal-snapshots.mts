@@ -1,6 +1,9 @@
-// Measures the RLS payload each staff role actually receives: bytes and sequential (unloaded) latency of both snapshot RPCs.
+// Measures the RLS payload each staff role actually receives: bytes and sequential (unloaded) latency of the ONE bundled
+// snapshot RPC the app sends per refresh (conference_state_snapshot; executive_state_snapshot for an Admin-only identity).
 //   npx tsx scripts/rehearsal-snapshots.mts --identities .test-sessions/rehearsal-identities.json [--reads 20] [--worst-case]
-//        [--fixture .test-sessions/load-fixtures.json] [--executive-snapshot]  (core PR #10: Executive reads executive_snapshot)
+//        [--fixture .test-sessions/load-fixtures.json] [--components]
+//   --components also measures the bundle's parts (conference_snapshot/executive_snapshot, operations_snapshot,
+//   staff_batch_snapshot) for comparison only; the app reads them separately only on its missing-function fallback.
 // Read-only. Locked to the development project by remote-context.mts. Uses pre-authorized sessions; creates no Auth sessions.
 import { readFile } from "node:fs/promises";
 import { percentile } from "./rehearsal/metrics";
@@ -18,17 +21,21 @@ if (args.includes("--worst-case")) who.push(["worst-case (all roles, one identit
 const results: Record<string, unknown> = {};
 for (const [role, token] of who) {
   const row: Record<string, unknown> = {};
-  // Core PR #10 routes an Admin-only identity to executive_snapshot; conference_snapshot is kept for comparison.
-  // A missing function (older core) is reported as failures, not silently replaced.
-  const rpcs = role === "executive" && args.includes("--executive-snapshot") ? ["executive_snapshot", "conference_snapshot", "operations_snapshot"] : ["conference_snapshot", "operations_snapshot"];
+  // Same routing as lib/supabase/repository.ts: an Admin-only identity reads executive_state_snapshot, everyone else
+  // conference_state_snapshot. A missing function (older core) is reported as failures, not silently replaced.
+  const executive = role === "executive";
+  const rpcs = [executive ? "executive_state_snapshot" : "conference_state_snapshot"];
+  if (args.includes("--components")) rpcs.push(executive ? "executive_snapshot" : "conference_snapshot", "operations_snapshot", "staff_batch_snapshot");
   for (const rpc of rpcs) {
     const ms: number[] = []; let bytes = 0; let failures = 0;
+    // staff_batch_snapshot mirrors the bundle's own call: amendments are omitted from the Executive projection.
+    const body = rpc === "staff_batch_snapshot" ? { conf: fixture.conference, include_amendments: !executive } : { conf: fixture.conference };
     for (let i = 0; i < reads; i++) {
       const t = performance.now();
-      const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/${rpc}`, { method: "POST", headers: { apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ conf: fixture.conference }) });
-      const body = await r.text();
+      const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/${rpc}`, { method: "POST", headers: { apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const text = await r.text();
       if (!r.ok) { failures++; continue; }
-      ms.push(performance.now() - t); bytes = Buffer.byteLength(body);
+      ms.push(performance.now() - t); bytes = Buffer.byteLength(text);
     }
     ms.sort((a, b) => a - b);
     row[rpc] = { bytes, p50_ms: percentile(ms, 0.5), p95_ms: percentile(ms, 0.95), failures };

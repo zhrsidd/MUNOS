@@ -62,7 +62,7 @@ const identities: Partial<Record<StaffRoleKey, Identity>> = loaded?.identities ?
 const identityOf = (role: SimUser["role"]): Identity => scoped && role !== "delegate" ? identities[role]! : { userId: session.user.id, token: session.access_token };
 const { SupabaseTransport } = await import("../lib/supabase/repository");
 // Production (lib/repository-instance.ts) passes the device's granted roles to the transport; core uses them for Realtime
-// topic filtering and, from PR #10, to route an Admin-only identity to executive_snapshot. Older core ignores the extra
+// topic filtering and to route an Admin-only identity to executive_state_snapshot. Older core ignores the extra
 // arguments, so the constructor is called through a widened type to keep this file compiling against either.
 type TransportInstance = InstanceType<typeof SupabaseTransport>;
 const Transport = SupabaseTransport as unknown as new (...args: unknown[]) => TransportInstance;
