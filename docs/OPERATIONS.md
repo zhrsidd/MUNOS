@@ -8,6 +8,7 @@ This page used to hold the conference-day notes. They now live in:
 - [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) — one-page emergency sheet.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — gates from development to Production and the T-48h freeze.
 - [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md) — 30–45 minute staff familiarisation rehearsal (no load).
+- [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md) — one-time first-Executive access code for a brand-new project.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — technical contact: health details, access codes, unsynced/conflict recovery, Supabase/Vercel checks, end-of-conference clean-up.
 - [DEPLOYMENT.md](DEPLOYMENT.md) — release model (`main` → Preview, `production` → Production), known-good release, 48-hour freeze, emergency fixes, rollback.
 - [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md) — the conference-week load and failure rehearsal (on Supabase Pro/Small).

@@ -4,7 +4,7 @@ One page of gates. Work top to bottom. **Do not start a section until every box 
 
 Release model ([DEPLOYMENT.md](DEPLOYMENT.md)): `main` → automatic **Preview** (development Supabase). Production is built **only** from the `production` branch, which is moved deliberately. Merging to `main` never deploys Production.
 
-State at the time of writing (8 October 2026): `main` = `e91d3d9`; development Supabase has every migration through `20261008135032` applied once; development acceptance passed; `production` = `c0a6a65`; **no Production deployment and no production Supabase project exist**; the Supabase upgrade and load rehearsal are deliberately deferred to conference week.
+State at the time of writing (8 October 2026): `main` = `723147a` (PR #15: System health in every staff workspace); development Supabase has every migration through `20261008135032` applied once; development acceptance passed; `production` = `c0a6a65`; **no Production deployment and no production Supabase project exist**; the Supabase upgrade and load rehearsal are deliberately deferred to conference week.
 
 ---
 
@@ -13,8 +13,9 @@ State at the time of writing (8 October 2026): `main` = `e91d3d9`; development S
 - [ ] Staff familiarisation rehearsal run on development: [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md) (no load). — Executive
 - [ ] Runbook and emergency sheet reviewed by the Executive and printed drafts marked up. — Executive
 - [ ] Only bug fixes merged to `main`; every merge has green CI and a checked `main` Preview. — Codex / Claude
-- [ ] **Blocker — application fix (Codex):** System health (`/admin/health`: recovery export and "needs review" dismissal) must open on **every** staff device, not only Executive ones. Today `staffRoleForPath` treats it as an Executive route and redirects Chair/Approval/Admins devices, while a conflicted item blocks that device's later changes. Fix, test, merge to `main`, re-verify on the Preview, then remove the "known gap" notes from the runbook, emergency sheet and staff rehearsal. — Codex, Claude to verify
-- [ ] **Open item:** procedure for the very first Executive grant on a brand-new production project is written down and tried on development with a fresh conference. (The app cannot issue the first code itself: issuing codes requires an existing Executive grant.) — Codex, Claude to verify
+- [x] ~~System health on every staff device~~ — **resolved by PR #15** (merged `723147a`): Chair `/chair/health`, Approval `/approval/health`, Admins `/logistics/health`, Executive `/admin/health`; verified on the `main` Preview with each role (Chair still cannot open `/admin/health`). — Codex, verified by Claude
+- [ ] Optional follow-up (Codex, small): add `/chair/health` to the offline shell list in `public/sw.js`. Today it opens offline only through the sidebar link, not by a full reload.
+- [x] First-Executive bootstrap procedure written ([FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), `scripts/bootstrap-first-executive.sql`) and **tested on development on 8 October 2026** through the normal app flow (redeem → Executive → rotate → bootstrap code rejected on a new device → bootstrapped device still valid). — Claude
 
 ## 1. Conference week (T-7 days) — capacity gate
 
@@ -47,11 +48,11 @@ Supabase production project — technical lead with Codex:
 - [ ] Storage: `resolutions` bucket exists (created by migration), private.
 - [ ] Advisors run. Accepted findings only: SECURITY DEFINER access-code RPCs callable by signed-in users (by design: they check Executive access inside); "Anonymous Access Policies" warnings (by design: anonymous identities read only through grant-checked RLS); leaked-password protection (no passwords are used); unused indexes. **Anything else blocks.**
 - [ ] Backups: daily backups present on Pro; restore steps read through once.
-- [ ] Conference record created; first Executive granted using the procedure from section 0; that Executive issues the remaining codes from the app.
+- [ ] Conference record created; **first Executive bootstrapped** with [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md) (one short-lived bootstrap code, redeemed in the app, retired by the first normal Executive code). That Executive issues every other code from the app. No hand-inserted `user_access` rows.
 
 Vercel Production — Claude:
 - [ ] Production environment variables set from [DEPLOYMENT.md](DEPLOYMENT.md#environment-variables) with **production** values; `SUPABASE_SECRET_KEY` marked Sensitive; `NEXT_PUBLIC_CONFERENCE_ID` = the production conference. No development value anywhere in Production.
-- [ ] Deployment Protection changed so the **Production** domain opens without a Vercel login (Previews stay protected). Checked from a phone not signed in to Vercel.
+- [ ] **Public QR gate (conference-week configuration; do not change before):** Deployment Protection changed so the **Production** domain opens without a Vercel account — delegates must reach `/submit/*` (resolution QR) and `/amend/*` (amendment QR) from their own phones. Previews stay protected. This does not open staff access: staff workspaces still require a MUNOS staff access code and an active grant (enforced by the app and database RLS), and the public delegate routes never open a staff session or workspace. **Verify from a normal phone that is not signed in to Vercel** (mobile data): the conference URL shows the staff access-code screen, and one resolution QR and one amendment QR open their forms — before declaring the release.
 - [ ] Conference domain added to Production (optional).
 
 Release — technical lead, recorded in [RELEASES.md](RELEASES.md):

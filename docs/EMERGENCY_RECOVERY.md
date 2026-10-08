@@ -16,10 +16,10 @@ Keep chairing. Changes save on each laptop (YELLOW) and sync when Wi-Fi returns.
 Conference OS keeps working: roll call, speakers, timer, participation, votes, resolution workflow. Only opening or copying documents waits. Check [Google Workspace status](https://www.google.com/appsstatus/dashboard/).
 
 **A Chair laptop died**
-Take a spare laptop → if it asks, enter **that committee's Chair code** (Executive has it) → choose the committee → check *Current session*, roll call and speaker queue → continue. Changes the dead laptop had **not synced** stay on it. If it comes back: **before** reconnecting it, open `/admin/health` on it, *Export device recovery file*, and give it to the technical contact.
+Take a spare laptop → if it asks, enter **that committee's Chair code** (Executive has it) → choose the committee → check *Current session*, roll call and speaker queue → continue. Changes the dead laptop had **not synced** stay on it. If it comes back: **before** reconnecting it, open its workspace → sidebar *System health*, *Export device recovery file*, and give it to the technical contact.
 
 **A device shows RED "needs review"**
-Nothing is lost, but that device holds back its later changes. On a device with Executive access: System health → *Export device recovery file* → check the current value → *Keep conference value · dismiss exported action* → re-enter if still needed. **Chair/Approval/Admins laptops cannot open System health yet (known gap):** move the person to a spare laptop and call the technical contact (TROUBLESHOOTING.md → *Needs review on a non-Executive device*).
+Nothing is lost, but that device holds back its later changes. On **that** device: sidebar → *System health* (Chair `/chair/health`, Approval `/approval/health`, Admins `/logistics/health`, Executive `/admin/health`) → *Export device recovery file* → check the current value → *Keep conference value · dismiss exported action* → the waiting changes sync → re-enter the dismissed change only if still needed.
 
 **An access code leaked / a laptop was stolen**
 Executive → Access codes → that scope → *Revoke* (tick *Also revoke devices using this code* if a device may be in the wrong hands) → *Rotate* → give the new code privately → re-prepare that scope's real devices (export their unsynced work first).

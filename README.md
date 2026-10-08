@@ -38,7 +38,7 @@ The example defaults to an isolated local demo. For the development database, se
 | `/admin` | Conference overview |
 | `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,workflow,resources,audit}` | Configuration (`/admin/sessions` = central session schedule) |
 | `/admin/{access-codes,submissions,amendment-links}` | Staff access codes, resolution QR links, amendment QR links |
-| `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
+| `/{chair,approval,logistics,admin}/health` | GREEN/YELLOW/RED system health, version, recovery — in every staff workspace |
 | `/submit/{token}`, `/amend/{token}` | Public delegate QR forms (no sign-in) |
 | `/admin/schedule` | Import the conference schedule as sessions |
 | `/admin/photos` | School group-photo slots, CSV import, chair acknowledgements |

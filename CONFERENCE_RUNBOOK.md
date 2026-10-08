@@ -77,7 +77,7 @@ Owner: Executive (with the technical contact). Start one week before; finish by 
 
 ### Access codes — Executive
 
-Executive → **Access codes** ("Staff access codes"). One code per scope:
+Executive → **Access codes** ("Staff access codes"). (On a brand-new conference project, the technical lead first gives the first Executive a one-time bootstrap code: [docs/FIRST_EXECUTIVE_BOOTSTRAP.md](docs/FIRST_EXECUTIVE_BOOTSTRAP.md).) One code per scope:
 
 - [ ] **Chair · <committee>** — one for each committee.
 - [ ] **Approval Panel** — one for the panel.
@@ -109,7 +109,7 @@ For each: set **New code expires** to the end of the conference (Qatar time) →
 - [ ] Every device: date and time set **automatically** (photo reminders use the device clock).
 - [ ] Every device uses a **normal** browser window (not private/incognito) and a browser profile nobody else uses. Note on each laptop: *"Conference device — do not clear browser data."*
 - [ ] **Do not clear browser storage** on any prepared device from now until the end of the conference.
-- [ ] **Recovery practised:** on one prepared Executive laptop, Executive → System health → **Export device recovery file** works and downloads a file. Delete the test file. (After the System-health fix: also on one Chair laptop.)
+- [ ] **Recovery practised:** on one prepared Chair laptop and the Executive laptop, sidebar → **System health** → **Export device recovery file** downloads a file. Delete the test files.
 - [ ] **Paper fallback per committee** (in a labelled envelope): delegate list, blank attendance sheet, blank speakers list, both QR sheets, and this runbook's *During the conference* page.
 - [ ] Wi-Fi tested in every committee room (System health GREEN). Note weak rooms.
 
@@ -124,9 +124,9 @@ Do this the day before, on the school Wi-Fi, one device at a time (preparing man
    - *"That code is invalid or expired"* → check it with the Executive (codes are 24 characters; dashes don't matter).
    - *"Too many attempts. Please wait 10 minutes…"* → wait; don't keep trying.
 3. **Confirm the role.** The strip at the top shows your role (*Chair*, *Approval Panel*, *Admins* or *Executive*). Chairs: the top-bar **Select committee** list shows your committee (`CODE · Room`). Wrong role or committee → tell the Executive now.
-4. **Confirm the device is prepared.** Status strip gone (GREEN). Chairs: open Debate, Roll call, Documents and Amendments once. Executive devices: open **System health** once — it shows GREEN.
+4. **Confirm the device is prepared.** Status strip gone (GREEN). Chairs: open Debate, Roll call, Documents and Amendments once. Everyone: open **System health** from the sidebar once — it shows GREEN.
 5. **Test offline once** (Chairs): turn Wi-Fi off → refresh the page → the Chair Console still opens and the strip says *"Internet unavailable"* → mark one delegate present → turn Wi-Fi on → within a minute the strip disappears (GREEN). Undo the test mark.
-6. **Test recovery export once** (Executive devices now; every device once the System-health fix ships): System health → **Export device recovery file** → a file downloads. Give it to the Executive to delete.
+6. **Test recovery export once:** sidebar → **System health** → **Export device recovery file** → a file downloads. Give it to the Executive to delete.
 7. Close the lid. **Do not sign out.** The device stays prepared.
 
 **Spare laptops:** prepare them like Chair laptops with the Chair code of a committee, then leave them closed. On the day, a spare can join any committee by entering that committee's Chair code.
@@ -170,7 +170,7 @@ If a delegate sees *"This amendment link is not valid"*, the Executive replaced 
 | --- | --- |
 | **Wi-Fi drops (one room or everywhere)** | Keep chairing. Attendance, speakers, timer, participation, votes and amendment decisions save on the laptop (YELLOW *"Internet unavailable — N changes saved on this device"*) and sync when Wi-Fi returns. Don't close the laptop or switch devices. Delegates keep writing in Google Docs; phones on mobile data can still use both QR forms. After 15 minutes the strip turns RED as a reminder — still safe, keep it open, tell the Executive. |
 | **"Live updates temporarily unavailable"** (Realtime) | Nothing to do. Everything still saves. Other screens refresh at least once a minute and whenever you click back into the window. |
-| **RED "N changes need review"** (a conflict — technically a *PT409*) | Another device changed the same thing first, the session was archived, or access changed. **Nothing is lost**, but that laptop now holds back its later changes. Call the Executive, who handles it as in *Handling "needs review"* below. Until the known gap is fixed, a Chair laptop in this state is replaced by a spare. |
+| **RED "N changes need review"** (a conflict — technically a *PT409*) | Another device changed the same thing first, the session was archived, or access changed. **Nothing is lost**, but that laptop now holds back its later changes. Tell the Executive and clear it on that laptop straight away (*Handling "needs review"* below). |
 | **A Chair laptop dies or is lost** | Follow *Moving to a replacement device* below. |
 | **Two Chairs see different things** | Each clicks into the window once (refresh happens on focus). Still different after a minute → call the Executive. |
 | **Wrong current session selected** | Chair → top bar → **Current session** → pick the right one. Records already made stay in the session they were made in; tell the Executive so they can note it. |
@@ -179,27 +179,37 @@ If a delegate sees *"This amendment link is not valid"*, the Executive replaced 
 | **Resolution QR / amendment QR doesn't work** | Use the printed link under the QR, or Chair → Documents → *Open submission page* / Chair → Amendments → *Open amendment form*. *"not valid"* means the Executive replaced it — print the new sheet. |
 | **Photo reminder didn't appear** | Check the laptop clock is automatic. Chair → Group photos lists the slots. |
 
-### Handling "needs review" (Executive)
+### Handling "needs review"
 
-> **Known gap — must be fixed before the conference (tracked in RELEASE_CHECKLIST.md).** System health currently opens only on devices that hold an **Executive** code. On a Chair, Approval Panel or Admins laptop, `/admin/health` sends you back to that workspace, so the steps below cannot be done on those laptops yet. While a change waits for review, **that laptop also holds back every later change it records.** Until the fix ships: move the Chair to a spare laptop (*Moving to a replacement device*), keep the stuck laptop open, and call the technical contact, who uses the interim procedure in TROUBLESHOOTING.md (*Needs review on a non-Executive device*).
+A change that needs review **holds back every later change recorded on that device** until it is cleared, so clear it promptly. Do it **on the device that shows it** (don't move it). Anyone on that device can do it with the Executive watching:
 
-On a device where System health opens (don't move it):
-
-1. Executive → **System health**. Each item reads *"Review saved … change"*.
+1. Open **System health** from the sidebar of your workspace (Chair: *System health* in the Chair Console). Each item reads *"Review saved … change"*.
 2. **Export device recovery file** first (the dismiss button stays disabled until you do).
 3. Read the item's message and check the current value in the app (for example the delegate's attendance).
 4. **Keep conference value · dismiss exported action** → confirm.
-5. If the change is still needed, enter it again normally.
-6. Give the recovery file to the technical contact; delete it once the day is reconciled (it contains delegate details).
+5. Check the strip: the later changes that were waiting now sync (GREEN, 0 unsynced).
+6. If the dismissed change is still needed, enter it again normally.
+7. Give the recovery file to the Executive; delete it once the day is reconciled (it contains delegate details).
 
-There is no "force my version" button — by design.
+There is no "force my version" button — by design. **Never clear browser storage while changes are waiting** — that destroys them.
+
+### System health on every device
+
+| Workspace | System health address | In the app |
+| --- | --- | --- |
+| Chair | `/chair/health` | Chair Console sidebar → *System health* |
+| Approval Panel | `/approval/health` | sidebar → *System health* |
+| Admins | `/logistics/health` | sidebar → *System health* |
+| Executive | `/admin/health` | Executive sidebar → *System health* |
+
+Each shows **that device's** state: unsynced changes, items needing review, **Export device recovery file**. A Chair cannot open the Executive address (it returns to the Chair Console) — use the Chair one. **While offline, open System health from the sidebar link; don't type the address or refresh that page** (the offline copy of the Chair Console works, but the health page itself only opens from inside the app when offline).
 
 ### Moving to a replacement device
 
 1. Take a **spare laptop**. If it shows the code screen, enter the **Chair code for this committee** (from the Executive).
 2. Select the committee and check **Current session**, roll call and the speaker queue. Only changes the old laptop had **already synced** are there.
 3. Strip GREEN, 0 unsynced → continue chairing.
-4. **The old laptop:** if it can be revived, give it to the Executive **before connecting it to Wi-Fi**. The technical contact exports its saved work first (System health → **Export device recovery file** once the System-health fix ships; until then the interim procedure in TROUBLESHOOTING.md), then decides whether to let it sync (avoids recording things twice). If its access was revoked, the code screen offers **Export saved changes** then **Sign out after recovery export** — export first.
+4. **The old laptop:** if it can be revived, give it to the Executive **before connecting it to Wi-Fi**. On it, open the workspace and then **System health** from the sidebar → **Export device recovery file**. The technical contact then decides whether to let it sync (avoids recording things twice). If its access was revoked, the code screen offers **Export saved changes** then **Sign out after recovery export** — export first.
 5. If the old laptop is gone for good, its unsynced changes are lost: re-enter anything important and note it in the incident log. If it was **lost or stolen**, see *Incidents*.
 
 ---
@@ -232,5 +242,5 @@ Write every incident down: time, room, what happened, what was done.
 | **Wrong committee archived** | Stop. The committee disappeared from Chair laptops and its **Chair codes and devices were cancelled**. Don't create a replacement committee. Call the technical contact: restoring needs a database fix (there is no unarchive button). Meanwhile that committee runs on paper. After the fix, the Executive issues a new Chair code and the Chairs enter it. |
 | **Lost or stolen laptop** | Executive → Access codes → that laptop's scope → **Revoke** with **Also revoke devices using this code** → **Rotate** to create a new code → prepare the replacement and the other devices of that scope again. Its unsynced work is lost; re-enter from notes. |
 | **QR link leaked or abused** (spam submissions) | Executive → Resolution links or Amendment links → **Replace** (the old QR stops immediately) → print and post the new sheet. Chairs **Rule out** spam amendments. Built-in limits also stop floods (20 per link per 10 minutes; 5 amendments per delegation per 10 minutes). |
-| **Offline device with unsent work** (can't reconnect, or its access expired) | Keep it powered and do not sign out. If its access expired, the code screen shows **Export saved changes** — export. Otherwise: Executive devices → System health → **Export device recovery file**; other devices → technical contact (TROUBLESHOOTING.md interim procedure). The technical contact decides how the work is entered. Only then **Sign out after recovery export**. |
+| **Offline device with unsent work** (can't reconnect, or its access expired) | Keep it powered and do not sign out. Sidebar → **System health** → **Export device recovery file** (or, if its access expired, the code screen's **Export saved changes**). The technical contact decides how the work is entered. Only then **Sign out after recovery export**. |
 | **Paper fallback** (Conference OS unusable for a long time) | Each committee uses its envelope: attendance sheet, speakers list. One person per committee enters the paper record afterwards, once. Don't start a spreadsheet. |

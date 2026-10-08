@@ -4,7 +4,7 @@ Organizer runbook: [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md). One-page e
 
 ## Reading System health
 
-`/admin/health` on any device shows **that device's** view. *Technical details*:
+System health shows **that device's** view, in every staff workspace: Chair `/chair/health`, Approval `/approval/health`, Admins `/logistics/health`, Executive `/admin/health` (each in its own sidebar). Role routing is unchanged: a Chair opening `/admin/health` is sent back to `/chair`. *Technical details*:
 
 | Field | Meaning |
 | --- | --- |
@@ -26,31 +26,19 @@ Staff devices get access with **staff access codes** (Executive → Access codes
 - Prepared devices keep working offline until the earlier of 48 hours after their last access check or grant expiry; then they show "Conference access" and can still export pending work.
 - Archiving a committee revokes its Chair codes **and** Chair grants in the same transaction; new Chair codes for an archived committee are refused. There is no unarchive in the app.
 - Redemption is rate limited ("Too many attempts. Please wait 10 minutes…"). Anonymous sign-ins are also limited per IP by Supabase Auth: prepare devices the day before, a few at a time.
-- **First Executive on a new project:** the app cannot issue the first code (issuing requires an Executive grant). Follow the procedure recorded in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) section 0 (open item, Codex-owned). Only as a last resort, an authorized administrator can insert a short-lived grant with SQL for a device's user id; never add blanket or anonymous policies to work around access problems.
+- **First Executive on a new project:** the app cannot issue the first code (issuing requires an Executive grant). Use the one-time bootstrap: [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md) (`scripts/bootstrap-first-executive.sql`). Never insert `user_access` rows by hand and never add blanket or anonymous policies to work around access problems.
 
 ## Unsynced changes and conflicts
 
 - Changes are saved in the browser (IndexedDB) **before** they appear on screen and are sent in order with a stable id; a retry after a lost response is applied exactly once by the server.
 - A **conflict** (another device changed the same item, or access changed) stops later changes from that device until reviewed. On that device: *Export device recovery file* first, check the current value in Conference OS, then *Keep conference value · dismiss exported action* and re-enter the intended change if still needed.
 - Unsynced changes **never leave the device** by themselves. A replacement laptop only sees server-confirmed work.
-- Recovering a dead laptop: keep it **offline**, open `/admin/health`, export the recovery file, then decide whether to let it sync (duplicates are possible if the same changes were re-entered elsewhere). The file is JSON: `pending[]` lists each unsynced command.
+- Recovering a dead laptop: keep it **offline**, open its workspace and then System health from the sidebar, export the recovery file, then decide whether to let it sync (duplicates are possible if the same changes were re-entered elsewhere). The file is JSON: `pending[]` lists each unsynced command.
 - A device that has not been online for 48 hours (or whose grant expired) stops opening the cached conference offline.
 
 ## Conflicts (`PT409`) and other "needs review" codes
 
-The client marks a saved action "needs review" when the server answers `PT409` (stale revision, archived session/committee, the item changed elsewhere), `40001`, `42501` (access changed) or a `22xxx`/`23xxx` validation error. The action stays in the device outbox and blocks later actions until the Executive exports and dismisses it in System health. There is no server-side retry of a rejected action; re-entering it creates a new action. Sign-out is refused while such actions exist unless access is gone and a recovery export has been downloaded.
-
-### Needs review on a non-Executive device (interim, until the routing fix)
-
-`/admin/health` is routed as an Executive page: a device without an `admin` grant is redirected to its own workspace, and neither the status strip nor the access gate offers export/dismiss while access is active. A conflicted item blocks every later outbox item on that device. Interim procedure, no data loss:
-
-1. Move the person to a spare device (enter their code there). Keep the stuck device **open and powered**.
-2. The stuck device's *Device user* id is shown only in System health, so identify its grant instead: Supabase SQL editor (authorized administrator) → `select id, user_id, role, committee_id, created_at from public.user_access where conference_id='<conf>' and role='chair' and committee_id='<committee>' and revoked_at is null order by created_at;` — match by time the device was prepared (or ask Codex for help).
-3. Revoke **only that grant**: `update public.user_access set revoked_at=now() where id='<grant-id>';`
-4. On the stuck device: refresh → the code screen shows **Export saved changes** → download → **Sign out after recovery export**. The pending actions stay in the file (and on the device under the old identity); they are never sent by the next identity.
-5. Enter the Chair code again on that device if it should return to service. Re-enter any still-needed actions from the export by hand.
-
-Do not use *Revoke* with device revocation on the whole access code for this: that revokes every device prepared with the code.
+The client marks a saved action "needs review" when the server answers `PT409` (stale revision, archived session/committee, the item changed elsewhere), `40001`, `42501` (access changed) or a `22xxx`/`23xxx` validation error. The action stays in the device outbox and blocks later actions until someone exports and dismisses it in **that device's** System health (any staff role, see above); the later actions then sync. There is no server-side retry of a rejected action; re-entering it creates a new action. Sign-out is refused while such actions exist unless access is gone and a recovery export has been downloaded.
 
 ## Supabase
 
@@ -96,7 +84,7 @@ Derived on each device from slot times and the **device clock** every 15 seconds
 
 ## Offline shell
 
-The production service worker caches Chair Console pages (`/chair…`, `/admin/health`) after one online visit; Supabase responses are never cached by it. Data comes from the device's IndexedDB. Prepare each device online once; after a deployment, a refresh picks up the new version (the version-mismatch notice in System health tells you when).
+The production service worker caches Chair Console pages (`/chair…`, `/admin/health`) after one online visit; Supabase responses are never cached by it. Data comes from the device's IndexedDB. Prepare each device online once; after a deployment, a refresh picks up the new version (the version-mismatch notice in System health tells you when). Note: `/chair/health` is not in the offline shell list (`public/sw.js`), so offline it opens only through in-app navigation (sidebar link), not by a full reload; `/approval` and `/logistics` have no offline shell.
 
 ## After the conference
 

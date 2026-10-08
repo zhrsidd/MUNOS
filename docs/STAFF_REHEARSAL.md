@@ -21,7 +21,7 @@ Optional observer: technical contact (recommended for the first run).
 ## Prepared beforehand (technical contact, 15 minutes, the day before)
 
 - [ ] The current `main` Preview URL and a Vercel **share link** for it (Preview deployments are behind Vercel Authentication). Write it on the whiteboard.
-- [ ] Executive device prepared with an Executive code (development conference) — see RELEASE_CHECKLIST.md section 0 for how the first Executive is granted.
+- [ ] Executive device prepared with an Executive code for the development conference (an existing Executive issues one in Access codes; a brand-new conference uses [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md)).
 - [ ] Committee **X** chosen (has delegates; no resolution In Debate). Note its code.
 - [ ] Executive has created codes in **Access codes** for: Chair · X, Approval Panel, Admins (expiry: tomorrow). Codes written on separate slips, one per person.
 - [ ] Resolution link and amendment link exist for X (Executive → Resolution links / Amendment links). Sheets printed or open on a screen.
@@ -58,24 +58,30 @@ Runbook: *Staff device setup*, steps 1–4.
 - [ ] **Admins** → **Print queue** → **✓ Mark printed**.
 - [ ] **Chair A** → **Documents** → the resolution → **Open debate →**.
 
-### 5. Amendment QR and a passed amendment — 6 min
+### 5. Amendment QR and a passed amendment — 5 min
 
 - [ ] **Phone:** scan the amendment QR for X → delegation → **Add** → clause "1" → exact wording → tick the confirmation → **Submit amendment** → *"Amendment received"*.
 - [ ] **Chair A** → **Amendments** → **Accept for debate** → **Start amendment debate** → **Passed**.
 - [ ] Chair A reads the reminder *"Apply the passed amendment to the working Google Doc."* and types the amendment into the Google Doc by hand.
 - [ ] Phone: submit a second amendment → Chair B → **Rule out**.
 
-### 6. Offline Chair action, reconnect, and a "needs review" (PT409) — 6 min
+### 6. Offline Chair action, reconnect, and a "needs review" (PT409) — 7 min
 
-- [ ] **Chair A:** turn Wi-Fi off. The strip says *"Internet unavailable"*. Mark delegate **D** → **Absent** and add one speaker to the queue. The strip shows *"2 changes saved on this device…"*. Refresh the page: the Chair Console still opens with those changes.
+Chair A does every step on their own laptop; the Executive watches.
+
+- [ ] **Chair A:** turn Wi-Fi off. The strip says *"Internet unavailable"*. Mark delegate **D** → **Absent**, **then** add one speaker to the queue (order matters). The strip shows *"2 changes saved on this device…"*. Refresh the page: the Chair Console still opens with those changes.
 - [ ] **Chair B** (online): mark the **same** delegate **D** → **Present**.
-- [ ] **Chair A:** Wi-Fi on. The speaker syncs; the attendance change for D turns **RED "1 change needs review"** — because Chair B changed D first. Point out: *nothing is lost*.
-- [ ] **Executive, on Chair A's laptop:** **System health** → **Export device recovery file** → check D's attendance in Roll call → **Keep conference value · dismiss exported action** → confirm. Strip back to GREEN. Decide with the Chairs whether D is present and enter it once.
-  - *Until the System-health routing fix lands, a Chair-only laptop cannot open System health (it returns to the Chair Console). If so, record that as the expected finding, move Chair A to the spare (step 8 order is fine), and have the technical contact demonstrate the interim procedure in TROUBLESHOOTING.md.*
+- [ ] **Chair A:** Wi-Fi on. The attendance change for D turns **RED "1 change needs review"** (Chair B changed D first) and the **speaker added after it waits** — Chair B does not see it yet. Point out: *nothing is lost, and the laptop is holding back its later work*.
+- [ ] **Chair A:** Chair Console sidebar → **System health** (`/chair/health`) → item *"Review saved attendance change"*.
+- [ ] **Chair A:** **Export device recovery file** (the dismiss button is disabled until this is done) → a file downloads.
+- [ ] **Chair A:** Roll call → look at D's current value (Present, from Chair B).
+- [ ] **Chair A:** back in System health → **Keep conference value · dismiss exported action** → confirm.
+- [ ] **Chair A:** within a minute the strip is GREEN, 0 unsynced, and **the waiting speaker appears on Chair B's queue** — the later work resumed. Decide with Chair B whether D is present and enter it once.
+- [ ] Executive: remind everyone — **never clear browser storage while work is pending**.
 
-### 7. Recovery export — 2 min
+### 7. Recovery export — 2 min (every staff device)
 
-- [ ] Executive device: **System health** → **Export device recovery file** → a file downloads. (Other roles: only after the routing fix; until then their export path is the code screen after revocation, practised in step 9.) Executive deletes the files afterwards (they contain delegate details).
+- [ ] Approval, Admins, Chair B and the Executive: sidebar → **System health** (`/approval/health`, `/logistics/health`, `/chair/health`, `/admin/health`) → **Export device recovery file** → a file downloads. The Executive collects and deletes all rehearsal files (they contain delegate details).
 
 ### 8. Access-code rotation and replacement device — 5 min
 
