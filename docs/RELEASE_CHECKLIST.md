@@ -25,7 +25,7 @@ Supabase plan and compute — technical lead:
 - [ ] Billing owner confirmed; spend cap/alerts understood; region **ap-south-1 (Mumbai)**, same as Vercel functions `bom1`.
 
 Rehearsal on the upgraded instance — Claude runs, Executive observes ([STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)):
-- [ ] Fresh synthetic fixture; realistic **multi-committee** run with **50 simulated staff** (role-scoped identities, ideally one Chair identity per real committee) plus the delegate QR burst.
+- [ ] Fresh synthetic fixture; realistic **multi-committee** run with **50 simulated staff** plus the delegate QR burst. **Required:** one distinct Chair rehearsal identity/grant scope per simulated real committee (`npm run rehearsal:identities -- --chairs 14`, then `scripts/rehearsal-fixture.mts`); the harness report must say `READINESS RUN`. The earlier single-committee fixture (one Chair identity, committees simulated as sessions inside one committee) overstated shared-row contention and is retained only for historical comparison; it can never satisfy this gate.
 - [ ] Offline / reconnect / recovery rehearsal (exact steps in STAGING_REHEARSAL.md), including one `PT409` "needs review" and one recovery export.
 - [ ] Supabase *Logs* and *Observability* and Vercel *Logs* reviewed for the whole run window.
 

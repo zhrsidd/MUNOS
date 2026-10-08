@@ -17,7 +17,8 @@
     "verify:deployment": "tsx scripts/verify-deployment.mts",
     "drive:plan": "tsx scripts/drive-plan.mts",
     "rehearsal:plan": "tsx scripts/rehearsal-plan.mts",
-    "rehearsal:run": "tsx scripts/rehearsal-run.mts"
+    "rehearsal:run": "tsx scripts/rehearsal-run.mts",
+    "rehearsal:identities": "tsx scripts/rehearsal-identities.mts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

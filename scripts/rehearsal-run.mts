@@ -1,4 +1,7 @@
 // Realistic staging rehearsal. Opt-in, guarded, conservative by default (10 staff, 0 delegates, 5 minutes).
+// READINESS requires --identities from a multi-committee fixture (scripts/rehearsal-fixture.mts with a Chair pool from
+// scripts/rehearsal-identities.mts): one Chair identity/grant per real committee. Legacy single-committee and
+// all-roles runs still report metrics but are labelled NOT A READINESS RUN and can never PASS.
 //   npm run rehearsal:run -- --app https://<preview>.vercel.app [--staff 25 | --stages 25,50,100] [--minutes 5]
 //        [--identities .test-sessions/rehearsal-identities.json] [--fixture .test-sessions/load-fixtures.json]
 //        [--realtime topic-aware|current] [--executive-chair-window 2000] [--drain-seconds 120]
@@ -19,7 +22,8 @@ import { TOPIC_OF, buildScenario, recipients, type Action, type RealtimeModel, t
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./rehearsal/client-model";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
-import { loadIdentities, type Identity, type StaffRoleKey } from "./rehearsal/identities";
+import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type StaffRoleKey } from "./rehearsal/identities";
+import { assessReadiness, assignChair, readinessVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -51,15 +55,19 @@ const context = await import("./remote-context.mts").catch((e: Error) => {
   process.exit(2);
 });
 const { clientFor, session, ref } = context;
-// Role-scoped identities (--identities <file>): pre-authorized sessions, one per role, each holding ONLY that role's grant,
-// so every simulated device reads the RLS payload a real device of that role would receive. Without it, every device
-// shares the all-roles test identity: a labelled WORST-CASE (admin-sized snapshot for everyone), not a readiness baseline.
+// Role-scoped identities (--identities <file>): pre-authorized sessions, each holding ONLY its role's grant, so every
+// simulated device reads the RLS payload a real device of that role would receive.
+//  * realistic-multi-committee: one Chair identity per real committee (readiness).
+//  * legacy-single-committee: one Chair identity, committees simulated as floors in one committee (historical only).
+//  * no --identities: every device shares the all-roles test identity (WORST CASE, historical only).
 // No Auth session is created during the run; sessions near expiry are refreshed once before the run starts.
 const identitiesFile = value("--identities");
 const loaded = identitiesFile ? await loadIdentities(identitiesFile, context.env).catch((e: Error) => { console.error(e.message); process.exit(2); }) : null;
 const scoped = loaded?.scoped ?? null;
+const mode: RunMode = loaded ? loaded.mode : "worst-case-superuser";
 const identities: Partial<Record<StaffRoleKey, Identity>> = loaded?.identities ?? {};
-const identityOf = (role: SimUser["role"]): Identity => scoped && role !== "delegate" ? identities[role]! : { userId: session.user.id, token: session.access_token };
+const chairIdentities: ChairIdentity[] = loaded?.chairs ?? [];
+const superuser: Identity = { userId: session.user.id, token: session.access_token };
 const { SupabaseTransport } = await import("../lib/supabase/repository");
 // Production (lib/repository-instance.ts) passes the device's granted roles to the transport; core uses them for Realtime
 // topic filtering and to route an Admin-only identity to executive_state_snapshot. Older core ignores the extra
@@ -73,6 +81,17 @@ type Command = import("../lib/commands").Command;
 const fixture = JSON.parse(await readFile(fixtureFile, "utf8").catch(() => { console.error(`Missing ${fixtureFile}: run scripts/rehearsal-fixture.mts (or prepare-load.mts) and apply its SQL to the development project.`); process.exit(2); })) as { conference: string; committees: { id: string; session: string; code: string }[]; delegates: { id: string; committee: string }[] };
 // Delegates submit to the committee the rehearsal link belongs to; their country choices come from the fixture file
 // (what the public page would list), never from a staff read.
+// Chair scoping, resolved BEFORE any traffic. Readiness mode fails fast when the mapping is incomplete.
+let mapping: number[] | undefined;
+if (scoped && isMultiCommittee(scoped)) {
+  try { mapping = resolveChairMapping(scoped, fixture.committees, chairIdentities.map((c) => c.userId)); }
+  catch (e) { console.error(`Refused (readiness mode): ${(e as Error).message}`); process.exit(2); }
+} else console.warn(`WARNING: ${mode} identities — this run reports metrics only and is NOT A READINESS RUN. Use a multi-committee fixture (docs/STAGING_REHEARSAL.md) for the capacity gate.`);
+const legacy = scoped && !isMultiCommittee(scoped) ? { committee: scoped.chair.committee, sessions: scoped.chair.sessions } : undefined;
+const simulatedCommittees = legacy ? legacy.sessions.length : fixture.committees.length;
+const chairAssignments = new Map<SimUser, ChairAssignment>();
+const chairOf = (user: SimUser) => { let a = chairAssignments.get(user); if (!a) { a = assignChair(user, { mode, committees: fixture.committees, chairs: chairIdentities, mapping, legacy, superuser }); chairAssignments.set(user, a); } return a; };
+const identityOf = (user: SimUser): Identity => user.role === "chair" ? chairOf(user).identity : scoped && user.role !== "delegate" ? identities[user.role]! : superuser;
 const submitCommittee = fixture.committees.find((c) => c.code === (value("--submit-committee") ?? fixture.committees[0]?.code));
 const submitters = fixture.delegates.filter((d) => d.committee === submitCommittee?.id);
 if (delegateCount && submitToken && !submitters.length) { console.error("No fixture delegations for --submit-committee."); process.exit(2); }
@@ -118,7 +137,7 @@ const clock: Clock = { now: () => Date.now(), setTimeout: (fn, ms) => setTimeout
 let devices = new Map<SimUser, Device>();
 let stageSnapshotRpcs: Record<string, number> = {}; // snapshot RPCs actually sent this stage, by function name
 function makeDevice(user: SimUser, everyone: SimUser[]): Device {
-  const id = identityOf(user.role);
+  const id = identityOf(user);
   // Role-scoped identities hold exactly one grant, so the device's roles are known; the all-roles worst case passes none.
   const roles = scoped && user.role !== "delegate" ? grantedRoles[user.role] : [];
   // Count the snapshot RPCs this device really sends: one per refresh on bundled core, two only if the fallback runs.
@@ -142,9 +161,10 @@ function makeDevice(user: SimUser, everyone: SimUser[]): Device {
 }
 async function simulate(user: SimUser, t0: number) {
   if (user.role === "delegate") return simulateDelegate(user, t0);
-  // Scoped mode: every simulated committee k is an independent floor (its own session) inside the Chair identity's committee.
-  const committee = scoped ? { id: scoped.chair.committee, session: scoped.chair.sessions[user.committee % scoped.chair.sessions.length], code: `floor-${user.committee}` } : fixture.committees[user.committee % fixture.committees.length];
-  const actorId = identityOf(user.role).userId;
+  // Chairs: committee k's real committee row, session and Chair identity (realistic mode); legacy floor/worst-case
+  // modes keep their historical scoping. Support roles only use the committee index for Realtime attribution.
+  const committee = user.role === "chair" ? chairOf(user).committee : legacy ? { id: legacy.committee, session: legacy.sessions[user.committee % legacy.sessions.length], code: `floor-${user.committee}` } : fixture.committees[user.committee % fixture.committees.length];
+  const actorId = identityOf(user).userId;
   const device = devices.get(user)!;
   let cursor = 0;
   const role = user.role === "approval" ? "approval" : user.role === "admins" ? "logistics" : user.role === "executive" ? "admin" : "chair";
@@ -172,7 +192,8 @@ async function simulate(user: SimUser, t0: number) {
       case "read": if (!step.periodic) device.client.focus(); break;
       case "refocus": device.client.focus(); break;
       case "health": await timed("health", async () => { const r = await appFetch(`${base}/api/health`); if (r.status >= 500) throw Error(`HTTP ${r.status}`); }); break;
-      case "currentSession": if (scoped && user.committee > 0) break; send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
+      // Legacy floors share ONE committee row, so only floor 0 may set its current session there.
+      case "currentSession": if (legacy && user.committee > 0) break; send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
       case "attendance": { const delegate = mine()[cursor % Math.max(1, mine().length)]; if (delegate) send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
       case "queueAdd": {
         const lane = (["open", "for", "against"] as const)[cursor % 3];
@@ -207,13 +228,19 @@ async function simulate(user: SimUser, t0: number) {
   }
 }
 const stageReports = [];
+const readinessByStage: ReturnType<typeof assessReadiness>[] = [];
 for (const users of stages) {
-  const scenario = buildScenario({ staff: users, delegates: delegateCount, minutes, committees: scoped ? scoped.chair.sessions.length : fixture.committees.length, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction: submitToken ? Number(value("--submit-fraction") ?? 0.3) : 0 });
+  const scenario = buildScenario({ staff: users, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction: submitToken ? Number(value("--submit-fraction") ?? 0.3) : 0 });
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref}, realtime model ${realtimeModel})…`);
   const staffUsers = scenario.filter((u) => u.role !== "delegate");
   stageSnapshotRpcs = {};
   devices = new Map(staffUsers.map((user) => [user, makeDevice(user, staffUsers)]));
+  // Real committee distribution of this stage's Chair devices (committee row + Chair Auth identity actually used).
+  const chairTraffic: ChairTraffic[] = staffUsers.filter((u) => u.role === "chair").map((u) => { const a = chairOf(u); return { committeeId: a.committee.id, committeeCode: a.committee.code, identity: a.identity.userId }; });
+  const readiness = assessReadiness({ mode, committees: fixture.committees.slice(0, simulatedCommittees), chairTraffic });
+  readinessByStage.push(readiness);
+  console.log(`  ${readiness.label}: ${readiness.actualCommitteesWithChairTraffic} actual committees, ${readiness.distinctChairIdentities} distinct Chair identities, ${readiness.chairDevices} Chair devices${readiness.reasons.length ? ` — ${readiness.reasons.join("; ")}` : ""}`);
   const t0 = Date.now() + 1000;
   await Promise.all(scenario.map((u) => simulate(u, t0)));
   // Drain: people stop, devices keep their normal sync behaviour until outboxes are empty (bounded).
@@ -226,7 +253,7 @@ for (const users of stages) {
     return [r, { devices: [...devices.values()].filter((d) => d.user.role === r).length, refreshesExecuted: s.refreshesExecuted, triggersAttempted: s.triggersAttempted, triggersDropped: s.triggersDropped, bySource: s.reads, realtimeEvents: s.realtimeEvents, chairWindows: s.chairWindows, chairEventsCoalesced: s.chairEventsCoalesced }];
   }));
   const all = sumStats([...devices.values()].map((d) => d.client.stats));
-  stageReports.push({ staff: users, delegates: delegateCount, drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose,
+  stageReports.push({ staff: users, delegates: delegateCount, readiness, drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose,
     snapshotRpcsByName: stageSnapshotRpcs,
     clientModel: { realtimeModel, executiveChairWindowMs, triggersAttempted: all.triggersAttempted, triggersDropped: all.triggersDropped, refreshesExecuted: all.refreshesExecuted, attemptedBySource: all.attempted, droppedBySource: all.dropped, refreshesBySource: all.reads, byRole, conflictsDismissed: all.conflicts, sendFailures: all.sendFailures, failedRefreshes: all.failedReads, maxConcurrentRefreshesPerDevice: all.maxConcurrentReads },
     ...report(samples.slice(before)) });
@@ -234,7 +261,7 @@ for (const users of stages) {
 // Exactly-once check: every acknowledged scoring mutation produced exactly one participation event.
 // Executive (admin) sees every participation event through the full conference snapshot. No roles are passed, so core
 // reads conference_state_snapshot (conference_snapshot before PR #11), never executive_snapshot, which omits events.
-const finalIdentity = identityOf("executive");
+const finalIdentity = scoped ? identities.executive! : superuser;
 const final = await new SupabaseTransport(clientFor(finalIdentity.token), fixture.conference, finalIdentity.userId).read();
 let duplicates = 0, lost = 0;
 for (const id of acknowledged) {
@@ -242,8 +269,16 @@ for (const id of acknowledged) {
   if (n > 1) duplicates++; if (n === 0) lost++;
 }
 const overall = report(samples);
-const verdict = evaluate(overall, duplicates, lost);
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, distinctAuthIdentities: scoped ? 4 : 1, identityMode: scoped ? "role-scoped" : "worst-case-superuser", note: scoped ? "Each simulated device reads with a pre-authorized identity holding only its role's grant (Chair scoped to one committee; simulated committees are independent floors/sessions inside it). No Auth sessions were created during the run. Delegates use only the public form." : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Not a readiness baseline.", minutes, stages: stageReports, realtimeModel, clientModel: "production DurableRepository (one flush in flight; see scripts/rehearsal/client-model.ts)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
+// Readiness needs EVERY stage to be a realistic multi-committee run; the worst stage decides the label.
+const readiness = readinessByStage.find((r) => !r.qualifiesForReadiness) ?? readinessByStage[readinessByStage.length - 1];
+const verdict = readinessVerdict(evaluate(overall, duplicates, lost), readiness);
+const distinctAuthIdentities = scoped ? new Set([...chairIdentities.filter((_, i) => !mapping || mapping.includes(i)).map((c) => c.userId), ...(["approval", "admins", "executive"] as const).map((r) => identities[r]!.userId)]).size : 1;
+const note = mode === "realistic-multi-committee"
+  ? "Realistic multi-committee run: each simulated committee is a real committee row with its own session and its own Chair identity/grant; Chair devices of committee k use only committee k's identity, row and session. Approval, Admins and Executive use one role-scoped identity each. No Auth sessions were created during the run. Delegates use only the public form."
+  : mode === "legacy-single-committee"
+    ? "LEGACY single-committee floors: one Chair identity scoped to ONE committee; simulated committees are extra sessions inside it, so every Chair write serializes on one committees row (overstates contention). Historical comparison only — NOT A READINESS RUN."
+    : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Historical comparison only — NOT A READINESS RUN.";
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: verdict.label, readiness, distinctAuthIdentities, note, minutes, stages: stageReports, realtimeModel, clientModel: "production DurableRepository (one flush in flight; see scripts/rehearsal/client-model.ts)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });

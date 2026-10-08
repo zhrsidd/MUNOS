@@ -1,7 +1,7 @@
 // Measures the RLS payload each staff role actually receives: bytes and sequential (unloaded) latency of the ONE bundled
 // snapshot RPC the app sends per refresh (conference_state_snapshot; executive_state_snapshot for an Admin-only identity).
 //   npx tsx scripts/rehearsal-snapshots.mts --identities .test-sessions/rehearsal-identities.json [--reads 20] [--worst-case]
-//        [--fixture .test-sessions/load-fixtures.json] [--components]
+//        [--fixture .test-sessions/load-fixtures.json] [--components] [--all-chairs]
 //   --components also measures the bundle's parts (conference_snapshot/executive_snapshot, operations_snapshot,
 //   staff_batch_snapshot) for comparison only; the app reads them separately only on its missing-function fallback.
 // Read-only. Locked to the development project by remote-context.mts. Uses pre-authorized sessions; creates no Auth sessions.
@@ -11,12 +11,16 @@ import { loadIdentities } from "./rehearsal/identities";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const { env, session, ref } = await import("./remote-context.mts");
-const fixture = JSON.parse(await readFile(value("--fixture") ?? ".test-sessions/load-fixtures.json", "utf8")) as { conference: string };
+const fixture = JSON.parse(await readFile(value("--fixture") ?? ".test-sessions/load-fixtures.json", "utf8")) as { conference: string; committees?: { id: string; code: string }[] };
 const file = value("--identities");
 if (!file) { console.error("Pass --identities <file> (see docs/STAGING_REHEARSAL.md)."); process.exit(2); }
-const { identities } = await loadIdentities(file, env);
+const { identities, chairs, mode } = await loadIdentities(file, env);
 const reads = Number(value("--reads") ?? 20);
-const who: [string, string][] = (["chair", "approval", "admins", "executive"] as const).map((role) => [role, identities[role].token]);
+// Each Chair identity is scoped to ONE committee, so its payload is that committee's. --all-chairs probes every
+// committee's Chair (realistic multi-committee fixtures); the default probes the first.
+const chairCode = (committee: string) => fixture.committees?.find((c) => c.id === committee)?.code ?? committee.slice(0, 8);
+const probedChairs = args.includes("--all-chairs") ? chairs : chairs.slice(0, 1);
+const who: [string, string][] = [...probedChairs.map((c): [string, string] => [`chair (${chairCode(c.committee)})`, c.token]), ...(["approval", "admins", "executive"] as const).map((role): [string, string] => [role, identities[role].token])];
 if (args.includes("--worst-case")) who.push(["worst-case (all roles, one identity)", session.access_token]);
 const results: Record<string, unknown> = {};
 for (const [role, token] of who) {
@@ -42,4 +46,4 @@ for (const [role, token] of who) {
   }
   results[role] = row;
 }
-console.log(JSON.stringify({ date: new Date().toISOString(), supabaseProject: ref, conference: fixture.conference, sequentialReadsPerRpc: reads, results }, null, 2));
+console.log(JSON.stringify({ date: new Date().toISOString(), supabaseProject: ref, conference: fixture.conference, identityMode: mode, chairIdentities: chairs.length, sequentialReadsPerRpc: reads, results }, null, 2));

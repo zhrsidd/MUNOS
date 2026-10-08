@@ -159,9 +159,9 @@ test('estimate: deterministic, one refresh in flight per device, and topic-aware
 });
 // ---- Fresh fixture ----------------------------------------------------------------------------------------------
 import {buildFixture,derivedUuid} from '../scripts/rehearsal/fixture';
-test('fresh fixture: deterministic ids, 14 floors in the scoped Chair committee, single-role grants, no Auth users',()=>{
+test('LEGACY fresh fixture (historical comparison only, never readiness): 14 floors in ONE scoped Chair committee, single-role grants, no Auth users',()=>{
  const users={chair:'00000000-0000-4000-8000-0000000000c1',approval:'00000000-0000-4000-8000-0000000000a1',admins:'00000000-0000-4000-8000-0000000000l1',executive:'00000000-0000-4000-8000-0000000000e1'};
- const o={conference:'11111111-1111-4111-8111-111111111111',committees:14,delegates:420,floors:14,grantHours:3,users};
+ const o={mode:'legacy-floors' as const,conference:'11111111-1111-4111-8111-111111111111',committees:14,delegates:420,floors:14,grantHours:3,users};
  const a=buildFixture(o),b=buildFixture(o);
  assert.deepEqual(a,b,'same conference id → identical committees, sessions and floors');
  assert.equal(a.committees.length,14);assert.equal(a.floors.length,14);assert.equal(new Set(a.floors).size,14);
