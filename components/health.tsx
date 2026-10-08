@@ -84,7 +84,7 @@ export function SystemHealth() {
   }
   return (
     <section className="health-screen">
-      <div className="eyebrow">EXECUTIVE · SYSTEM HEALTH</div>
+      <div className="eyebrow">STAFF · SYSTEM HEALTH</div>
       <h1>System health</h1>
       <p className="muted">Is Conference OS working on this device right now? Keep a device open until its changes are synced.</p>
       <div className={`status-banner ${status.level}`} role="status" aria-live="polite">
