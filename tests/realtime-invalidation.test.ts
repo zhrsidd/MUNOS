@@ -32,11 +32,29 @@ class MockChannel {
     if (payload.new[field as 'conference_id' | 'committee_id'] === expected) this.onChange?.(payload);
   }
 }
-function harness(roles: readonly Role[], committeeIds: string[] = [], connectImmediately = false) {
+function harness(roles: readonly Role[], committeeIds: string[] = [], connectImmediately = false, deferAuth = false) {
   const channels: MockChannel[] = [];
   const removed: MockChannel[] = [];
   let reads = 0;
+  let authCalls = 0;
+  const authArgs: number[] = [];
+  let releaseAuth = () => {};
+  const deferredAuth = deferAuth ? new Promise<void>(resolve => { releaseAuth = resolve; }) : null;
+  // Most invalidation tests are about filtering/debouncing, not Promise scheduling. This
+  // immediate thenable keeps those tests synchronous; the dedicated auth-race test below
+  // uses a real deferred Promise to verify that channels cannot join before auth settles.
+  const immediateAuth = {
+    catch() { return this; },
+    then(onFulfilled: () => void) { onFulfilled(); return Promise.resolve(); },
+  };
   const client = {
+    realtime: {
+      setAuth(...args: unknown[]) {
+        authCalls++;
+        authArgs.push(args.length);
+        return deferredAuth ?? immediateAuth;
+      },
+    },
     channel() { const channel = new MockChannel(connectImmediately); channels.push(channel); return channel; },
     async removeChannel(channel: MockChannel) { removed.push(channel); },
     async rpc(name: string) {
@@ -48,6 +66,9 @@ function harness(roles: readonly Role[], committeeIds: string[] = [], connectImm
   return {
     transport: new SupabaseTransport(client, 'conference-test', 'staff-test', committeeIds, false, roles),
     channels, removed, reads: () => reads,
+    authCalls: () => authCalls,
+    authArgs: () => authArgs,
+    releaseAuth,
     emit(topic: string | undefined, committeeId: string | null = 'ga1') {
       channels.forEach(channel => channel.deliver({ new: { conference_id: 'conference-test', committee_id: committeeId, topic } }));
     },
@@ -73,6 +94,27 @@ test('Realtime SUBSCRIBED reports connection without scheduling a second invalid
     assert.equal(refreshes, 0, 'reconnect also reconciles through the state callback only');
   } finally { stop(); }
   assert.equal(h.removed.length, 2);
+});
+
+test('Realtime auth settles before the first channel joins, without handling raw tokens in the transport', async () => {
+  const settle = async () => { for (let i = 0; i < 4; i++) await Promise.resolve(); };
+  const h = harness(['chair'], ['ga1'], false, true);
+  const stop = h.transport.subscribe(() => {}, () => {});
+  assert.equal(h.authCalls(), 1);
+  assert.deepEqual(h.authArgs(), [0], 'setAuth is called without a token so Supabase keeps its auth callback as source of truth');
+  assert.equal(h.channels.length, 0, 'no channel joins while Realtime auth is unresolved');
+  h.releaseAuth();
+  await settle();
+  assert.equal(h.channels.length, 1, 'channel joins only after auth preparation settles');
+  stop();
+  assert.equal(h.removed.length, 1);
+
+  const cancelled = harness(['chair'], ['ga1'], false, true);
+  const cancel = cancelled.transport.subscribe(() => {}, () => {});
+  cancel();
+  cancelled.releaseAuth();
+  await settle();
+  assert.equal(cancelled.channels.length, 0, 'disposing during auth preparation cannot create a late subscription');
 });
 
 for (const roles of [['approval'], ['logistics'], ['approval', 'logistics']] as Role[][]) {

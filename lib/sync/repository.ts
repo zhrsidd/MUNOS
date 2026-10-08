@@ -1,3 +1,5 @@
+import {batchFingerprint} from '../batch/commands';
+import {isBatchCommand} from '../batch/types';
 import {operationsFingerprint} from "../operations/fingerprint";
 import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
@@ -16,6 +18,7 @@ export interface Health {
   message: string; detail: string; actorId?: string; lastSynced?: string;
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
+  if(isBatchCommand(c))return batchFingerprint(data,c);
   switch (c.type) {
     case "staffContact": return String(data.staff.find(s=>s.id===c.id)?.contactRevision ?? 1);
     case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);
@@ -63,7 +66,7 @@ export class DurableRepository implements ConferenceRepository {
     const conflicts = checkpoint.pending.filter(m=>m.state==="conflict").length;
     this.health = { ...this.health, pending: checkpoint.pending.length, conflicts,
       state: conflicts ? "conflict" : checkpoint.pending.length ? "waiting" : "saved",
-      message: conflicts ? `${conflicts} change(s) need review in System health. Your changes are retained.` : checkpoint.pending.length ? "Saved on this device — waiting for connection" : this.transport ? "Synced" : "Saved on this device · local demo" };
+      message: conflicts ? `${conflicts} ${conflicts === 1 ? "change needs" : "changes need"} review in System health. Your changes are retained.` : checkpoint.pending.length ? "Saved on this device — waiting for connection" : this.transport ? "Synced" : "Saved on this device · local demo" };
     this.emit();
   }
   initialize = () => { void this.ready().catch(e=>{ this.health={...this.health,state:"error",message:"Device storage is unavailable. Changes cannot be saved.",detail:String(e)}; this.emit(); }); };

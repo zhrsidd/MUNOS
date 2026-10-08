@@ -1,3 +1,5 @@
+import {applyBatch,materializeCommitteeSessions} from './batch/commands';
+import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
 import {
@@ -11,6 +13,7 @@ import { applyOperationsCommand, isOperationsCommand, operationsRoles, type Oper
 // CODEX REVIEW REQUIRED: extension commands (OperationsCommand) join the union and are
 // delegated to lib/operations; core command handling is unchanged.
 export type Command =
+  | BatchCommand
   | OperationsCommand
   | ProcedureCommand
   | {
@@ -169,6 +172,7 @@ const allowed: Record<Command["type"], Role[]> = {
   staff: ["admin"],
   staffContact: ["admin"],
   ...operationsRoles,
+  committeeUpdate:["admin"],committeeLifecycle:["admin"],sessionSlot:["admin"],amendmentLink:["admin"],amendmentStatus:["chair"],
   currentSession:["chair"], debateMode:["chair"], queueAdd:["chair"], queueOrder:["chair"], queueRemove:["chair"], speechStart:["chair"], speechYield:["chair"], speechScore:["chair"], speechFinish:["chair"], poiAllowance:["chair"], poiAdd:["chair"], poiOrder:["chair"], poiRecognize:["chair"], voteMode:["chair"], vetoRules:["admin"],
 };
 export function applyCommand(
@@ -475,7 +479,9 @@ export function applyCommand(
         code: c.code.trim(),
         name: c.name,
         room: c.room,
+        revision: 1, archived: false,
       });
+      materializeCommitteeSessions(d,d.committees[d.committees.length-1].id,nextId);
       break;
     case "delegate": {
       const delegate = d.delegates.find((x) => x.id === c.id);
@@ -564,7 +570,8 @@ export function applyCommand(
       });
       break;
     default:
-      if (isProcedureCommand(c)) applyProcedure(d,c,nextId,now,metadata?.actorId ?? "chair-demo");
+      if (isBatchCommand(c)) applyBatch(d,c,nextId,now);
+      else if (isProcedureCommand(c)) applyProcedure(d,c,nextId,now,metadata?.actorId ?? "chair-demo");
       else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
   }
   if (!["queue","queueAdd","queueOrder","queueRemove","poiAdd","poiOrder","poiAllowance","debateMode"].includes(c.type)) d.audit.unshift({
@@ -578,7 +585,7 @@ export function applyCommand(
           : `${c.type} updated`,
     entityId:
       "id" in c
-        ? c.id
+        ? (c.id ?? d.conference.id)
         : "delegateId" in c
           ? (c.delegateId ?? d.conference.id)
           : d.conference.id,

@@ -6,12 +6,16 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import {usePathname,useRouter} from "next/navigation";
+import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
+import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
 import { DurableStore } from "./sync/store";
 const preferences = new DurableStore();
 import { ConferenceData, Role } from "./domain";
 import { Command, repository } from "./repository";
 const Context = createContext<{
   data: ConferenceData;
+  access: StaffAccess;
   act: (c: Command, role: Role) => Promise<boolean>;
   notice: string;
   committeeId: string;
@@ -30,6 +34,11 @@ export function ConferenceProvider({
     () => null,
   );
   const health = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
+  const access=useSyncExternalStore(repository.subscribe,repository.getAccess,repository.getAccess);
+  const pathname=usePathname(),router=useRouter();
+  const requestedRole=staffRoleForPath(pathname);
+  const wrongRole=access.status==="active"&&requestedRole&&!access.roles.includes(requestedRole);
+  useEffect(()=>{if(wrongRole&&access.roles.length)router.replace(staffRolePath(access.roles[0]));},[wrongRole,access.roles,router]);
   const [notice, setNotice] = useState("");
   const [committeeId, setCommitteeId] = useState("ga1");
   const [selectedSessionId, setSelectedSessionId] = useState("");
@@ -62,12 +71,15 @@ export function ConferenceProvider({
       return false;
     }
   }
+  if(access.status!=="demo"&&access.status!=="active")return <StaffAccessGate access={access}/>;
+  if(wrongRole)return <div className="loading">Opening your authorized workspace…</div>;
   if (!data)
     return <div className="loading">{health.message}</div>;
   return (
     <Context.Provider
       value={{
         data,
+        access,
         act,
         notice,
         committeeId,
@@ -76,6 +88,7 @@ export function ConferenceProvider({
         setSelectedSessionId: id=>{setSelectedSessionId(id);void preferences.savePreferences(`context:${data.conference.id}`,{sessionId:id});},
       }}
     >
+      <StaffAccessStatus access={access}/>
       {children}
       <div className="toast" role="status" key={notice}>
         {notice}

@@ -14,14 +14,29 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Ensure PostgreSQL test client
+        run: command -v psql || (sudo apt-get update && sudo apt-get install --yes postgresql-client)
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+        env:
+          TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
       - run: npm run build
