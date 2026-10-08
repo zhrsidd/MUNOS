@@ -21,6 +21,7 @@ const STALE_MINUTES = 15;
 const SLOW_MS = 3000;
 const rank: Record<Level, number> = { green: 0, yellow: 1, red: 2 };
 const changes = (n: number) => `${n} change${n === 1 ? "" : "s"}`;
+const reviewChanges = (n: number) => `${changes(n)} ${n === 1 ? "needs" : "need"} review`;
 export function systemStatus(i: StatusInput): SystemStatus {
   const { health } = i;
   const items: StatusItem[] = [];
@@ -45,7 +46,7 @@ export function systemStatus(i: StatusInput): SystemStatus {
     add("storage", "Document storage", storage === "ok" ? "green" : "yellow", storage === "ok" ? "Available" : "Temporarily unavailable");
 
   if (health.state === "error") add("device", "This device", "red", "Recording is paused on this device. Check Technical details or renew device access.");
-  else if (health.conflicts) add("device", "This device", "red", `${changes(health.conflicts)} need review`);
+  else if (health.conflicts) add("device", "This device", "red", reviewChanges(health.conflicts));
   else if (health.pending && staleMinutes >= STALE_MINUTES) add("device", "This device", "red", `${changes(health.pending)} not synced for ${Math.floor(staleMinutes)} minutes`);
   else if (health.pending) add("device", "This device", "yellow", `${changes(health.pending)} saved here · will sync automatically`);
   else add("device", "This device", "green", "All changes synced");
@@ -63,7 +64,7 @@ function summarize(i: StatusInput, items: StatusItem[], level: Level, demo: bool
   if (level === "green") return { headline: "All systems operational", message: "Changes are syncing and live updates are connected." };
   if (has("device", "red") && health.state === "error") return { headline: "This device cannot save changes", message: "Do not record anything on this device. Use another prepared device and tell the Executive." };
   if (has("database", "red")) return { headline: "Not connected to the conference", message: "Changes on this device are not shared with anyone. Tell the Executive; access needs to be set up for this device." };
-  if (has("device", "red") && health.conflicts) return { headline: `${changes(health.conflicts)} need review`, message: "Keep this device open and ask the Executive to review them in System health. Nothing has been lost." };
+  if (has("device", "red") && health.conflicts) return { headline: reviewChanges(health.conflicts), message: "Keep this device open and ask the Executive to review them in System health. Nothing has been lost." };
   if (has("device", "red")) return { headline: "Changes are waiting too long", message: `${changes(health.pending)} saved on this device have not synced for over 15 minutes. Keep this device open and tell the Executive.` };
   if (!i.online) return { headline: "Internet unavailable", message: health.pending ? `${changes(health.pending)} saved on this device and will sync automatically.` : "Committee operations can continue. Changes will be saved on this device and sync automatically." };
   if (demo) return { headline: "Demo mode", message: "This is an isolated demonstration. Nothing is sent to a conference database." };

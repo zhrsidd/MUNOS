@@ -33,6 +33,14 @@ test('red: conflicts, device storage failure, stale outbox, cloud expected but l
  assert.equal(stale.level,'red');assert.match(stale.message,/over 15 minutes/);
  const fallback=run({},{mode:'local',realtime:false});assert.equal(fallback.level,'red');assert.equal(fallback.headline,'Not connected to the conference');
 });
+test('conflict review grammar is correct for singular and plural counts',()=>{
+ const one=run({},{state:'conflict',pending:1,conflicts:1});
+ assert.equal(one.headline,'1 change needs review');
+ assert.match(one.items.find(i=>i.key==='device')?.text ?? '',/^1 change needs review$/);
+ const two=run({},{state:'conflict',pending:2,conflicts:2});
+ assert.equal(two.headline,'2 changes need review');
+ assert.match(two.items.find(i=>i.key==='device')?.text ?? '',/^2 changes need review$/);
+});
 test('local demo is yellow and never red when no cloud is expected',()=>{
  const s=run({cloudExpected:false,server:report('not_configured')},{mode:'local',realtime:false});assert.equal(s.level,'yellow');assert.equal(s.headline,'Demo mode');
 });
