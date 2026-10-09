@@ -21,27 +21,21 @@ export function useClock(intervalMs = 15_000) {
 }
 const when = (r: PhotoReminder) => `${zonedTime(r.slot.startsAt)}${r.slot.endsAt ? `–${zonedTime(r.slot.endsAt)}` : ""}`;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-function DelegateList({ reminder, sessionId }: { reminder: PhotoReminder; sessionId: string }) {
-  const { data } = useConference();
+function DelegateList({ reminder, absent }: { reminder: PhotoReminder; absent: ReadonlySet<string> }) {
   return (
     <ul className="photo-delegates">
-      {reminder.delegates.map((d) => {
-        const absent = data.attendance.some((a) => a.delegateId === d.id && a.sessionId === sessionId && a.status === "Absent");
-        return (
-          <li key={d.id}>
-            {d.flag} <b>{d.country}</b> — {d.name}
-            {absent && <span className="muted"> (marked absent this session)</span>}
-          </li>
-        );
-      })}
+      {reminder.delegates.map((d) => (
+        <li key={d.id}>
+          {d.flag} <b>{d.country}</b> — {d.name}
+          {absent.has(d.id) && <span className="muted"> (marked absent this session)</span>}
+        </li>
+      ))}
     </ul>
   );
 }
-function ReminderCard({ reminder, committeeId, sessionId }: { reminder: PhotoReminder; committeeId: string; sessionId: string }) {
-  const { act } = useConference();
-  const [open, setOpen] = useState(reminder.stage === "due");
+/** Pure presentation of one reminder: school, location, affected delegates and the acknowledgement action. */
+export function PhotoAlert({ reminder, absent, open, onToggle, onAcknowledge }: { reminder: PhotoReminder; absent: ReadonlySet<string>; open: boolean; onToggle: () => void; onAcknowledge: (stage: "warning" | "due") => void }) {
   const { slot, school, delegates, stage } = reminder;
-  const acknowledge = (s: "warning" | "due") => act({ type: "photoAck", committeeId, slotId: slot.id, stage: s, revision: slot.revision }, "chair");
   if (stage === "cancelled")
     return (
       <div className="photo-card cancelled" role="status">
@@ -52,7 +46,7 @@ function ReminderCard({ reminder, committeeId, sessionId }: { reminder: PhotoRem
             {when(reminder)} · {slot.location}. Delegates do not need to leave.
           </p>
         </div>
-        <button onClick={() => void acknowledge("warning")}>Dismiss</button>
+        <button onClick={() => onAcknowledge("warning")}>Dismiss</button>
       </div>
     );
   const due = stage === "due";
@@ -72,27 +66,34 @@ function ReminderCard({ reminder, committeeId, sessionId }: { reminder: PhotoRem
         ) : (
           <p>{plural(delegates.length, "delegate")} from this committee should attend.</p>
         )}
-        {open && <DelegateList reminder={reminder} sessionId={sessionId} />}
+        {open && <DelegateList reminder={reminder} absent={absent} />}
       </div>
       <div className="photo-actions">
-        {!due && <button onClick={() => setOpen(!open)}>{open ? "Hide delegates" : "View delegates"}</button>}
-        <button className="primary" onClick={() => void acknowledge(due ? "due" : "warning")}>
+        {!due && <button onClick={onToggle}>{open ? "Hide delegates" : "View delegates"}</button>}
+        <button className="primary" onClick={() => onAcknowledge(due ? "due" : "warning")}>
           {due ? "Delegates sent" : "Acknowledge"}
         </button>
       </div>
     </div>
   );
 }
-/** Shown on every Chair Console screen. Derived from slot times on this device; works offline and after refresh. */
-export function PhotoReminderBanner({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
+function ReminderCard({ reminder, committeeId, sessionId, prominent }: { reminder: PhotoReminder; committeeId: string; sessionId: string; prominent: boolean }) {
+  const { data, act } = useConference();
+  const [open, setOpen] = useState(prominent || reminder.stage === "due");
+  const absent = new Set(data.attendance.filter((a) => a.sessionId === sessionId && a.status === "Absent").map((a) => a.delegateId));
+  const acknowledge = (s: "warning" | "due") => void act({ type: "photoAck", committeeId, slotId: reminder.slot.id, stage: s, revision: reminder.slot.revision }, "chair");
+  return <PhotoAlert reminder={reminder} absent={absent} open={open} onToggle={() => setOpen(!open)} onAcknowledge={acknowledge} />;
+}
+/** Shown on every Chair Console screen, prominently on Debate. Derived from slot times on this device; works offline and after refresh. */
+export function PhotoReminderBanner({ committeeId, sessionId, prominent = false }: { committeeId: string; sessionId: string; prominent?: boolean }) {
   const { data } = useConference();
   const now = useClock();
   const active = committeePhotoReminders(data, committeeId, now).filter((r) => r.attention);
   if (!active.length) return null;
   return (
-    <div className="photo-banner">
+    <div className={`photo-banner${prominent ? " prominent" : ""}`} aria-label="Group photo alert">
       {active.map((r) => (
-        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.stage}`} reminder={r} committeeId={committeeId} sessionId={sessionId} />
+        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.stage}`} reminder={r} committeeId={committeeId} sessionId={sessionId} prominent={prominent} />
       ))}
     </div>
   );

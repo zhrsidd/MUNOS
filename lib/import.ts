@@ -1,3 +1,4 @@
+import { countryFlag } from "./countries";
 export function parseCSV(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [],
@@ -43,6 +44,7 @@ export function validateImport(
       errors.push("Valid email required");
     if (seen.has(email.toLowerCase())) errors.push("Duplicate email");
     seen.add(email.toLowerCase());
-    return { line: i + 2, name, country, email, errors };
+    // The flag is derived from the country text; staff never type an emoji.
+    return { line: i + 2, name, country, flag: countryFlag(country), email, errors };
   });
 }

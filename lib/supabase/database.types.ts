@@ -1152,6 +1152,7 @@ export type Database = {
           delegateId: string
           id: string
           position: number
+          recognizedAt: string | null
           speechId: string
         }
         Insert: {
@@ -1160,6 +1161,7 @@ export type Database = {
           delegateId: string
           id: string
           position: number
+          recognizedAt?: string | null
           speechId: string
         }
         Update: {
@@ -1168,6 +1170,7 @@ export type Database = {
           delegateId?: string
           id?: string
           position?: number
+          recognizedAt?: string | null
           speechId?: string
         }
         Relationships: [
@@ -1449,6 +1452,7 @@ export type Database = {
       }
       speeches: {
         Row: {
+          amendmentId: string | null
           classification: string
           committee_id: string
           conference_id: string
@@ -1464,6 +1468,7 @@ export type Database = {
           yieldedFrom: string | null
         }
         Insert: {
+          amendmentId?: string | null
           classification: string
           committee_id: string
           conference_id: string
@@ -1479,6 +1484,7 @@ export type Database = {
           yieldedFrom?: string | null
         }
         Update: {
+          amendmentId?: string | null
           classification?: string
           committee_id?: string
           conference_id?: string

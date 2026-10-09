@@ -26,7 +26,7 @@ export function fingerprint(data: ConferenceData, c: Command): string | null {
     case "queueOrder": return data.queue.filter(q=>q.sessionId===c.sessionId&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
     case "poiOrder": return (data.poiQueue??[]).filter(q=>q.speechId===c.speechId).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
     case "speechStart": return data.speeches?.find(s=>s.sessionId===c.sessionId&&s.state!=="finished")?.id??"empty";
-    case "speechYield": case "speechFinish": case "poiAllowance": case "poiRecognize": return String(data.speeches?.find(s=>s.id===c.speechId)?.revision??0);
+    case "speechYield": case "speechFinish": case "poiAllowance": case "poiRecognize": case "poiScore": case "poiRemove": return String(data.speeches?.find(s=>s.id===c.speechId)?.revision??0);
     case "voteMode": return String(data.documents.find(r=>r.id===c.resolutionId)?.revision??0);
     case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
     case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
