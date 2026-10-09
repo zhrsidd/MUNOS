@@ -71,6 +71,7 @@ test('before hydration the public form cannot submit natively, expose wording in
   assert.match(html, /<fieldset disabled=""/, 'fields cannot be edited and then lost before hydration');
   assert.match(html, /<button class="primary" type="submit" disabled="">Loading form…<\/button>/, 'submit (and Enter-key implicit submission) is blocked');
   assert.equal((html.match(/type="submit"/g) ?? []).length, 1, 'no other enabled submitter');
+  assert.match(html, /<p class="muted" role="status">If this form does not load, ask your Chair for a printed amendment sheet\.<\/p>/, 'stalled hydration (JS on, never loads) still tells the delegate what to do');
   assert.match(html, /<noscript>.*This form needs JavaScript to submit\. Ask your Chair for the printed amendment sheet\..*<\/noscript>/, 'never a silent dead form');
 });
 test('after hydration the public form is enabled and submits as before', t => {
@@ -79,6 +80,7 @@ test('after hydration the public form is enabled and submits as before', t => {
   assert.doesNotMatch(html, /<fieldset disabled/);
   assert.match(html, /<button class="primary" type="submit">Submit amendment<\/button>/);
   assert.doesNotMatch(html, /Loading form…/);
+  assert.doesNotMatch(html, /If this form does not load/, 'the loading fallback disappears once hydrated');
 });
 test('HTTP boundary bounds chunked bodies, rejects malformed JSON and reports missing configuration', async () => {
   const previous = process.env.NEXT_PUBLIC_DATA_BACKEND; process.env.NEXT_PUBLIC_DATA_BACKEND = 'local';
