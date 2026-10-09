@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createElement } from 'react';
+import React, { createElement } from 'react';
 import { AmendmentForm } from '../components/amendments/form';
 import { amendmentBackend } from '../lib/amendments/backend';
 import { AmendmentRejected, handleAmendment, type AmendmentBackend, type AmendmentSubmitArgs } from '../lib/amendments/service';
@@ -61,6 +61,24 @@ test('public form shows only supplied committee/delegate fields, exact confirmat
   const closed = renderToStaticMarkup(createElement(AmendmentForm, { token, link: { ...link, resolution: null } }));
   assert.ok(closed.includes('Amendments are not currently open in this committee.')); assert.ok(!closed.includes('<form'));
   assert.equal(isPublicPath('/amend/abc'), true); assert.equal(isPublicPath('/amend/abc/sheet'), true); assert.equal(isPublicPath('/submit/abc'), true); assert.equal(isPublicPath('/chair/amendments'), false);
+});
+test('before hydration the public form cannot submit natively, expose wording in the URL or lose input', () => {
+  // Server HTML is exactly what a slow device shows until React attaches submit().
+  const html = renderToStaticMarkup(createElement(AmendmentForm, { token, link }));
+  const form = html.match(/<form[^>]*>/)![0];
+  assert.match(form, /method="post"/, 'a native submission can never be a GET carrying the wording in the URL');
+  assert.doesNotMatch(form, /action=/, 'no native action target');
+  assert.match(html, /<fieldset disabled=""/, 'fields cannot be edited and then lost before hydration');
+  assert.match(html, /<button class="primary" type="submit" disabled="">Loading form…<\/button>/, 'submit (and Enter-key implicit submission) is blocked');
+  assert.equal((html.match(/type="submit"/g) ?? []).length, 1, 'no other enabled submitter');
+  assert.match(html, /<noscript>.*This form needs JavaScript to submit\. Ask your Chair for the printed amendment sheet\..*<\/noscript>/, 'never a silent dead form');
+});
+test('after hydration the public form is enabled and submits as before', t => {
+  t.mock.method(React, 'useSyncExternalStore', ((_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot()) as typeof React.useSyncExternalStore);
+  const html = renderToStaticMarkup(createElement(AmendmentForm, { token, link }));
+  assert.doesNotMatch(html, /<fieldset disabled/);
+  assert.match(html, /<button class="primary" type="submit">Submit amendment<\/button>/);
+  assert.doesNotMatch(html, /Loading form…/);
 });
 test('HTTP boundary bounds chunked bodies, rejects malformed JSON and reports missing configuration', async () => {
   const previous = process.env.NEXT_PUBLIC_DATA_BACKEND; process.env.NEXT_PUBLIC_DATA_BACKEND = 'local';
