@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {handleSubmission,SubmissionRejected,derivedIds,type SubmissionBackend,type SubmitArgs} from '../lib/submissions/service';
 import {kindFromBytes,type LinkInfo} from '../lib/submissions/rules';
 import {demoSubmissionBackend} from '../lib/submissions/demo-backend';
+import React,{createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {SubmissionForm} from '../components/operations/submission-form';
 const token='T'.repeat(22), submitter='11111111-1111-4111-8111-111111111111';
 const docId='1aBcD_efGhIjKlMnOpQrStUvWxYz0123456789-xyz';
 const docLink=`https://docs.google.com/document/d/${docId}/edit?usp=sharing`;
@@ -114,4 +117,26 @@ test('local demo backend resolves seed committees only, does not invent Chair ma
  const args={token:'demo_ga1_0123456789abcdef0123',submitterId:'d0',title:'T',googleDocId:docId};
  assert.equal((await demo.submit({...args,submissionId:crypto.randomUUID()})).status,'created');
  assert.equal((await demo.submit({...args,submissionId:crypto.randomUUID()})).status,'duplicate');
+});
+const formLink:LinkInfo={linkId:'l',conferenceId:'conf',committeeId:'ga1',conferenceName:'DCMUN',committeeCode:'GA1',committeeName:'General Assembly',shareWith:'',chairs:[{name:'Chair One',email:'chair@dcmun.example'}],submitters:[{id:submitter,country:'France',flag:'🇫🇷'}]};
+test('before hydration the resolution form cannot submit natively, accept unsynced input or fail silently',()=>{
+ // Server HTML is exactly what a slow device shows until React attaches submit() and the onChange handlers.
+ const html=renderToStaticMarkup(createElement(SubmissionForm,{token,link:formLink}));
+ const form=html.match(/<form[^>]*>/)![0];
+ assert.match(form,/method="post"/,'a native submission is never a GET reload');
+ assert.doesNotMatch(form,/action=/,'no native action target');
+ assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, title, link, checkbox and file cannot be edited before React state exists');
+ assert.match(html,/<button class="button primary submit-button" disabled="">Loading form…<\/button>/,'submit (and Enter-key implicit submission) is blocked');
+ assert.match(html,/<button type="button" class="link-button" disabled="">/,'the file/Google Doc toggle is not a silent no-op');
+ assert.match(html,/<p class="muted" role="status">If this form does not load, ask your Chair how to submit your resolution\.<\/p>/,'stalled hydration (JS on, never loads) still tells the delegate what to do');
+ assert.match(html,/<noscript>.*This form needs JavaScript to submit\. Ask your Chair how to submit your resolution\..*<\/noscript>/,'JavaScript disabled is never a silent dead form');
+});
+test('after hydration the resolution form is enabled and unchanged',t=>{
+ t.mock.method(React,'useSyncExternalStore',((_subscribe:unknown,getSnapshot:()=>unknown)=>getSnapshot()) as typeof React.useSyncExternalStore);
+ const html=renderToStaticMarkup(createElement(SubmissionForm,{token,link:formLink}));
+ assert.doesNotMatch(html,/<fieldset disabled/);
+ assert.match(html,/<button class="button primary submit-button">Submit resolution<\/button>/);
+ assert.match(html,/<button type="button" class="link-button">Can&#x27;t use Google Docs\? Upload a file instead<\/button>/);
+ assert.doesNotMatch(html,/Loading form…|If this form does not load/);
+ for(const s of ['France','Chair One','chair@dcmun.example','Google Doc link'])assert.ok(html.includes(s),s);
 });
