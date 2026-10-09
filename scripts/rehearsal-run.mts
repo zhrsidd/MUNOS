@@ -2,11 +2,17 @@
 // READINESS requires --identities from a multi-committee fixture (scripts/rehearsal-fixture.mts with a Chair pool from
 // scripts/rehearsal-identities.mts): one Chair identity/grant per real committee. Legacy single-committee and
 // all-roles runs still report metrics but are labelled NOT A READINESS RUN and can never PASS.
-//   npm run rehearsal:run -- --app https://<preview>.vercel.app [--staff 25 | --stages 25,50,100] [--minutes 5]
-//        [--identities .test-sessions/rehearsal-identities.json] [--fixture .test-sessions/load-fixtures.json]
-//        [--realtime topic-aware|current] [--executive-chair-window 2000] [--drain-seconds 120]
-//        [--start-window 150] [--delegates 150 --delegate-window 120 --submit-token <token>
-//         --submit-committee <code> --submit-fraction 0.3]
+// Mandatory conference-week capacity gate (docs/STAGING_REHEARSAL.md → C2): 50 staff across the real committees plus
+// the delegate public-form burst on ONE resolution link:
+//   npm run rehearsal:run -- --app https://<preview>.vercel.app --identities <fixture>/identities.json
+//        --fixture <fixture>/fixture.json --staff 50 --delegates 150 --delegate-window 120
+//        --submit-token <token> --submit-committee GA1 --submit-fraction 0.10 --minutes 8
+// Other options: [--stages 25,50 | --staff N] [--minutes 5] [--realtime topic-aware|current]
+//        [--executive-chair-window 2000] [--drain-seconds 120] [--start-window 150]
+// Delegates create NO Supabase Auth session: they load /submit/<token> and POST /api/submissions with fixture
+// delegate ids. Planned submissions on the one link must stay <= 18 (designed limit 20 / 10 min); the run refuses
+// otherwise, before any request. Rate-limit behaviour is a separate test, never part of the capacity run.
+// A 100-staff stage is an OPTIONAL stress/headroom test, not a release requirement.
 // Every simulated staff device runs the production client's sync loop (scripts/rehearsal/client-model.ts mirrors
 // DurableRepository: one flush in flight, triggers dropped while busy, send+read per item then a final read, 60 s
 // recovery timer). Realtime is simulated: after each committed write, devices that would receive the
@@ -14,16 +20,16 @@
 // STAFF stages simulate Chairs/Approval/Admins/Executive with a staff session. DELEGATES are separate:
 // they only load the public QR page and POST submissions — no Supabase client, no session, no dashboard.
 // Requires: .env.local pointing at the DEVELOPMENT Supabase project (enforced by remote-context.mts),
-// .test-sessions/development.json (npm script prepare-session) and .test-sessions/load-fixtures.json
-// (scripts/prepare-load.mts, applied to the development project). Never targets production; no override exists.
+// .test-sessions/development.json (npm script prepare-session), and a fixture + identities from
+// scripts/rehearsal-fixture.mts applied to the development project. Never targets production; no override exists.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { checkAppUrl, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
 import { TOPIC_OF, buildScenario, recipients, type Action, type RealtimeModel, type SimUser, type Topic } from "./rehearsal/scenario";
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./rehearsal/client-model";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
-import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type StaffRoleKey } from "./rehearsal/identities";
-import { assessReadiness, assignChair, readinessVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
+import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type IdentityFile, type StaffRoleKey } from "./rehearsal/identities";
+import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -33,9 +39,6 @@ const base = app!.replace(/\/$/, "");
 // Protected Preview deployments: Vercel "Protection Bypass for Automation" secret, from the environment only.
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const appFetch = (url: string, init: RequestInit = {}) => fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}) } });
-const health = await appFetch(`${base}/api/health`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-const env = checkHealthEnvironment(health);
-if (!env.ok) { console.error(`Refused: ${env.reason}`); process.exit(2); }
 const stages = (value("--stages") ?? value("--staff") ?? "10").split(",").map(Number);
 for (const n of stages) { const g = checkUsers(n); if (!g.ok) { console.error(g.reason); process.exit(2); } }
 const delegateCount = Number(value("--delegates") ?? 0);
@@ -49,6 +52,23 @@ const drainMs = Number(value("--drain-seconds") ?? 120) * 1000;
 const executiveChairWindowMs = realtimeModel === "topic-aware" ? Number(value("--executive-chair-window") ?? 2000) : 0;
 const fixtureFile = value("--fixture") ?? ".test-sessions/load-fixtures.json";
 const submitToken = value("--submit-token");
+const identitiesFile = value("--identities");
+// ---- Local preflight: plan every stage from local files only, BEFORE any network request -----------------------------
+const fixture = JSON.parse(await readFile(fixtureFile, "utf8").catch(() => { console.error(`Missing ${fixtureFile}: run scripts/rehearsal-fixture.mts (or prepare-load.mts) and apply its SQL to the development project.`); process.exit(2); })) as { conference: string; committees: { id: string; session: string; code: string }[]; delegates: { id: string; committee: string; session?: string }[] };
+const rawIdentities = identitiesFile ? JSON.parse(await readFile(identitiesFile, "utf8").catch(() => { console.error(`Missing ${identitiesFile}.`); process.exit(2); })) as IdentityFile : null;
+// Legacy single-Chair files simulate committees as floor sessions; every other mode uses the fixture's real committees.
+const simulatedCommittees = rawIdentities && !isMultiCommittee(rawIdentities) ? rawIdentities.chair.sessions.length : fixture.committees.length;
+const submitFraction = submitToken ? Number(value("--submit-fraction") ?? DOCUMENTED_SUBMIT_FRACTION) : 0;
+const scenarioFor = (staff: number) => buildScenario({ staff, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction });
+// One resolution link: stay below its designed 20 accepted submissions / 10 min. Never plan an intentional 429.
+for (const n of stages) {
+  const plan = checkSingleLinkSubmissions(scenarioFor(n), Boolean(submitToken));
+  if (!plan.ok) { console.error(`Refused: ${plan.reason}`); process.exit(2); }
+  if (submitToken) console.log(`Stage ${n} staff: ${plan.pageLoads} public page loads, ${plan.planned} resolution submissions planned on one link (max ${MAX_SINGLE_LINK_SUBMISSIONS}).`);
+}
+const health = await appFetch(`${base}/api/health`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+const env = checkHealthEnvironment(health);
+if (!env.ok) { console.error(`Refused: ${env.reason}`); process.exit(2); }
 // Loaded only after the guards: these enforce the development Supabase project and an authorized test session.
 const context = await import("./remote-context.mts").catch((e: Error) => {
   console.error(`Rehearsal setup missing: ${e.message}\nNeeds .env.local for the DEVELOPMENT Supabase project and an authorized session (see docs/STAGING_REHEARSAL.md → Preparation).`);
@@ -61,7 +81,6 @@ const { clientFor, session, ref } = context;
 //  * legacy-single-committee: one Chair identity, committees simulated as floors in one committee (historical only).
 //  * no --identities: every device shares the all-roles test identity (WORST CASE, historical only).
 // No Auth session is created during the run; sessions near expiry are refreshed once before the run starts.
-const identitiesFile = value("--identities");
 const loaded = identitiesFile ? await loadIdentities(identitiesFile, context.env).catch((e: Error) => { console.error(e.message); process.exit(2); }) : null;
 const scoped = loaded?.scoped ?? null;
 const mode: RunMode = loaded ? loaded.mode : "worst-case-superuser";
@@ -78,7 +97,6 @@ const grantedRoles: Record<StaffRoleKey, string[]> = { chair: ["chair"], approva
 const { ConflictError, fingerprint } = await import("../lib/sync/repository");
 type Data = Awaited<ReturnType<InstanceType<typeof SupabaseTransport>["read"]>>;
 type Command = import("../lib/commands").Command;
-const fixture = JSON.parse(await readFile(fixtureFile, "utf8").catch(() => { console.error(`Missing ${fixtureFile}: run scripts/rehearsal-fixture.mts (or prepare-load.mts) and apply its SQL to the development project.`); process.exit(2); })) as { conference: string; committees: { id: string; session: string; code: string }[]; delegates: { id: string; committee: string }[] };
 // Delegates submit to the committee the rehearsal link belongs to; their country choices come from the fixture file
 // (what the public page would list), never from a staff read.
 // Chair scoping, resolved BEFORE any traffic. Readiness mode fails fast when the mapping is incomplete.
@@ -88,7 +106,6 @@ if (scoped && isMultiCommittee(scoped)) {
   catch (e) { console.error(`Refused (readiness mode): ${(e as Error).message}`); process.exit(2); }
 } else console.warn(`WARNING: ${mode} identities — this run reports metrics only and is NOT A READINESS RUN. Use a multi-committee fixture (docs/STAGING_REHEARSAL.md) for the capacity gate.`);
 const legacy = scoped && !isMultiCommittee(scoped) ? { committee: scoped.chair.committee, sessions: scoped.chair.sessions } : undefined;
-const simulatedCommittees = legacy ? legacy.sessions.length : fixture.committees.length;
 const chairAssignments = new Map<SimUser, ChairAssignment>();
 const chairOf = (user: SimUser) => { let a = chairAssignments.get(user); if (!a) { a = assignChair(user, { mode, committees: fixture.committees, chairs: chairIdentities, mapping, legacy, superuser }); chairAssignments.set(user, a); } return a; };
 const identityOf = (user: SimUser): Identity => user.role === "chair" ? chairOf(user).identity : scoped && user.role !== "delegate" ? identities[user.role]! : superuser;
@@ -230,7 +247,7 @@ async function simulate(user: SimUser, t0: number) {
 const stageReports = [];
 const readinessByStage: ReturnType<typeof assessReadiness>[] = [];
 for (const users of stages) {
-  const scenario = buildScenario({ staff: users, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction: submitToken ? Number(value("--submit-fraction") ?? 0.3) : 0 });
+  const scenario = scenarioFor(users);
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref}, realtime model ${realtimeModel})…`);
   const staffUsers = scenario.filter((u) => u.role !== "delegate");
@@ -278,7 +295,12 @@ const note = mode === "realistic-multi-committee"
   : mode === "legacy-single-committee"
     ? "LEGACY single-committee floors: one Chair identity scoped to ONE committee; simulated committees are extra sessions inside it, so every Chair write serializes on one committees row (overstates contention). Historical comparison only — NOT A READINESS RUN."
     : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Historical comparison only — NOT A READINESS RUN.";
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: verdict.label, readiness, distinctAuthIdentities, note, minutes, stages: stageReports, realtimeModel, clientModel: "production DurableRepository (one flush in flight; see scripts/rehearsal/client-model.ts)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
+const peakStaff = Math.max(...stages);
+const capacityGate = peakStaff >= 100 ? "OPTIONAL STRESS / HEADROOM (100 staff) — not a release requirement"
+  : peakStaff >= 50 ? "REQUIRED capacity gate (C2: 50 staff across the real committees plus resolution public-form traffic)"
+  : "BELOW the required 50-staff gate (warm-up only)";
+const publicForm = { delegates: delegateCount, singleLink: Boolean(submitToken), submissionsPlannedPerStage: Object.fromEntries(stages.map((n) => [n, plannedSubmissions(scenarioFor(n))])), maxSingleLinkSubmissions: MAX_SINGLE_LINK_SUBMISSIONS, note: "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately." };
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: verdict.label, readiness, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "production DurableRepository (one flush in flight; see scripts/rehearsal/client-model.ts)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });

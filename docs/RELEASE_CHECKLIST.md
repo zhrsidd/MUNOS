@@ -25,7 +25,7 @@ Supabase plan and compute — technical lead:
 - [ ] Billing owner confirmed; spend cap/alerts understood; region **ap-south-1 (Mumbai)**, same as Vercel functions `bom1`.
 
 Rehearsal on the upgraded instance — Claude runs, Executive observes ([STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)):
-- [ ] Fresh synthetic fixture; realistic **multi-committee** run with **50 simulated staff** plus the delegate QR burst. **Required:** one distinct Chair rehearsal identity/grant scope per simulated real committee (`npm run rehearsal:identities -- --chairs 14`, then `scripts/rehearsal-fixture.mts`); the harness report must say `READINESS RUN`. The earlier single-committee fixture (one Chair identity, committees simulated as sessions inside one committee) overstated shared-row contention and is retained only for historical comparison; it can never satisfy this gate.
+- [ ] **REQUIRED capacity gate (STAGING_REHEARSAL.md → C2):** fresh synthetic fixture; realistic **multi-committee** run with **50 simulated staff** across the real committees plus delegate public-form traffic — 150–200 resolution page loads and a safe number of real submissions on one link (≤ 18; the documented command plans 11; delegates create no Supabase Auth sessions). **Required:** one distinct Chair rehearsal identity/grant scope per simulated real committee (`npm run rehearsal:identities -- --chairs 14`, then `scripts/rehearsal-fixture.mts`); the harness report must say `READINESS RUN`. The earlier single-committee fixture (one Chair identity, committees simulated as sessions inside one committee) overstated shared-row contention and is retained only for historical comparison; it can never satisfy this gate. Intentional rate-limit testing is separate. A 100-staff run is an optional stress test, not a gate.
 - [ ] Offline / reconnect / recovery rehearsal (exact steps in STAGING_REHEARSAL.md), including one `PT409` "needs review" and one recovery export.
 - [ ] Supabase *Logs* and *Observability* and Vercel *Logs* reviewed for the whole run window.
 
@@ -34,6 +34,7 @@ Rehearsal on the upgraded instance — Claude runs, Executive observes ([STAGING
 - [ ] zero `PGRST003` (connection-pool) errors
 - [ ] zero `40001` retry loops; zero statement timeouts
 - [ ] zero lost and zero duplicate writes (harness exactly-once check and manual counts)
+- [ ] zero rate-limit responses (the run plans fewer submissions than the link limit)
 - [ ] read and write latency within the STAGING_REHEARSAL.md readiness criteria; real Chair browsers stay responsive
 
 If anything fails: stop. Fix on `main`, re-verify the Preview, rerun the failed part. Do not create Production.

@@ -6,10 +6,10 @@ Conference OS is **staff software**; delegates are not users. Two load populatio
 
 | Population | Who | Realistic peak | Rehearsal target (headroom) | Touches |
 | --- | --- | --- | --- | --- |
-| **Staff app** | Chairs, Approval, Admins, Executive | ≈ 45–55 active devices (e.g. 14 committees × 2–3 Chair laptops + ~4 Approval + ~4 Admins + ~3 Executive) | **100, then 150–200** simulated staff devices | Supabase Auth session, snapshot reads, outbox writes, Realtime |
-| **Delegate public forms** | Delegations on phones | ≈ 100–150 page loads within a couple of minutes after "submissions open"; a few dozen submissions | **150–200** page loads in 2 minutes + submissions | resolution QR (`/submit/{token}`, `POST /api/submissions`) and amendment QR (`/amend/{token}`, `POST /api/amendments`) only — server-mediated, **no Supabase Auth session** |
+| **Staff app** | Chairs, Approval, Admins, Executive | ≈ 45–55 active devices (e.g. 14 committees × 2–3 Chair laptops + ~4 Approval + ~4 Admins + ~3 Executive) | **50** simulated staff devices across the real committees (required gate); 100 only as an optional stress/headroom test | Supabase Auth session, snapshot reads, outbox writes, Realtime |
+| **Delegate public form** (resolution QR) | Delegations on phones | ≈ 100–150 page loads within a couple of minutes after "submissions open"; a handful of submissions per committee link | **150–200** page loads over the delegate window + a safe number of real submissions on one link (≤ 18; the designed limit is 20 per link per 10 min) | resolution QR only (`/submit/{token}`, `POST /api/submissions`) — server-mediated, **no Supabase Auth session**. The amendment QR (`/amend/{token}`) is verified functionally (Phase A, E15, rate limits, link rotation), not by this synthetic burst. |
 
-A 100-person conference does not mean 100 simultaneous staff users; it does mean a delegate burst on the public form. Both must pass.
+A 100-person conference is mostly delegates, who have no staff session: it does **not** mean 100 or 200 simultaneous staff users. The required capacity gate is therefore **realistic 50 staff across the real committees plus the delegate public-form traffic** (C2 below). Larger staff counts are optional stress tests only.
 
 ## Environments
 
@@ -53,11 +53,13 @@ Run a scripted mini-session: roll call, 10 speakers with queue advance, particip
 
 Verify: both laptops in the shared committee converge within a minute; conflicting edits produce a clear "review" message, not silent loss; Approval sees only Submitted+ resolutions.
 
-## Phase C — Load ramp (60 min)
+## Phase C — Capacity (60 min)
 
-**C1 — Staff app ramp:** `npm run rehearsal:run -- --app <preview-url> --identities <folder>/identities.json --fixture <folder>/fixture.json --stages 50 --minutes 5` (one stage per fresh fixture; escalate only after reviewing the previous stage). With a multi-committee fixture, Chair devices of simulated committee k use **committee k's own committee row, session and Chair identity**; several Chair devices in one committee share that committee's identity. The run refuses to start if any committee lacks its own Chair identity.
+**C1 — Staff warm-up (optional, recommended first):** `npm run rehearsal:run -- --app <preview-url> --identities <folder>/identities.json --fixture <folder>/fixture.json --stages 25 --minutes 5` on its own fresh fixture. With a multi-committee fixture, Chair devices of simulated committee k use **committee k's own committee row, session and Chair identity**; several Chair devices in one committee share that committee's identity. The run refuses to start if any committee lacks its own Chair identity.
 
-**C2 — Staff + delegate burst together (realistic peak):** `npm run rehearsal:run -- --app <preview-url> --identities <folder>/identities.json --fixture <folder>/fixture.json --staff 50 --delegates 150 --delegate-window 120 --submit-token <token> --submit-committee GA1 --minutes 8` (without `--identities` every device shares one all-roles identity: a historical worst case, never a readiness run).
+**C2 — REQUIRED capacity gate: 50 staff + delegate public-form traffic (realistic peak):** on a fresh multi-committee fixture, `npm run rehearsal:run -- --app <preview-url> --identities <folder>/identities.json --fixture <folder>/fixture.json --staff 50 --delegates 150 --delegate-window 120 --submit-token <GA1 resolution-link token> --submit-committee GA1 --submit-fraction 0.10 --minutes 8`. This plans **150 page loads and 11 real resolution submissions** on the one link (deterministic scenario; 200 delegates would plan 16). Delegates use real delegation ids from `fixture.json` and create **no Supabase Auth session**. Before any request the run refuses if it would plan more than **18** submissions on a single link — the production limit is 20 accepted per link per 10 minutes and the capacity run must never cause an intentional 429. Rate-limit behaviour is tested separately (functional tests and Phase D/E), never in this run. Without `--identities` every device would share one all-roles identity: a historical worst case, never a readiness run.
+
+**C3 — OPTIONAL stress / headroom test (NOT a release requirement):** the same command with `--staff 100` (plans 15 submissions at 0.10). Record the numbers for information; a weaker result here does not block the release if C2 passes.
 
 The harness (`scripts/rehearsal-run.mts`) simulates **people, not requests**, in two populations:
 
@@ -103,7 +105,7 @@ The report separates triggers attempted, triggers dropped because the device was
 Test from **one network** (ideally the school Wi-Fi; otherwise one office connection):
 1. **Prepared devices:** 30–60 browser profiles that already have sessions and grants (as on conference morning). Open all within 2–3 minutes. Expect: all reach GREEN; only token refreshes, no sign-ups.
 2. **Fresh devices entering codes:** open N new browser profiles within 2–3 minutes (Playwright contexts or real laptops), N = 10, 25, 40, and enter a valid staff access code on each. Record how many obtain a session and a grant, Auth log entries, HTTP 429s / rate-limit messages, and what a failed device shows (the access gate with a clear message — never a silently local workspace).
-3. **Delegate burst from one network (separate test):** 150–200 QR page loads within 2 minutes plus a few dozen submissions from the same public IP (`--staff 1 --delegates 200 --submit-token …`, or real phones on the school Wi-Fi). Expect: no auth activity at all in Supabase Auth logs; page p95 ≤ 2 s; submissions succeed (the only limit is 20 accepted submissions per committee link per 10 minutes — spread the test across committee links or expect 429s on one link by design); Vercel function errors 0.
+3. **Delegate burst from one network (separate test):** 150–200 QR page loads within 2 minutes from the same public IP (`--staff 1 --delegates 200 --submit-token … --submit-fraction 0.05`, or real phones on the school Wi-Fi). Expect: no auth activity at all in Supabase Auth logs; page p95 ≤ 2 s; submissions succeed; Vercel function errors 0. This plans 200 page loads and 6 submissions; real submissions on one link stay ≤ 18 (the harness refuses more); an explicit rate-limit check — submitting past 20 on one link and seeing the clear "Too many submissions" response — is a separate, deliberate functional test, not a capacity result.
 
 Do **not** weaken security to pass: no blanket anonymous policies, no trusting client-supplied IPs. If fresh sign-ups hit the limit, the plan stands: prepare all staff devices in advance (the day before), stagger code entry, and set a measured Auth rate limit. The access-code design (PR #12/#13) already gives each device one stable identity, creates none per navigation or refresh, and handles replacement laptops by entering a code on the new device; this phase measures it against the per-IP limits from a single NAT.
 
@@ -181,17 +183,21 @@ No extra monitoring platform is needed for this.
 
 ## Readiness criteria
 
-**PASS (all required):**
-- **Realistic multi-committee run:** the harness report says `READINESS RUN` — one distinct Chair identity/grant per simulated real committee, Chair traffic in every committee, no identity shared across committees.
-- Staff app at **100** simulated staff devices (about twice the realistic peak): error rate < 1% (conflicts excluded), write p95 ≤ 1.5 s, read p95 ≤ 2.5 s, no rate-limit responses; real Chair browsers stay responsive.
-- Staff app at **150–200**: no systemic failure (no cascading errors, no stuck devices); latency may rise but operations complete.
-- Delegate public forms (resolution and amendment QR): 150–200 page loads in 2 minutes with page p95 ≤ 2 s and no 5xx; submissions succeed apart from the designed limits (resolutions 20 per link / 10 min; amendments 20 per link and 5 per delegation / 10 min); **zero Supabase Auth activity** from delegates.
+**REQUIRED capacity gate (C2, conference week, Supabase Pro + Small) — PASS only if all are true:**
+- **Realistic multi-committee mode:** the harness report says `READINESS RUN` — 50 simulated staff, one distinct Chair identity/grant per simulated real committee, Chair traffic in every committee, no identity shared across committees.
+- Delegate public-form traffic: 150–200 resolution page loads over the delegate window with page p95 ≤ 2 s and no 5xx; the planned real submissions (≤ 18 on the one link) all succeed; **zero Supabase Auth activity** from delegates; **no rate-limit responses** (the plan stays below the designed limit).
+- Staff app: error rate < 1% (conflicts excluded), write p95 ≤ 1.5 s, read p95 ≤ 2.5 s; real Chair browsers stay responsive.
+- Zero unexplained HTTP 5xx, zero `PGRST003` (connection-pool wait) errors, zero `40001` retry loops, zero statement timeouts in Supabase/Vercel logs for the run window.
+- Zero duplicate and zero lost writes (harness exactly-once check, plus offline/reconnect).
+
+**Also required before release (functional, not load):**
+- Amendment QR end to end, its rate limits, link rotation and public access (Phase A, E15); the synthetic burst does not load-test `/amend/*`.
 - Burst start of prepared devices: all reach GREEN within 3 minutes.
-- Zero duplicate and zero lost writes after retries and offline/reconnect.
 - Realtime loss never stops core operations.
 - Rollback completed and verified in under 5 minutes.
-- Zero unexplained HTTP 5xx, zero `PGRST003` (connection-pool wait) errors, zero `40001` retry loops, zero statement timeouts in Supabase/Vercel logs for the run window.
 - No critical security/RLS findings (Supabase Advisors: no new findings beyond the accepted list in RELEASE_CHECKLIST.md; no anonymous grants).
+
+**OPTIONAL stress / headroom (information only, NOT a release requirement):** C3 at 100 staff — record latency and errors; look for systemic failure (cascading errors, stuck devices). Do not run 150–200 staff: that traffic is not expected at this conference.
 
 **FAIL (any):** sign-in/auth burst breaks prepared devices · duplicated queue/participation entries · offline changes disappear · database latency makes chairing impractical (several seconds per action) · any Drive or Google dependency blocks core workflow · rollback cannot be completed confidently.
 
@@ -232,7 +238,7 @@ Findings: (1) explicit stale-write conflicts raised SQLSTATE 40001, which PostgR
 - default and maximum 150/200 clients with no conservative default;
 - overwrites the committed `docs/load-test-results.json`.
 
-The new `npm run rehearsal:run` complements it: a human-paced staff role mix, a **separate delegate public-form population**, ramp stages, burst start windows, health/page/submission requests through the deployed app, retries with exactly-once verification, conservative defaults, production refusal, and results written to ignored `.test-sessions/`. Simulated staff still share one identity — Phase D covers fresh staff-device sign-in bursts separately.
+The new `npm run rehearsal:run` complements it: a human-paced staff role mix, a **separate delegate public-form population**, ramp stages, burst start windows, health/page/submission requests through the deployed app, retries with exactly-once verification, conservative defaults, production refusal, and results written to ignored `.test-sessions/`. In realistic readiness mode each simulated committee has its own Chair rehearsal identity (one per real committee) plus one Approval, one Admins and one Executive identity; the legacy single-Chair and all-roles modes remain only for historical comparison. Phase D covers fresh staff-device sign-in bursts separately.
 
 ## Rehearsal-day checklist
 

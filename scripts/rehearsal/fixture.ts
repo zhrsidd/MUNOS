@@ -13,6 +13,9 @@ export type FixtureOptions =
   | (BaseOptions & { mode: "multi-committee"; users: MultiCommitteeUsers })
   | (BaseOptions & { mode?: "legacy-floors"; floors: number; users: LegacyUsers });
 export interface ChairGrant { user: string; committee: string; committeeIndex: number }
+/** A synthetic delegation. Ids are derived here (not by the database) so fixture.json carries the exact rows that
+ *  fixture.sql inserts — the public-form simulation needs real submitter ids. Delegates never get an Auth identity. */
+export interface FixtureDelegate { id: string; committee: string; session: string }
 export function derivedUuid(seed: string) {
   const h = createHash("sha256").update(seed).digest("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${((parseInt(h[16], 16) & 3) | 8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`;
@@ -34,6 +37,11 @@ export function buildFixture(o: FixtureOptions) {
     floors = [committees[0].session, ...Array.from({ length: o.floors - 1 }, (_, i) => derivedUuid(`${conference}:floor:${i + 1}`))];
   }
   const chairCommittee = committees[0];
+  // Spread round-robin across the real committees, as before; deterministic for one conference id.
+  const delegates: FixtureDelegate[] = Array.from({ length: o.delegates }, (_, i) => {
+    const c = committees[i % o.committees];
+    return { id: derivedUuid(`${conference}:delegate:${i}`), committee: c.id, session: c.session };
+  });
   const school = derivedUuid(`${conference}:school`);
   const q = (s: string) => `'${s.replaceAll("'", "''")}'`;
   const grant = (user: string, role: string, committee: string | null) => ` (${q(conference)},${q(user)},'${role}',${committee ? q(committee) : "null"},now()+interval '${o.grantHours} hours')`;
@@ -50,13 +58,16 @@ insert into public.committees(id,conference_id,code,name,room) values
 ${committees.map((c) => ` (${q(c.id)},${q(conference)},${q(c.code)},${q(`Load test ${c.code}`)},'Simulation')`).join(",\n")};
 insert into public.sessions(id,conference_id,committee_id,name,"startsAt",state) values
 ${sessionRows.join(",\n")};
-insert into public.delegates(id,conference_id,committee_id,"schoolId",country,name,email)
- select gen_random_uuid(),${q(conference)},(array[${committees.map((c) => q(c.id) + "::uuid").join(",")}])[1 + i % ${o.committees}],${q(school)},'Country '||i,'Simulated delegate '||i,'load'||i||'@example.com'
- from generate_series(0,${o.delegates - 1}) i;
+insert into public.delegates(id,conference_id,committee_id,"schoolId",country,name,email) values
+${delegates.map((d, i) => ` (${q(d.id)},${q(conference)},${q(d.committee)},${q(school)},'Country ${i}','Simulated delegate ${i}','load${i}@example.com')`).join(",\n")};
 insert into public.scoring_definitions(conference_id,code,label,values) values(${q(conference)},'speech','Speech',array[1,2,3]);
 insert into public.user_access(conference_id,user_id,role,committee_id,expires_at) values
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};
 commit;
 `;
-  return { conference, mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, chairGrants, chairCommittee, floors, sql };
+  return { conference, mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
+}
+/** The harness/probe `--fixture` file: ids only (committees, sessions, delegates); no users, tokens or secrets. */
+export function fixtureJson(f: ReturnType<typeof buildFixture>) {
+  return { conference: f.conference, mode: f.mode, committees: f.committees, delegates: f.delegates };
 }

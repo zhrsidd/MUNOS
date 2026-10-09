@@ -34,7 +34,7 @@ export function report(samples: Sample[]) {
   const rateLimited = samples.filter((s) => s.outcome === "rate_limited").length;
   return { total, errors, rateLimited, conflicts: samples.filter((s) => s.outcome === "conflict").length, errorRate: total ? errors / total : 0, summary, actions };
 }
-/** Readiness thresholds from docs/STAGING_REHEARSAL.md (100-user stage). */
+/** Readiness thresholds from docs/STAGING_REHEARSAL.md (the required 50-staff C2 gate; also applied to optional stress runs). */
 export function evaluate(r: ReturnType<typeof report>, duplicates: number, lostWrites: number) {
   const writeActions = ["currentSession", "attendance", "queueAdd", "queueOrder", "speechStart", "speechScore", "poiAllowance", "poiAdd", "poiRecognize", "speechFinish", "timer", "approve", "print", "photoAck", "sendToApproval", "submit"];
   const writeP95 = Math.max(0, ...writeActions.map((a) => r.actions[a]?.p95_ms ?? 0));

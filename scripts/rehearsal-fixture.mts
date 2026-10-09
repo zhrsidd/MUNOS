@@ -18,8 +18,11 @@
 // The SQL creates the conference, committees, sessions, delegations, the speech scoring definition and temporary
 // single-role grants for the identities' existing Auth users. It never creates Auth users, never writes tokens, and
 // never touches the identities' session files.
+// Delegates get deterministic ids (derivedUuid(`${conference}:delegate:${i}`)), spread round-robin over the real
+// committees; fixture.sql inserts exactly those ids and fixture.json lists them ({ id, committee, session }), so the
+// harness submits as real fixture delegates. Delegates never get an Auth user or session.
 import { randomUUID } from "node:crypto";
-import { buildFixture } from "./rehearsal/fixture";
+import { buildFixture, fixtureJson } from "./rehearsal/fixture";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isMultiCommittee, type IdentityFile } from "./rehearsal/identities";
 const args = process.argv.slice(2);
@@ -59,9 +62,10 @@ if (isMultiCommittee(ids)) {
   fixture = buildFixture({ mode: "legacy-floors", conference, committees: committeesCount, delegates: delegatesCount, floors: floorsCount, grantHours: hours, users: { chair: await userId(ids.chair.session), ...support } });
   runIdentities = { ...ids, chair: { ...ids.chair, committee: fixture.chairCommittee.id, sessions: fixture.floors } };
 }
-const { committees, floors, sql, mode, chairGrants } = fixture;
+const { delegates, floors, sql, mode, chairGrants } = fixture;
 await mkdir(dir, { recursive: true, mode: 0o700 });
-await writeFile(`${dir}/fixture.json`, JSON.stringify({ conference, mode, committees, delegates: [], note: "Delegations are generated server-side; public-form runs need a fixture with delegate ids." }, null, 1), { mode: 0o600 });
+// fixture.json carries the exact delegate ids fixture.sql inserts (public-form submitters); no Auth users, no tokens.
+await writeFile(`${dir}/fixture.json`, JSON.stringify(fixtureJson(fixture), null, 1), { mode: 0o600 });
 await writeFile(`${dir}/identities.json`, JSON.stringify(runIdentities, null, 1), { mode: 0o600 });
 await writeFile(`${dir}/fixture.sql`, sql, { mode: 0o600 });
-console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));
+console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, delegatesInFixtureJson: delegates.length, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));

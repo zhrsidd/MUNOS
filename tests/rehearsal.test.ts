@@ -172,7 +172,7 @@ test('LEGACY fresh fixture (historical comparison only, never readiness): 14 flo
  assert.ok(grants[0].includes(`'chair','${a.committees[0].id}'`),'Chair scoped to one committee');
  for(const [g,role] of [[grants[1],'approval'],[grants[2],'logistics'],[grants[3],'admin']])assert.ok(g.includes(`'${role}',null`),role);
  assert.equal((a.sql.match(/'active'\)/g)??[]).length,14+13,'14 committee sessions + 13 extra floors');
- assert.match(a.sql,/generate_series\(0,419\)/);
+ assert.equal(a.delegates.length,420,'legacy mode uses the same deterministic delegate model');
  assert.ok(!/auth\.|service_role|sb_secret|access_token|refresh_token/i.test(a.sql),'never touches Auth or embeds credentials');
 });
 // ---- PR #10 Executive Chair-topic window ----------------------------------------------------------------------------

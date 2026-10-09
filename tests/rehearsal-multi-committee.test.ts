@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildFixture} from '../scripts/rehearsal/fixture';
+import {buildFixture,fixtureJson} from '../scripts/rehearsal/fixture';
 import {resolveChairMapping,identityModeOf,type ChairIdentity,type MultiCommitteeFile,type LegacyScopedFile} from '../scripts/rehearsal/identities';
-import {assignChair,assessReadiness,readinessVerdict,type ChairTraffic} from '../scripts/rehearsal/readiness';
+import {assignChair,assessReadiness,readinessVerdict,checkSingleLinkSubmissions,plannedSubmissions,DOCUMENTED_SUBMIT_FRACTION,MAX_SINGLE_LINK_SUBMISSIONS,RESOLUTION_LINK_LIMIT_PER_10_MIN,type ChairTraffic} from '../scripts/rehearsal/readiness';
+import {evaluate,report} from '../scripts/rehearsal/metrics';
 import {buildScenario,recipients,type SimUser} from '../scripts/rehearsal/scenario';
 import {planPool,checkPoolDir,MAX_NEW_SIGN_INS_PER_RUN} from '../scripts/rehearsal/identity-pool';
 import {freshDatabase} from './helpers/database';
@@ -146,4 +147,63 @@ test('identity pool planning: one session file per Chair plus support roles, onl
  for(const bad of ['/tmp/x','sessions','.test-sessions/../x','../.test-sessions/x'])assert.throws(()=>checkPoolDir(bad),/\.test-sessions/);
  assert.throws(()=>planPool(0,'.test-sessions/x'));assert.throws(()=>planPool(41,'.test-sessions/x'));
  assert.ok(MAX_NEW_SIGN_INS_PER_RUN<30,'stays under the default 30 anonymous sign-ins per IP per hour');
+});
+
+// ---- Public-form fixture: real delegate ids for resolution submissions -----------------------------------------------
+test('readiness fixture: 420 deterministic delegate ids spread over the 14 real committees, inserted verbatim, in fixture.json',()=>{
+ const f=multi(),again=multi();
+ assert.equal(f.delegates.length,N*30,'exactly 420 delegates');
+ assert.deepEqual(f.delegates,again.delegates,'deterministic for the same conference id');
+ assert.equal(new Set(f.delegates.map(d=>d.id)).size,N*30,'all delegate ids unique');
+ const committeeIds=new Set(f.committees.map(c=>c.id));
+ assert.ok(f.delegates.every(d=>committeeIds.has(d.committee)),'every delegate references a real fixture committee');
+ assert.ok(f.delegates.every(d=>d.session===f.committees.find(c=>c.id===d.committee)!.session),'and that committee\'s session');
+ for(const c of f.committees)assert.equal(f.delegates.filter(d=>d.committee===c.id).length,30,`${c.code} receives delegates`);
+ assert.doesNotMatch(f.sql,/gen_random_uuid/,'no server-generated delegate ids');
+ for(const d of f.delegates)assert.ok(f.sql.includes(`('${d.id}','${conference}','${d.committee}'`),'fixture.sql inserts the same id and committee');
+ const json=JSON.parse(JSON.stringify(fixtureJson(f)));
+ assert.deepEqual(json.delegates,f.delegates,'fixture.json carries those exact ids');
+ assert.ok(!/token|secret|session_|refresh|password|auth\./i.test(JSON.stringify(json).replace(/"session":"[0-9a-f-]{36}"/g,'')),'no tokens or secrets in fixture.json');
+ // rehearsal-run.mts: submitters = fixture.delegates for the --submit-committee (GA1) → a real GA1 delegation.
+ const ga1=json.committees.find((c:{code:string})=>c.code==='GA1');
+ const submitters=json.delegates.filter((d:{committee:string})=>d.committee===ga1.id);
+ assert.equal(submitters.length,30);assert.ok(submitters.every((d:{id:string})=>f.delegates.some(x=>x.id===d.id&&x.committee===ga1.id)));
+ assert.ok(!/auth\.users|auth\.sessions|signInAnonymously/.test(f.sql),'delegates get no Auth user or session');
+ const legacy=buildFixture({mode:'legacy-floors',conference,committees:N,delegates:N*30,floors:N,grantHours:3,users:{chair:chairUsers[0],...support}});
+ assert.deepEqual(legacy.delegates,f.delegates,'legacy mode uses the same deterministic delegate model');
+});
+
+test('readiness fixture SQL creates exactly the fixture.json delegates in the database, with no Auth users',async()=>{
+ const f=multi();const {db,query,asOwner}=await freshDatabase();
+ try{
+  await asOwner();
+  for(const u of [...chairUsers,support.approval,support.admins,support.executive])await query('insert into auth.users(id) values($1)',[u]);
+  const authBefore=(await query<{n:number}>('select count(*)::int n from auth.users'))[0].n;
+  await db.exec(f.sql);
+  const rows=await query<{id:string;committee_id:string}>('select id,committee_id from public.delegates where conference_id=$1 order by id',[conference]);
+  assert.deepEqual(rows.map(r=>[r.id,r.committee_id]).sort(),f.delegates.map(d=>[d.id,d.committee]).sort(),'database delegates = fixture.json delegates');
+  assert.equal((await query<{n:number}>('select count(*)::int n from auth.users'))[0].n,authBefore,'no Auth identity created for delegates');
+ }finally{await db.close();}
+});
+
+// ---- Single-link submission preflight (capacity run never plans an intentional 429) ----------------------------------
+const c2=(delegates:number,submitFraction:number,staff=50)=>buildScenario({staff,delegates,minutes:8,committees:N,startWindowSeconds:150,delegateWindowSeconds:120,submitFraction});
+test('documented C2 (50 staff + 150 delegates, one link) plans 150 page loads and at most 18 submissions',()=>{
+ assert.equal(DOCUMENTED_SUBMIT_FRACTION,0.1);
+ const plan=checkSingleLinkSubmissions(c2(150,DOCUMENTED_SUBMIT_FRACTION),true);
+ assert.ok(plan.ok);assert.equal(plan.pageLoads,150);
+ assert.ok(plan.planned>0&&plan.planned<=MAX_SINGLE_LINK_SUBMISSIONS,`planned ${plan.planned}`);
+ assert.ok(plan.planned<RESOLUTION_LINK_LIMIT_PER_10_MIN,'below the designed 20 / 10 min link limit');
+ const upper=checkSingleLinkSubmissions(c2(200,DOCUMENTED_SUBMIT_FRACTION),true);
+ assert.ok(upper.ok&&upper.pageLoads===200&&upper.planned<=MAX_SINGLE_LINK_SUBMISSIONS,'200 page loads also stays under the cap');
+ assert.equal(plannedSubmissions(c2(150,DOCUMENTED_SUBMIT_FRACTION)),plan.planned,'deterministic plan');
+});
+test('a deliberately high submission fraction is refused before any traffic; no readiness run needs an intentional 429',()=>{
+ const high=checkSingleLinkSubmissions(c2(150,0.3),true);
+ assert.equal(high.ok,false);assert.ok(high.planned>MAX_SINGLE_LINK_SUBMISSIONS);
+ assert.match(high.reason,/Single-link readiness run plans \d+ submissions; maximum is 18 to stay below the designed 20\/10min link limit\. Lower --submit-fraction or use a separate rate-limit test\./);
+ assert.ok(checkSingleLinkSubmissions(c2(150,0.3),false).ok,'page-load-only runs (no --submit-token) post nothing');
+ assert.equal(plannedSubmissions(c2(150,0)),0);
+ // The verdict still fails on any rate-limit response; the preflight keeps the capacity run from causing one.
+ assert.equal(evaluate(report([{action:'submit',ms:100,outcome:'rate_limited'}]),0,0).pass,false);
 });

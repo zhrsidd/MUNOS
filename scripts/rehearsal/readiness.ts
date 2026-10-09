@@ -92,3 +92,23 @@ export function readinessVerdict(metrics: { pass: boolean; checks: { check: stri
   const checks = [...metrics.checks, { check: `realistic multi-committee distribution (${readiness.label}${readiness.reasons.length ? `: ${readiness.reasons.join("; ")}` : ""})`, pass: readiness.qualifiesForReadiness }];
   return { pass: metrics.pass && readiness.qualifiesForReadiness, label: readiness.label, checks };
 }
+
+// ---- Single-link submission preflight ------------------------------------------------------------------------------
+// The resolution QR endpoint accepts at most 20 submissions per link per 10 minutes (production rate limit, by design).
+// A capacity run must stay BELOW it with headroom: hitting it would be an intentional 429, and the readiness verdict
+// (correctly) fails on any rate-limit response. Rate-limit behaviour is tested separately, not in the capacity run.
+export const RESOLUTION_LINK_LIMIT_PER_10_MIN = 20;
+export const MAX_SINGLE_LINK_SUBMISSIONS = 18;
+/** Submission fraction used by the documented conference-week C2 command (50 staff + 150 delegates, one link). */
+export const DOCUMENTED_SUBMIT_FRACTION = 0.1;
+/** Resolution submissions the scenario will POST (delegate "submit" steps); page loads are not counted. */
+export function plannedSubmissions(users: SimUser[]) {
+  return users.reduce((n, u) => n + (u.role === "delegate" ? u.steps.filter((s) => s.action === "submit").length : 0), 0);
+}
+export function checkSingleLinkSubmissions(users: SimUser[], singleLink: boolean) {
+  const planned = plannedSubmissions(users);
+  const pageLoads = users.reduce((n, u) => n + (u.role === "delegate" ? u.steps.filter((s) => s.action === "submitPage").length : 0), 0);
+  if (singleLink && planned > MAX_SINGLE_LINK_SUBMISSIONS)
+    return { ok: false as const, planned, pageLoads, reason: `Single-link readiness run plans ${planned} submissions; maximum is ${MAX_SINGLE_LINK_SUBMISSIONS} to stay below the designed ${RESOLUTION_LINK_LIMIT_PER_10_MIN}/10min link limit. Lower --submit-fraction or use a separate rate-limit test.` };
+  return { ok: true as const, planned, pageLoads, reason: "" };
+}
