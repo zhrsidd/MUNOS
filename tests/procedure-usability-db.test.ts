@@ -29,22 +29,25 @@ test('real PostgreSQL: blank-conference scoring, flags, top-of-queue, two-stage 
   await assert.rejects(()=>send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:4}),/configured speech value/);
   await send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:3});
   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
-  for(const [id,values] of [['speech',[1,1]],['speech',[21]],['submitter',[3,5]],['speech',[]]] as [string,number[]][])
-   await assert.rejects(()=>send({type:'scoring',id,values},'admin'),/whole-number|only once|exactly one|scoring_definitions/,`${id} ${values}`);
+  for(const [id,values] of [['speech',[1,1]],['speech',[21]],['speech',[]],['poi',[0,1,2,3,4,5,6,7,8,9,10]]] as [string,number[]][])
+   await assert.rejects(()=>send({type:'scoring',id,values},'admin'),/whole-number|only once|scoring_definitions/,`${id} ${values}`);
+  for(const values of [[7],[5],[3,5]])await assert.rejects(()=>send({type:'scoring',id:'submitter',values},'admin'),/fixed at \+5/,`submitter ${values}`);
+  await assert.rejects(()=>send({type:'scoring',id:'submitter',values:[7],committeeId:ids.ga1},'admin'),/fixed at \+5/,'no committee override either');
   await assert.rejects(()=>send({type:'scoring',id:'made-up',values:[1]},'admin'),/Unknown scoring category/);
   await send({type:'scoring',id:'speech',values:[2,4]},'admin');
-  await send({type:'scoring',id:'submitter',values:[7]},'admin');
   await send({type:'scoring',id:'speech',values:[9],committeeId:ids.ga1},'admin');
   await asOwner();
   assert.deepEqual((await query<{code:string;label:string;values:number[];committee_id:string|null}>('select code,label,values,committee_id from public.scoring_definitions where conference_id=$1 order by code,committee_id nulls first',[ids.conference])).map(r=>[r.code,r.label,r.values,r.committee_id]),
-   [['speech','Speech',[2,4],null],['speech','Speech',[9],ids.ga1],['submitter','Main Submitter',[7],null]]);
+   [['speech','Speech',[2,4],null],['speech','Speech',[9],ids.ga1]]);
   await as(actor);
   await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
   s=await active();
   await assert.rejects(()=>send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:4}),/configured speech value/,'committee override wins');
   await send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:9});
-  assert.deepEqual((await snap()).events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===ids.resolution).map(e=>e.points),[7],'once-per-resolution Main Submitter credit, configured value');
   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
+  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
+  s=await active();await send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:9});await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
+  assert.deepEqual((await snap()).events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===ids.resolution).map(e=>e.points),[5],'Main Submitter credit: fixed +5, once per resolution');
 
   // 2) Derived flags are stored on delegate edit and import; arbitrary text is refused.
   await send({type:'delegate',id:ids.japan,name:'Hana Tanaka',email:'delegate2@example.com',country:'Ivory Coast',flag:'🇨🇮'},'admin');
@@ -90,23 +93,35 @@ test('real PostgreSQL: blank-conference scoring, flags, top-of-queue, two-stage 
   assert.equal((await events(s.id,'poi')).length,2);
   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
 
-  // 5) Amendment context on speeches (and through speechId on their events).
+  // 5) Amendment debate: floor must be with the Chair to start/close; context on speeches; no Main/Co-Submitter.
   await asOwner();
   const amendment='72000000-0000-4000-8000-000000000001';
   await query(`insert into public.amendments(id,conference_id,committee_id,"resolutionId","sessionId","submitterId",type,clause,wording,status) values($1,$2,$3,$4,$5,$6,'Add','Clause 3','Adds a review clause.','Accepted for Debate')`,[amendment,ids.conference,ids.ga1,ids.resolution,ids.session,brazil]);
   await as(actor);
   const amendmentExpected=async()=>String((await query<{revision:string}>('select revision from public.amendments where id=$1',[amendment]))[0].revision);
-  await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify({type:'amendmentStatus',id:amendment,status:'In Debate'}),'chair',await amendmentExpected(),'2026-10-09T09:00:00Z']);
-  await assert.rejects(()=>send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter',amendmentId:null}),/amendment debate changed/);
-  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter',amendmentId:amendment});
+  const amend=async(status:string,outcome?:string)=>db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify({type:'amendmentStatus',id:amendment,status,...(outcome?{outcome}:{})}),'chair',await amendmentExpected(),'2026-10-09T09:00:00Z']);
+  // A resolution-debate speech in its POI phase holds the floor: the amendment cannot start.
+  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.japan,resolutionId:ids.resolution,classification:'Other',amendmentId:null});
+  s=await active();await send({type:'poiAllowance',sessionId:ids.session,speechId:s.id,limit:1});
+  await assert.rejects(()=>amend('In Debate'),/return the floor to the Chair/);
+  await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
+  await amend('In Debate');
+  // Stale/older clients cannot start Main Submitter procedure in amendment context (with or without amendmentId).
+  await assert.rejects(()=>send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter',amendmentId:amendment}),/not amendment debate/);
+  await assert.rejects(()=>send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'}),/not amendment debate/);
+  await assert.rejects(()=>send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'For',amendmentId:null}),/amendment debate changed/);
+  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'For',amendmentId:amendment});
   s=await active();assert.equal(s.amendmentId,amendment);assert.equal(s.resolutionId,ids.resolution);
-  await send({type:'speechYield',sessionId:ids.session,speechId:s.id,delegateId:brazil});
-  const coSubmitter=await active();assert.equal(coSubmitter.classification,'Co-Submitter');assert.equal(coSubmitter.amendmentId,amendment,'yield keeps the amendment context');
-  await send({type:'speechScore',sessionId:ids.session,speechId:coSubmitter.id,points:9});
-  const event=(await snap()).events.find(e=>e.speechId===coSubmitter.id)!;
-  assert.equal((await snap()).speeches!.find(x=>x.id===event.speechId)?.amendmentId,amendment);
-  await send({type:'speechFinish',sessionId:ids.session,speechId:coSubmitter.id});
-  await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify({type:'amendmentStatus',id:amendment,status:'Closed',outcome:'Passed'}),'chair',await amendmentExpected(),'2026-10-09T09:00:00Z']);
+  await assert.rejects(()=>send({type:'speechYield',sessionId:ids.session,speechId:s.id,delegateId:brazil}),/Only Main Submitter/);
+  await send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:9});
+  const event=(await snap()).events.find(e=>e.speechId===s.id)!;
+  assert.equal((await snap()).speeches!.find(x=>x.id===event.speechId)?.amendmentId,amendment,'event reaches its amendment via speechId');
+  // A speech/POI holds the floor: the active amendment cannot be passed, failed, withdrawn or ruled out.
+  await send({type:'poiAllowance',sessionId:ids.session,speechId:s.id,limit:1});
+  for(const outcome of ['Passed','Failed','Withdrawn','Ruled Out'])await assert.rejects(()=>amend('Closed',outcome),/return the floor to the Chair/,outcome);
+  await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
+  await amend('Closed','Passed');
+  assert.equal((await query<{status:string;outcome:string}>('select status,outcome from public.amendments where id=$1',[amendment]))[0].outcome,'Passed');
   await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Other',amendmentId:null});
   assert.equal((await active()).amendmentId,null,'resolution debate again');
   assert.equal((await query<{status:string}>('select status from public.documents where id=$1',[ids.resolution]))[0].status,'In Debate');

@@ -27,3 +27,10 @@ export function activeAmendment(d:Pick<ConferenceData,'amendments'|'documents'>,
 export function eventAmendmentId(d:Pick<ConferenceData,'speeches'>,e:ParticipationEvent){
  return e.speechId?d.speeches?.find(s=>s.id===e.speechId)?.amendmentId??null:null;
 }
+export const FLOOR_NOT_WITH_CHAIR='Finish the current speech and return the floor to the Chair first.';
+/** True while someone has the floor (a speech or its POIs) in the amendment's session or the committee's
+ *  current session. An amendment may not start, nor close once In Debate, until the floor is with the Chair. */
+export function amendmentFloorTaken(d:Pick<ConferenceData,'speeches'|'committees'>,a:{committeeId:string;sessionId:string}){
+ const current=d.committees.find(c=>c.id===a.committeeId)?.currentSessionId;
+ return !!d.speeches?.some(s=>s.state!=='finished'&&(s.sessionId===a.sessionId||s.sessionId===current));
+}

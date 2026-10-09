@@ -1,5 +1,6 @@
 import type {ConferenceData} from '../domain';
 import type {BatchCommand} from './types';
+import {amendmentFloorTaken,FLOOR_NOT_WITH_CHAIR} from '../procedure/view';
 export function batchFingerprint(d:ConferenceData,c:BatchCommand):string|null{
  if(c.type==='committeeUpdate'||c.type==='committeeLifecycle')return String(d.committees.find(x=>x.id===c.id)?.revision??1);
  if(c.type==='sessionSlot')return c.action==='create'?null:String(d.sessionSlots?.find(x=>x.id===c.id)?.revision??0);
@@ -52,5 +53,7 @@ export function applyBatch(d:ConferenceData,c:BatchCommand,nextId:()=>string,now
  const valid=(amendment.status==='Submitted'&&c.status==='Accepted for Debate'&&!c.outcome)||(amendment.status==='Accepted for Debate'&&c.status==='In Debate'&&!c.outcome)||(amendment.status!=='Closed'&&c.status==='Closed'&&(c.outcome==='Ruled Out'||c.outcome==='Withdrawn'||(amendment.status==='In Debate'&&(c.outcome==='Passed'||c.outcome==='Failed'))));
  if(!valid)throw Error('Invalid amendment transition.');
  if(c.status==='In Debate'&&d.amendments?.some(x=>x.id!==c.id&&x.committeeId===amendment.committeeId&&x.status==='In Debate'))throw Error('Close the current amendment debate first.');
+ // Procedural invariant: an amendment debate starts, and an active one closes, only with the floor at the Chair.
+ if((c.status==='In Debate'||(amendment.status==='In Debate'&&c.status==='Closed'))&&amendmentFloorTaken(d,amendment))throw Error(FLOOR_NOT_WITH_CHAIR);
  Object.assign(amendment,{status:c.status,outcome:c.outcome??null,revision:amendment.revision+1});
 }

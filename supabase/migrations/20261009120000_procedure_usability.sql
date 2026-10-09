@@ -15,18 +15,19 @@ create index speeches_amendment_idx on public.speeches("amendmentId",conference_
 alter table public.poi_queue add column "recognizedAt" timestamptz;
 create unique index poi_one_recognized on public.poi_queue("speechId") where "recognizedAt" is not null;
 
--- 3) Scoring and flag helpers. Required procedure categories have built-in defaults, mirrored in lib/scoring.ts.
+-- 3) Scoring and flag helpers. Speech/POI have built-in defaults; Main Submitter is fixed. Mirrored in lib/scoring.ts.
 create function private.required_scoring_label(category text) returns text language sql immutable set search_path='' as $$
- select case category when 'speech' then 'Speech' when 'poi' then 'POI' when 'submitter' then 'Main Submitter' end $$;
+ select case category when 'speech' then 'Speech' when 'poi' then 'POI' end $$;
+-- Main Submitter is a fixed +5 credit (once per resolution), never configurable or overridable.
 create function private.scoring_values(conf uuid,cid uuid,category text) returns integer[] language sql stable set search_path='' as $$
- select coalesce(
+ select case when category='submitter' then array[5] else coalesce(
   (select s.values from public.scoring_definitions s where s.conference_id=conf and s.code=category and (s.committee_id=cid or s.committee_id is null) order by s.committee_id nulls last limit 1),
-  case category when 'speech' then array[1,2,3] when 'poi' then array[1,2] when 'submitter' then array[5] end) $$;
+  case category when 'speech' then array[1,2,3] when 'poi' then array[1,2] end) end $$;
 create function private.scoring_problem(category text,vals integer[]) returns text language sql immutable set search_path='' as $$
  select case
+  when category='submitter' then 'Main Submitter credit is fixed at +5 and cannot be changed.'
   when vals is null or cardinality(vals) not between 1 and 10 or exists(select 1 from unnest(vals) v where v is null or v<0 or v>20) then 'Use 1–10 whole-number points from 0 to 20.'
   when cardinality(vals)<>(select count(distinct v) from unnest(vals) v) then 'Each point value may appear only once.'
-  when category='submitter' and cardinality(vals)<>1 then 'Main Submitter credit has exactly one point value.'
  end $$;
 -- Two regional-indicator letters (a client-derived country flag) or the unknown-country globe.
 create function private.valid_flag(value text) returns boolean language sql immutable set search_path='' as $$
@@ -44,7 +45,7 @@ begin
 end $$;
 
 -- 4) private.apply_mutation: participation and correction values use private.scoring_values; the scoring
---    command validates values and can establish a required category on a blank conference; delegate edit
+--    command validates values, refuses Main Submitter, and can establish speech/POI on a blank conference; delegate edit
 --    and import store the client-derived flag (validated), defaulting to 🌐.
 do $patch$
 declare definition text;
@@ -88,7 +89,8 @@ begin
 end $patch$;
 
 -- 5) private.apply_procedure: configured speech/POI/submitter values; speechStart recognizes only the first
---    entry of the active lane and records the In Debate amendment; yields inherit it; POIs are recognize
+--    entry of the active lane and records the In Debate amendment (no Main Submitter speech or Co-Submitter
+--    yield in amendment context); yields inherit it; POIs are recognize
 --    (no points) → poiScore (exactly one event) or poiRemove. Legacy poiRecognize with points from older
 --    saved actions still records exactly once.
 do $patch$
@@ -96,12 +98,16 @@ declare definition text;
 begin
  definition:=pg_get_functiondef('private.apply_procedure(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
  definition:=pg_temp.patch_once(definition,
+  $q$  if sp.classification<>'Main Submitter' or sp."resolutionId" is null or did=sp."delegateId" then raise exception 'Only Main Submitter may yield to another delegate' using errcode='22023'; end if;$q$,
+  $q$  if sp.classification<>'Main Submitter' or sp."resolutionId" is null or did=sp."delegateId" then raise exception 'Only Main Submitter may yield to another delegate' using errcode='22023'; end if;
+  if sp."amendmentId" is not null then raise exception 'Main Submitter and Co-Submitter speeches belong to resolution debate, not amendment debate.' using errcode='22023'; end if;$q$,'apply_procedure anchor 1');
+ definition:=pg_temp.patch_once(definition,
   $q$ lane_value text:=command->>'lane'; classification_value text:=command->>'classification'; n integer; points_value integer:=(command->>'points')::integer;$q$,
   $q$ lane_value text:=command->>'lane'; classification_value text:=command->>'classification'; n integer; points_value integer:=(command->>'points')::integer;
- vals integer[]; amend_value uuid; queue_row public.speaker_queue; poi_row public.poi_queue; lane_active text;$q$,'apply_procedure anchor 1');
+ vals integer[]; amend_value uuid; queue_row public.speaker_queue; poi_row public.poi_queue; lane_active text;$q$,'apply_procedure anchor 2');
  definition:=pg_temp.patch_once(definition,
   $q$ elsif kind in ('speechYield','speechFinish','poiAllowance','poiRecognize') then actual:=sp.revision::text;$q$,
-  $q$ elsif kind in ('speechYield','speechFinish','poiAllowance','poiRecognize','poiScore','poiRemove') then actual:=sp.revision::text;$q$,'apply_procedure anchor 2');
+  $q$ elsif kind in ('speechYield','speechFinish','poiAllowance','poiRecognize','poiScore','poiRemove') then actual:=sp.revision::text;$q$,'apply_procedure anchor 3');
  definition:=pg_temp.patch_once(definition,
   $q$  if classification_value='Co-Submitter' or (classification_value='Main Submitter' and (rid is null or r."submitterId" is distinct from did)) then raise exception 'Invalid speech relationship' using errcode='22023'; end if;
   if command ? 'entryId' then
@@ -113,6 +119,7 @@ begin
   -- A speech during an amendment debate keeps the amendment context (the parent resolution stays In Debate).
   if rid is not null then select id into amend_value from public.amendments where committee_id=cid and conference_id=conf and status='In Debate' and "resolutionId"=rid; end if;
   if command ? 'amendmentId' and private.uuid_or_null(command->>'amendmentId') is distinct from amend_value then raise sqlstate 'PT409' using message='The amendment debate changed. Review the Debate Console.'; end if;
+  if amend_value is not null and classification_value='Main Submitter' then raise exception 'Main Submitter and Co-Submitter speeches belong to resolution debate, not amendment debate.' using errcode='22023'; end if;
   if command ? 'entryId' then
    select * into queue_row from public.speaker_queue where id=private.uuid_or_null(command->>'entryId') and "sessionId"=sid and "delegateId"=did and state='active';
    if not found then raise sqlstate 'PT409' using message='Queue entry changed'; end if;
@@ -121,17 +128,14 @@ begin
    if queue_row.lane is distinct from lane_active or exists(select 1 from public.speaker_queue o where o."sessionId"=sid and o.lane=queue_row.lane and o.state='active' and o.position<queue_row.position) then raise sqlstate 'PT409' using message='The speaker queue changed. Only the first speaker in the current queue can be recognized.'; end if;
    update public.speaker_queue set state='completed' where id=queue_row.id;
   end if;
-  insert into public.speeches(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",classification,"createdAt","amendmentId") values(new_id,conf,cid,sid,did,rid,classification_value,client_time,amend_value);$q$,'apply_procedure anchor 3');
+  insert into public.speeches(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",classification,"createdAt","amendmentId") values(new_id,conf,cid,sid,did,rid,classification_value,client_time,amend_value);$q$,'apply_procedure anchor 4');
  definition:=pg_temp.patch_once(definition,
   $q$  insert into public.speeches(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",classification,"yieldedFrom","createdAt") values(new_id,conf,cid,sid,did,sp."resolutionId",'Co-Submitter',sp.id,client_time);$q$,
-  $q$  insert into public.speeches(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",classification,"yieldedFrom","createdAt","amendmentId") values(new_id,conf,cid,sid,did,sp."resolutionId",'Co-Submitter',sp.id,client_time,sp."amendmentId");$q$,'apply_procedure anchor 4');
+  $q$  insert into public.speeches(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",classification,"yieldedFrom","createdAt","amendmentId") values(new_id,conf,cid,sid,did,sp."resolutionId",'Co-Submitter',sp.id,client_time,sp."amendmentId");$q$,'apply_procedure anchor 5');
  definition:=pg_temp.patch_once(definition,
   $q$  if points_value is null or points_value not between 1 and 3 then raise exception 'Speech points must be 1–3' using errcode='22023'; end if;$q$,
   $q$  vals:=private.scoring_values(conf,cid,'speech');
-  if points_value is null or not points_value=any(vals) then raise exception 'Choose a configured speech value' using errcode='22023'; end if;$q$,'apply_procedure anchor 5');
- definition:=pg_temp.patch_once(definition,
-  $q$values(second_id,conf,cid,sp."delegateId",sid,sp."resolutionId",'submitter',5,actor,client_time,sp.id,sp.classification);$q$,
-  $q$values(second_id,conf,cid,sp."delegateId",sid,sp."resolutionId",'submitter',(private.scoring_values(conf,cid,'submitter'))[1],actor,client_time,sp.id,sp.classification);$q$,'apply_procedure anchor 6');
+  if points_value is null or not points_value=any(vals) then raise exception 'Choose a configured speech value' using errcode='22023'; end if;$q$,'apply_procedure anchor 6');
  definition:=pg_temp.patch_once(definition,
   $q$ when 'poiRecognize' then
   if sp.state<>'pois' or (sp."poiLimit" is not null and sp."poiCount">=sp."poiLimit") then raise exception 'Set or extend POIs first' using errcode='22023'; end if;
@@ -174,7 +178,21 @@ begin
  execute definition;
 end $patch$;
 
--- 6) Route the two new procedure commands.
+-- 6) private.apply_staff_batch: an amendment debate starts, and an active amendment closes (Pass/Fail/
+--    Withdraw/Rule Out), only while no speech or POI holds the floor in its session or the current session.
+do $patch$
+declare definition text;
+begin
+ definition:=pg_get_functiondef('private.apply_staff_batch(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
+ definition:=pg_temp.patch_once(definition,
+  $q$  if target='In Debate' and exists(select 1 from public.amendments where committee_id=cid and status='In Debate' and id<>amend.id) then raise exception 'Close the current amendment debate first' using errcode='22023';end if;$q$,
+  $q$  if target='In Debate' and exists(select 1 from public.amendments where committee_id=cid and status='In Debate' and id<>amend.id) then raise exception 'Close the current amendment debate first' using errcode='22023';end if;
+  -- Procedural invariant: start an amendment debate, or close an active one, only with the floor at the Chair.
+  if (target='In Debate' or (amend.status='In Debate' and target='Closed')) and exists(select 1 from public.speeches where committee_id=cid and conference_id=conf and state<>'finished' and "sessionId" in (amend."sessionId",committee."currentSessionId")) then raise exception 'Finish the current speech and return the floor to the Chair first.' using errcode='22023';end if;$q$,'apply_staff_batch anchor 1');
+ execute definition;
+end $patch$;
+
+-- 7) Route the two new procedure commands.
 create or replace function public.apply_conference_mutation(conf uuid,mutation uuid,command jsonb,requested_role public.conference_role,expected text,client_time timestamptz)
 returns void language plpgsql security invoker set search_path='' as $$ begin
  if command->>'type' in ('committeeUpdate','committeeLifecycle','sessionSlot','amendmentLink','amendmentStatus') then

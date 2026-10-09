@@ -1,7 +1,7 @@
 import type {ConferenceData, ParticipationEvent} from '../domain';
 import type {ProcedureCommand, Speech} from './types';
 import {activeAmendment,activeLane,laneEntries,poiEntries} from './view';
-import {scoringValues} from '../scoring';
+import {MAIN_SUBMITTER_POINTS,scoringValues} from '../scoring';
 export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>string,now:string,actor:string){
  const committee=d.committees.find(x=>x.id===('committeeId' in c?c.committeeId:d.sessions.find(s=>s.id===c.sessionId)?.committeeId));
  if(!committee)throw Error('Committee unavailable.');
@@ -39,6 +39,7 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
   if(!['Main Submitter','For','Against','Other'].includes(c.classification))throw Error('Co-Submitter requires a yield from the Main Submitter.');
   const amendment=doc?activeAmendment(d,committee.id):undefined;
   if('amendmentId' in c&&(c.amendmentId??null)!==(amendment?.id??null))throw Error('The amendment debate changed. Review the Debate Console.');
+  if(amendment&&c.classification==='Main Submitter')throw Error('Main Submitter and Co-Submitter speeches belong to resolution debate, not amendment debate.');
   if(c.entryId){
    const entry=d.queue.find(q=>q.id===c.entryId&&q.sessionId===sid&&q.delegateId===c.delegateId);
    if(!entry)throw Error('Queue entry changed.');
@@ -52,6 +53,7 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
  case 'speechYield':{
   const s=active();requirePresent(c.delegateId);
   if(s.classification!=='Main Submitter'||!s.resolutionId||s.delegateId===c.delegateId)throw Error('Only a Main Submitter may yield to a different Co-Submitter.');
+  if(s.amendmentId)throw Error('Main Submitter and Co-Submitter speeches belong to resolution debate, not amendment debate.');
   s.state='finished';s.revision++;d.poiQueue=pois.filter(p=>p.speechId!==s.id);
   speeches.push({id:nextId(),sessionId:sid,delegateId:c.delegateId,resolutionId:s.resolutionId,amendmentId:s.amendmentId??null,classification:'Co-Submitter',yieldedFrom:s.id,state:'speaking',poiLimit:0,poiCount:0,revision:1,createdAt:now});break;
  }
@@ -59,7 +61,7 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
   const s=active();if(!scoringValues(d,committee.id,'speech').includes(c.points))throw Error('Choose a configured speech value.');
   if(d.events.some(e=>e.speechId===s.id&&e.categoryId==='speech'))throw Error('Speech already recorded. Edit its event in Participation.');
   event(s,s.delegateId,'speech',c.points);
-  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter'))event(s,s.delegateId,'submitter',scoringValues(d,committee.id,'submitter')[0]);
+  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter'))event(s,s.delegateId,'submitter',MAIN_SUBMITTER_POINTS);
   break;
  }
  case 'speechFinish': {const s=active();s.state='finished';s.revision++;d.poiQueue=pois.filter(p=>p.speechId!==s.id);break;}

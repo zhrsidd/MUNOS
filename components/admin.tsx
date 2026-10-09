@@ -9,7 +9,7 @@ import { Command, repository } from "@/lib/repository";
 import { Role } from "@/lib/domain";
 import { parseCSV, validateImport } from "@/lib/import";
 import { countryFlag } from "@/lib/countries";
-import { conferenceScoring, effectiveScoring, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
+import { conferenceScoring, effectiveScoring, isConfigurableScoring, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
 import { Metric, Search } from "./chair";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 const sections: Record<string, [string, string]> = {
@@ -906,7 +906,7 @@ function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope:
   const [busy, setBusy] = useState(false);
   const committee = data.committees.find((c) => c.id === scope);
   const definitions = committee ? effectiveScoring(data, committee.id) : conferenceScoring(data);
-  const unsaved = REQUIRED_SCORING.filter((r) => !data.scoring.some((s) => s.id === r.id));
+  const unsaved = REQUIRED_SCORING.filter((r) => isConfigurableScoring(r.id) && !data.scoring.some((s) => s.id === r.id));
   async function save(id: string, text: string) {
     const values = parseScoringValues(text);
     const problem = scoringProblem(id, values);
@@ -943,13 +943,23 @@ function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope:
       <Panel title="Point definitions" subtitle="Chairs choose from these values on the Debate Console. One event equals one opportunity, regardless of its quality points.">
         {error && <p className="form-error" role="alert">{error}</p>}
         {definitions.map((s) => {
+          if (!isConfigurableScoring(s.id))
+            return (
+              <div className="definition-row" key={`${scope}-${s.id}`}>
+                <div>
+                  <strong>{s.label}</strong>
+                  <p>Fixed +{s.values[0]}, once per resolution, on the Main Submitter’s first scored speech · locked</p>
+                </div>
+                <span className="muted">Not configurable</span>
+              </div>
+            );
           const builtIn = !data.scoring.some((x) => x.id === s.id);
           const overridden = !!committee?.scoringOverrides?.some((x) => x.id === s.id);
           return (
             <form className="definition-row" key={`${scope}-${s.id}-${s.values}`} onSubmit={(e) => { e.preventDefault(); void save(s.id, String(new FormData(e.currentTarget).get("values"))); }}>
               <div>
                 <strong>{s.label}</strong>
-                <p>{s.id === "submitter" ? "Once per resolution, on the Main Submitter’s first scored speech" : s.id === "speech" ? "Chair-judged value for each delivered speech" : s.id === "poi" ? "Chair-judged value after a recognized POI is asked" : "Chair-awarded points"}{committee ? (overridden ? " · committee override" : " · conference default") : builtIn ? " · built-in default" : ""}</p>
+                <p>{s.id === "speech" ? "Chair-judged value for each delivered speech" : s.id === "poi" ? "Chair-judged value after a recognized POI is asked" : "Chair-awarded points"}{committee ? (overridden ? " · committee override" : " · conference default") : builtIn ? " · built-in default" : ""}</p>
               </div>
               <label>
                 Allowed values

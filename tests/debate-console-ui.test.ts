@@ -71,6 +71,12 @@ test('Chair Debate: amendment in debate takes over the console; passed reminder 
  const html=text(await renderChair(t,d));
  for(const s of ['AMENDMENT IN DEBATE','Resolution debate paused · amendment has priority','GA1 / 01','Safeguarding civilians in autonomous warfare','Kenya','Replace','Operative clause 2','expert panel','Pass amendment','Fail amendment','Withdraw','Rule out'])assert.ok(html.includes(s),s);
  assert.doesNotMatch(html,/Invite Main Submitter/);
+ assert.doesNotMatch(await renderChair(t,d),/<button[^>]*disabled[^>]*>Pass amendment/,'floor with the Chair: closing is available');
+ d.speeches=[{id:'sp1',sessionId:'s1',delegateId:'d1',resolutionId:'r1',amendmentId:'am1',classification:'For',yieldedFrom:null,state:'pois',poiLimit:1,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];
+ const held=await renderChair(t,d);
+ for(const label of ['Pass amendment','Fail amendment','Withdraw'])assert.match(held,new RegExp(`<button[^>]*disabled[^>]*>${label}<`),label);
+ assert.match(text(held),/Finish the current speech and return the floor to the Chair first\./);
+ d.speeches[0]={...d.speeches[0],state:'finished'};
  d.amendments[0]={...d.amendments[0],status:'Closed',outcome:'Passed',revision:4};
  const after=text(await renderChair(t,d));
  assert.match(after,/RESOLUTION IN DEBATE/);assert.doesNotMatch(after,/AMENDMENT IN DEBATE/);

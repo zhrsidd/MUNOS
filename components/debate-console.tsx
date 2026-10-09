@@ -7,7 +7,7 @@ import { suggestedDelegates } from "@/lib/repository";
 import type { Command } from "@/lib/commands";
 import type { Delegate } from "@/lib/domain";
 import type { Lane, SpeechKind } from "@/lib/procedure/types";
-import { activeAmendment, activeLane, activePoi, laneEntries, nextPoi, nextSpeaker, poiEntries } from "@/lib/procedure/view";
+import { activeAmendment, activeLane, activePoi, FLOOR_NOT_WITH_CHAIR, laneEntries, nextPoi, nextSpeaker, poiEntries } from "@/lib/procedure/view";
 import { scoringValues } from "@/lib/scoring";
 import { Chip, DelegateIdentity, Panel, Timer } from "./ui";
 
@@ -131,9 +131,10 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
         <blockquote className="amendment-wording">{amendment.wording}</blockquote>
       </div>
       <div className="amendment-actions">
-        <button className="primary" disabled={busy} onClick={() => closeAmendment("Passed")}>Pass amendment</button>
-        <button disabled={busy} onClick={() => closeAmendment("Failed")}>Fail amendment</button>
-        <button disabled={busy} onClick={() => closeAmendment("Withdrawn")}>Withdraw</button>
+        <button className="primary" disabled={busy || !!active} onClick={() => closeAmendment("Passed")}>Pass amendment</button>
+        <button disabled={busy || !!active} onClick={() => closeAmendment("Failed")}>Fail amendment</button>
+        <button disabled={busy || !!active} onClick={() => closeAmendment("Withdrawn")}>Withdraw</button>
+        {active && <p className="footnote" role="note">{FLOOR_NOT_WITH_CHAIR}</p>}
         <Link className="button" href="/chair/amendments">Rule out in Amendments →</Link>
       </div>
     </section> : <section className="procedure-context" aria-label="Current resolution">
