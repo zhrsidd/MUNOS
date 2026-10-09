@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { googleDocMessages, parseGoogleDocLink } from "@/lib/submissions/google-doc";
 import { ACCEPT, MAX_SUBMISSION_BYTES, cleanTitle, kindFromName, submissionMessages, type LinkInfo, type SubmissionResponse } from "@/lib/submissions/rules";
 
@@ -9,8 +9,13 @@ type State =
   | { phase: "done"; status: "created" | "duplicate" | "replayed"; code: string }
   | { phase: "error"; message: string };
 
+const subscribeNever = () => () => {};
+/** False in server HTML and until React hydrates; true once submit() and the onChange handlers are attached. */
+const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
+
 /** Delegate page. Normal path: share the Google Doc with the Chair, paste its link. Fallback: upload a file. */
 export function SubmissionForm({ token, link }: { token: string; link: LinkInfo }) {
+  const hydrated = useHydrated();
   const [submitterId, setSubmitterId] = useState("");
   const [title, setTitle] = useState("");
   const [docLink, setDocLink] = useState("");
@@ -93,7 +98,7 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
       </section>
     );
   return (
-    <form className="submit-card" onSubmit={submit} noValidate>
+    <form className="submit-card" method="post" onSubmit={submit} noValidate>
       <div className="eyebrow">{link.conferenceName}</div>
       <h1>{link.committeeCode} resolution submission</h1>
       <p className="muted">{link.committeeName}</p>
@@ -106,6 +111,9 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
           <small>Then Share → Copy link. Keep edit access enabled during review and debate.</small>
         </div>
       )}
+      {/* Until hydration a native submit reloads the page and loses everything entered, and values typed into these
+          controlled fields never reach React state; method="post" is a backstop. */}
+      <fieldset disabled={!hydrated} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <ol className="submit-steps">
         <li>
           <label htmlFor="submitter">Main submitter (your country)</label>
@@ -153,15 +161,18 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
           </li>
         )}
       </ol>
+      </fieldset>
       {state.phase === "error" && (
         <p className="submit-error" role="alert">
           {state.message}
         </p>
       )}
-      <button className="button primary submit-button" disabled={state.phase === "sending"}>
-        {state.phase === "sending" ? "Submitting…" : "Submit resolution"}
+      <button className="button primary submit-button" disabled={state.phase === "sending" || !hydrated}>
+        {!hydrated ? "Loading form…" : state.phase === "sending" ? "Submitting…" : "Submit resolution"}
       </button>
-      <button type="button" className="link-button" onClick={() => { setMode(mode === "doc" ? "file" : "doc"); fresh(); setState({ phase: "idle" }); }}>
+      {!hydrated && <p className="muted" role="status">If this form does not load, ask your Chair how to submit your resolution.</p>}
+      <noscript><p className="submit-error" role="alert">This form needs JavaScript to submit. Ask your Chair how to submit your resolution.</p></noscript>
+      <button type="button" className="link-button" disabled={!hydrated} onClick={() => { setMode(mode === "doc" ? "file" : "doc"); fresh(); setState({ phase: "idle" }); }}>
         {mode === "doc" ? "Can't use Google Docs? Upload a file instead" : "Use a Google Doc link instead"}
       </button>
       <p className="muted submit-note">Only the main submitter submits. No account is needed — your Chair is notified automatically.</p>
