@@ -29,15 +29,17 @@ The example defaults to an isolated local demo. For the development database, se
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Role entry; access-code screens are deferred |
+| `/` | Role entry for granted workspaces; a device without a grant sees the staff access-code gate |
 | `/chair` | Debate, speakers, timer, scoring and suggestions |
-| `/chair/{roll-call,participation,documents,voting,awards}` | Chair operations |
+| `/chair/{roll-call,participation,documents,amendments,voting,awards}` | Chair operations |
 | `/chair/photos` | This committee's school group-photo slots (reminders appear on every Chair screen) |
 | `/approval` | Review inbox |
 | `/logistics` | Print queue |
 | `/admin` | Conference overview |
-| `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,workflow,resources,audit}` | Configuration |
-| `/admin/health` | GREEN/YELLOW/RED system health, version, recovery |
+| `/admin/{conference,committees,sessions,delegates,schools,staff,scoring,workflow,resources,audit}` | Configuration (`/admin/sessions` = central session schedule) |
+| `/admin/{access-codes,submissions,amendment-links}` | Staff access codes, resolution QR links, amendment QR links |
+| `/{chair,approval,logistics,admin}/health` | GREEN/YELLOW/RED system health, version, recovery — in every staff workspace |
+| `/submit/{token}`, `/amend/{token}` | Public delegate QR forms (no sign-in) |
 | `/admin/schedule` | Import the conference schedule as sessions |
 | `/admin/photos` | School group-photo slots, CSV import, chair acknowledgements |
 | `/admin/submissions` | Committee resolution-submission links / QR codes |
@@ -56,16 +58,16 @@ npm run build
 npm start -- --port 3001
 ```
 
-`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. The public submission server additionally requires `SUPABASE_SECRET_KEY`, kept server-only. Its real HTTP/Storage path still needs verification; direct database workflow tests do not cover that path. See [integration review](docs/INTEGRATION_REVIEW.md), [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) and [organizer runbook](docs/OPERATIONS.md).
+`npm test` includes a fresh PostgreSQL-compatible PGlite migration/RLS test, durable IndexedDB failure tests and existing workflow tests. These do not substitute for remote Supabase verification. Remote scripts require explicitly authorized, short-lived development sessions in ignored `.test-sessions/`; they never use a service key. The public submission server additionally requires `SUPABASE_SECRET_KEY`, kept server-only. Its real HTTP/Storage path was verified against the development project (see the integration review). See [integration review](docs/INTEGRATION_REVIEW.md), [verification status](docs/VERIFICATION.md), [load results](docs/load-test-results.json) , the [organizer runbook](CONFERENCE_RUNBOOK.md), [emergency sheet](docs/EMERGENCY_RECOVERY.md) and [troubleshooting](docs/TROUBLESHOOTING.md).
 
 ## Deployment
 
-Vercel Preview for every branch/PR, Production from `main`, CI on every PR, build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL.
+Vercel Preview for every branch/PR **and for `main`**; Production only from the `production` branch, advanced deliberately; CI on every PR; build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL. Release gates: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). Staff practice: [docs/STAFF_REHEARSAL.md](docs/STAFF_REHEARSAL.md). Conference-week load rehearsal: [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) (`npm run rehearsal:plan`, guarded `npm run rehearsal:run`). Drive design: [docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md) (`npm run drive:plan`, dry run).
 
 ## Deferred
 
-Google Drive automation (Approval-folder copies, PDF snapshots, archive), access-code redemption, production Supabase setup, school-network enrollment/load rehearsal and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+Google Drive automation (Approval-folder copies, PDF snapshots, archive), production Supabase setup, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
-Operations extensions (resolution submission, schedule import, group-photo reminders) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
+Operations extensions (resolution submission, group-photo reminders; the earlier schedule import is superseded by central sessions) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
 
 GitHub `zhrsidd/MUNOS` is the shared source of truth. See [AGENTS.md](AGENTS.md) for ownership and review boundaries.

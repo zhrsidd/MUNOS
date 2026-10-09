@@ -6,7 +6,7 @@ Target: ~100 simultaneous users, 150–200 headroom, one school network, no IT t
 
 | Source | Network cost | Notes |
 | --- | --- | --- |
-| Snapshot read | +1 small RPC per existing read (`operations_snapshot`, in parallel with `conference_snapshot`) | Reads already happen after a sync, on focus/online, on a Realtime notification and every ~60 s. Extension tables are small (≤ a few thousand rows). RLS-scoped: chairs read only their committee's acknowledgements and links. |
+| Snapshot read | No extra request since PR #11: `operations_snapshot` is folded into the one bundled state-snapshot RPC (originally +1 small parallel RPC) | Reads already happen after a sync, on focus/online, on a Realtime notification and every ~60 s. Extension tables are small (≤ a few thousand rows). RLS-scoped: chairs read only their committee's acknowledgements and links. |
 | Health indicator / status strip | none | Derived from the device's own sync state and `navigator.onLine`; re-evaluated locally every 30 s. |
 | System health screen | `GET /api/health` once a minute **only while that screen is visible**, plus on reconnect | Response is CDN-cacheable for 15 s and each server instance probes Supabase at most once per 15 s. |
 | Photo reminders | none | Derived from cached slot timestamps every 15 s on the device. No polling, no WebSocket dependency, no timer ticks over the network. |
@@ -38,5 +38,5 @@ No Redis, queue, cron job, second database, push service or monitoring platform.
 
 ## Open items
 
-- A real load test against a deployed Preview with the extension migration applied (submission burst + 150 chair clients) has not been run; the existing load scripts can be extended once a Preview with Storage exists.
+- A real load test against a deployed Preview has not been run yet. The full plan (ramp to 200, burst start, shared NAT, failure injection, rollback drill) and the human-paced harness (`npm run rehearsal:plan` / `rehearsal:run`) are in [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md).
 - Per-IP rate limiting of `/api/submissions` is not implemented (link possession + per-link limit only). Vercel's platform DDoS protection applies; add a Vercel Firewall rule if abuse is observed.

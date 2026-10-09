@@ -1,14 +1,13 @@
 # Remaining product and release work
 
-The initial backlog was superseded by the approved core integration. QR resolution submission, schedule import, shared current-session selection, school group-photo reminders and configurable Security Council veto rules are implemented, with verification limits recorded in [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
+The initial backlog was superseded by the approved core integration. Staff access codes, central sessions, the amendment QR workflow and System health in every staff workspace (PR #12–#16), QR resolution submission, shared current-session selection, school group-photo reminders and configurable Security Council veto rules are implemented, with verification limits recorded in [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
 
 Public workspace labels are **Admins** and **Executive**; internal role identifiers and routes are unchanged. Award rubric controls are retired; award discussion uses alphabetical factual participation context and remains a human decision.
 
 Still deferred:
 
-- Access-code entry/redemption and hardened staff replacement-device recovery.
 - Drive automation for Approval copies, PDF snapshots and archive mirroring; its identity is separate from human Chair sharing.
-- Digital amendment submission/editor, document parsing and automatic amendment application. Chairs edit the working Google Doc manually.
+- Amendment editor, document parsing and automatic amendment application. (Amendment QR submission and the Chair amendment workflow exist since PR #13; Chairs still edit the working Google Doc manually.)
 - Motions, announcements and general logistics requests.
 - Legacy Google Docs `resourcekey` preservation in canonical links (low priority).
 
