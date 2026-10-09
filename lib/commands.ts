@@ -10,6 +10,9 @@ import {
   Vote,
 } from "./domain";
 import { applyOperationsCommand, isOperationsCommand, operationsRoles, type OperationsCommand } from "./operations/commands";
+import { conferenceScoring, scoringProblem, scoringValues } from "./scoring";
+import { countryFlag } from "./countries";
+export { effectiveScoring } from "./scoring";
 // CODEX REVIEW REQUIRED: extension commands (OperationsCommand) join the union and are
 // delegated to lib/operations; core command handling is unchanged.
 export type Command =
@@ -74,6 +77,8 @@ export type Command =
       name: string;
       email: string;
       country: string;
+      /** Derived from country by the client (lib/countries); never typed by staff. */
+      flag?: string;
     }
   | {
       type: "import";
@@ -83,6 +88,7 @@ export type Command =
         email: string;
         schoolId: string;
         committeeId: string;
+        flag?: string;
       }[];
     }
   | { type: "conference"; name: string; venue: string; date: string }
@@ -173,7 +179,7 @@ const allowed: Record<Command["type"], Role[]> = {
   staffContact: ["admin"],
   ...operationsRoles,
   committeeUpdate:["admin"],committeeLifecycle:["admin"],sessionSlot:["admin"],amendmentLink:["admin"],amendmentStatus:["chair"],
-  currentSession:["chair"], debateMode:["chair"], queueAdd:["chair"], queueOrder:["chair"], queueRemove:["chair"], speechStart:["chair"], speechYield:["chair"], speechScore:["chair"], speechFinish:["chair"], poiAllowance:["chair"], poiAdd:["chair"], poiOrder:["chair"], poiRecognize:["chair"], voteMode:["chair"], vetoRules:["admin"],
+  currentSession:["chair"], debateMode:["chair"], queueAdd:["chair"], queueOrder:["chair"], queueRemove:["chair"], speechStart:["chair"], speechYield:["chair"], speechScore:["chair"], speechFinish:["chair"], poiAllowance:["chair"], poiAdd:["chair"], poiOrder:["chair"], poiRecognize:["chair"], poiScore:["chair"], poiRemove:["chair"], voteMode:["chair"], vetoRules:["admin"],
 };
 export function applyCommand(
   previous: ConferenceData,
@@ -241,16 +247,8 @@ export function applyCommand(
     }
     case "participation": {
       if(c.categoryId==="submitter" && (!c.resolutionId || d.documents.find(r=>r.id===c.resolutionId)?.submitterId!==c.delegateId || d.events.some(e=>e.categoryId==="submitter" && e.resolutionId===c.resolutionId))) throw Error("Main Submitter credit requires a resolution and may only be recorded once.");
-      const definition =
-        d.committees
-          .find(
-            (x) =>
-              x.id ===
-              d.sessions.find((s) => s.id === c.sessionId)?.committeeId,
-          )
-          ?.scoringOverrides?.find((s) => s.id === c.categoryId) ||
-        d.scoring.find((s) => s.id === c.categoryId);
-      if (!definition?.values.includes(c.points))
+      const committeeId = d.sessions.find((s) => s.id === c.sessionId)?.committeeId ?? "";
+      if (!scoringValues(d, committeeId, c.categoryId).includes(c.points))
         throw Error("Choose a configured point value.");
       d.events.push({
         id: nextId(),
@@ -270,14 +268,8 @@ export function applyCommand(
         e.revision = (e.revision ?? 0) + 1;
         if (c.undo) e.voidedAt = now;
         else {
-          const definition = (
-            d.committees.find(
-              (x) =>
-                x.id ===
-                d.sessions.find((s) => s.id === e.sessionId)?.committeeId,
-            )?.scoringOverrides?.length ? d.committees.find(x=>x.id===d.sessions.find(s=>s.id===e.sessionId)?.committeeId)!.scoringOverrides! : d.scoring
-          ).find((x) => x.id === e.categoryId);
-          if (!definition?.values.includes(c.points ?? -1))
+          const committeeId = d.sessions.find((s) => s.id === e.sessionId)?.committeeId ?? "";
+          if (!scoringValues(d, committeeId, e.categoryId).includes(c.points ?? -1))
             throw Error("Invalid points.");
           e.points = c.points!;
           e.updatedAt = now;
@@ -490,6 +482,7 @@ export function applyCommand(
           name: c.name,
           email: c.email,
           country: c.country,
+          flag: countryFlag(c.country),
         });
       break;
     }
@@ -511,7 +504,7 @@ export function applyCommand(
         emails.add(row.email.toLowerCase());
       }
       c.rows.forEach((row) =>
-        d.delegates.push({ id: nextId(), ...row, flag: "🌐" }),
+        d.delegates.push({ id: nextId(), ...row, flag: countryFlag(row.country) }),
       );
       break;
     }
@@ -526,17 +519,17 @@ export function applyCommand(
       d.conference.features[c.name] = c.enabled;
       break;
     case "scoring": {
-      if (
-        !c.values.length ||
-        c.values.some((n) => !Number.isInteger(n) || n < 0 || n > 20)
-      )
-        throw Error("Use whole-number points from 0 to 20.");
+      const problem = scoringProblem(c.id, c.values);
+      if (problem) throw Error(problem);
+      const base = conferenceScoring(d).find((s) => s.id === c.id);
+      if (!base) throw Error("Unknown scoring category.");
+      const definition = { id: c.id, label: base.label, values: [...c.values] };
       if (c.committeeId) {
-        const committee = d.committees.find((x) => x.id === c.committeeId)!;
-        committee.scoringOverrides ??= structuredClone(d.scoring);
-        committee.scoringOverrides.find((s) => s.id === c.id)!.values =
-          c.values;
-      } else d.scoring.find((s) => s.id === c.id)!.values = c.values;
+        const committee = d.committees.find((x) => x.id === c.committeeId);
+        if (!committee) throw Error("Committee unavailable.");
+        // An override replaces only this category; other categories keep inheriting.
+        committee.scoringOverrides = [...(committee.scoringOverrides ?? []).filter((s) => s.id !== c.id), definition];
+      } else d.scoring = d.scoring.some((s) => s.id === c.id) ? d.scoring.map((s) => (s.id === c.id ? definition : s)) : [...d.scoring, definition];
       break;
     }
     case "criterion": case "award": throw Error("Award rubrics have been retired. Awards remain Chair judgement.");
@@ -602,11 +595,6 @@ export function votingOutcome(data: ConferenceData, resolutionId: string): "Pass
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
  return yes+no>0 && (rule==='two_thirds'?yes*3>=(yes+no)*2:yes>no)?'Passed':'Failed';
 }
-export function effectiveScoring(data: ConferenceData, committeeId: string) {
- const overrides=data.committees.find(c=>c.id===committeeId)?.scoringOverrides;
- return data.scoring.map(s=>overrides?.find(o=>o.id===s.id)??s);
-}
-
 export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
  const r=data.documents.find(r=>r.id===resolutionId); if(!r)return []; if(r.status==="Closed")return r.vetoedBy??[];
  const c=data.committees.find(c=>c.id===r.committeeId);

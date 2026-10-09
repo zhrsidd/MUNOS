@@ -46,8 +46,8 @@ Runbook: *Staff device setup*, steps 1–4.
 ### 3. Attendance, speakers, POIs — 5 min (Chairs)
 
 - [ ] Chair A → **Roll call**: mark five delegates **Present & Voting**, one **Absent**.
-- [ ] Chair A → **Debate** → **Debate order**: **Add delegate** → **+ Queue** for three delegates → **Recognize** the first → **▶ Start timer** → **Ⅱ Pause** → score **+1** → **Finish · return floor to Chair**.
-- [ ] Chair B → **Points of information**: **Add to POI queue** → **Recognize +1**.
+- [ ] Chair A → **Debate** → **Debate order**: **Add delegate** → **+ Queue** for three delegates → reorder with ↑/↓ → **Next speaker · ‹Country›** (always position 1) → **▶ Start timer** → **Ⅱ Pause** → score a configured speech value (e.g. **+1**) → **Finish · return floor to Chair**. The next speaker does not start automatically.
+- [ ] Chair B → **Points of information**: choose an allowance → **Add to POI queue** for two delegates → **Next POI · ‹Country›** (records nothing yet) → after the question, choose a configured POI value (e.g. **+1**) → the next POI can now be recognized.
 - [ ] Both Chairs see each other's changes within a minute (click into the window to refresh).
 
 ### 4. Resolution QR → Approval → Admins → debate — 7 min

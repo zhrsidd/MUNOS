@@ -288,7 +288,7 @@ export function Workspace({ path }: { path: string }) {
         </header>
         <main className="workspace-content">
           {section !== "health" && <StatusStrip />}
-          {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} />}
+          {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} prominent={section === ""} />}
           {section !== "health" && role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
               0 && (

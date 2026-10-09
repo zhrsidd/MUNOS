@@ -8,6 +8,8 @@ import { useConference } from "@/lib/context";
 import { Command, repository } from "@/lib/repository";
 import { Role } from "@/lib/domain";
 import { parseCSV, validateImport } from "@/lib/import";
+import { countryFlag } from "@/lib/countries";
+import { conferenceScoring, effectiveScoring, isConfigurableScoring, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
 import { Metric, Search } from "./chair";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 const sections: Record<string, [string, string]> = {
@@ -383,74 +385,7 @@ export function AdminScreen({ section }: { section: string }) {
         </Panel>
       )}
       {section === "scoring" && (
-        <>
-          <div className="scope-bar">
-            <label>
-              Configure scope
-              <select
-                value={scoreScope}
-                onChange={(e) => setScoreScope(e.target.value)}
-              >
-                <option value="conference">Conference defaults</option>
-                {data.committees.filter(c => !c.archived).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} · Committee override
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              {scoreScope === "conference"
-                ? "Inherited by all committees unless overridden."
-                : "Saving creates an independent committee scoring override."}
-            </p>
-          </div>
-          <Panel
-            title="Point definitions"
-            subtitle="One event equals one opportunity, regardless of its quality points."
-          >
-            {(scoreScope === "conference"
-              ? data.scoring
-              : data.committees.find((c) => c.id === scoreScope)
-                  ?.scoringOverrides || data.scoring
-            ).map((s) => (
-              <form
-                className="definition-row"
-                key={`${scoreScope}-${s.id}-${s.values}`}
-                onSubmit={(e) =>
-                  void submit(e, (f) => ({
-                    type: "scoring",
-                    id: s.id,
-                    values: String(f.get("values"))
-                      .split(",")
-                      .map((x) => Number(x.trim())),
-                    committeeId:
-                      scoreScope === "conference" ? undefined : scoreScope,
-                  }))
-                }
-              >
-                <div>
-                  <strong>{s.label}</strong>
-                  <p>Chair-awarded points</p>
-                </div>
-                <label>
-                  Allowed values
-                  <input
-                    name="values"
-                    required
-                    defaultValue={s.values.join(", ")}
-                    aria-label={`${s.label} allowed values`}
-                  />
-                </label>
-                <button>Save definition</button>
-              </form>
-            ))}
-          </Panel>
-          <p className="footnote">
-            Historical events retain their original points when definitions
-            change. Speaker suggestions use opportunity counts.
-          </p>
-        </>
+        <ScoringSettings scope={scoreScope} setScope={setScoreScope} />
       )}
       {section === "awards" && (
         <Panel title="Awards are chair decisions">
@@ -666,6 +601,7 @@ export function AdminScreen({ section }: { section: string }) {
                 id: delegate.id,
                 name: String(f.get("name")),
                 country: String(f.get("country")),
+                flag: countryFlag(String(f.get("country"))),
                 email: String(f.get("email")),
               }))
             }
@@ -897,7 +833,7 @@ function ImportFlow({ close }: { close: () => void }) {
                   <tr key={r.line}>
                     <td>{r.line}</td>
                     <td>{r.name}</td>
-                    <td>{r.country}</td>
+                    <td>{r.flag} {r.country}</td>
                     <td>
                       {r.errors.length ? (
                         <span className="form-error">
@@ -927,6 +863,7 @@ function ImportFlow({ close }: { close: () => void }) {
                       rows: validated.map((r) => ({
                         name: r.name,
                         country: r.country,
+                        flag: r.flag,
                         email: r.email,
                         committeeId,
                         schoolId,
@@ -959,4 +896,81 @@ function StaffContact({id,email,name}:{id:string;email:string;name:string}) {
     <input type="email" maxLength={254} aria-label={`${name} contact email`} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Contact email" />
     <button disabled={draft.trim()===email}>Save</button>
   </form>;
+}
+
+/** Executive → Scoring. Works on a blank conference: required procedure categories always show, with
+ *  built-in defaults until an Executive establishes them. Categories cannot be deleted. */
+function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope: string) => void }) {
+  const { data, act } = useConference();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const committee = data.committees.find((c) => c.id === scope);
+  const definitions = committee ? effectiveScoring(data, committee.id) : conferenceScoring(data);
+  const unsaved = REQUIRED_SCORING.filter((r) => isConfigurableScoring(r.id) && !data.scoring.some((s) => s.id === r.id));
+  async function save(id: string, text: string) {
+    const values = parseScoringValues(text);
+    const problem = scoringProblem(id, values);
+    setError(problem ?? "");
+    if (problem) return;
+    setBusy(true);
+    try { await act({ type: "scoring", id, values, committeeId: committee?.id }, "admin"); } finally { setBusy(false); }
+  }
+  async function establish() {
+    setBusy(true);
+    try { for (const r of unsaved) if (!(await act({ type: "scoring", id: r.id, values: [...r.values] }, "admin"))) break; } finally { setBusy(false); }
+  }
+  return (
+    <>
+      {unsaved.length > 0 && (
+        <div className="callout" role="status">
+          <strong>Scoring is using built-in defaults</strong>
+          <p>Chairs can already record {unsaved.map((r) => `${r.label} ${r.values.join("/")}`).join(", ")}. Establish them as this conference’s defaults, then adjust any values below.</p>
+          <button className="primary" disabled={busy} onClick={() => void establish()}>Establish default scoring</button>
+        </div>
+      )}
+      <div className="scope-bar">
+        <label>
+          Configure scope
+          <select value={scope} onChange={(e) => { setScope(e.target.value); setError(""); }}>
+            <option value="conference">Conference defaults</option>
+            {data.committees.filter((c) => !c.archived).map((c) => (
+              <option key={c.id} value={c.id}>{c.code} · Committee override</option>
+            ))}
+          </select>
+        </label>
+        <p>{committee ? "Saving a category creates a committee override for that category only; other categories keep the conference default." : "Inherited by all committees unless overridden."}</p>
+      </div>
+      <Panel title="Point definitions" subtitle="Chairs choose from these values on the Debate Console. One event equals one opportunity, regardless of its quality points.">
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {definitions.map((s) => {
+          if (!isConfigurableScoring(s.id))
+            return (
+              <div className="definition-row" key={`${scope}-${s.id}`}>
+                <div>
+                  <strong>{s.label}</strong>
+                  <p>Fixed +{s.values[0]}, once per resolution, on the Main Submitter’s first scored speech · locked</p>
+                </div>
+                <span className="muted">Not configurable</span>
+              </div>
+            );
+          const builtIn = !data.scoring.some((x) => x.id === s.id);
+          const overridden = !!committee?.scoringOverrides?.some((x) => x.id === s.id);
+          return (
+            <form className="definition-row" key={`${scope}-${s.id}-${s.values}`} onSubmit={(e) => { e.preventDefault(); void save(s.id, String(new FormData(e.currentTarget).get("values"))); }}>
+              <div>
+                <strong>{s.label}</strong>
+                <p>{s.id === "speech" ? "Chair-judged value for each delivered speech" : s.id === "poi" ? "Chair-judged value after a recognized POI is asked" : "Chair-awarded points"}{committee ? (overridden ? " · committee override" : " · conference default") : builtIn ? " · built-in default" : ""}</p>
+              </div>
+              <label>
+                Allowed values
+                <input name="values" required defaultValue={s.values.join(", ")} aria-label={`${s.label} allowed values`} />
+              </label>
+              <button disabled={busy}>Save definition</button>
+            </form>
+          );
+        })}
+      </Panel>
+      <p className="footnote">Historical events retain their original points when definitions change. Speaker suggestions use opportunity counts. Awards remain Chair judgement; there is no automatic ranking.</p>
+    </>
+  );
 }

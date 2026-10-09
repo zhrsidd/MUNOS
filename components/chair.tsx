@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useConference } from "@/lib/context";
 import { AttendanceStatus, Delegate } from "@/lib/domain";
 import { participationSummary, votingOutcome, effectiveScoring } from "@/lib/repository";
+import { scoringLabel, scoringValues } from "@/lib/scoring";
+import { eventAmendmentId } from "@/lib/procedure/view";
 import {
   Chip,
   DelegateIdentity,
@@ -300,7 +302,7 @@ export function ChairScreen({
                         }
                       </td>
                       <td>
-                        {data.scoring.find((s) => s.id === e.categoryId)?.label}
+                        {scoringLabel(data, e.categoryId)}
                       </td>
                       <td>
                         <Chip tone="blue">+{e.points}</Chip>
@@ -308,6 +310,7 @@ export function ChairScreen({
                       <td>
                         {data.documents.find((d) => d.id === e.resolutionId)
                           ?.code || "General debate"}
+                        {(() => { const amendment = data.amendments?.find((a) => a.id === eventAmendmentId(data, e)); return amendment ? <> · <Chip tone="review">Amendment debate · {amendment.type} {amendment.clause}</Chip></> : null; })()}
                       </td>
                       <td>Head chair · Demo</td>
                       <td>
@@ -401,12 +404,11 @@ export function ChairScreen({
         <Modal title="Edit contribution" onClose={() => setEventEdit(null)}>
           <p>
             {data.delegates.find((d) => d.id === edit.delegateId)?.country} ·{" "}
-            {data.scoring.find((s) => s.id === edit.categoryId)?.label}
+            {scoringLabel(data, edit.categoryId)}
           </p>
           <div className="rating">
-            {(committee.scoringOverrides || data.scoring)
-              .find((s) => s.id === edit.categoryId)
-              ?.values.map((points) => (
+            {scoringValues(data, committee.id, edit.categoryId)
+              .map((points) => (
                 <button
                   key={points}
                   onClick={async () => {
