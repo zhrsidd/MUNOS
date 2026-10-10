@@ -71,8 +71,8 @@ test('before hydration the public form cannot submit natively, expose wording in
   assert.match(html, /<fieldset disabled=""/, 'fields cannot be edited and then lost before hydration');
   assert.match(html, /<button class="primary" type="submit" disabled="">Loading form…<\/button>/, 'submit (and Enter-key implicit submission) is blocked');
   assert.equal((html.match(/type="submit"/g) ?? []).length, 1, 'no other enabled submitter');
-  assert.match(html, /<p class="muted" role="status">If this form does not load, ask your Chair for a printed amendment sheet\.<\/p>/, 'stalled hydration (JS on, never loads) still tells the delegate what to do');
-  assert.match(html, /<noscript>.*This form needs JavaScript to submit\. Ask your Chair for the printed amendment sheet\..*<\/noscript>/, 'never a silent dead form');
+  assert.match(html, /<p class="muted" role="status">If this form does not load, ask your Chair how to submit your amendment\.<\/p>/, 'stalled hydration (JS on, never loads) still tells the delegate what to do');
+  assert.match(html, /<noscript>.*This form needs JavaScript to submit\. Ask your Chair how to submit your amendment\..*<\/noscript>/, 'never a silent dead form');
 });
 test('after hydration the public form is enabled and submits as before', t => {
   t.mock.method(React, 'useSyncExternalStore', ((_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot()) as typeof React.useSyncExternalStore);

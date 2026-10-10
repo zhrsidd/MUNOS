@@ -173,7 +173,7 @@ export function SystemHealth() {
               ? "Checking…"
               : server === "unreachable"
                 ? "/api/health did not respond"
-                : `${server.status} · Supabase ${server.checks.supabase.status}${server.checks.supabase.latencyMs !== undefined ? ` (${server.checks.supabase.latencyMs} ms)` : ""} · Storage ${server.checks.storage.status} · server build ${server.app.commit.slice(0, 7) || "local"} · ${new Date(server.checkedAt).toLocaleTimeString("en-GB")}`}
+                : `${server.status} · Supabase ${server.checks.supabase.status}${server.checks.supabase.latencyMs !== undefined ? ` (${server.checks.supabase.latencyMs} ms)` : ""} · Database ${server.checks.database?.status ?? "not reported"} · Storage ${server.checks.storage.status} · server build ${server.app.commit.slice(0, 7) || "local"} · ${new Date(server.checkedAt).toLocaleTimeString("en-GB")}`}
           </dd>
           <dt>Drive archive</dt>
           <dd>Not configured</dd>
