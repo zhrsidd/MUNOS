@@ -10,10 +10,10 @@ export interface HealthReport {
   checks: { supabase: ProbeResult; database: ProbeResult; storage: ProbeResult };
 }
 type Fetch = typeof fetch;
-async function timed(fetcher: Fetch, url: string, headers: Record<string, string>, timeoutMs: number, method = "GET"): Promise<ProbeResult> {
+async function timed(fetcher: Fetch, url: string, headers: Record<string, string>, timeoutMs: number): Promise<ProbeResult> {
   const started = Date.now();
   try {
-    const response = await fetcher(url, { method, headers, signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
+    const response = await fetcher(url, { headers, signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
     const latencyMs = Date.now() - started;
     if (response.ok) return { status: latencyMs > 2500 ? "degraded" : "ok", latencyMs };
     return { status: response.status >= 500 ? "down" : "degraded", latencyMs, detail: `HTTP ${response.status}` };
@@ -31,8 +31,10 @@ export async function probe(env: Record<string, string | undefined> = process.en
   const server = cloud && secret ? { apikey: secret, authorization: `Bearer ${secret}` } : null;
   const [supabase, database, storage] = await Promise.all([
     cloud ? timed(fetcher, `${url}/auth/v1/health`, { apikey: publishable! }, timeoutMs) : unchecked,
-    // A real PostgREST query (HEAD: no body, so no conference record is ever returned).
-    server ? timed(fetcher, `${url}/rest/v1/conferences?select=id&limit=1`, server, timeoutMs, "HEAD") : unchecked,
+    // A real database round trip through PostgREST, using the read-only (STABLE) RPC the QR form already calls.
+    // The server key may execute only the public-form RPCs (no table grants), and a token shorter than any
+    // issued link (22+ characters) can never match, so this always returns null: no conference data.
+    server ? timed(fetcher, `${url}/rest/v1/rpc/submission_link_info?link_token=health-probe`, server, timeoutMs) : unchecked,
     // Storage is only checked when the server holds the key used for resolution uploads.
     server ? timed(fetcher, `${url}/storage/v1/bucket/resolutions`, server, timeoutMs) : unchecked,
   ]);
