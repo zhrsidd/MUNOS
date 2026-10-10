@@ -1,5 +1,5 @@
 /* Static application shell only. Supabase/Auth responses are NEVER cached here. */
-const VERSION = 'conference-os-0.2.3';
+const VERSION = 'conference-os-0.2.4';
 const SHELL = ['/chair','/chair/roll-call','/chair/participation','/chair/documents','/chair/amendments','/chair/voting','/chair/photos','/chair/health','/approval/health','/logistics/health','/admin/health','/dcmun-logo.jpg'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(VERSION);
@@ -26,7 +26,14 @@ self.addEventListener('fetch',event=>{
  event.respondWith((async()=>{
   const cache=await caches.open(VERSION);
   if(asset){const hit=await cache.match(request);if(hit)return hit;}
-  try{const response=await fetch(request);if(response.ok)await cache.put(navigation?url.pathname:request,response.clone());return response;}
+  try{
+   const response=await fetch(request);
+   if(response.ok){await cache.put(navigation?url.pathname:request,response.clone());return response;}
+   // A server error (e.g. a broken deploy) on a prepared staff screen: keep the last good copy.
+   // 401/403/404 and redirects pass through, so access changes are never masked.
+   if(navigation&&response.status>=500){const hit=await cache.match(url.pathname);if(hit)return hit;}
+   return response;
+  }
   catch{const hit=await cache.match(navigation?url.pathname:request);return hit||new Response('Reconnect once to prepare this screen for offline use.',{status:503});}
  })());
 });

@@ -110,7 +110,7 @@ For each: set **New code expires** to the end of the conference (Qatar time) →
 - [ ] Every device uses a **normal** browser window (not private/incognito) and a browser profile nobody else uses. Note on each laptop: *"Conference device — do not clear browser data."*
 - [ ] **Do not clear browser storage** on any prepared device from now until the end of the conference.
 - [ ] **Recovery practised:** on one prepared Chair laptop and the Executive laptop, sidebar → **System health** → **Export device recovery file** downloads a file. Delete the test files.
-- [ ] **Paper fallback per committee** (in a labelled envelope): delegate list, blank attendance sheet, blank speakers list, both QR sheets, and this runbook's *During the conference* page.
+- [ ] **Paper fallback per committee** (in a labelled envelope, for emergencies only): delegate list, blank attendance sheet, blank speakers list, **blank amendment slips** (delegation, resolution, Add/Strike/Replace, clause, exact wording), **vote-tally sheets** (for / against / abstain per vote), a **resolution intake log** (time, delegation, title, how received), both QR sheets, and this runbook's *During the conference* page.
 - [ ] Wi-Fi tested in every committee room (System health GREEN). Note weak rooms.
 
 ---
@@ -243,4 +243,4 @@ Write every incident down: time, room, what happened, what was done.
 | **Lost or stolen laptop** | Executive → Access codes → that laptop's scope → **Revoke** with **Also revoke devices using this code** → **Rotate** to create a new code → prepare the replacement and the other devices of that scope again. Its unsynced work is lost; re-enter from notes. |
 | **QR link leaked or abused** (spam submissions) | Executive → Resolution links or Amendment links → **Replace** (the old QR stops immediately) → print and post the new sheet. Chairs **Rule out** spam amendments. Built-in limits also stop floods (20 per link per 10 minutes; 5 amendments per delegation per 10 minutes). |
 | **Offline device with unsent work** (can't reconnect, or its access expired) | Keep it powered and do not sign out. Sidebar → **System health** → **Export device recovery file** (or, if its access expired, the code screen's **Export saved changes**). The technical contact decides how the work is entered. Only then **Sign out after recovery export**. |
-| **Paper fallback** (Conference OS unusable for a long time) | Each committee uses its envelope: attendance sheet, speakers list. One person per committee enters the paper record afterwards, once. Don't start a spreadsheet. |
+| **Paper fallback** (emergency only: Conference OS unusable for a long time) | Each committee uses its envelope: attendance sheet, speakers list, blank amendment slips (delegates write the exact wording; the Chair keeps them in order), vote-tally sheets, and the resolution intake log. One person per committee enters the paper record afterwards, once. Don't start a spreadsheet. |

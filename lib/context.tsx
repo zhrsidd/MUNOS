@@ -9,6 +9,7 @@ import {
 import {usePathname,useRouter} from "next/navigation";
 import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
 import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
+import {requestPersistentStorage} from "./platform/persistent-storage";
 import { DurableStore } from "./sync/store";
 const preferences = new DurableStore();
 import { ConferenceData, Role } from "./domain";
@@ -43,6 +44,8 @@ export function ConferenceProvider({
   const [committeeId, setCommitteeId] = useState("ga1");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   useEffect(() => repository.initialize(), []);
+  // Public delegate pages never mount this provider, so only active staff devices ask.
+  useEffect(()=>{void requestPersistentStorage({status:access.status});},[access.status]);
   const contextConferenceId = data?.conference.id;
   useEffect(()=>{
     if(!contextConferenceId)return;

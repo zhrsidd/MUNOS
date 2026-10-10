@@ -42,7 +42,7 @@ export function AmendmentForm({ token, link }: { token: string; link: AmendmentL
     {result && !result.ok && <p className="error" role="alert">{result.message}</p>}
     {attempted && <p className="muted">Your details are held unchanged for safe retry. If debate has moved on or you need to change them, check this reference with your Chair first: {submissionId}</p>}
     <button className="primary" type="submit" disabled={sending || !hydrated}>{!hydrated ? 'Loading form…' : sending ? 'Submitting…' : attempted ? 'Retry same amendment' : 'Submit amendment'}</button>
-    {!hydrated && <p className="muted" role="status">If this form does not load, ask your Chair for a printed amendment sheet.</p>}
-    <noscript><p className="error" role="alert">This form needs JavaScript to submit. Ask your Chair for the printed amendment sheet.</p></noscript>
+    {!hydrated && <p className="muted" role="status">If this form does not load, ask your Chair how to submit your amendment.</p>}
+    <noscript><p className="error" role="alert">This form needs JavaScript to submit. Ask your Chair how to submit your amendment.</p></noscript>
   </form><p className="muted">No account or Google Doc required. Only your committee and current resolution are shown here.</p></section>;
 }

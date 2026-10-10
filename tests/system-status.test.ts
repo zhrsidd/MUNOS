@@ -5,7 +5,7 @@ import type {Health} from '../lib/sync/repository';
 import type {HealthReport} from '../lib/platform/health-probe';
 const now=Date.parse('2026-11-12T10:00:00Z');
 const healthy:Health={mode:'supabase',state:'saved',pending:0,conflicts:0,realtime:true,latency:180,message:'Synced',detail:''};
-const report=(storage:'ok'|'down'|'not_configured'='ok',commit='abc1234'):HealthReport=>({status:storage==='down'?'degraded':'ok',checkedAt:'',app:{version:'1',commit,shortCommit:commit.slice(0,7),branch:'main',environment:'production',deploymentId:'',builtAt:''},checks:{supabase:{status:'ok'},storage:{status:storage}}});
+const report=(storage:'ok'|'down'|'not_configured'='ok',commit='abc1234'):HealthReport=>({status:storage==='down'?'degraded':'ok',checkedAt:'',app:{version:'1',commit,shortCommit:commit.slice(0,7),branch:'main',environment:'production',deploymentId:'',builtAt:''},checks:{supabase:{status:'ok'},database:{status:'ok'},storage:{status:storage}}});
 const base:StatusInput={health:healthy,online:true,cloudExpected:true,server:report(),clientCommit:'abc1234',now};
 const run=(p:Partial<StatusInput>,h:Partial<Health>={})=>systemStatus({...base,...p,health:{...healthy,...h}});
 test('green when everything is connected and synced',()=>{
