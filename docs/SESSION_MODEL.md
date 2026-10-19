@@ -1,6 +1,6 @@
-# Session model: sessions are a schedule that labels records (contract draft v2)
+# Session model: sessions are a schedule that labels records (contract draft v3)
 
-**Status:** draft contract for review; **not approved for schema work.** No schema or command code has been changed for this model. Revised on 19 October 2026 after the independent review of draft v1 (`85012ca`), which found four contract blockers (action review state, schedule history, roll-call semantics, internal contradictions). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
+**Status:** draft contract for review; **not approved for schema work.** No schema or command code has been changed for this model. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
 
 ## 1. Decisions and their provenance
 
@@ -12,7 +12,7 @@
 | 4 | Overruns are allowed until the next session's switch time | **Owner**: "overruns are allowed to go as far as the beginning of next session lead time" |
 | 5 | Automation is toggleable | **Owner**: "automation for session switching should be toggle able" |
 | 6 | An offline action is labelled by the session whose window contains its device time | **Owner**: "offline actions … submitted if time on device matches that committee session's time as scheduled" |
-| 7 | Queue and debate mode persist across sessions | **Owner**: answered "yes" to persisting by default. The optional auto-clear is **withdrawn** from this draft (§9) |
+| 7 | Queue and debate mode persist across sessions by default | **Owner**: "yes". The owner **also approved an optional auto-clear at session start**; it is **retained as approved but deferred scope**, not cancelled (§9) |
 | 8 | Roll call is prompted at each session start, with an option to copy the last roll call | **Owner**: "yes with option to copy last sessions roll call" |
 | 9 | Timers are local-only and not audited; the projector page is removed | **Owner**: timers "not necessary to audit and save"; projector: "6. Remove" |
 | 10 | Amendments and votes belong to the resolution, not the session | Follows from decision 1; owner approved the restructure |
@@ -50,7 +50,8 @@ A record has four distinct session fields. They are never merged or overwritten.
 
 **Overrides.** An override is an immutable log entry `(scope: committee | conference, session, set_by, set_at, expires_at)`.
 - Precedence: a **committee** override beats a **conference** override; within one scope the later `set_at` wins.
-- Expiry: with automation on, `expires_at` is the next scheduled switch (computed and stored at creation under the schedule version in effect, so history is stable); with automation off, none (until changed).
+- Expiry: with automation on, `expires_at` is the next scheduled switch (computed and stored at creation under the schedule version in effect, so history is stable). With automation off, an override has no scheduled expiry, but **no override ever crosses the next local midnight** (a window never crosses a day boundary).
+- **Enabling automation ends every manual override in its scope at that moment.** The log appends an `ended` entry (`reason: automation_enabled`, `ended_at`) and never rewrites the original; history is interpreted from the log as it was. Disabling automation does not create an override. With automation off and no unexpired override, the committee has no session.
 - An action is labelled by the override log and schedule versions **as they were at the action's time**, not as they are now.
 - **Automation off with no applicable override: the committee has no session** (null label, flagged). The Chair Console says so, and the Executive dashboard lists such committees.
 
@@ -74,48 +75,76 @@ A record has four distinct session fields. They are never merged or overwritten.
 | Committee override vs conference override at the same time | committee wins |
 | Override set under automation on | expires at next switch; an action stamped after that uses the schedule |
 | Automation toggled off, no override | null, flagged, console shows "no session" |
-| Automation toggled off then on | window rule resumes from the toggle's `effective_from` |
+| Automation off; override S5 set at 12:00; automation on at 12:30 | the override ends at 12:30 (`automation_enabled`); an action at 12:40 is labelled by the schedule, not S5; an action at 12:20 is still labelled S5 |
+| Automation off with an override set at 22:00 | the override ends at local midnight; the next day has no session until set or automation is enabled |
+| Automation toggled off then on, no override | window rule resumes from the toggle's `effective_from` |
 
-## 4. Action lifecycle: saving is not applying (resolves the review blocker)
+## 4. Time confidence: when a device timestamp may authorise anything
 
-Every mutation has a durable server-side state, separate from its device state:
+A device timestamp is **evidence, not authority**. Everything below follows from one classification, computed by the server at receipt for every mutation and recorded with it.
+
+**Time confidence.** An action's time is **Trusted** when either (a) the server received it within 2 minutes of its device time (an online action), or (b) the device's most recent successful sync **on the same conference day** recorded a clock offset of at most 2 minutes. Otherwise it is **Uncertain**: offset over 2 minutes, no sync that day, or a device time later than receipt by more than 2 minutes. (2 minutes is a **proposed**, unconfirmed parameter.)
+
+**Order without clocks.** Within one device, order is the outbox sequence number (`device_seq`), which does not depend on the clock. Across devices, order uses Trusted times only.
+
+### Acceptance table (one deterministic answer per case)
+
+| Command class | Trusted time, in window, day open | Trusted, label differs from the device's | Trusted, outside any window | Uncertain time | Arrives after the day is closed |
+|---|---|---|---|---|---|
+| **Record** (scores, vote records, POI scores, document comments) | **Apply** | **Apply**; label flagged for review | **Apply**; label null, flagged | **Hold** | **Hold** |
+| **Control** (queue, debate mode/phase, speech start/finish, vote open/close, resolution status) | **Apply** if the entity revision matches and the action is not stale (received within `control_stale_minutes`, default 5, proposed) | same as left, label flagged | **Hold** | **Hold** | **Hold** |
+| **Roll call** (§6) | **Apply** | **Apply**, flagged | **Hold** | **Hold** | **Hold** |
+
+**Why records are held when the time is Uncertain.** A record's validity depends on the time: historical eligibility is chosen by the action's time (§6) and the schedule version by its time (§3). An unreliable clock can therefore pick the wrong eligibility state, not only the wrong label, and scores and votes change authoritative totals before anyone reviews. There is **no automatic-application exception** for Uncertain-time records. (If the owner later wants one, it needs an explicit rule and recorded provenance: every non-label precondition independently established by identifiers alone.) **Chairs keep recording**; held work is never lost.
+
+**Bulk review.** For a device whose clock is the only problem, the Executive can confirm the device's clock error once and approve its held items together; the confirmation is recorded.
+
+## 5. Action lifecycle: saving is not applying
 
 | State | Meaning | Shared-state effect |
 |---|---|---|
 | **Saved locally** | In the device outbox | none |
-| **Received** | The server has durably captured the mutation (UUID, payload, `client_time`, `displayed_label`, clock offset). Idempotent by UUID. The device may now drop it from the outbox | none until applied |
+| **Received** | Durably captured by the server (UUID, payload hash, `client_time`, `device_seq`, `displayed_label`, clock offset, time confidence). Idempotent by UUID; the same UUID with a **different payload is rejected** | none until applied |
 | **Applied** | Its effect ran once, under current authorisation | yes |
-| **Held for review** | Received, **not** applied; shown to the Executive and to the author | **none** |
-| **Resolved** | Held item approved (becomes Applied exactly once) or discarded with a reason; both retained in the ledger | as decided |
+| **Held for review** | Received, not applied (per §4) | **none** |
+| **Resolved** | A held item approved (it becomes Applied exactly once) or discarded with a reason; both retained | as decided |
 
-**Which commands apply immediately.**
-- **Record commands** (participation and speech scores, POI scores, vote records, document comments): apply with the original time and label even when the label is flagged, **provided** their own preconditions hold (entity exists, revision matches, eligibility as of the action time, §5). A flagged label never changes the effect, only the attribution.
-- **Control commands** (queue add/remove/order, debate mode/phase, speech start/finish, vote open/close, resolution status changes): apply only if **all** hold: the entity's expected revision still matches (existing optimistic fingerprint), the action is **not stale** (received within `control_stale_minutes`, default 5, of its device time), and the label confidence is normal (§6). Otherwise it is **Held for review** with the reason. A stale queue clear, debate-mode change or vote operation therefore cannot change today's state because it carries an old time.
-- **Dependent actions.** Once a control command for a committee is held, later *control* commands from the same device for that committee are held behind it until it is resolved ("held behind"). Record commands continue to apply when their own preconditions hold, otherwise they are held. The chair keeps recording throughout; a boundary never causes a lost action.
+- **Dependent actions.** Once a control command for a committee is held, later control commands from the **same device** (by `device_seq`) for that committee are held behind it until it is resolved. Record commands follow the table in §4 on their own.
+- **Acknowledgement without loss.** The server acknowledges *Received* (including *Held*); the device removes the outbox entry only on that acknowledgement and then shows the item as "sent for review" in the status area and the notification inbox.
+- **Review.** Approval applies the **original payload once** under **current authorisation** and the current entity revision; if the revision no longer matches the item stays held with the new reason. Application is idempotent by UUID; the decision (who, when, reason) is recorded; a discarded item is retained.
+- **Requirements for the schema/sync owner** (not designed here, and the existing "a receipt means the effect was applied" behaviour **cannot be reused unchanged**): atomic durable receipt, crash recovery between receive and apply, UUID and payload consistency, the application transaction, and dependency and device ordering.
 
-**Acknowledgement without loss.** The server acknowledges *Received* (including *Held*). The device removes the outbox entry only on that acknowledgement; it then shows the item as "sent for review" in the status area and Leo's inbox. Nothing is dropped while *Held*.
+## 6. Roll calls: effective time, local commit and server commit are different
 
-**Review.** The Executive approves or discards a held item. Approval applies the **original payload once** under the **current** authorisation and the current entity revision; if the revision no longer matches, the item stays held with the new conflict reason. Application is idempotent by mutation UUID (the receipt ledger), and the decision is recorded (who, when, reason). A discarded item is retained.
+**Four times, never conflated.**
 
-## 5. Roll calls: historical eligibility is not live presence (resolves the review blocker)
+| Time | Meaning |
+|---|---|
+| `observed_at` | Device time when the roll call was taken |
+| `local_committed_at` | Device time of the explicit Commit |
+| `received_at` | Server receipt time |
+| `server_committed_at` | When the server accepted it as committed |
 
-**Roll calls are identified, committed snapshots.**
-- `roll_call(id, committee, taken_at, committed_at, revision, copied_from, state: draft | committed)`; rows carry `status ∈ {Present, Present & Voting, Absent}` (the existing attendance statuses).
-- **Copy last roll call** creates a **draft** with `copied_from` set and the rows copied, in one server-side step. A draft **never** affects presence. Partial edits stay a draft. The chair commits with an explicit **Commit** action, sent as one idempotent mutation carrying the full row set, so a half-edited roll call cannot become live by accident. An abandoned draft expires and is retained.
-- A correction after commit (late arrival) increments `revision`; the revision effective at a given time is the one with the greatest `committed_at` not later than it.
+**Effective time = `local_committed_at` when its time is Trusted** (§4); it is otherwise **held** and not live. Effective time is capped: if it is later than `received_at` by more than the tolerance, the roll call is **held**, so a badly future-dated roll call can never become live indefinitely.
 
-**Two different questions, two answers.**
-- **Live presence** (is this delegate present *now*, for controls such as adding to the queue): the committed roll call with the greatest `taken_at` (ties by id). A **delayed older roll call** never overwrites it: ordering is by `taken_at`, not arrival, and an older one is recorded as history only.
-- **Historical eligibility** (was this delegate eligible when a delayed action was recorded): the committed roll call, at its effective revision, that was latest **as of the action's device time**. *Example:* present at 11:55, marked absent by a 12:30 roll call; a speech score recorded at 11:58 arrives at 12:40. It is validated against the 11:55 roll call and applies. It is not rejected because a newer roll call exists.
+**Roll calls are identified, committed snapshots.** `roll_call(id, committee, state: draft | committed, revision, copied_from)` with rows `status ∈ {Present, Present & Voting, Absent}`. The id is generated on the device, so a roll call taken and committed offline has a stable identity before it reaches the server.
+- **Copy last roll call** (online or offline) creates a **draft** with `copied_from` and the rows copied; a draft never affects presence. The chair commits with an explicit **Commit**, sent as **one idempotent mutation carrying the full row set**, so a half-edited roll call cannot become live by accident. Abandoned drafts expire and are retained.
+- A correction after commit increments `revision`, with its own effective time.
 
-**Votes.** When a vote opens, the server snapshots the eligible set (delegates `Present & Voting`, and `Present` where abstention is permitted; the existing rule that `Present & Voting` cannot abstain is preserved) from the live roll call at that moment. Every vote on that resolution is validated against **that snapshot**, never against a later roll call. Once the result is **closed** it is immutable: a delayed vote arriving afterwards is **held for review** and changes nothing.
+**Live presence** (controls such as adding to the queue): the committed revision with the greatest effective time, ties by id. Ordering uses effective time, not arrival, so a delayed older roll call never overwrites it.
 
-## 6. Offline labelling and confidence
+**Historical eligibility** (validating a delayed action): the revision effective **as of the action's time**, with these causal rules:
+- A dependent action **cites the roll-call id and revision** the device relied on. On the **same device** the roll call precedes the action by `device_seq`, so the server receives and applies them in that order regardless of clocks.
+- The server then checks that the cited revision is committed, belongs to the committee and permits the delegate; if the action's time is Trusted and no later revision with a Trusted effective time at or before the action's time exists, the action is eligible.
+- *Counterexample covered:* roll call taken and locally committed at 11:55 and participation at 11:58 on a device offline until 12:40. Both arrive at 12:40, roll call first; its effective time is 11:55 (Trusted: the device synced that day within 2 minutes offset), so a server commit time of 12:40 is **not** used for eligibility; the 11:58 action is eligible.
+- *Counterexample covered:* present at 11:55, absent in a 12:30 roll call, action recorded 11:58 arriving 12:40: validated against the 11:55 revision and applied.
+- If time is Uncertain at any link, the dependent action is **held** (§4).
 
-- The server stamps `assigned_label` from the action's device time with the schedule version in effect then (§3).
-- **Clock safeguard.** The device records its clock offset at each successful sync and sends it with the mutation. If the offset exceeds 2 minutes, or the device has not synced that day, label confidence is **uncertain**: record commands still apply (flagged for label review); control commands are **held** (§4).
-- Authorisation is checked against current server access; entity relationships are validated; a late action is never rejected merely because a boundary passed.
-- Late acceptance: until the Executive closes that conference day; later arrivals are held for review.
+**Votes.** When a vote opens, the server snapshots the eligible set (`Present & Voting`, and `Present` where abstention is allowed; the existing rule that `Present & Voting` cannot abstain is preserved) from the live roll call at that moment. Every vote on that resolution is validated against **that snapshot**. Once the result is **closed** it is immutable: a delayed vote arriving afterwards is **held for review**.
+
+## 6a. Offline labelling
+
+The server stamps `assigned_label` from the action's time with the schedule version in effect then (§3). Authorisation is checked against current access; entity relationships are validated; a late action is never rejected merely because a boundary passed. Late acceptance runs until the Executive closes that conference day; arrivals after that are held (§4).
 
 ## 7. Boundary behaviour on devices
 
@@ -128,8 +157,8 @@ A time boundary produces no database write, so nothing announces it. Devices hol
 | Entity | New model |
 |---|---|
 | Speaker queue, debate mode/phase, floor, POI queue | Committee-level; persist across sessions; session fields become labels |
-| Votes | Keyed by `(resolution, delegate)`; eligibility from the vote-open snapshot (§5) |
-| Attendance | Roll calls (§5) |
+| Votes | Keyed by `(resolution, delegate)`; eligibility from the vote-open snapshot (§6) |
+| Attendance | Roll calls (§6) |
 | Documents / amendments | The resolution owns its debate; amendment submission requires `In Debate` and committee match; no equality with a pointer |
 | Participation events | The four labels (§2) |
 | Timers | Removed |
@@ -137,17 +166,19 @@ A time boundary produces no database write, so nothing announces it. Devices hol
 
 **Timer removal scope (precise).** Disconnect the persistence command path (`timer` command and its fingerprint, the server `timer` branch and its audit); **replace every consumer**, namely the read-only `<Timer>` used by the projector page (`components/workspace.tsx`), the `data.timers` reads (`components/ui.tsx`), the speech-transition timer reset, and the "session used" check that looks at timer presence; delete the projector page (owner: remove). Hiding the UI is not enough. **Database cleanup (dropping the table) is left to the schema owner.**
 
-## 9. Withdrawn: automatic queue clear at session start
+## 9. Deferred (approved) scope: automatic queue clear at session start
 
-The draft v1 setting is withdrawn. A device-side boundary timer would let every chair clear the shared queue independently, and an old offline queue-add could resurrect a deliberately cleared entry. A future design needs a **server-side, versioned, idempotent transition**: a per-committee `queue_epoch` bumped by the server at the boundary or by the Executive, entries carrying their epoch, and offline adds with an older epoch **held** (§4). Until then the queue persists and chairs clear it with the existing controls.
+The owner approved an optional auto-clear. It is **retained as approved but deferred**, not cancelled. A device-side boundary timer would let every chair clear the shared queue independently, and an old offline queue-add could resurrect a deliberately cleared entry. The future design needs a **server-side, versioned, idempotent transition**: a per-committee `queue_epoch` bumped by the server at the boundary or by the Executive, entries carrying their epoch, and offline adds with an older epoch **held** (§4). Until then the queue persists and chairs clear it with the existing controls.
 
 ## 10. Test plan (before any merge)
 
-Shared vectors for the window function, identical in TypeScript and SQL: all of §3's cases, including an offline action crossing a schedule edit in both orders, override precedence and expiry, automation toggled both ways, a break shorter than the lead, overnight, day close and grace, before-first and after-close. Lifecycle: record vs control, stale control, label-uncertain control held, held-behind, approve applies once, replay of an approved UUID, revision mismatch on approval. Roll calls: the 11:55/12:30/12:40 example, a delayed older roll call, copy-last draft not live until committed, vote snapshot with `Present & Voting` and abstention, a vote after the result closed. Speech, vote and amendment spanning a boundary; RLS unchanged (chairs see their own committee); duplicate mutation replay; the existing outbox, idempotency and PT409 tests unchanged.
+Shared vectors for the window function, identical in TypeScript and SQL: all of §3's cases, including an offline action crossing a schedule edit in both orders, override precedence and expiry, automation toggled both ways, a break shorter than the lead, overnight, day close and grace, before-first and after-close. Lifecycle: every cell of the §4 acceptance table (including Uncertain-time **record** commands held), held-behind, approve applies once, replay of an approved UUID, the same UUID with a different payload rejected, crash between receive and apply, revision mismatch on approval, bulk approval after a confirmed clock error. Roll calls: the 11:55/12:30/12:40 example, **the offline roll call plus action arriving together (effective time, not server commit time, decides)**, a future-dated roll call held, a delayed older roll call, copy-last (also offline) is a draft until committed, vote snapshot with `Present & Voting` and abstention, a vote after the result closed. Speech, vote and amendment spanning a boundary; RLS unchanged (chairs see their own committee); duplicate mutation replay; the existing outbox, idempotency and PT409 tests unchanged.
 
 ## 11. Open items
 
-- Owner: confirm or replace the 5-minute lead and 20-minute grace (decision 11), and `control_stale_minutes` (default 5, proposed).
+- Owner: confirm or replace the 5-minute lead, 20-minute grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance. **All four are proposals, not approved release settings.**
 - Reports, exports and awards that group by session are **not yet audited** for the four-label model.
 - Every UI use of `currentSessionId` is not yet inventoried; the Executive archive and "session used" checks need design.
 - Whether `Present` (non-voting) may abstain exactly as today when snapshot-based; confirm with the procedure rules.
+- Schema detail: `final_label` is derived, but "no correction yet" must be distinguishable from "corrected to null"; store an explicit correction record, not a nullable column that falls back to `assigned_label`.
+- The review UI for held items (per device, bulk approve, reasons) is not designed.
