@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
 import { Role } from "@/lib/domain";
 import { soleWorkspacePath } from "@/lib/access";
 import { Icon, Chip, Panel } from "./ui";
+import { Brand } from "./brand";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
@@ -44,33 +44,34 @@ const roles: { id: Role; name: string; description: string; icon: string }[] = [
     icon: "settings",
   },
 ];
+// [route, label, icon, group]. An empty group is the everyday work; named groups sit quietly below it.
 const chairNav = [
-  ["", "Debate", "debate"],
-  ["roll-call", "Roll call", "attendance"],
-  ["participation", "Participation", "log"],
-  ["documents", "Documents", "documents"],
-  ["amendments", "Amendments", "documents"],
-  ["voting", "Voting", "voting"],
-  ["photos", "Group photos", "clock"],
-  ["awards", "Award discussion", "awards"],
-  ["health", "System health", "settings"],
+  ["", "Debate", "debate", ""],
+  ["roll-call", "Roll call", "attendance", ""],
+  ["participation", "Participation", "log", ""],
+  ["documents", "Resolutions", "documents", ""],
+  ["amendments", "Amendments", "documents", ""],
+  ["voting", "Voting", "voting", ""],
+  ["photos", "Group photos", "clock", "More"],
+  ["awards", "Award discussion", "awards", "More"],
+  ["health", "System health", "settings", "More"],
 ];
 const adminNav = [
-  ["", "Overview", "admin"],
-  ["conference", "Conference", "settings"],
-  ["committees", "Committees", "debate"],
-  ["sessions", "Sessions", "clock"],
-  ["delegates", "Delegates", "attendance"],
-  ["schools", "Schools", "admin"],
-  ["photos", "Group photos", "clock"],
-  ["staff", "Chairs & staff", "review"],
-  ["access-codes", "Access codes", "settings"],
-  ["scoring", "Scoring", "log"],
-  ["workflow", "Workflow & features", "settings"],
-  ["submissions", "Resolution links", "documents"],
-  ["amendment-links", "Amendment links", "documents"],
-  ["audit", "Audit log", "log"],
-  ["health", "System health", "settings"],
+  ["", "Overview", "admin", ""],
+  ["conference", "Conference", "settings", "Set up"],
+  ["committees", "Committees", "debate", "Set up"],
+  ["sessions", "Sessions", "clock", "Set up"],
+  ["delegates", "Delegates", "attendance", "Set up"],
+  ["schools", "Schools", "admin", "Set up"],
+  ["staff", "Chairs & staff", "review", "Set up"],
+  ["photos", "Group photos", "clock", "Run the day"],
+  ["submissions", "Resolution links", "documents", "Run the day"],
+  ["amendment-links", "Amendment links", "documents", "Run the day"],
+  ["access-codes", "Access codes", "settings", "Run the day"],
+  ["scoring", "Scoring", "log", "Run the day"],
+  ["workflow", "Workflow & features", "settings", "Run the day"],
+  ["audit", "Audit log", "log", "Records"],
+  ["health", "System health", "settings", "Records"],
 ];
 export function Workspace({ path }: { path: string }) {
   const {
@@ -102,18 +103,7 @@ export function Workspace({ path }: { path: string }) {
     return (
       <main className="landing">
         <header>
-          <Link href="/" className="brand">
-            <Image
-              className="brand-logo"
-              src="/dcmun-logo.jpg"
-              alt="Doha College Model United Nations"
-              width={42}
-              height={42}
-            />
-            <span>
-              DCMUN<span className="brand-os"> / OS</span>
-            </span>
-          </Link>
+          <Brand />
           <Chip tone="neutral">{access.status === "active" ? "Staff workspace" : "Interactive demo"}</Chip>
         </header>
         <div className="landing-content">
@@ -177,48 +167,34 @@ export function Workspace({ path }: { path: string }) {
               "",
               role === "approval" ? "Review inbox" : "Print queue",
               role === "approval" ? "review" : "print",
+              "",
             ],
-            ["health", "System health", "settings"],
+            ["health", "System health", "settings", ""],
           ];
   return (
     <div className="app-shell">
       <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <Link href="/" className="brand">
-          <Image
-            className="brand-logo"
-            src="/dcmun-logo.jpg"
-            alt="Doha College Model United Nations"
-            width={42}
-            height={42}
-          />
-          <span>
-            DCMUN<span className="brand-os"> / OS</span>
-          </span>
-        </Link>
-        <div className="conference-label">
-          <span>DCMUN</span>
-          <small>Conference operations</small>
-        </div>
+        <Brand />
         <div className="workspace-label">{roleInfo.name}</div>
         <nav>
-          {nav.map(([slug, label, icon]) => (
-            <Link
-              onClick={() => setMenu(false)}
-              key={slug}
-              href={`/${role}${slug ? `/${slug}` : ""}`}
-              className={section === slug ? "active" : ""}
-            >
-              <Icon name={icon} />
-              {label}
-              {role === "chair" && slug === "documents" && (
-                <span className="nav-count">
-                  {
-                    data.documents.filter((d) => d.committeeId === committeeId)
-                      .length
-                  }
-                </span>
-              )}
-            </Link>
+          {nav.map(([slug, label, icon, group], i) => (
+            <Fragment key={slug}>
+              {group && group !== nav[i - 1]?.[3] && <div className="nav-group">{group}</div>}
+              <Link
+                onClick={() => setMenu(false)}
+                href={`/${role}${slug ? `/${slug}` : ""}`}
+                className={section === slug ? "active" : ""}
+                aria-current={section === slug ? "page" : undefined}
+              >
+                <Icon name={icon} />
+                {label}
+                {role === "chair" && slug === "documents" && (
+                  <span className="nav-count">
+                    {data.documents.filter((d) => d.committeeId === committeeId).length}
+                  </span>
+                )}
+              </Link>
+            </Fragment>
           ))}
         </nav>
         <div className="sidebar-bottom">
@@ -230,20 +206,9 @@ export function Workspace({ path }: { path: string }) {
             Switch workspace
           </Link>
           <div className="user">
-            <span className="avatar">
-              {role === "chair"
-                ? "AM"
-                : role === "approval"
-                  ? "SR"
-                  : role === "logistics"
-                    ? "NA"
-                    : "CA"}
-            </span>
             <div>
-              <strong>{data.staff.find((s) => s.role === role)?.name}</strong>
-              <small>
-                {access.status === "active" ? roleInfo.name : "Demo access"}
-              </small>
+              <strong>{roleInfo.name}</strong>
+              <small>{access.status === "active" ? "Signed in" : "Demo access"}</small>
             </div>
           </div>
         </div>
@@ -258,8 +223,6 @@ export function Workspace({ path }: { path: string }) {
             >
               ☰
             </button>
-            <span>{roleInfo.name}</span>
-            <span className="divider">/</span>
             {role === "chair" ? (
               <select
                 aria-label="Select committee"
@@ -275,10 +238,6 @@ export function Workspace({ path }: { path: string }) {
             ) : (
               <strong>Conference-wide</strong>
             )}
-          </div>
-          <div className="topbar-right">
-            <Chip tone="neutral">{access.status === "active" ? "STAFF" : "DEMO"}</Chip>
-            <span>Monday, 5 October</span>
           </div>
         </header>
         <main className="workspace-content">

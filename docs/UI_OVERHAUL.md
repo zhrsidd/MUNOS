@@ -27,7 +27,7 @@ safeguards.
 Acceptance: no rule restricts Claude from core features; the five protected areas are listed with reasons; it
 points at `docs/BRAND.md` and this plan; no reference to the ChatGPT mirror or `sources/` directory remains.
 
-## W2 · DCMUN visual identity ◐ (BRAND.md, tokens, buttons, chips, focus done; primitives sweep and header lockup remain)
+## W2 · DCMUN visual identity ◐ (BRAND.md, tokens, buttons, chips, focus, sidebar, lockup (`components/brand.tsx`) done; a mechanical pass moved ~120 grey text/border/background values onto tokens; remaining one-off hex values and the panel/modal/table primitives still to sweep)
 
 Palette, typography, spacing, component styles and information hierarchy defined in `docs/BRAND.md` first,
 adapted from DeutschLab's principles (colour roles, hairlines over cards, 4 px scale, measured contrast).
@@ -40,7 +40,7 @@ Acceptance: contrast table in BRAND.md reproduced by a script; no new one-off he
 status chip has a word; focus ring visible on every control; typecheck, lint, tests, build pass; real-browser
 screenshots of the four workspaces at 360 px and 1280 px reviewed.
 
-## W3 · Shell and navigation ☐ (depends W2)
+## W3 · Shell and navigation ◐ (one lockup, grouped sidebar, duplicate topbar role/DEMO chip removed, fake staff name/avatar and hard-coded date removed; Approval/Print/Executive tab consolidation continues)
 
 One shell for Chair, Approval Panel, Printing and Executive: lockup, workspace and committee, sync status,
 user menu, ≤ 5 tabs named for jobs. Auto-enter for single-workspace users is already in (`soleWorkspacePath`).
@@ -97,7 +97,22 @@ comment, reviewer, time, newest first, per resolution. Landmark and heading stru
 focusable, announced updates. Acceptance: axe-style checks (roles, names, contrast) pass in a browser; works
 without colour; shows decisions made offline once synced, labelled with the server time.
 
-## W7 · Declutter every tab and panel ☐ (depends W3, W4)
+## W7 · Declutter every tab and panel ◐ (depends W3, W4)
+
+Inventory so far (screen → decision):
+
+| Screen | Decision | Reason |
+| --- | --- | --- |
+| Chair nav (9 items) | 6 everyday + "More" (Group photos, Award discussion, System health) | Match the day's jobs; rare screens stay reachable |
+| Chair "Documents" | Renamed Resolutions; preview, timeline, version panel, mock version removed | Facts inline; one next action |
+| Executive nav (15 items) | Grouped: Set up / Run the day / Records | Same pages, findable |
+| Executive "Resources & Drive" | Removed | Retired feature; stale "Not connected" panels |
+| Sidebar conference label, topbar DEMO/STAFF chip, topbar role name | Removed | Repeated the lockup, sync status and workspace label |
+| Sidebar user block | Role and sign-in state only | Showed an arbitrary staff member's name and fixed initials |
+| Topbar date | Removed | Hard-coded "Monday, 5 October" |
+| Executive home demo callout | Demo only, with the reset button | Was shown in production |
+
+Remaining: Approval/Print/Executive page bodies, Chair Debate screen, Executive Overview, Amendments, Group photos.
 
 Audit every tab, panel and repeated control across Chair, Approval Panel, printing and Executive. Remove
 retired features (timers on the server, projector, Drive, award rubric remnants), merge redundant views, keep
