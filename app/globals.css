@@ -3339,3 +3339,20 @@ html { scroll-padding-top: 12rem; }
 @media (prefers-reduced-motion: reduce) {
   .workspace-loading-orbit { display: none; animation: none !important; }
 }
+
+/* Compact operational views; shared visual cleanup is assigned to Claude. */
+.points-leaderboard { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.points-leaderboard li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.points-leaderboard li > span:nth-child(2) { overflow-wrap: anywhere; }
+.points-leaderboard strong { font-variant-numeric: tabular-nums; }
+.resolution-overview-filters { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-5); }
+.resolution-overview-filters label { display: grid; gap: var(--space-2); flex: 1 1 240px; min-width: 0; }
+.resolution-overview-filters input, .resolution-overview-filters select { width: 100%; min-width: 0; }
+.executive-resolution-row { padding: var(--space-4) var(--space-4); overflow-wrap: anywhere; }
+.executive-resolution-row + .executive-resolution-row { border-top: 1px solid var(--line); }
+.executive-resolution-heading { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: var(--space-3); }
+.executive-resolution-heading > div { min-width: 0; flex: 1 1 240px; }
+.executive-resolution-heading h3 { margin: var(--space-1) 0; }
+.executive-resolution-feedback { margin: var(--space-4) 0; padding: var(--space-3); border-left: var(--space-1) solid var(--action); background: var(--action-soft); white-space: pre-wrap; }
+.executive-resolution-feedback p { margin-bottom: 0; }
+.executive-resolution-row details { margin-top: var(--space-3); }

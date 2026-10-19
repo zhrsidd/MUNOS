@@ -83,3 +83,18 @@ test('Chair Debate: amendment in debate takes over the console; passed reminder 
  assert.match(after,/Apply the passed amendment to the working Google Doc\./);
  assert.doesNotMatch(after,/docs\.google\.com\/.*edit/,'no automatic Google Doc editing');
 });
+
+
+test('Debate replaces suggestions with a bounded points list containing every committee delegation', async t => {
+ const data=seed();
+ const html=await renderChair(t,data);
+ assert.match(text(html),/Points leaderboard/);
+ assert.match(text(html),/Conference totals · every delegation/);
+ assert.doesNotMatch(text(html),/Make room for another voice/);
+ const list=html.match(/<ol class="points-leaderboard"[\s\S]*?<\/ol>/)![0];
+ assert.match(list,/tabIndex="0"|tabindex="0"/);
+ const delegates=data.delegates.filter(d=>d.committeeId==='ga1');
+ assert.equal((list.match(/<li/g)||[]).length,delegates.length);
+ for(const d of delegates)assert.ok(list.includes(d.country),d.country);
+ assert.doesNotMatch(list,/<button/);
+});

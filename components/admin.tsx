@@ -1,5 +1,6 @@
 "use client";
 import {VetoSettings} from "./veto-settings";
+import { ExecutiveResolutionOverview } from "./executive-resolution-overview";
 import { CentralSessions } from "./central-sessions";
 import { CommitteeManagement } from "./committee-management";
 import Link from "next/link";
@@ -69,6 +70,7 @@ export function AdminScreen({ section }: { section: string }) {
     }
   }
   if (section === "committees") return <CommitteeManagement />;
+  if (section === "resolution-status") return <ExecutiveResolutionOverview />;
   if (section === "sessions" || section === "schedule") return <CentralSessions />;
   return (
     <>
@@ -88,7 +90,7 @@ export function AdminScreen({ section }: { section: string }) {
               + Add{" "}
               {section === "staff" ? "staff member" : section.slice(0, -1)}
             </button>
-          ) : undefined
+          ) : !section ? <Link className="button" href="/admin/resolution-status">Resolution status</Link> : undefined
         }
       />
       {!section && (

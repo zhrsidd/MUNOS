@@ -22,6 +22,17 @@ Branch: `codex/priority-chair-ui`. Claude can review and clean up this package i
    Historical records and the already-retired command checks are preserved. The offline shell never contained
    the award routes. Cache version 0.2.5 refreshes the changed shell assets without changing bypass rules.
 
+## Follow-up functional package
+
+Implemented: contribution-ranked Participation, compact conference-points Debate leaderboard and read-only
+Executive resolution status at `/admin/resolution-status` (Operations menu and Overview shortcut).
+See [PARTICIPATION_VIEWS.md](PARTICIPATION_VIEWS.md) for counting rules. Existing scoped snapshots supply all
+three views; no extra polling, schema or permission changes.
+
+**Claude: the owner explicitly requests a global button and spacing overhaul.**
+See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md) for the owner's feedback and acceptance checks.
+This functional package does not claim that cleanup is complete.
+
 ## Remaining priority order
 
 These are the owner's current requirements, including superseding decisions. They are not marked done by this
@@ -35,9 +46,9 @@ package. Continue from the existing Assembly implementation, rather than reintro
 2. **Passed amendment history.** Exact wording, type, clause, submitter, outcome, time, honest clipboard feedback
    and working-Doc link remain accessible by original resolution after closure, session changes and reload.
    Bound/paginate older history and verify permissions; the current active-resolution inbox is insufficient.
-3. **Executive resolution status.** Useful all-committee status/feedback/working-document overview using existing
+3. **Executive resolution status — implemented in the follow-up package.** Useful all-committee status/feedback/working-document overview using existing
    scoped state; no per-row polling or audit-log exposure to other roles.
-4. **Participation by contributions, Debate by points.** Contribution count descending, stable country/name/id
+4. **Participation by contributions, Debate by points — implemented in the follow-up package.** Contribution count descending, stable country/name/id
    ties, no points tie-break; define counted amendments and submitter credit first. Preserve editing focus and
    align exports. Separate compact, bounded Debate leaderboard contains every country, flag and point total,
    explicitly labelled scope, including ties/zero/negative totals. Replace the suggestions panel there.
@@ -90,3 +101,25 @@ Orbit seal selected by the owner and now implemented in the initial staff loadin
 remain Slow seal spin, Breathing seal and Assembly dots. The linked document records online references, timing,
 reduced motion, app verification and remaining limits. Background work keeps the persistent sync strip; ready
 content is not delayed. Row skeletons, other loading primitives and broader transitions remain pending.
+
+## Follow-up package verification · 19 October 2026
+
+- Full automated suite: 416 tests, 412 passed, 4 existing PostgreSQL 17 concurrency skips, 0 failed.
+  Typecheck, lint (no warnings) and production build pass.
+- New functional coverage: contribution rules (zero points, voids, distinct POIs, recorded amendments,
+  automatic submitter credits, duplicate ids), deterministic ties, focus freeze, net points/adjustments,
+  lifecycle progress, empty/archived committees, filtering, safe Doc links and Chair-only role denial.
+- Production-build Chrome demo checks at 320/390/768/1280 px: all 12 committee delegations in the bounded
+  keyboard-scrollable points list; no horizontal overflow; full latest feedback; read-only Executive rows;
+  local country/status/code filtering; empty/no-match states. The 320 px run requests reduced motion.
+- Six real contribution saves keep keyboard-focused rows stable, then update the rank on leaving the list.
+  A deduction changes the numeric total without changing contribution rank; restoring and reloading preserve
+  the result. Executive resolution status also reloads and filters offline after shell preparation.
+- Snapshot/API/outbox contracts and permissions are unchanged. Executive uses the existing bundled compact
+  snapshot; no per-row fetching or new polling is added. Worker shell cache is 0.2.7 for the new route/assets,
+  with API/auth bypass and 401/403/404 behavior preserved. No hosted resource or migration was changed.
+- Screenshots and browser result details are in ignored `artifacts/participation-views/`.
+
+Not verified: authenticated staging/cloud behavior, screen-reader announcements, actual browser 200% zoom,
+representative Chair hardware or the conference-week workload. The global button and spacing overhaul remains
+Claude's task; these features do not mark it complete.

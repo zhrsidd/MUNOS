@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useConference } from "@/lib/context";
-import { suggestedDelegates } from "@/lib/repository";
+import { PointsLeaderboard } from "./points-leaderboard";
 import type { Command } from "@/lib/commands";
 import type { Delegate } from "@/lib/domain";
 import type { Lane, SpeechKind } from "@/lib/procedure/types";
@@ -100,7 +100,6 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
   const yieldDelegates = present.filter(d => d.id !== active?.delegateId);
   const selectedYield = yieldDelegates.some(d => d.id === yieldSelection) ? yieldSelection : "";
   const mainSubmitter = present.find(d => d.id === resolution?.submitterId);
-  const suggested = suggestedDelegates(data, sessionId).filter(d => d.id !== active?.delegateId).slice(0, 3);
   const lanes: Lane[] = mode === "open" ? ["open"] : ["for", "against"];
   async function send(command: Command) {
     if (busy) return;
@@ -204,9 +203,6 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
         })}
       </div>
     </Panel>
-    <Panel title="Make room for another voice" subtitle="Suggestions prioritize fewer opportunities, independently of quality points.">
-      <div className="procedure-suggestions">{suggested.map(d => <div key={d.id}><DelegateIdentity delegate={d} /><button disabled={busy || data.queue.some(q => q.sessionId === sessionId && q.delegateId === d.id && (q.lane ?? "open") === currentLane)} onClick={() => void send({ type: "queueAdd", sessionId, delegateId: d.id, lane: currentLane })}>+ Queue</button></div>)}</div>
-      {!present.length && <p className="footnote">Mark delegates present in <Link href="/chair/roll-call">Roll call</Link> to begin.</p>}
-    </Panel>
+    <PointsLeaderboard delegates={delegates} />
   </div>;
 }

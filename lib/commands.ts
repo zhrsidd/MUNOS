@@ -14,6 +14,7 @@ import type { DecisionKind } from "./operations/types";
 import { applyOperationsCommand, isOperationsCommand, operationsRoles, type OperationsCommand } from "./operations/commands";
 import { conferenceScoring, scoringProblem, scoringValues } from "./scoring";
 import { countryFlag } from "./countries";
+import { contributionCount, delegationOrder, isContribution } from "./participation-view";
 export { effectiveScoring } from "./scoring";
 // CODEX REVIEW REQUIRED: extension commands (OperationsCommand) join the union and are
 // delegated to lib/operations; core command handling is unchanged.
@@ -119,10 +120,11 @@ const id = () => crypto.randomUUID();
 export function adjustmentTotal(data: ConferenceData, delegateId: string) {
   return (data.pointAdjustments ?? []).reduce((n, a) => (a.delegateId === delegateId ? n + a.points : n), 0);
 }
-/** Highest total first. Ties: country A to Z, then id, so the order is the same on every device. */
+/** Most contributions first, independently of awarded points. */
 export function participationOrder(data: ConferenceData, delegates: Delegate[]) {
-  const total = new Map(delegates.map((d) => [d.id, participationSummary(data, d.id).points]));
-  return [...delegates].sort((a, b) => total.get(b.id)! - total.get(a.id)! || a.country.localeCompare(b.country, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const contributions = new Map(delegates.map(d => [d.id, new Set<string>()]));
+  for (const event of data.events) if (isContribution(event)) contributions.get(event.delegateId)?.add(event.id);
+  return [...delegates].sort((a, b) => contributions.get(b.id)!.size - contributions.get(a.id)!.size || delegationOrder(a, b));
 }
 /**
  * While a row is being edited or keyboard focus sits in the list, keep the order the person was looking at, so the
@@ -145,7 +147,7 @@ export function participationSummary(data: ConferenceData, delegateId: string) {
     (e) => e.delegateId === delegateId && !e.voidedAt,
   );
   return {
-    opportunities: events.filter(e=>e.categoryId!=="submitter").length,
+    opportunities: contributionCount(events),
     // Effective event points plus the Chair's adjustments; the events themselves are never edited by an adjustment.
     points: events.reduce((n, e) => n + e.points, 0) + adjustmentTotal(data, delegateId),
     speeches: events.filter((e) => e.categoryId === "speech").length,

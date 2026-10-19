@@ -142,3 +142,11 @@ Ready/cached workspaces keep their content and use the sync strip for refreshes.
 shows the existing access/recovery controls. Public delegate forms never mount this staff loading screen.
 
 `docs/LOADING_MOTION_PROPOSAL.md` records the selected design, references and verification limits.
+
+## Operational view follow-up (19 October 2026)
+
+The Debate points list uses compact 8 px row padding and a 240 px bounded scroll region; every delegation
+is present and keyboard scrolling is available. Executive resolution status uses the existing heading, chip,
+source-link and history patterns: latest feedback is visible in full, older history is disclosed on demand.
+Both use the existing palette and spacing tokens. Global control/spacing cleanup is assigned to Claude in
+[CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).

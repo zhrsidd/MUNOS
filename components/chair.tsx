@@ -8,6 +8,7 @@ import { useConference } from "@/lib/context";
 import { AttendanceStatus, Delegate } from "@/lib/domain";
 import { participationSummary, votingOutcome, effectiveScoring } from "@/lib/repository";
 import { frozenOrder, participationOrder } from "@/lib/commands";
+import { contributionCount, isContribution } from "@/lib/participation-view";
 import { AdjustmentHistory, DeductPoints } from "./point-adjustments";
 import { scoringLabel, scoringValues } from "@/lib/scoring";
 import { eventAmendmentId } from "@/lib/procedure/view";
@@ -77,7 +78,7 @@ export function ChairScreen({
   const [selected, setSelected] = useState<string | null>(null);
   const [eventEdit, setEventEdit] = useState<string | null>(null);
   const [deducting, setDeducting] = useState<string | null>(null);
-  // Order shown while an editor is open or keyboard focus is in the list; null = follow live totals.
+  // Order shown while an editor is open or keyboard focus is in the list; null = follow live contributions.
   const [heldOrder, setHeldOrder] = useState<string[] | null>(null);
   const [keyboardInList, setKeyboardInList] = useState(false);
   const [adjusted, setAdjusted] = useState("");
@@ -235,19 +236,19 @@ export function ChairScreen({
       {section === "participation" && (
         <>
           <div className="metrics">
-            <Metric value={events.length} label="Opportunities recorded" />
+            <Metric value={contributionCount(events)} label="Contributions this session" />
             <Metric
               value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && a.sessionId === sessionId).reduce((m, a) => m + a.points, 0), 0)}
               label="Points awarded this session (net)"
             />
             <Metric
-              value={new Set(events.map((e) => e.delegateId)).size}
+              value={new Set(events.filter(isContribution).map((e) => e.delegateId)).size}
               label="Delegates heard"
             />
             <Metric
               value={
                 delegates.filter(
-                  (d) => !events.some((e) => e.delegateId === d.id),
+                  (d) => !events.some((e) => e.delegateId === d.id && isContribution(e)),
                 ).length
               }
               label="Yet to contribute"
@@ -255,7 +256,7 @@ export function ChairScreen({
           </div>
           <Panel
             title="Quick entry"
-            subtitle="Highest total first. Select a delegate, then tap a point value."
+            subtitle="Conference totals · most contributions first. Select a delegate, then tap a point value."
             action={<Search value={search} onChange={setSearch} />}
           >
             {keyboardInList && (
@@ -286,7 +287,7 @@ export function ChairScreen({
                 <div className="participation-row" key={d.id}>
                   <DelegateIdentity delegate={d} />
                   <span className="opportunity-total">
-                    {participationSummary(data, d.id).opportunities} turns{" "}
+                    {participationSummary(data, d.id).opportunities} contributions{" "}
                     <strong>
                       {participationSummary(data, d.id).points} pts
                     </strong>

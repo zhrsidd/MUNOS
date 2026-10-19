@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyCommand, participationSummary, participationOrder, adjustmentTotal, decisionFor } from "../lib/commands";
+import { applyCommand, participationSummary, adjustmentTotal, decisionFor } from "../lib/commands";
+import { pointsLeaderboard } from "../lib/participation-view";
 import { createSeed } from "../lib/seed";
 import { deductionProblem } from "../lib/operations/commands";
 
@@ -53,22 +54,22 @@ test("a restore is a new row that references the deduction and works once", () =
   assert.throws(() => applyCommand(d, restore, "chair"), /already restored/);
   assert.throws(() => applyCommand(d, { type: "pointAdjustment", action: "restore", delegateId: delegates[0].id, adjustmentId: d.pointAdjustments![1].id } as never, "chair"), /Only a deduction/);
 });
-test("participation sorts by highest total first, ties by country then id, stable as totals change", () => {
+test("points leaderboard sorts by highest total first, ties by country then id, stable as totals change", () => {
   const { data, s, delegates } = session();
   const [a, b, c] = delegates;
   let d = data;
   const grant = (id: string, points: number) => (d = applyCommand(d, { type: "participation", delegateId: id, sessionId: s.id, resolutionId: null, categoryId: "speech", points } as never, "chair"));
   grant(b.id, 3);
   grant(c.id, 3);
-  const top = participationOrder(d, delegates).map((x) => x.id);
+  const top = pointsLeaderboard(d, delegates).map(row => row.delegate).map((x) => x.id);
   assert.deepEqual(top.slice(0, 2), [b, c].sort((x, y) => x.country.localeCompare(y.country, "en")).map((x) => x.id), "equal totals fall back to country");
   assert.equal(top.includes(a.id), true);
-  const shuffled = participationOrder(d, [...delegates].reverse()).map((x) => x.id);
+  const shuffled = pointsLeaderboard(d, [...delegates].reverse()).map(row => row.delegate).map((x) => x.id);
   assert.deepEqual(shuffled, top, "input order does not matter");
   d = applyCommand(d, deduct(b.id, s.id, 2), "chair");
-  assert.ok(participationOrder(d, delegates).findIndex((x) => x.id === c.id) < participationOrder(d, delegates).findIndex((x) => x.id === b.id), "a deduction moves a delegate down");
+  assert.ok(pointsLeaderboard(d, delegates).map(row => row.delegate).findIndex((x) => x.id === c.id) < pointsLeaderboard(d, delegates).map(row => row.delegate).findIndex((x) => x.id === b.id), "a deduction moves a delegate down");
   // A total of zero or below stays ordered after everyone with more.
-  const order = participationOrder(d, delegates).map((x) => participationSummary(d, x.id).points);
+  const order = pointsLeaderboard(d, delegates).map(row => row.delegate).map((x) => participationSummary(d, x.id).points);
   assert.deepEqual(order, [...order].sort((x, y) => y - x));
 });
 test("decisions are the Approval Panel transitions only", () => {

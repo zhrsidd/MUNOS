@@ -21,4 +21,6 @@ Google Drive mirroring and automation are **retired** (owner decision, October 2
 See [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md) for the first implementation package and the remaining ordered
 queue. Google Docs-only submission with honest access verification is the first larger task. The new
 contribution-ranked Participation view supersedes the earlier points-order requirement; the compact Debate
-leaderboard separately shows points. Do not mark either ranking requirement complete based on the older UI.
+leaderboard separately shows points. Both new rankings and the Executive resolution-status overview are
+implemented in the follow-up package, with local verification in UI_PRIORITY_PASS.md. Global buttons and
+spacing remain assigned to Claude: see [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).

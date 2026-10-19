@@ -80,11 +80,12 @@ browser check covers draft, submitted, changes-requested, approved.
 
 ## W6 · Functional quality-of-life
 
-**W6a · Participation ranking ◐ (owner superseded points ordering, 19 October).** The existing points order is
-implemented, but the approved default is now contribution count, highest first, with country/name/id ties and
-no hidden points tie-break. Keep points and manual scoring visible. Define counted contributions before changing
-the comparator and exports. A separate compact Debate leaderboard must show points, flags and all countries.
-Both ranking changes remain pending; the existing points comparator is not completion of the new requirement.
+**W6a · Participation ranking ✓ (owner's contribution ordering implemented, 19 October).** Conference-wide
+contribution count, highest first, with country/name/id ties and no points tie-break. Points and manual scoring
+remain visible; editing/keyboard focus keeps the row order stable. Counting rules, including amendments and
+automatic submitter credit, are in [PARTICIPATION_VIEWS.md](PARTICIPATION_VIEWS.md). No ranked export exists to
+align. A separate bounded Debate list shows all committee countries, flags and conference-total net points,
+including zero and negative values. Unit tests and production-build browser checks cover both views.
 
 **W6b · Chair deducts a chosen number of points ◐ (migration, command, UI, tests written; awaiting independent review, not applied to any project).** A custom amount, not fixed steps.
 Stored as a traceable adjustment: amount, reason (required), chair, time, delegate; original participation
@@ -167,3 +168,9 @@ conference-week validation gates. No schema, repository transport, migration or 
 workspace redirects. Cached refreshes retain the workspace and use the sync strip. Existing failed-startup
 recovery controls replace the loader when data is unavailable. See [LOADING_MOTION_PROPOSAL.md](LOADING_MOTION_PROPOSAL.md)
 for the implementation and verification; other skeleton/loading primitives and wider transitions remain open.
+
+## Owner follow-up: button and spacing overhaul
+
+Claude owns the global button, alignment, panel-width and spacing cleanup requested on 19 October 2026.
+See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md). The functional follow-up is recorded in
+[UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); it does not complete the global visual overhaul.

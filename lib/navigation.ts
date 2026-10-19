@@ -52,7 +52,7 @@ export function navigationFor(role: Role): NavItem[] {
         },
         {
           label: "Operations",
-          children: [{ slug: "submissions", label: "Resolution links" }, { slug: "amendment-links", label: "Amendment links" }, { slug: "scoring", label: "Scoring" }, { slug: "workflow", label: "Workflow & features" }],
+          children: [{ slug: "resolution-status", label: "Resolution status" }, { slug: "submissions", label: "Resolution links" }, { slug: "amendment-links", label: "Amendment links" }, { slug: "scoring", label: "Scoring" }, { slug: "workflow", label: "Workflow & features" }],
         },
         { label: "More", children: [{ slug: "audit", label: "Audit log" }, health] },
       ];

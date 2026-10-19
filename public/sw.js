@@ -1,6 +1,6 @@
 /* Static application shell only. Supabase/Auth responses are NEVER cached here. */
-const VERSION = 'conference-os-0.2.6';
-const SHELL = ['/chair','/chair/roll-call','/chair/participation','/chair/documents','/chair/amendments','/chair/voting','/chair/photos','/chair/health','/approval/history','/approval/health','/logistics/completed','/logistics/health','/admin/health','/dcmun-logo.jpg'];
+const VERSION = 'conference-os-0.2.7';
+const SHELL = ['/chair','/chair/roll-call','/chair/participation','/chair/documents','/chair/amendments','/chair/voting','/chair/photos','/chair/health','/approval/history','/approval/health','/logistics/completed','/logistics/health','/admin/health','/admin/resolution-status','/dcmun-logo.jpg'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(VERSION);
  for(const path of SHELL){
