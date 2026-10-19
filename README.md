@@ -46,7 +46,6 @@ The example defaults to an isolated local demo. For the development database, se
 | `/submit/{token}` | Public, mobile page where delegates register their Google Doc resolution with the Chair (no account; file upload fallback) |
 | `/submit/{token}/sheet` | Printable committee room sheet with QR code |
 | `/api/health` | Build identity and Supabase/Storage reachability (JSON) |
-| `/projector` | Lightweight display |
 
 ## Verify
 

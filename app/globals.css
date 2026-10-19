@@ -2093,29 +2093,6 @@ dd {
     opacity: 0;
   }
 }
-.projector {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 50px;
-  text-align: center;
-}
-.projector h1 {
-  font-size: 50px;
-  max-width: 900px;
-  margin: 30px 0 50px;
-}
-.projector .timer {
-  width: 450px;
-}
-.projector .timer-digits {
-  font-size: 120px;
-}
-.projector a {
-  font-size: 12px;
-}
 @media (min-width: 1500px) {
   .workspace-content {
     padding: 44px 48px;
@@ -2869,18 +2846,6 @@ dd {
   .landing footer {
     font-size: 8px;
     line-height: 1.8;
-  }
-  .projector {
-    padding: 25px;
-  }
-  .projector h1 {
-    font-size: 30px;
-  }
-  .projector .timer {
-    width: 100%;
-  }
-  .projector .timer-digits {
-    font-size: 90px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

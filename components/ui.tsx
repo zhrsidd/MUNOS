@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useRef, useId } from "react";
-import { Delegate, Role, stages } from "@/lib/domain";
+import { useCallback, useEffect, useState, useRef, useId } from "react";
+import { freshTimer, parseTimer, pauseTimer, resetTimer, setTimerDuration, startTimer, TIMER_DURATIONS, timerPhase, timerRemaining, timerStorageKey, type LocalTimer } from "@/lib/timer/local-timer";
+import { Delegate, stages } from "@/lib/domain";
 import { useConference } from "@/lib/context";
 export function Chip({
   children,
@@ -241,124 +242,73 @@ export function Timeline({ status }: { status: string }) {
     </div>
   );
 }
-export function Timer({
-  role = "chair",
-  readonly = false,
-  sessionId,
-}: {
-  role?: Role;
-  readonly?: boolean;
-  sessionId: string;
-}) {
-  const { data, act } = useConference();
+/**
+ * Speaker timer. Local to this device: nothing is saved, audited or synced. State is kept in browser storage per committee so
+ * a reload and other tabs on the same device agree. `resetKey` changes when the floor changes (a speech starts, is yielded or
+ * finishes); the timer then returns to its full duration, stopped, as the stored timer used to.
+ */
+export function Timer({ committeeId, resetKey }: { committeeId: string; resetKey?: string }) {
+  const key = timerStorageKey(committeeId);
+  const [timer, setTimer] = useState<LocalTimer>(() => freshTimer());
   const [now, setNow] = useState(0);
+  const lastReset = useRef<string | undefined>(resetKey);
+  const read = useCallback(() => {
+    try { return parseTimer(window.localStorage.getItem(key)); } catch { return null; }
+  }, [key]);
+  const write = useCallback((next: LocalTimer) => {
+    setTimer(next);
+    try { window.localStorage.setItem(key, JSON.stringify(next)); } catch { /* the timer still works for this page */ }
+  }, [key]);
+  useEffect(() => {
+    // Adopt the stored timer when mounting or when the committee changes; follow changes made in another tab.
+    const adopt = () => setTimer(read() ?? freshTimer());
+    adopt();
+    const onStorage = (event: StorageEvent) => { if (event.key === key) adopt(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [key, read]);
   useEffect(() => {
     const update = () => setNow(Date.now());
     update();
     const interval = setInterval(update, 250);
     return () => clearInterval(interval);
   }, []);
-  const t = data.timers[sessionId] || {
-    duration: 90,
-    remaining: 90,
-    startedAt: null,
-  };
-  const remaining = Math.max(
-    0,
-    Math.ceil(
-      t.remaining - (t.startedAt && now ? (now - t.startedAt) / 1000 : 0),
-    ),
-  );
+  useEffect(() => {
+    if (lastReset.current === resetKey) return;
+    lastReset.current = resetKey;
+    write(resetTimer(read() ?? timer));
+  }, [resetKey, read, write, timer]);
+  const remaining = timerRemaining(timer, now);
+  const phase = timerPhase(timer, now);
   return (
     <div className={`timer ${remaining === 0 ? "expired" : ""}`}>
       <div className="timer-top">
         <span>
           <Icon name="clock" /> SPEAKER TIMER
         </span>
-        <span>
-          {t.startedAt && remaining > 0
-            ? "Running"
-            : remaining === 0
-              ? "Time elapsed"
-              : "Ready"}
-        </span>
+        <span>{phase === "running" ? "Running" : phase === "expired" ? "Time elapsed" : "Ready"}</span>
       </div>
-      <div
-        className="timer-digits"
-        aria-label={`${remaining} seconds remaining`}
-      >
+      <div className="timer-digits" aria-label={`${remaining} seconds remaining`}>
         {String(Math.floor(remaining / 60)).padStart(2, "0")}
         <span>:</span>
         {String(remaining % 60).padStart(2, "0")}
       </div>
       <div className="timer-progress">
-        <div
-          style={{ width: `${Math.min(100, (remaining / t.duration) * 100)}%` }}
-        />
+        <div style={{ width: `${Math.min(100, (remaining / timer.duration) * 100)}%` }} />
       </div>
-      {!readonly && (
-        <>
-          <div className="timer-actions">
-            <button
-              className="primary"
-              onClick={() =>
-                void act(
-                  {
-                    type: "timer",
-                    sessionId,
-                    remaining: t.startedAt
-                      ? remaining
-                      : remaining || t.duration,
-                    startedAt: t.startedAt ? null : Date.now(),
-                    duration: t.duration,
-                  },
-                  role,
-                )
-              }
-            >
-              {t.startedAt ? "Ⅱ Pause" : "▶ Start timer"}
-            </button>
-            <button
-              onClick={() =>
-                void act(
-                  {
-                    type: "timer",
-                    sessionId,
-                    remaining: t.duration,
-                    startedAt: null,
-                    duration: t.duration,
-                  },
-                  role,
-                )
-              }
-            >
-              ↻ Reset
-            </button>
-          </div>
-          <div className="duration-options">
-            {[60, 90, 120, 180].map((n) => (
-              <button
-                key={n}
-                className={t.duration === n ? "selected" : ""}
-                onClick={() =>
-                  void act(
-                    {
-                      type: "timer",
-                      sessionId,
-                      remaining: n,
-                      startedAt: null,
-                      duration: n,
-                    },
-                    role,
-                  )
-                }
-              >
-                {n}s
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <div className="timer-actions">
+        <button className="primary" onClick={() => write(timer.startedAt === null ? startTimer(timer, Date.now()) : pauseTimer(timer, Date.now()))}>
+          {timer.startedAt === null ? "▶ Start timer" : "Ⅱ Pause"}
+        </button>
+        <button onClick={() => write(resetTimer(timer))}>↻ Reset</button>
+      </div>
+      <div className="duration-options">
+        {TIMER_DURATIONS.map((n) => (
+          <button key={n} className={timer.duration === n ? "selected" : ""} onClick={() => write(setTimerDuration(n))}>
+            {n}s
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

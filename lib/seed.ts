@@ -275,6 +275,5 @@ export function createSeed(): ConferenceData {
         createdAt: timestamp,
       },
     ],
-    timers: { s1: { duration: 90, remaining: 90, startedAt: null } },
   };
 }

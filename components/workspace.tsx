@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
 import { Role } from "@/lib/domain";
 import { soleWorkspacePath } from "@/lib/access";
-import { Icon, Chip, Timer, Panel } from "./ui";
+import { Icon, Chip, Panel } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
 import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
@@ -89,7 +89,7 @@ export function Workspace({ path }: { path: string }) {
   useEffect(() => { if (soleWorkspace) router.replace(soleWorkspace); }, [soleWorkspace, router]);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
-  const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair'||path==='projector') || access.status!=='active' || access.committeeIds.includes(c.id)));
+  const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair') || access.status!=='active' || access.committeeIds.includes(c.id)));
   const availableRoles = access.status === "active" ? roles.filter(r => access.roles.includes(r.id)) : roles;
   const committee =
     activeCommittees.find((c) => c.id === requestedCommitteeId) ||
@@ -97,9 +97,6 @@ export function Workspace({ path }: { path: string }) {
   const committeeId = committee?.id ?? "";
   const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId && !s.archived);
   const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && !s.archived && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
-  const current = data.documents.find(
-    (d) => d.committeeId === committeeId && d.status === "In Debate",
-  );
   // While access is still loading the picker would flash every workspace, including ones this person cannot enter.
   if (soleWorkspace || (!path && access.status === "loading")) return <main className="landing"><p role="status">Opening your workspace…</p></main>;
   if (!path)
@@ -168,15 +165,6 @@ export function Workspace({ path }: { path: string }) {
         <footer>
           {access.status === "active" ? "Choose one of your assigned workspaces. Conference access is controlled by your staff grant." : "Illustrative data, not official conference records. Local demo roles are for exploration."}
         </footer>
-      </main>
-    );
-  if (path === "projector")
-    return (
-      <main className="projector">
-        <div className="eyebrow">{committee?.code ?? "No active committee"} · LIVE DEBATE</div>
-        <h1>{current?.title || "General debate"}</h1>
-        {session && <Timer readonly sessionId={session.id} />}
-        <Link href="/chair">Return to Chair Console</Link>
       </main>
     );
   const roleInfo = roles.find((r) => r.id === role)!;

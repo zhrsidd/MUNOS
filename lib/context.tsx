@@ -58,15 +58,13 @@ export function ConferenceProvider({
     try {
       await repository.execute(c, role);
       setNotice(
-        c.type === "timer"
-          ? ""
-          : c.type === "event"
-            ? "Participation event updated"
-            : c.type === "participation"
-              ? "Participation recorded"
-              : c.type === "document"
-                ? `Resolution moved to ${c.status}`
-                : repository.getHealth().message,
+        c.type === "event"
+          ? "Participation event updated"
+          : c.type === "participation"
+            ? "Participation recorded"
+            : c.type === "document"
+              ? `Resolution moved to ${c.status}`
+              : repository.getHealth().message,
       );
       return true;
     } catch (e) {

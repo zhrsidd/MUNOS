@@ -43,7 +43,7 @@ test('rehearsal counts two snapshot RPCs only when the fallback path is actually
 test('rehearsal counter ignores writes and leaves the RPC result untouched',async()=>{
  const d=device(['chair']);
  const before=d.counter.snapshot;
- await d.transport.send({id:crypto.randomUUID(),actorId:'staff-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'timer',sessionId:'s1',remaining:90,startedAt:0,duration:90}});
+ await d.transport.send({id:crypto.randomUUID(),actorId:'staff-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'attendance',delegateId:'d0',sessionId:'s1',status:'Present'}});
  assert.equal(d.counter.snapshot,before,'apply_* mutations are not snapshot reads');
  assert.ok(d.sent.some(n=>n.startsWith('apply_')));
 });

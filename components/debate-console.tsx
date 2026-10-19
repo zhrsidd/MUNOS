@@ -168,7 +168,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
           </>}
         </div>
       </Panel>
-      <Timer sessionId={sessionId} />
+      <Timer committeeId={committeeId} resetKey={active?.id ?? "floor-free"} />
     </div>
     {active && <Panel title="Points of information" subtitle="Recognize the first POI, let the delegate ask it, then record its configured value. Recognition alone records nothing." action={<Chip tone="neutral">{active.poiCount} heard · {active.poiLimit === null ? "Any" : active.poiLimit} allowed</Chip>}>
       <div className="procedure-pois">

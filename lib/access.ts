@@ -27,7 +27,7 @@ export function cachedStaffAccess(pointer:Record<string,string>|undefined,actorI
  }catch{return null;}
 }
 export function staffRoleForPath(path:string):Role|undefined{
- if(path.startsWith('/chair')||path.startsWith('/projector'))return'chair';
+ if(path.startsWith('/chair'))return'chair';
  if(path.startsWith('/approval'))return'approval';
  if(path.startsWith('/logistics'))return'logistics';
  if(path.startsWith('/admin'))return'admin';

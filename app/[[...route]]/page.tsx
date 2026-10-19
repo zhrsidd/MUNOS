@@ -33,7 +33,6 @@ const paths = [
   "admin/resources",
   "admin/audit",
   "admin/health",
-  "projector",
 ];
 export function generateStaticParams() {
   return paths.map((p) => ({ route: p ? p.split("/") : [] }));

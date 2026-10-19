@@ -58,13 +58,6 @@ export type Command =
       choice: Vote["choice"];
     }
   | {
-      type: "timer";
-      sessionId: string;
-      remaining: number;
-      startedAt: number | null;
-      duration: number;
-    }
-  | {
       type: "committee";
       code: string;
       name: string;
@@ -164,7 +157,6 @@ const allowed: Record<Command["type"], Role[]> = {
   newDocument: ["chair"],
   queue: ["chair"],
   vote: ["chair"],
-  timer: ["chair"],
   committee: ["admin"],
   delegate: ["admin"],
   import: ["admin"],
@@ -411,13 +403,6 @@ export function applyCommand(
         .sort((a, b) => a.position - b.position);
       if (c.advance && q[0]) {
         d.queue = d.queue.filter((x) => x.id !== q[0].id);
-        const duration = d.timers[c.sessionId]?.duration || 90;
-        d.timers[c.sessionId] = {
-          revision: (d.timers[c.sessionId]?.revision ?? 0) + 1,
-          duration,
-          remaining: duration,
-          startedAt: null,
-        };
       } else if (c.delegateId && !q.some((x) => x.delegateId === c.delegateId))
         d.queue.push({
           id: nextId(),
@@ -454,14 +439,6 @@ export function applyCommand(
       d.votes.push({ id: nextId(), ...c, createdAt: now, revision });
       break;
     }
-    case "timer":
-      d.timers[c.sessionId] = {
-        revision: (d.timers[c.sessionId]?.revision ?? 0) + 1,
-        remaining: c.remaining,
-        startedAt: c.startedAt,
-        duration: c.duration,
-      };
-      break;
     case "committee":
       if (!c.code.trim() || d.committees.some((x) => x.code === c.code.trim()))
         throw Error("Use a unique committee code.");
