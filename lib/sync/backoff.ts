@@ -17,12 +17,51 @@ export function errorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+/** Message of anything a transport can throw: an Error, a string, or the plain `{message}` object an API client returns. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof Error) return `${error.name} ${error.message}`;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "";
+}
+
+/** HTTP status carried by an error, if any. */
+export function errorStatus(error: unknown): number | undefined {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = Number((error as { status?: unknown }).status);
+    if (Number.isFinite(status)) return status;
+  }
+  return undefined;
+}
+
+/**
+ * Non-JSON gateway responses (502, 504, 429, Cloudflare 52x) reach the caller as a plain `{message}` object, with the HTTP
+ * status only on the response wrapper. The transport must keep that status with the error, or the failure cannot be
+ * recognised as server overload. The error keeps its identity (callers and tests compare it); the status is attached as a
+ * non-enumerable property so it does not change how the error serialises or compares. Primitives are wrapped.
+ */
+export function transportError(error: unknown, status?: number): unknown {
+  if (status === undefined || errorStatus(error) !== undefined) return error;
+  if (error && typeof error === "object") {
+    try {
+      Object.defineProperty(error, "status", { value: status, enumerable: false, configurable: true, writable: true });
+      return error;
+    } catch { /* a frozen or exotic object: fall through to a wrapper */ }
+  }
+  const e = new Error(errorMessage(error) || "Request failed", { cause: error }) as Error & { status?: number };
+  e.status = status;
+  return e;
+}
+
 export function classifyError(error: unknown): ErrorKind {
   const code = errorCode(error);
   if (code && OVERLOAD_CODES.has(code)) return "overload";
-  const status = error && typeof error === "object" && "status" in error ? Number((error as { status?: unknown }).status) : NaN;
-  if (status === 429 || (status >= 500 && status <= 599)) return "overload";
-  const text = error instanceof Error ? `${error.name} ${error.message}` : typeof error === "string" ? error : "";
+  const status = errorStatus(error);
+  if (status !== undefined && (status === 429 || (status >= 500 && status <= 599))) return "overload";
+  const text = errorMessage(error);
   if (OVERLOAD_TEXT.test(text)) return "overload";
   if (/network|failed to fetch|load failed|offline|fetch/i.test(text)) return "network";
   return "other";
