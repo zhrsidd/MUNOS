@@ -82,3 +82,10 @@ The short-viewport check is not presented as an actual 200% browser-zoom check. 
 including existing operation toasts, remains in the queue above.
 No hosted environment, production configuration, migration, server permissions or durable transport changed.
 Authenticated staging replay and the conference-week Pro/Small capacity rehearsal remain outstanding.
+
+## Loading-screen design follow-up
+
+[LOADING_MOTION_PROPOSAL.md](LOADING_MOTION_PROPOSAL.md) adds four owner-requested logo-based studies, with
+Orbit seal recommended. The alternatives are Slow seal spin, Breathing seal and Assembly dots. Online references,
+timing, reduced motion and integration rules are recorded there. This is a design proposal, not an implemented
+loading-screen claim. Keep the persistent sync strip for background work and never delay ready content.
