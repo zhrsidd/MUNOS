@@ -27,7 +27,7 @@ safeguards.
 Acceptance: no rule restricts Claude from core features; the five protected areas are listed with reasons; it
 points at `docs/BRAND.md` and this plan; no reference to the ChatGPT mirror or `sources/` directory remains.
 
-## W2 · DCMUN visual identity ◐
+## W2 · DCMUN visual identity ◐ (BRAND.md, tokens, buttons, chips, focus done; primitives sweep and header lockup remain)
 
 Palette, typography, spacing, component styles and information hierarchy defined in `docs/BRAND.md` first,
 adapted from DeutschLab's principles (colour roles, hairlines over cards, 4 px scale, measured contrast).
@@ -48,7 +48,7 @@ user menu, ≤ 5 tabs named for jobs. Auto-enter for single-workspace users is a
 Acceptance: a Chair-only login lands in Chair with no picker; tab names match BRAND.md §5; sync status is a live
 region; keyboard-only walk-through passes; no horizontal scroll at 320 px.
 
-## W5 · Remove Drive mirroring completely ☐ (before W4 ships)
+## W5 · Remove Drive mirroring completely ☑ (commit "retire Google Drive mirroring"; typecheck, lint, 354 tests pass)
 
 Remove: `lib/drive/plan.ts`, `scripts/drive-plan.mts`, `npm run drive:plan`, `tests/drive-plan.test.ts`,
 `docs/GOOGLE_DRIVE_ARCHITECTURE.md`; the "Resources & Drive" tab label (rename to "Resolutions"); the Drive
@@ -65,7 +65,7 @@ Acceptance: `grep -ri drive` over code, scripts, package.json and docs returns o
 wording that describes ordinary link sharing; no dedicated dependency, script, env var or setting remains; tests
 and build pass; a retirement checklist is in `docs/OPERATIONS.md`.
 
-## W4 · Resolution documents tab ☐ (depends W2, W3, W5)
+## W4 · Resolution documents tab ◐ (Chair tab, Approval detail and print queue done; Approval history needs W6c schema)
 
 Remove the document preview (the demo "paper", version picker and `<pre>` text). The list becomes the page. Each
 resolution is one row showing, without opening anything: title, submitter, status chip, working-document link

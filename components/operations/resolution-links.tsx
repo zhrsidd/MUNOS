@@ -65,7 +65,7 @@ function LinkWorkingDoc({ documentId }: { documentId: string }) {
     </span>
   );
 }
-/** Document preview caption: the working Google Doc, the Approval copy and any uploaded file. */
+/** The working Google Doc, the Approval copy and any uploaded file. */
 export function ResolutionSources({ resolution, storageKey, fileName }: { resolution: Resolution; storageKey: string | null; fileName: string }) {
   const { data } = useConference();
   const chair = usePathname()?.startsWith("/chair");
@@ -75,7 +75,7 @@ export function ResolutionSources({ resolution, storageKey, fileName }: { resolu
       {link?.approvalCopyDocId && <GoogleDocButton docId={link.approvalCopyDocId} label="Open approval copy" primary={!chair} />}
       {link?.workingDocId && <GoogleDocButton docId={link.workingDocId} label="Open working Google Doc" primary={chair || !link.approvalCopyDocId} />}
       {storageKey && <OpenSubmittedFile storageKey={storageKey} fileName={fileName} />}
-      {!link?.workingDocId && !storageKey && (chair ? <LinkWorkingDoc documentId={resolution.id} /> : <span className="muted">{fileName} · no Google Doc linked</span>)}
+      {!link?.workingDocId && !storageKey && (chair ? <LinkWorkingDoc documentId={resolution.id} /> : <span className="muted">No working document linked yet.</span>)}
       {link?.access === "problem" && <Chip tone="draft">Chair can&apos;t access document</Chip>}
     </span>
   );

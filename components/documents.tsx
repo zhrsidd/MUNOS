@@ -2,264 +2,109 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useConference } from "@/lib/context";
-import { Resolution } from "@/lib/domain";
-import { Chip, Empty, Icon, Modal, PageHeading, Panel, Timeline } from "./ui";
+import type { Resolution } from "@/lib/domain";
+import { resolutionFeedback, resolutionNextAction, resolutionOrder, sentBack, type Feedback } from "@/lib/resolution-view";
+import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { ResolutionSources } from "./operations/resolution-links";
-export function DocumentPreview({ resolution }: { resolution: Resolution }) {
+
+const qatarTime = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Qatar", dateStyle: "medium", timeStyle: "short" });
+
+/** The working Google Doc, the Approval copy and any uploaded file, for the latest version. */
+function Sources({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
-  const [versionId, setVersionId] = useState("");
-  const version = data.versions.find(
-    (v) =>
-      v.id ===
-      (resolution.versionIds.includes(versionId)
-        ? versionId
-        : resolution.versionIds.at(-1)),
-  );
+  const version = data.versions.find((v) => v.id === resolution.versionIds.at(-1));
+  return <ResolutionSources resolution={resolution} storageKey={version?.storageKey ?? null} fileName={version?.fileName ?? ""} />;
+}
+/** Approval Panel feedback, shown in full where the Chair and the panel are already looking. */
+function FeedbackNote({ feedback, changes }: { feedback: Feedback; changes: boolean }) {
   return (
-    <div className="document-preview">
-      <div className="preview-toolbar">
-        <span>
-          <Icon name="documents" />
-          Document preview
-        </span>
-        <select
-          aria-label="Document version"
-          value={version?.id || ""}
-          onChange={(e) => setVersionId(e.target.value)}
-        >
-          {resolution.versionIds.map((id) => {
-            const v = data.versions.find((x) => x.id === id)!;
-            return (
-              <option key={id} value={id}>
-                Version {v.number}
-                {id === resolution.versionIds.at(-1) ? " · Latest" : ""}
-              </option>
-            );
-          })}
-        </select>
-      </div>
-      <div className="paper">
-        <div className="paper-brand">
-          DCMUN <span>RESOLUTION</span>
-        </div>
-        <pre>{version?.text}</pre>
-        <div className="paper-footer">
-          {resolution.code} · v{version?.number}
-          <span>Illustrative demo document</span>
-        </div>
-      </div>
-      <div className="preview-caption">
-        <ResolutionSources resolution={resolution} storageKey={version?.storageKey ?? null} fileName={version?.fileName ?? ""} />
-      </div>
-    </div>
+    <section className={`feedback${changes ? " changes" : ""}`} aria-label="Approval Panel feedback">
+      <p className="feedback-meta">
+        <strong>{changes ? "Changes requested" : "Approval Panel"}</strong> · <time dateTime={feedback.createdAt}>{qatarTime(feedback.createdAt)}</time>
+      </p>
+      <p className="feedback-text">{feedback.text}</p>
+    </section>
   );
 }
-export function Documents({
-  committeeId,
-  sessionId,
-}: {
-  committeeId: string;
-  sessionId: string;
-}) {
-  const { data, act } = useConference();
-  const [selected, setSelected] = useState("");
-  const [modal, setModal] = useState<"new" | "version" | null>(null);
-  const [title, setTitle] = useState("");
-  const [submitterId, setSubmitterId] = useState(
-    data.delegates.find((d) => d.committeeId === committeeId)?.id || "",
+function EarlierFeedback({ items }: { items: Feedback[] }) {
+  if (!items.length) return null;
+  return (
+    <details className="feedback-earlier">
+      <summary>Earlier feedback ({items.length})</summary>
+      {items.map((f) => (
+        <FeedbackNote key={f.id} feedback={f} changes={false} />
+      ))}
+    </details>
   );
-  const [fileName, setFileName] = useState("resolution-v2.txt");
-  const [text, setText] = useState("");
-  const documents = data.documents.filter((r) => r.committeeId === committeeId);
-  const resolution = documents.find((r) => r.id === selected) || documents[0];
+}
+function ResolutionRow({ resolution }: { resolution: Resolution }) {
+  const { data, act } = useConference();
+  const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
+  const { latest, earlier } = resolutionFeedback(resolution);
+  const next = resolutionNextAction(resolution);
+  const back = sentBack(resolution);
+  const heading = `resolution-${resolution.id}`;
+  return (
+    <article className="resolution-row" aria-labelledby={heading}>
+      <header className="resolution-head">
+        <div>
+          <small className="eyebrow">{resolution.code}</small>
+          <h3 id={heading}>{resolution.title}</h3>
+          <p className="muted">{submitter ? `Submitted by ${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
+        </div>
+        <div className="resolution-status">
+          <Chip tone={back ? "review" : ""}>{back ? "Changes requested" : resolution.status}</Chip>
+          {resolution.outcome && <Chip tone="blue">{resolution.outcome}</Chip>}
+        </div>
+      </header>
+      <div className="resolution-doc">
+        <Sources resolution={resolution} />
+      </div>
+      {latest ? <FeedbackNote feedback={latest} changes={back} /> : (resolution.status === "Submitted" || resolution.status === "Review") && <p className="muted">No feedback from the Approval Panel yet.</p>}
+      <EarlierFeedback items={earlier} />
+      <footer className="resolution-next">
+        {next.status ? (
+          <button className="primary" onClick={() => void act({ type: "document", id: resolution.id, status: next.status! }, "chair")}>
+            {next.label}
+          </button>
+        ) : next.href ? (
+          <Link className="button primary" href={next.href}>
+            {next.label}
+          </Link>
+        ) : (
+          <span className="muted">{next.label}</span>
+        )}
+      </footer>
+    </article>
+  );
+}
+export function Documents({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
+  const { data, act } = useConference();
+  const [modal, setModal] = useState<"new" | null>(null);
+  const [title, setTitle] = useState("");
+  const [submitterId, setSubmitterId] = useState(data.delegates.find((d) => d.committeeId === committeeId)?.id || "");
+  const documents = data.documents.filter((r) => r.committeeId === committeeId).sort(resolutionOrder);
   return (
     <>
       <PageHeading
-        eyebrow="RESOLUTION MANAGEMENT"
-        title="From draft to decision."
-        description="One resolution record connects review, printing, debate, and the final outcome."
+        eyebrow="RESOLUTIONS"
+        title="Resolutions"
+        description="Title, submitter, status, the working document and the Approval Panel's feedback, in one place."
         action={
-          <button
-            className="primary"
-            disabled={
-              !sessionId ||
-              !data.delegates.some((d) => d.committeeId === committeeId)
-            }
-            onClick={() => setModal("new")}
-          >
+          <button className="primary" disabled={!sessionId || !data.delegates.some((d) => d.committeeId === committeeId)} onClick={() => setModal("new")}>
             + New resolution
           </button>
         }
       />
-      <div className="documents-layout">
-        <div>
-          <Panel
-            title="Committee documents"
-            subtitle={`${documents.length} resolutions`}
-          >
-            <div className="document-list">
-              {documents.map((r) => (
-                <button
-                  className={
-                    r.id === resolution?.id
-                      ? "document-card selected"
-                      : "document-card"
-                  }
-                  key={r.id}
-                  onClick={() => setSelected(r.id)}
-                >
-                  <div>
-                    <span className="eyebrow">{r.code}</span>
-                    <Chip>{r.status}</Chip>
-                  </div>
-                  <h3>{r.title}</h3>
-                  <p>
-                    v{r.versionIds.length} ·{" "}
-                    {
-                      data.delegates.find((d) => d.id === r.submitterId)
-                        ?.country
-                    }
-                  </p>
-                  {r.outcome && <Chip tone="blue">{r.outcome}</Chip>}
-                </button>
-              ))}
-            </div>
-            {!documents.length && (
-              <Empty
-                title="A clean slate"
-                text="Create a draft resolution to begin the workflow."
-              />
-            )}
-          </Panel>
+      {documents.length ? (
+        <div className="resolution-list">
+          {documents.map((r) => (
+            <ResolutionRow key={r.id} resolution={r} />
+          ))}
         </div>
-        {resolution && (
-          <div>
-            <Panel
-              title={resolution.code}
-              subtitle={resolution.title}
-              action={<Chip>{resolution.status}</Chip>}
-            >
-              <Timeline status={resolution.status} />
-              <div className="next-action">
-                <div>
-                  <strong>{nextAction(resolution)}</strong>
-                  <p>
-                    {resolution.status === "Draft"
-                      ? "Add a version or submit the draft to the Approval Panel."
-                      : resolution.status === "Approved"
-                        ? "This resolution is now in the Logistics print queue."
-                        : resolution.status === "Review" ||
-                            resolution.status === "Submitted"
-                          ? "The Approval Panel will review the latest version."
-                          : resolution.status === "Printed"
-                            ? "The printed document is ready to introduce to the committee."
-                            : resolution.status === "In Debate"
-                              ? "Record participation and votes in the Chair Console."
-                              : "The final outcome is preserved with the resolution."}
-                  </p>
-                </div>
-                <div className="actions">
-                  {resolution.status === "Draft" && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setText(
-                            data.versions.find(
-                              (v) => v.id === resolution.versionIds.at(-1),
-                            )?.text || "",
-                          );
-                          setModal("version");
-                        }}
-                      >
-                        + Mock version
-                      </button>
-                      <button
-                        className="primary"
-                        onClick={() =>
-                          void act(
-                            {
-                              type: "document",
-                              id: resolution.id,
-                              status: "Submitted",
-                            },
-                            "chair",
-                          )
-                        }
-                      >
-                        Submit for review →
-                      </button>
-                    </>
-                  )}
-                  {resolution.status === "Printed" && (
-                    <button
-                      className="primary"
-                      disabled={documents.some((r) => r.status === "In Debate")}
-                      onClick={() =>
-                        void act(
-                          {
-                            type: "document",
-                            id: resolution.id,
-                            status: "In Debate",
-                          },
-                          "chair",
-                        )
-                      }
-                    >
-                      Open debate →
-                    </button>
-                  )}
-                  {resolution.status === "In Debate" && (
-                    <Link className="button primary" href="/chair/voting">
-                      Go to voting →
-                    </Link>
-                  )}
-                  {resolution.outcome && (
-                    <Chip tone="blue">{resolution.outcome}</Chip>
-                  )}
-                </div>
-              </div>
-              <DocumentPreview key={resolution.id} resolution={resolution} />
-            </Panel>
-            <Panel
-              title="Version history & review notes"
-              subtitle="Versions remain attached to the resolution throughout its lifecycle."
-            >
-              {[...resolution.versionIds].reverse().map((id) => {
-                const v = data.versions.find((v) => v.id === id)!;
-                return (
-                  <div className="version-row" key={id}>
-                    <span className="version-icon">
-                      <Icon name="documents" />
-                    </span>
-                    <div>
-                      <strong>Version {v.number}</strong>
-                      <p>{v.fileName}</p>
-                    </div>
-                    <span>
-                      {id === resolution.versionIds.at(-1) ? (
-                        <Chip tone="blue">Latest</Chip>
-                      ) : (
-                        <span className="muted">Previous</span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-              {resolution.comments.map((c) => (
-                <div className="review-comment" key={c.id}>
-                  <strong>Approval Panel</strong>
-                  <p>{c.text}</p>
-                  <small>
-                    {new Date(c.createdAt).toLocaleString("en-GB", {
-                      timeZone: "Asia/Qatar",
-                    })}
-                  </small>
-                </div>
-              ))}
-            </Panel>
-          </div>
-        )}
-      </div>
+      ) : (
+        <Empty title="No resolutions yet" text="Delegates submit through the committee QR code, or create a draft here." />
+      )}
       {modal === "new" && (
         <Modal title="New resolution" onClose={() => setModal(null)}>
           <form
@@ -309,63 +154,21 @@ export function Documents({
           </form>
         </Modal>
       )}
-      {modal === "version" && resolution && (
-        <Modal
-          title="Add a mock document version"
-          onClose={() => setModal(null)}
-        >
-          <p className="footnote">
-            This saves a text preview locally. PDF upload and storage adapters
-            are deferred.
-          </p>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (
-                await act(
-                  { type: "version", id: resolution.id, fileName, text },
-                  "chair",
-                )
-              )
-                setModal(null);
-            }}
-          >
-            <label>
-              Filename
-              <input
-                required
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-              />
-            </label>
-            <label>
-              Document text
-              <textarea
-                required
-                rows={10}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-            </label>
-            <button className="primary">
-              Save version {resolution.versionIds.length + 1}
-            </button>
-          </form>
-        </Modal>
-      )}
     </>
   );
 }
-function nextAction(r: Resolution) {
-  return {
-    Draft: "Next: submit for review",
-    Submitted: "Waiting for review",
-    Review: "Under review",
-    Approved: "Next: print approved version",
-    Printed: "Next: introduce to debate",
-    "In Debate": "The resolution is on the floor",
-    Closed: `Closed · ${r.outcome || "Outcome pending"}`,
-  }[r.status];
+function ResolutionDetail({ resolution }: { resolution: Resolution }) {
+  const { data } = useConference();
+  const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
+  const { latest, earlier } = resolutionFeedback(resolution);
+  return (
+    <div className="resolution-detail">
+      <p className="muted">{submitter ? `Submitted by ${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
+      <Sources resolution={resolution} />
+      {latest && <FeedbackNote feedback={latest} changes={false} />}
+      <EarlierFeedback items={earlier} />
+    </div>
+  );
 }
 export function Approval() {
   const { data, act } = useConference();
@@ -447,7 +250,7 @@ export function Approval() {
                 </div>
                 <Chip>{resolution.status}</Chip>
               </div>
-              <DocumentPreview key={resolution.id} resolution={resolution} />
+              <ResolutionDetail resolution={resolution} />
               <Panel
                 title="Your decision"
                 subtitle="Approval sends this version directly to the print queue."
@@ -512,13 +315,11 @@ export function Approval() {
 }
 export function Logistics() {
   const { data, act } = useConference();
-  const [preview, setPreview] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const queue = data.documents.filter((r) => r.status === "Approved");
   const completed = data.documents.filter((r) =>
     ["Printed", "In Debate", "Closed"].includes(r.status),
   );
-  const resolution = data.documents.find((r) => r.id === preview);
   return (
     <>
       <PageHeading
@@ -562,9 +363,7 @@ export function Logistics() {
                     <span>copies</span>
                   </div>
                   <div className="actions">
-                    <button onClick={() => setPreview(r.id)}>
-                      Open document ↗
-                    </button>
+                    <Sources resolution={r} />
                     <button
                       className="primary"
                       onClick={() =>
@@ -615,18 +414,6 @@ export function Logistics() {
             </div>
           ))}
       </Panel>
-      {resolution && (
-        <Modal
-          title={`${resolution.code} · Print preview`}
-          onClose={() => setPreview(null)}
-        >
-          <DocumentPreview resolution={resolution} />
-          <p className="footnote">
-            Demo text preview. Actual PDF access and physical printing will use
-            the Storage adapter.
-          </p>
-        </Modal>
-      )}
     </>
   );
 }
