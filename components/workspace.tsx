@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
 import { Role } from "@/lib/domain";
+import { soleWorkspacePath } from "@/lib/access";
 import { Icon, Chip, Timer, Panel } from "./ui";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
@@ -81,6 +83,10 @@ export function Workspace({ path }: { path: string }) {
   } = useConference();
   const [now] = useState(()=>Date.now());
   const [menu, setMenu] = useState(false);
+  const router = useRouter();
+  // A staff member with exactly one workspace goes straight in; the picker is only for people with a choice.
+  const soleWorkspace = !path ? soleWorkspacePath(access) : null;
+  useEffect(() => { if (soleWorkspace) router.replace(soleWorkspace); }, [soleWorkspace, router]);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
   const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair'||path==='projector') || access.status!=='active' || access.committeeIds.includes(c.id)));
@@ -94,6 +100,8 @@ export function Workspace({ path }: { path: string }) {
   const current = data.documents.find(
     (d) => d.committeeId === committeeId && d.status === "In Debate",
   );
+  // While access is still loading the picker would flash every workspace, including ones this person cannot enter.
+  if (soleWorkspace || (!path && access.status === "loading")) return <main className="landing"><p role="status">Opening your workspace…</p></main>;
   if (!path)
     return (
       <main className="landing">

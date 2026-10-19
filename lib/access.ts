@@ -33,6 +33,11 @@ export function staffRoleForPath(path:string):Role|undefined{
  if(path.startsWith('/admin'))return'admin';
 }
 export const staffRolePath=(role:Role)=>({chair:'/chair',approval:'/approval',logistics:'/logistics',admin:'/admin'})[role];
+/** The one workspace a signed-in staff member can enter, or null when there is a choice (or no access). Used to skip the picker. */
+export function soleWorkspacePath(access:Pick<StaffAccess,'status'|'roles'>):string|null{
+ if(access.status!=='active'||access.roles.length!==1)return null;
+ return staffRolePath(access.roles[0]);
+}
 /** Cancels further transport work without deleting the independent actor-bound outbox. */
 export class AccessGatedTransport implements Transport {
  actorId:string;
