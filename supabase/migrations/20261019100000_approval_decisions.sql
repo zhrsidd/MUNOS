@@ -7,9 +7,13 @@
 -- replayed or duplicated mutation never reaches the update and never records a second decision. Recording on
 -- the status transition covers every path that can change status and does not patch the core mutation.
 --
--- Permissions: the table is read-only to authenticated and uses the same lifecycle-scoped policy as
--- document_comments (visible only where the parent document is visible). The Executive audit log is not
--- exposed to anyone new. There are no write grants; rows are written only by the trigger.
+-- Permissions: the table is read-only to authenticated and its direct policy stays narrow (parent document
+-- visible). History must outlive lifecycle changes (back to Draft, Printed, In Debate, Closed), so it is published
+-- through private.decision_history: a SECURITY DEFINER projection that returns only the decision, safe resolution
+-- identity (code, title, committee), reviewer name, round, version and the linked feedback text, and only to roles
+-- that already work the resolution (approval, chair, admin, observer), under private.has_access (conference,
+-- committee scope, revocation, expiry). Logistics gets none. The Executive audit log is not exposed to anyone new.
+-- There are no write grants; rows are written only by the trigger.
 
 -- A review round starts each time the Chair submits (Draft -> Submitted). 0 means never submitted.
 alter table public.documents add column review_round integer not null default 0 check (review_round >= 0);
@@ -41,12 +45,19 @@ revoke all on public.document_decisions from anon, authenticated;
 grant select on public.document_decisions to authenticated;
 create policy read_authorized on public.document_decisions for select to authenticated using (exists (select 1 from public.documents d where d.id = "documentId"));
 
+-- Seed, import and other non-Draft inserts start in round 1; a later Draft -> Submitted starts the next round.
+-- Keeping every non-Draft document at round >= 1 means a decision never records a round the document is not in.
 create function private.document_round() returns trigger language plpgsql set search_path = '' as $$
 begin
- if new.status = 'Submitted' and old.status is distinct from 'Submitted' then new.review_round := old.review_round + 1; end if;
+ if tg_op = 'INSERT' then
+  if new.status <> 'Draft' and new.review_round = 0 then new.review_round := 1; end if;
+  return new;
+ end if;
+ if new.status = 'Submitted' and old.status is distinct from 'Submitted' then new.review_round := old.review_round + 1;
+ elsif new.status <> 'Draft' and new.review_round = 0 then new.review_round := 1; end if;
  return new;
 end $$;
-create trigger document_round before update of status on public.documents for each row execute function private.document_round();
+create trigger document_round before insert or update of status on public.documents for each row execute function private.document_round();
 
 create function private.record_document_decision() returns trigger language plpgsql security definer set search_path = '' as $$
 declare kind text; v public.document_versions; reviewer uuid := auth.uid(); reviewer_name text;
@@ -78,13 +89,31 @@ revoke all on function private.document_round() from public, anon, authenticated
 revoke all on function private.record_document_decision() from public, anon, authenticated;
 revoke all on function private.link_decision_comment() from public, anon, authenticated;
 
--- Publish through the operations snapshot (conference-wide, SECURITY INVOKER: the policy above applies).
+create function private.decision_history(conf uuid) returns jsonb language sql stable security definer set search_path = '' as $$
+ select coalesce(jsonb_agg(h.entry order by h.at, h.id), '[]'::jsonb) from (
+  select d."decidedAt" at, d.id::text id, jsonb_build_object('id',d.id,'documentId',d."documentId",'committeeId',d.committee_id,'code',x.code,'title',x.title,
+    'decision',d.decision,'round',d.round,'versionId',d."versionId",'versionNumber',d."versionNumber",'reviewerId',d."reviewerId",'reviewerName',d."reviewerName",
+    'commentId',d."commentId",'comment',c.text,'decidedAt',d."decidedAt") entry
+  from public.document_decisions d join public.documents x on x.id = d."documentId" left join public.document_comments c on c.id = d."commentId"
+  where d.conference_id = conf and private.has_access(d.conference_id, d.committee_id, array['approval','chair','admin','observer']::public.conference_role[])
+  union all
+  -- Comments written before decisions were recorded keep their text, honestly classified as a comment.
+  select c."createdAt", 'comment-' || c.id, jsonb_build_object('id','comment-' || c.id,'documentId',c."documentId",'committeeId',c.committee_id,'code',x.code,'title',x.title,
+    'decision','comment','round',0,'versionId',null,'versionNumber',null,'reviewerId',c."authorId",'reviewerName',null,'commentId',c.id,'comment',c.text,'decidedAt',c."createdAt")
+  from public.document_comments c join public.documents x on x.id = c."documentId"
+  where c.conference_id = conf and not exists (select 1 from public.document_decisions d where d."commentId" = c.id)
+   and private.has_access(c.conference_id, c.committee_id, array['approval','chair','admin','observer']::public.conference_role[])
+ ) h $$;
+revoke all on function private.decision_history(uuid) from public, anon;
+grant execute on function private.decision_history(uuid) to authenticated;
+
+-- Publish through the operations snapshot. The projection above is what makes history survive lifecycle changes.
 -- Patched in place with an anchor that must occur once; fails closed if the base changes.
 do $patch$
 declare definition text; marker text := 'from public.photo_acknowledgements a where a.conference_id = conf)';
 begin
  definition := pg_get_functiondef('public.operations_snapshot(uuid)'::regprocedure);
  if length(definition) - length(replace(definition, marker, '')) <> length(marker) then raise exception 'operations_snapshot anchor changed; review before applying'; end if;
- execute replace(definition, marker, marker || E',\n  ''documentDecisions'', (select coalesce(jsonb_agg(jsonb_build_object(''id'',d.id,''documentId'',d."documentId",''decision'',d.decision,''round'',d.round,''versionId'',d."versionId",''versionNumber'',d."versionNumber",''reviewerId'',d."reviewerId",''reviewerName'',d."reviewerName",''commentId'',d."commentId",''decidedAt'',d."decidedAt") order by d."decidedAt", d.id),''[]'')
-    from public.document_decisions d where d.conference_id = conf)');
+ execute replace(definition, marker, marker || E',
+  ''documentDecisions'', private.decision_history(conf)');
 end $patch$;

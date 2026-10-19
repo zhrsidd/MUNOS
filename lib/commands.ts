@@ -372,7 +372,7 @@ export function applyCommand(
         // A round starts at each submission and ends in changes requested, so the next one is that count + 1.
         const round = list.filter((x) => x.documentId === documentId && x.decision === "changes_requested").length + 1;
         // Mirrors the database trigger: only Approval Panel transitions are decisions.
-        list.push({ id: nextId(), documentId, decision, round, versionId: version?.id ?? null, versionNumber: version?.number ?? null, reviewerId: metadata?.actorId ?? `${role}-demo`, reviewerName: null, commentId, decidedAt: now });
+        list.push({ id: nextId(), documentId, committeeId: r.committeeId, code: r.code, title: r.title, comment: c.comment?.trim() || null, decision, round, versionId: version?.id ?? null, versionNumber: version?.number ?? null, reviewerId: metadata?.actorId ?? `${role}-demo`, reviewerName: null, commentId, decidedAt: now });
       }
       break;
     }

@@ -60,7 +60,14 @@ export type DecisionKind = "review_started" | "changes_requested" | "approved";
 export interface DocumentDecision {
   id: string;
   documentId: string;
-  decision: DecisionKind;
+  /** Safe resolution identity, carried so history still renders after the resolution leaves the reader's lifecycle view. */
+  committeeId?: string;
+  code?: string;
+  title?: string;
+  /** The feedback text linked to this decision; null for a comment-free decision. */
+  comment?: string | null;
+  /** "comment" is a note written before decisions were recorded (no known decision). */
+  decision: DecisionKind | "comment";
   round: number;
   versionId: string | null;
   versionNumber: number | null;

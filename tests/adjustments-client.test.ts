@@ -110,3 +110,14 @@ test("a held order keeps the row under the person's hands and appends newcomers 
   assert.equal(frozenOrder(live, held.slice(1)).at(-1)!.id, held[0], "a delegate missing from the held order goes last");
   assert.equal(data.delegates.length > 0, true);
 });
+test("a session whose only history is a deduction or restore is in use, so the client does not offer to delete it", async () => {
+  const { sessionUsed } = await import("../lib/batch/commands");
+  const { data, s, delegates } = session();
+  // Start from a session with no other history.
+  const clean = { ...data, attendance: [], documents: [], events: [], queue: [], votes: [], speeches: [], debateStates: [], amendments: [] } as typeof data;
+  assert.equal(sessionUsed(clean, s.id), false);
+  const d = applyCommand(clean, deduct(delegates[0].id, s.id, 3), "chair");
+  assert.equal(sessionUsed(d, s.id), true);
+  const restored = applyCommand(d, { type: "pointAdjustment", action: "restore", delegateId: delegates[0].id, adjustmentId: d.pointAdjustments![0].id } as never, "chair");
+  assert.equal(sessionUsed(restored, s.id), true, "the restore row references the session too");
+});

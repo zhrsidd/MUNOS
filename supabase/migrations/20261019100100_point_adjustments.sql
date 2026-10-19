@@ -52,6 +52,8 @@ begin
   select * into orig from public.participation_adjustments where id = private.uuid_or_null(command->>'adjustmentId') and conference_id = conf and committee_id = cid for update;
   if not found then raise exception 'Adjustment unavailable' using errcode = '22023'; end if;
   if orig.points >= 0 or orig."delegateId" <> delegate_id then raise exception 'Only a deduction for this delegate can be restored.' using errcode = '22023'; end if;
+  -- Same archive boundary as a new deduction: an archived session or committee is history and its totals do not move.
+  perform private.require_operational_session(conf, orig."sessionId");
   if exists (select 1 from public.participation_adjustments where reverses = orig.id) then
    raise sqlstate 'PT409' using message = 'This deduction was already restored on another device.';
   end if;

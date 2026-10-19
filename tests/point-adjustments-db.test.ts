@@ -57,3 +57,29 @@ test('retired Drive archive table is gone and no function depends on it',async()
   assert.equal((await query('select to_regclass($1) t',['public.archive_jobs']))[0].t,null);
  }finally{await db.close();}
 });
+test('an archived session is history: neither a new deduction nor a restore moves its totals',async()=>{
+ const {db,ids,query,as,asOwner,grant}=await freshDatabase();
+ try{
+  await grant(chair,'chair',ids.ga1);
+  const send=async(command:unknown,key=crypto.randomUUID())=>{await as(chair);await db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,key,JSON.stringify(command),'chair',null,'2026-10-19T10:00:00Z']);};
+  const deduct={type:'pointAdjustment',action:'deduct',delegateId:ids.france,sessionId:ids.session,amount:4,reason:'Disrupted the session'};
+  await send(deduct);
+  await asOwner();const original=(await query<{id:string}>('select id from public.participation_adjustments'))[0].id;
+  await db.query('update public.sessions set archived=true where id=$1',[ids.session]);
+  await assert.rejects(()=>send({...deduct,amount:1}),/archived/);
+  await assert.rejects(()=>send({type:'pointAdjustment',action:'restore',delegateId:ids.france,adjustmentId:original}),/archived/,'restore uses the same boundary');
+  await asOwner();assert.equal((await query('select * from public.participation_adjustments')).length,1,'the historical total did not move');
+  await db.query('update public.sessions set archived=false where id=$1',[ids.session]);
+  await send({type:'pointAdjustment',action:'restore',delegateId:ids.france,adjustmentId:original});
+  await asOwner();assert.equal((await query('select * from public.participation_adjustments')).length,2,'an active session can still restore');
+ }finally{await db.close();}
+});
+test('the archive_jobs retirement locks the table before it checks it, in one statement',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const sql=readFileSync('supabase/migrations/20261019100200_retire_archive_jobs.sql','utf8').replace(/--.*$/gm,'');
+ const lock=sql.indexOf('lock table public.archive_jobs in access exclusive mode');const check=sql.indexOf('select 1 from public.archive_jobs');const drop=sql.indexOf('drop table public.archive_jobs');
+ assert.ok(lock>=0&&lock<check&&check<drop,'lock, then check, then drop');
+ assert.match(sql,/lock_timeout/);
+ assert.equal((sql.match(/\bdo \$\$/g)??[]).length,1,'lock, check and drop live in one DO block (one atomic statement)');
+ assert.ok(drop<sql.lastIndexOf('end $$'),'the DROP is inside the guarded block');
+});

@@ -59,3 +59,18 @@ repository's existing pattern).
 - Should the Approval Panel keep read access to decisions after a send-back (needs a policy change)?
 - Is -20..20 per adjustment the right bound, and should net totals be allowed below zero (currently allowed)?
 - Index and lock behaviour of `participation_adjustment_once_reversed` under two Chairs restoring at once.
+
+## Response to the independent review of `fd91da7` (all five accepted and fixed)
+
+The migrations were never applied anywhere, so they were corrected in place (no applied migration was edited).
+
+| # | Finding | Fix | Regression test |
+| --- | --- | --- | --- |
+| 1 | History hidden after Draft / Printed / In Debate / Closed | `private.decision_history(conf)`: SECURITY DEFINER projection under `private.has_access` for approval, chair, admin, observer; returns only decision, round, version, reviewer name, committee, resolution code/title and the linked feedback text. Legacy comments are projected as `comment`. Table RLS stays narrow; Logistics and other committees get nothing; revocation and expiry are immediate. | `tests/approval-lifecycle-db.test.ts` (Draft, Printed, In Debate, Closed, scopes, revoke/expire, audit still closed, exact field list) |
+| 2 | Seeded Review document rejected a second change request | `document_round` is now BEFORE INSERT OR UPDATE: non-Draft inserts start in round 1, direct non-Draft moves are lifted to round 1, Draft to Submitted still increments | same file, using the real seed (GA1 / 02), plus an imported Approved row |
+| 3 | Restore bypassed the archive guard | `require_operational_session` on the original adjustment's session | `tests/point-adjustments-db.test.ts` |
+| 4 | Client `sessionUsed` ignored adjustments | `sessionUsed` checks `pointAdjustments` (deduction and restore) | `tests/adjustments-client.test.ts` |
+| 5 | Check/drop race in `archive_jobs` | `lock table ... access exclusive` first, then check, then drop, in one DO block with a 10 s lock timeout | file-order test, plus a real PostgreSQL 16 run: a writer committing a row during the migration made it refuse and the table and row survived |
+
+Client: `DocumentDecision` now carries code, title, committee and comment so history renders without the resolution being visible; the local demo path produces the same shape. Not changed: timestamp comment linking (hardening noted, mutation-ID correlation left for any future batching); the 1 to 20 per-adjustment bound is still a product default for the owner to confirm; net totals below zero remain allowed.
+Not run: the four PostgreSQL-17-gated concurrency suites (the only local server here is PostgreSQL 16 and they fail on it for version reasons; the reviewer ran them on 17.11). Row counts, payload size and query cost of the two snapshot arrays are still unmeasured and belong to the conference-week rehearsal.
