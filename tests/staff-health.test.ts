@@ -46,8 +46,9 @@ test('each active staff role renders its own health route/navigation and rejects
   assert.equal(staffRoleForPath(path),role);
   const html=await render(path);
   assert.match(html,/<h1>System health<\/h1>/);assert.match(html,/STAFF · SYSTEM HEALTH/);
-  assert.match(html,new RegExp(`class="active" aria-current="page" href="${path}"`));
-  assert.match(html,/sync-status/,'compact sidebar status remains');
+  // System health lives under the More menu, which is the active entry; its links render when opened.
+  assert.match(html,/<button class="tab active"[^>]*aria-expanded="false"[^>]*>More/);
+  assert.match(html,/save-status/,'save status remains in the masthead');
   assert.doesNotMatch(html,/class="session-selector"|class="status-strip/);
   if(role!=='admin')assert.doesNotMatch(html,/href="\/admin(?:\/|\")/,'no Executive navigation');
   assert.deepEqual(redirects,[]);

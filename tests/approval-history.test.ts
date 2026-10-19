@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approvalHistory, decisionLabel } from "../lib/approval-history";
+import { approvalHistory, decisionLabel, latestFeedback } from "../lib/approval-history";
 import { createSeed } from "../lib/seed";
 import type { DocumentDecision } from "../lib/operations/types";
 
@@ -30,4 +30,18 @@ test("history can span resolutions, ignores unknown documents and breaks time ti
   assert.deepEqual(approvalHistory(data).map((x) => x.id), ["b", "a"]);
   assert.deepEqual(approvalHistory(data, a.id).map((x) => x.id), ["a"]);
   assert.deepEqual(approvalHistory(createSeed()), []);
+});
+test("legacy comments with no recorded decision appear as Comment; latest feedback ignores comment-free decisions", () => {
+  const data = createSeed();
+  const r = data.documents[0];
+  r.comments = [{ id: "old", text: "Imported note.", authorId: "u", createdAt: "2026-10-01T09:00:00Z" }, { id: "c1", text: "Cite the treaty.", authorId: "u", createdAt: "2026-10-19T09:00:00Z" }];
+  data.documentDecisions = [dec("2", r.id, "changes_requested", "2026-10-19T09:00:00Z", { commentId: "c1" }), dec("3", r.id, "approved", "2026-10-19T11:00:00Z", { round: 2 })];
+  const h = approvalHistory(data, r.id);
+  assert.deepEqual(h.map((x) => [x.kind, x.comment]), [["approved", null], ["changes_requested", "Cite the treaty."], ["comment", "Imported note."]]);
+  assert.equal(h[2].label, "Comment");
+  assert.equal(h[2].round, 0);
+  const f = latestFeedback(data, r.id)!;
+  assert.equal(f.comment, "Cite the treaty.");
+  assert.equal(f.reviewer, "Priya Nair");
+  assert.equal(latestFeedback(createSeed(), "none"), null);
 });

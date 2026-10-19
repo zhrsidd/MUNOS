@@ -124,6 +124,15 @@ export function participationOrder(data: ConferenceData, delegates: Delegate[]) 
   const total = new Map(delegates.map((d) => [d.id, participationSummary(data, d.id).points]));
   return [...delegates].sort((a, b) => total.get(b.id)! - total.get(a.id)! || a.country.localeCompare(b.country, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
+/**
+ * While a row is being edited or keyboard focus sits in the list, keep the order the person was looking at, so the
+ * row they are working on does not move under them. Delegates not in the frozen order go last, in live order.
+ */
+export function frozenOrder(live: Delegate[], frozen: string[] | null) {
+  if (!frozen) return live;
+  const at = new Map(frozen.map((id, i) => [id, i]));
+  return [...live].sort((a, b) => (at.get(a.id) ?? Infinity) - (at.get(b.id) ?? Infinity));
+}
 /** Approval Panel decisions are these transitions; every other status change is not a decision. */
 export function decisionFor(from: DocumentStatus, to: DocumentStatus): DecisionKind | null {
   if (from === "Submitted" && to === "Review") return "review_started";

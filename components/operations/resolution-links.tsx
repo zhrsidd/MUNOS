@@ -60,7 +60,7 @@ function LinkWorkingDoc({ documentId }: { documentId: string }) {
     <span className="link-field">
       <input value={value} aria-label="Working Google Doc link" placeholder="Paste the Google Doc link" onChange={(e) => setValue(e.target.value)} />
       <button disabled={!parsed.ok} title={!parsed.ok && value ? googleDocMessages[parsed.problem] : undefined} onClick={() => parsed.ok && void act({ type: "resolutionLink", documentId, action: "workingDoc", docId: parsed.id }, "chair").then((ok) => ok && setValue(""))}>
-        Link Google Doc
+        Link working document
       </button>
     </span>
   );

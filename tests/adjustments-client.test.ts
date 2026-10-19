@@ -100,3 +100,13 @@ test("adjustments travel through the operations boundary and its idempotent outb
   assert.deepEqual(operationsRoles.pointAdjustment, ["chair"]);
   assert.equal(operationsFingerprint(createSeed(), { type: "pointAdjustment", action: "deduct", delegateId: "x", sessionId: "y", amount: 1, reason: "abc" }), null, "append-only: no precondition to go stale");
 });
+test("a held order keeps the row under the person's hands and appends newcomers last", async () => {
+  const { frozenOrder } = await import("../lib/commands");
+  const { data, delegates } = session();
+  const live = delegates;
+  const held = [...live].reverse().map((d) => d.id);
+  assert.deepEqual(frozenOrder(live, held).map((d) => d.id), held);
+  assert.deepEqual(frozenOrder(live, null), live);
+  assert.equal(frozenOrder(live, held.slice(1)).at(-1)!.id, held[0], "a delegate missing from the held order goes last");
+  assert.equal(data.delegates.length > 0, true);
+});

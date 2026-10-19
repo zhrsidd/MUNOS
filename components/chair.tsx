@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useConference } from "@/lib/context";
 import { AttendanceStatus, Delegate } from "@/lib/domain";
 import { participationSummary, votingOutcome, effectiveScoring } from "@/lib/repository";
-import { participationOrder } from "@/lib/commands";
+import { frozenOrder, participationOrder } from "@/lib/commands";
 import { AdjustmentHistory, DeductPoints } from "./point-adjustments";
 import { scoringLabel, scoringValues } from "@/lib/scoring";
 import { eventAmendmentId } from "@/lib/procedure/view";
@@ -78,6 +78,10 @@ export function ChairScreen({
   const [selected, setSelected] = useState<string | null>(null);
   const [eventEdit, setEventEdit] = useState<string | null>(null);
   const [deducting, setDeducting] = useState<string | null>(null);
+  // Order shown while an editor is open or keyboard focus is in the list; null = follow live totals.
+  const [heldOrder, setHeldOrder] = useState<string[] | null>(null);
+  const [keyboardInList, setKeyboardInList] = useState(false);
+  const [adjusted, setAdjusted] = useState("");
   const committee = data.committees.find((c) => c.id === committeeId)!;
   const session = data.sessions.find((s) => s.id === sessionId);
   const delegates = data.delegates.filter((d) => d.committeeId === committeeId);
@@ -259,8 +263,31 @@ export function ChairScreen({
             subtitle="Highest total first. Select a delegate, then tap a point value."
             action={<Search value={search} onChange={setSearch} />}
           >
-            <div className="participation-delegates">
-              {participationOrder(data, filtered).map((d) => (
+            {keyboardInList && (
+              <p className="muted" role="status">
+                The order updates when you leave this list.
+              </p>
+            )}
+            {adjusted && (
+              <p role="status" className="adjusted-note">
+                {adjusted} <a href="#adjustments">View adjustment history</a>
+              </p>
+            )}
+            <div
+              className="participation-delegates"
+              onFocus={(e) => {
+                if (e.target.matches(":focus-visible")) {
+                  setKeyboardInList(true);
+                  setHeldOrder((h) => h ?? participationOrder(data, filtered).map((x) => x.id));
+                }
+              }}
+              onBlur={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+                setKeyboardInList(false);
+                if (!deducting && !eventEdit) setHeldOrder(null);
+              }}
+            >
+              {frozenOrder(participationOrder(data, filtered), heldOrder).map((d) => (
                 <div className="participation-row" key={d.id}>
                   <DelegateIdentity delegate={d} />
                   <span className="opportunity-total">
@@ -274,8 +301,16 @@ export function ChairScreen({
                     sessionId={sessionId}
                     resolutionId={resolution?.id || null}
                   />
-                  <button className="text-button" onClick={() => setDeducting(d.id)} aria-label={`Deduct points from ${d.country}`}>
-                    Deduct…
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setHeldOrder(participationOrder(data, filtered).map((x) => x.id));
+                      setAdjusted("");
+                      setDeducting(d.id);
+                    }}
+                    aria-label={`Adjust points for ${d.country}`}
+                  >
+                    Adjust points…
                   </button>
                 </div>
               ))}
@@ -408,7 +443,16 @@ export function ChairScreen({
         </Modal>
       )}
       {deducting && delegates.find((d) => d.id === deducting) && (
-        <DeductPoints delegate={delegates.find((d) => d.id === deducting)!} sessionId={sessionId} onClose={() => setDeducting(null)} />
+        <DeductPoints
+          delegate={delegates.find((d) => d.id === deducting)!}
+          sessionId={sessionId}
+          onClose={(saved) => {
+            const who = delegates.find((d) => d.id === deducting)!;
+            setDeducting(null);
+            if (!keyboardInList) setHeldOrder(null);
+            if (saved) setAdjusted(`Deducted ${saved} ${saved === 1 ? "point" : "points"} from ${who.country}.`);
+          }}
+        />
       )}
       {edit && (
         <Modal title="Edit contribution" onClose={() => setEventEdit(null)}>

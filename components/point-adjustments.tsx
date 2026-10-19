@@ -10,7 +10,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: 
 const QUICK = [1, 2, 3, 5, 10];
 
 /** Deduct a chosen number of points. Recorded as an adjustment; the delegate's original scores are not changed. */
-export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Delegate; sessionId: string; onClose: () => void }) {
+export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Delegate; sessionId: string; onClose: (savedAmount?: number) => void }) {
   const { data, act } = useConference();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -18,6 +18,7 @@ export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Deleg
   const [busy, setBusy] = useState(false);
   const total = participationSummary(data, delegate.id).points;
   const parsed = /^\d+$/.test(amount) ? Number(amount) : NaN;
+  const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= MAX_DEDUCTION;
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const problem = deductionProblem(parsed, reason);
@@ -25,10 +26,10 @@ export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Deleg
     setBusy(true);
     const ok = await act({ type: "pointAdjustment", action: "deduct", delegateId: delegate.id, sessionId, amount: parsed, reason: reason.trim() }, "chair");
     setBusy(false);
-    if (ok) onClose();
+    if (ok) onClose(parsed);
   }
   return (
-    <Modal title={`Deduct points · ${delegate.country}`} onClose={onClose}>
+    <Modal title={`Adjust points · ${delegate.country}`} onClose={() => onClose()}>
       <form onSubmit={(e) => void submit(e)} className="deduct-form">
         <p className="muted">
           Current total {total} pts. The deduction is recorded with your name, the reason and the time. Original scores stay in the log.
@@ -81,11 +82,11 @@ export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Deleg
           </p>
         )}
         <div className="actions">
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={() => onClose()}>
             Cancel
           </button>
           <button className="primary" disabled={busy}>
-            Deduct points
+            {valid ? `Deduct ${parsed} ${parsed === 1 ? "point" : "points"}` : "Deduct points"}
           </button>
         </div>
       </form>
@@ -100,7 +101,7 @@ export function AdjustmentHistory({ committeeId }: { committeeId: string }) {
   const list = (data.pointAdjustments ?? []).filter((a) => delegates.has(a.delegateId)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id < b.id ? 1 : -1));
   const restored = new Set(list.filter((a) => a.reverses).map((a) => a.reverses));
   return (
-    <Panel title="Point adjustments" subtitle="Deductions are recorded separately. Original scores are never changed.">
+    <Panel id="adjustments" title="Point adjustments" subtitle="Deductions are recorded separately. Original scores are never changed.">
       {list.length ? (
         <ul className="adjustments" aria-label="Point adjustments, newest first">
           {list.map((a) => {

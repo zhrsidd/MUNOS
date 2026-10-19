@@ -1,5 +1,10 @@
 "use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useConference } from "@/lib/context";
+import { staffRoleForPath } from "@/lib/access";
+import { saveStatus } from "@/lib/save-status";
 import { repository } from "@/lib/repository";
 import { buildInfo, releaseLabel } from "@/lib/platform/build-info";
 import type { HealthReport } from "@/lib/platform/health-probe";
@@ -213,6 +218,21 @@ export function SystemHealth() {
           </article>
         ))}
     </section>
+  );
+}
+/** Save and sync state in the masthead, in the shared state language (lib/save-status.ts). */
+export function SaveStatus() {
+  const { status } = useSystemStatus(false);
+  const { access } = useConference();
+  const h = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
+  const area = staffRoleForPath(usePathname() ?? "") ?? "chair";
+  const online = !status.items.some((i) => i.key === "internet" && i.level !== "green");
+  const info = saveStatus({ health: h, online, access: access.status });
+  return (
+    <span className={`save-status ${info.tone}`} role="status" aria-live="polite">
+      <span className="status-dot" aria-hidden="true" />
+      {info.details ? <Link href={`/${area}/health`}>{info.label}</Link> : info.label}
+    </span>
   );
 }
 /** Compact indicator for the sidebar. Client-side signals only; never polls the server. */

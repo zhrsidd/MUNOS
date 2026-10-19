@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useConference } from "@/lib/context";
 import type { Resolution } from "@/lib/domain";
 import { approvalHistory, decisionTone, type HistoryEntry } from "@/lib/approval-history";
-import { resolutionFeedback, resolutionNextAction, resolutionOrder, sentBack, type Feedback } from "@/lib/resolution-view";
+import { resolutionNextAction, resolutionOrder, sentBack } from "@/lib/resolution-view";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { ResolutionSources } from "./operations/resolution-links";
 
@@ -17,23 +17,23 @@ function Sources({ resolution }: { resolution: Resolution }) {
   return <ResolutionSources resolution={resolution} storageKey={version?.storageKey ?? null} fileName={version?.fileName ?? ""} />;
 }
 /** Approval Panel feedback, shown in full where the Chair and the panel are already looking. */
-function FeedbackNote({ feedback, changes }: { feedback: Feedback; changes: boolean }) {
+function FeedbackNote({ entry, changes }: { entry: HistoryEntry; changes: boolean }) {
   return (
     <section className={`feedback${changes ? " changes" : ""}`} aria-label="Approval Panel feedback">
       <p className="feedback-meta">
-        <strong>{changes ? "Changes requested" : "Approval Panel"}</strong> · <time dateTime={feedback.createdAt}>{qatarTime(feedback.createdAt)}</time>
+        <strong>{changes ? "Changes requested" : "Approval Panel feedback"}</strong> · {entry.reviewer} · <time dateTime={entry.at}>{qatarTime(entry.at)}</time> Qatar time
       </p>
-      <p className="feedback-text">{feedback.text}</p>
+      <p className="feedback-text">{entry.comment}</p>
     </section>
   );
 }
-function EarlierFeedback({ items }: { items: Feedback[] }) {
-  if (!items.length) return null;
+function EarlierFeedback({ entries }: { entries: HistoryEntry[] }) {
+  if (!entries.length) return null;
   return (
     <details className="feedback-earlier">
-      <summary>Earlier feedback ({items.length})</summary>
-      {items.map((f) => (
-        <FeedbackNote key={f.id} feedback={f} changes={false} />
+      <summary>Earlier feedback · {entries.length}</summary>
+      {entries.map((e) => (
+        <FeedbackNote key={e.id} entry={e} changes={false} />
       ))}
     </details>
   );
@@ -46,15 +46,15 @@ export function ApprovalHistory({ entries, showResolution = false, label = "Appr
       {entries.map((e) => (
         <li key={e.id} className="history-entry">
           <div className="history-line">
-            <Chip tone={decisionTone[e.kind]}>{e.label}</Chip>
+            <Chip tone={decisionTone[e.kind]}>{e.kind === "approved" && !e.comment ? "Approved — no comment added" : e.label}</Chip>
             {showResolution && (
               <strong className="history-resolution">
                 {e.code} · {e.title}
               </strong>
             )}
             <span className="muted">
-              Round {e.round}
-              {e.version ? ` · version ${e.version}` : ""} · by {e.reviewer} · <time dateTime={e.at}>{qatarTime(e.at)}</time>
+              {e.round ? `Round ${e.round}` : "Before decisions were recorded"}
+              {e.version ? ` · version ${e.version}` : ""} · by {e.reviewer} · <time dateTime={e.at}>{qatarTime(e.at)}</time> Qatar time
             </span>
           </div>
           {e.comment && <p className="history-comment">{e.comment}</p>}
@@ -66,47 +66,59 @@ export function ApprovalHistory({ entries, showResolution = false, label = "Appr
 function ResolutionRow({ resolution }: { resolution: Resolution }) {
   const { data, act } = useConference();
   const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
-  const { latest, earlier } = resolutionFeedback(resolution);
+  const history = approvalHistory(data, resolution.id);
+  const withComment = history.filter((e) => e.comment);
+  const latest = withComment[0] ?? null;
   const next = resolutionNextAction(resolution);
   const back = sentBack(resolution);
   const heading = `resolution-${resolution.id}`;
-  const lastDecision = approvalHistory(data, resolution.id)[0];
+  const lastDecision = history[0];
+  const resubmit = next.status && (
+    <button className={back ? "link-action" : "primary"} onClick={() => void act({ type: "document", id: resolution.id, status: next.status! }, "chair")}>
+      {back ? "Resubmit after editing →" : next.label}
+    </button>
+  );
   return (
-    <article className="resolution-row" aria-labelledby={heading}>
+    <article className={`resolution-row${back ? " changes" : ""}`} aria-labelledby={heading}>
       <header className="resolution-head">
         <div>
           <small className="eyebrow">{resolution.code}</small>
           <h3 id={heading}>{resolution.title}</h3>
-          <p className="muted">{submitter ? `Submitted by ${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
+          <p className="muted">{submitter ? `${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
         </div>
         <div className="resolution-status">
           <Chip tone={back ? "review" : ""}>{back ? "Changes requested" : resolution.status}</Chip>
           {resolution.outcome && <Chip tone="blue">{resolution.outcome}</Chip>}
         </div>
       </header>
-      <div className="resolution-doc">
-        <Sources resolution={resolution} />
-      </div>
-      {latest ? <FeedbackNote feedback={latest} changes={back} /> : (resolution.status === "Submitted" || resolution.status === "Review") && <p className="muted">No feedback from the Approval Panel yet.</p>}
-      <EarlierFeedback items={earlier} />
+      {!back && (
+        <div className="resolution-doc">
+          <Sources resolution={resolution} />
+        </div>
+      )}
+      {latest ? <FeedbackNote entry={latest} changes={back} /> : (resolution.status === "Submitted" || resolution.status === "Review") && <p className="muted">No feedback from the Approval Panel yet.</p>}
       {lastDecision && !lastDecision.comment && (
         <p className="decision-line">
-          <strong>{lastDecision.label}</strong> by {lastDecision.reviewer} · <time dateTime={lastDecision.at}>{qatarTime(lastDecision.at)}</time>
+          <strong>{lastDecision.kind === "approved" ? "Approved — no comment added" : lastDecision.label}</strong> by {lastDecision.reviewer} · <time dateTime={lastDecision.at}>{qatarTime(lastDecision.at)}</time> Qatar time
         </p>
       )}
       <footer className="resolution-next">
-        {next.status ? (
-          <button className="primary" onClick={() => void act({ type: "document", id: resolution.id, status: next.status! }, "chair")}>
-            {next.label}
-          </button>
-        ) : next.href ? (
+        {back && <Sources resolution={resolution} />}
+        {resubmit}
+        {!next.status && next.href && (
           <Link className="button primary" href={next.href}>
             {next.label}
           </Link>
-        ) : (
-          <span className="muted">{next.label}</span>
         )}
+        {!next.status && !next.href && <span className="muted">{next.label}</span>}
       </footer>
+      <EarlierFeedback entries={withComment.slice(1)} />
+      {history.length > 0 && (
+        <details className="feedback-earlier">
+          <summary>Approval history · {history.length}</summary>
+          <ApprovalHistory entries={history} label={`Approval history for ${resolution.code}`} />
+        </details>
+      )}
     </article>
   );
 }
@@ -119,9 +131,9 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
   return (
     <>
       <PageHeading
-        eyebrow="RESOLUTIONS"
+        eyebrow={`Chair Console · ${data.committees.find((c) => c.id === committeeId)?.code ?? ""}`}
         title="Resolutions"
-        description="Title, submitter, status, the working document and the Approval Panel's feedback, in one place."
+        description={documents.some((r) => r.status === "Draft") ? "Resolutions that need you are listed first." : "Each resolution with its document, feedback and next step."}
         action={
           <button className="primary" disabled={!sessionId || !data.delegates.some((d) => d.committeeId === committeeId)} onClick={() => setModal("new")}>
             + New resolution
@@ -192,29 +204,21 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
 function ResolutionDetail({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
   const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
-  const { latest, earlier } = resolutionFeedback(resolution);
   const history = approvalHistory(data, resolution.id);
   return (
     <div className="resolution-detail">
-      <p className="muted">{submitter ? `Submitted by ${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
+      <p className="muted">{submitter ? `${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
       <Sources resolution={resolution} />
-      {history.length ? (
-        <section aria-labelledby={`history-${resolution.id}`}>
-          <h3 id={`history-${resolution.id}`} className="history-heading">
-            Decisions on this resolution
-          </h3>
-          <ApprovalHistory entries={history} label={`Decisions on ${resolution.code}`} />
-        </section>
-      ) : (
-        <>
-          {latest && <FeedbackNote feedback={latest} changes={false} />}
-          <EarlierFeedback items={earlier} />
-        </>
-      )}
+      <section aria-labelledby={`history-${resolution.id}`}>
+        <h3 id={`history-${resolution.id}`} className="history-heading">
+          Decisions on this resolution
+        </h3>
+        <ApprovalHistory entries={history} label={`Decisions on ${resolution.code}`} />
+      </section>
     </div>
   );
 }
-export function Approval() {
+export function Approval({ section = "" }: { section?: string }) {
   const { data, act } = useConference();
   const [selected, setSelected] = useState("");
   const [comment, setComment] = useState("");
@@ -244,13 +248,21 @@ export function Approval() {
       setError("");
     }
   }
+  if (section === "history")
+    return (
+      <>
+        <PageHeading eyebrow="APPROVAL PANEL" title="History" description="Every decision on every resolution, newest first, with the version and review round it applied to." />
+        <Panel title="Decisions" subtitle="Comments written without a recorded decision appear as Comment.">
+          <ApprovalHistory entries={approvalHistory(data)} showResolution />
+        </Panel>
+      </>
+    );
   return (
     <>
       <PageHeading
         eyebrow="APPROVAL PANEL"
-        title="A clear path to the floor."
-        description="Review the latest version. Send a decision back to the committee."
-        action={<Chip tone="blue">{inbox.length} awaiting review</Chip>}
+        title="Review inbox"
+        description={inbox.length ? `${inbox.length} ${inbox.length === 1 ? "resolution is" : "resolutions are"} waiting for a decision.` : "Nothing is waiting for your review."}
       />
       {inbox.length ? (
         <div className="review-layout">
@@ -354,26 +366,47 @@ export function Approval() {
           text="New submissions will appear here. Approved resolutions are now with Logistics."
         />
       )}
-      <Panel title="Approval history" subtitle="Every decision on every resolution, newest first.">
-        <ApprovalHistory entries={approvalHistory(data)} showResolution />
-      </Panel>
     </>
   );
 }
-export function Logistics() {
+export function Logistics({ section = "" }: { section?: string }) {
   const { data, act } = useConference();
-  const [showCompleted, setShowCompleted] = useState(false);
   const queue = data.documents.filter((r) => r.status === "Approved");
   const completed = data.documents.filter((r) =>
     ["Printed", "In Debate", "Closed"].includes(r.status),
   );
+  if (section === "completed")
+    return (
+      <>
+        <PageHeading eyebrow="ADMINS" title="Completed" description="Printed resolutions and where their documents are." />
+        <Panel title="Completed jobs" subtitle={`${completed.length} documents have been printed`}>
+            {completed.length ? (
+              completed.map((r) => (
+                <div className="summary-row" key={r.id}>
+                  <div>
+                    <strong>
+                      {r.code} · {r.title}
+                    </strong>
+                    <p>
+                      {r.copies} copies · v{r.versionIds.length}
+                    </p>
+                  </div>
+                  <Sources resolution={r} />
+                  <Chip tone="green">Printed</Chip>
+                </div>
+              ))
+            ) : (
+              <Empty title="Nothing printed yet" text="Printed jobs appear here." />
+            )}
+        </Panel>
+      </>
+    );
   return (
     <>
       <PageHeading
         eyebrow="ADMINS"
-        title="Ready. Set. Print."
-        description="Only approved versions enter this queue. Mark them printed when the copies are ready."
-        action={<Chip tone="blue">{queue.length} pending jobs</Chip>}
+        title="Print queue"
+        description={queue.length ? `${queue.length} ${queue.length === 1 ? "job is" : "jobs are"} ready to print. Mark each printed when the copies are ready.` : "No approved resolutions are waiting to print."}
       />
       <div className="print-summary">
         <Icon name="print" />
@@ -433,33 +466,6 @@ export function Logistics() {
             text="Approved resolutions will appear here automatically."
           />
         )}
-      </Panel>
-      <Panel
-        title="Completed jobs"
-        subtitle={`${completed.length} documents have been printed`}
-        action={
-          <button
-            className="text-button"
-            onClick={() => setShowCompleted(!showCompleted)}
-          >
-            {showCompleted ? "Hide history" : "Show history"}
-          </button>
-        }
-      >
-        {showCompleted &&
-          completed.map((r) => (
-            <div className="summary-row" key={r.id}>
-              <div>
-                <strong>
-                  {r.code} · {r.title}
-                </strong>
-                <p>
-                  {r.copies} copies · v{r.versionIds.length}
-                </p>
-              </div>
-              <Chip tone="green">Printed</Chip>
-            </div>
-          ))}
       </Panel>
     </>
   );

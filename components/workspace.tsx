@@ -1,15 +1,17 @@
 "use client";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
 import { Role } from "@/lib/domain";
 import { soleWorkspacePath } from "@/lib/access";
 import { Icon, Chip, Panel } from "./ui";
 import { Brand } from "./brand";
+import { Tabs } from "./shell";
+import { navigationFor } from "@/lib/navigation";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { StatusStrip, SystemHealth, SyncStatus, DataModeLabel } from "./health";
+import { StatusStrip, SystemHealth, SaveStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { AccessCodes } from "./access-codes";
@@ -44,35 +46,6 @@ const roles: { id: Role; name: string; description: string; icon: string }[] = [
     icon: "settings",
   },
 ];
-// [route, label, icon, group]. An empty group is the everyday work; named groups sit quietly below it.
-const chairNav = [
-  ["", "Debate", "debate", ""],
-  ["roll-call", "Roll call", "attendance", ""],
-  ["participation", "Participation", "log", ""],
-  ["documents", "Resolutions", "documents", ""],
-  ["amendments", "Amendments", "documents", ""],
-  ["voting", "Voting", "voting", ""],
-  ["photos", "Group photos", "clock", "More"],
-  ["awards", "Award discussion", "awards", "More"],
-  ["health", "System health", "settings", "More"],
-];
-const adminNav = [
-  ["", "Overview", "admin", ""],
-  ["conference", "Conference", "settings", "Set up"],
-  ["committees", "Committees", "debate", "Set up"],
-  ["sessions", "Sessions", "clock", "Set up"],
-  ["delegates", "Delegates", "attendance", "Set up"],
-  ["schools", "Schools", "admin", "Set up"],
-  ["staff", "Chairs & staff", "review", "Set up"],
-  ["photos", "Group photos", "clock", "Run the day"],
-  ["submissions", "Resolution links", "documents", "Run the day"],
-  ["amendment-links", "Amendment links", "documents", "Run the day"],
-  ["access-codes", "Access codes", "settings", "Run the day"],
-  ["scoring", "Scoring", "log", "Run the day"],
-  ["workflow", "Workflow & features", "settings", "Run the day"],
-  ["audit", "Audit log", "log", "Records"],
-  ["health", "System health", "settings", "Records"],
-];
 export function Workspace({ path }: { path: string }) {
   const {
     data,
@@ -82,8 +55,7 @@ export function Workspace({ path }: { path: string }) {
     access,
   } = useConference();
   const [now] = useState(()=>Date.now());
-  const [menu, setMenu] = useState(false);
-  const router = useRouter();
+    const router = useRouter();
   // A staff member with exactly one workspace goes straight in; the picker is only for people with a choice.
   const soleWorkspace = !path ? soleWorkspacePath(access) : null;
   useEffect(() => { if (soleWorkspace) router.replace(soleWorkspace); }, [soleWorkspace, router]);
@@ -157,89 +129,53 @@ export function Workspace({ path }: { path: string }) {
       </main>
     );
   const roleInfo = roles.find((r) => r.id === role)!;
-  const nav =
-    role === "chair"
-      ? chairNav
-      : role === "admin"
-        ? adminNav
-        : [
-            [
-              "",
-              role === "approval" ? "Review inbox" : "Print queue",
-              role === "approval" ? "review" : "print",
-              "",
-            ],
-            ["health", "System health", "settings", ""],
-          ];
+  const items = navigationFor(role);
+  const canSwitch = access.status !== "active" || access.roles.length > 1;
   return (
-    <div className="app-shell">
-      <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <Brand />
-        <div className="workspace-label">{roleInfo.name}</div>
-        <nav>
-          {nav.map(([slug, label, icon, group], i) => (
-            <Fragment key={slug}>
-              {group && group !== nav[i - 1]?.[3] && <div className="nav-group">{group}</div>}
-              <Link
-                onClick={() => setMenu(false)}
-                href={`/${role}${slug ? `/${slug}` : ""}`}
-                className={section === slug ? "active" : ""}
-                aria-current={section === slug ? "page" : undefined}
-              >
-                <Icon name={icon} />
-                {label}
-                {role === "chair" && slug === "documents" && (
-                  <span className="nav-count">
-                    {data.documents.filter((d) => d.committeeId === committeeId).length}
-                  </span>
-                )}
+    <div className="assembly">
+      <header className="masthead">
+        <div className="masthead-inner">
+          <Brand />
+          <div className="masthead-right">
+            <SaveStatus />
+            <span className="workspace-name">{roleInfo.name}</span>
+            {canSwitch && (
+              <Link href="/" className="masthead-link">
+                Switch workspace
               </Link>
-            </Fragment>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="local-state">
-            <SyncStatus />
-          </div>
-          <Link href="/" className="switch-role">
-            <Icon name="arrow" />
-            Switch workspace
-          </Link>
-          <div className="user">
-            <div>
-              <strong>{roleInfo.name}</strong>
-              <small>{access.status === "active" ? "Signed in" : "Demo access"}</small>
-            </div>
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="topbar-left">
-            <button
-              className="mobile-menu"
-              aria-label="Toggle navigation"
-              onClick={() => setMenu(!menu)}
-            >
-              ☰
-            </button>
-            {role === "chair" ? (
-              <select
-                aria-label="Select committee"
-                value={committeeId}
-                onChange={(e) => setCommitteeId(e.target.value)}
-              >
-                {activeCommittees.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} · {c.room}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <strong>Conference-wide</strong>
             )}
           </div>
-        </header>
+        </div>
+      </header>
+      <div className="context-band">
+        <div className="context-inner">
+          {role === "chair" ? (
+            <>
+              <label className="context-committee">
+                <span className="sr-only">Committee</span>
+                <select aria-label="Select committee" value={committeeId} onChange={(e) => setCommitteeId(e.target.value)}>
+                  {activeCommittees.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} · {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="context-secondary">
+                {committee ? `Room ${committee.room.replace(/^Room\s+/i, "")}` : ""}
+                {session ? ` · ${session.name}` : " · No current session"}
+              </span>
+            </>
+          ) : (
+            <>
+              <strong>{roleInfo.name}</strong>
+              <span className="context-secondary">Conference-wide</span>
+            </>
+          )}
+        </div>
+      </div>
+      <Tabs items={items} role={role} section={section} count={role === "chair" ? { documents: data.documents.filter((d) => d.committeeId === committeeId).length } : undefined} />
+      <div className="main-shell">
         <main className="workspace-content">
           {section !== "health" && <StatusStrip />}
           {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} prominent={section === ""} />}
@@ -288,9 +224,9 @@ export function Workspace({ path }: { path: string }) {
               />
             )
           ) : role === "approval" ? (
-            <Approval />
+            <Approval section={section} />
           ) : role === "logistics" ? (
-            <Logistics />
+            <Logistics section={section} />
           ) : (
             section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
