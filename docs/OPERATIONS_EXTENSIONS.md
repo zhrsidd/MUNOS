@@ -24,7 +24,7 @@ GOOGLE DOCS   authoring · editing · formatting · comments · revision history
      ↓
 MUNOS         workflow truth: submission, Chair review, approval, printing, debate, voting, audit
      ↓
-GOOGLE DRIVE  approval copies · archive · final PDF snapshots (automation later)
+GOOGLE DRIVE  Approval Panel folder (copies made by hand)
 ```
 
 Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/archive.
@@ -41,7 +41,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Google Doc links.** Accepted: `https://docs.google.com/document/d/<id>/…` (any suffix/query, `/u/<n>/` account paths, missing `https://`). Rejected with a plain explanation: other hosts and look-alikes (`docs.google.com.evil…`, `user@host` tricks, ports), non-HTTP(S) protocols (`javascript:`, `data:`), Drive file links, spreadsheets, "Publish to the web" links (`/d/e/…`, view-only), malformed ids. Only the document **id** (`[A-Za-z0-9_-]{25,100}`) is stored — the database checks the same pattern — and the URL is always rebuilt as `https://docs.google.com/document/d/<id>/edit`, so no arbitrary user-supplied URL is rendered. This currently drops rare legacy `resourcekey` query parameters; preserving those is a low-priority follow-up. Conference OS makes **no Google API calls**; delegates need no Google sign-in with Conference OS. Whether the Chair can open the document is recorded by the Chair (*Can't access*), not verified by Conference OS.
 
-**Approval (manual for now).** The Chair copies the Google Doc into the Approval Panel's Drive folder by hand and may paste that copy's link (optional). Drive automation (copy on *Submit to Approval*, PDF snapshot) is a later Claude integration and is not implemented.
+**Approval (manual for now).** The Chair copies the Google Doc into the Approval Panel's Drive folder by hand and may paste that copy's link (optional). Drive automation was considered and retired.
 
 **Security model.**
 
@@ -58,7 +58,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 **Data.** `public.resolution_links` (per resolution): `working_doc_id`, `approval_copy_doc_id`, `access` (`unchecked`/`ok`/`problem`), `submitted_at`. Chairs (own committee) and Executives update it with the `resolutionLink` extension command (`workingDoc`, `approvalCopy`, `access`) through the normal outbox. Chair-created resolutions can also be given a working Google Doc from the document preview.
 
-**Not built (by design).** No document parser, clause import, structured clause editor, text storage, automatic amendment editing, Drive copying or Google OAuth. Future amendment tracking (Codex) only needs "passed, not yet applied" / "applied to the working document" flags on top of this.
+**Not built (by design).** No document parser, clause import, structured clause editor, text storage, automatic amendment editing, Drive copying/mirroring or Google OAuth. Future amendment tracking (Codex) only needs "passed, not yet applied" / "applied to the working document" flags on top of this.
 
 **Local demo.** With `NEXT_PUBLIC_DATA_BACKEND=local` the route uses an in-memory demo backend (tokens `demo_<committee>_<hex>`, seed committees only, contact details derived from configured demo staff assignments). Demo submissions do not appear in the browser's local demo workspace; the Chair panel can be exercised by linking a Google Doc to a demo resolution.
 

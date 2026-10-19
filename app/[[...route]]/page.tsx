@@ -30,7 +30,6 @@ const paths = [
   "admin/workflow",
   "admin/submissions",
   "admin/amendment-links",
-  "admin/resources",
   "admin/audit",
   "admin/health",
 ];

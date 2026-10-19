@@ -69,7 +69,6 @@ const adminNav = [
   ["workflow", "Workflow & features", "settings"],
   ["submissions", "Resolution links", "documents"],
   ["amendment-links", "Amendment links", "documents"],
-  ["resources", "Resources & Drive", "documents"],
   ["audit", "Audit log", "log"],
   ["health", "System health", "settings"],
 ];

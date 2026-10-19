@@ -87,7 +87,7 @@ export function SubmissionLinks() {
         }
       />
       <Panel title="Chair contact details" subtitle="The form prefers Anyone with the link → Editor. If school restrictions prevent that, delegates can share directly with the assigned Chairs listed below.">
-        <p className="panel-body"><Link href="/admin/staff">Manage Chair names and contact emails →</Link> These contacts do not grant app access and are separate from future Drive automation.</p>
+        <p className="panel-body"><Link href="/admin/staff">Manage Chair names and contact emails →</Link> These contacts do not grant app access.</p>
       </Panel>
       <Panel title="Committee links" subtitle="Replace a link if it was shared outside the committee: the old QR code stops working immediately. Updating staff contacts keeps the QR code.">
         <div className="table-scroll">

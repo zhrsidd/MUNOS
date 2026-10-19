@@ -15,7 +15,7 @@ export interface SubmissionLink {
 export interface ResolutionLink {
   documentId: string;
   workingDocId: string | null;
-  /** The Chair's copy in the Approval Panel folder (made manually in Google Drive for now). */
+  /** The Chair's copy in the Approval Panel folder (made manually in Google Drive). */
   approvalCopyDocId: string | null;
   /** The Chair's check that the shared document opens. */
   access: "unchecked" | "ok" | "problem";

@@ -130,7 +130,7 @@ function SubmissionCard({ resolution, link, shareWith }: { resolution: Resolutio
         <button className="primary" disabled={(!!copy.trim() && !parsedCopy.ok) || link.access === "problem"} onClick={() => void sendToApproval()}>
           Submit to Approval
         </button>
-        <small className="muted">Make your copy in the Approval Panel&apos;s Drive folder first (manual for now).</small>
+        <small className="muted">Make your copy in the Approval Panel&apos;s Google Drive folder first.</small>
       </div>
     </article>
   );

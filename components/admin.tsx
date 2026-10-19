@@ -12,6 +12,7 @@ import { countryFlag } from "@/lib/countries";
 import { conferenceScoring, effectiveScoring, isConfigurableScoring, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
 import { Metric, Search } from "./chair";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
+import { useDemo } from "./operations/submission-links";
 const sections: Record<string, [string, string]> = {
   conference: ["Conference", "Set the defaults that every committee inherits."],
   committees: [
@@ -36,10 +37,6 @@ const sections: Record<string, [string, string]> = {
     "Workflow & features",
     "Keep complexity here, so operational screens stay simple.",
   ],
-  resources: [
-    "Resources & Drive",
-    "Prepare integration boundaries without connecting external services.",
-  ],
   audit: ["Audit log", "Trace actions across every workspace."],
   "": [
     "Conference overview",
@@ -48,6 +45,7 @@ const sections: Record<string, [string, string]> = {
 };
 export function AdminScreen({ section }: { section: string }) {
   const { data, act } = useConference();
+  const demo = useDemo();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<string | null>(null);
   const [editing, setEditing] = useState("");
@@ -167,11 +165,6 @@ export function AdminScreen({ section }: { section: string }) {
                     "Set scoring definitions",
                     "Give chairs fast, consistent point entry.",
                   ],
-                  [
-                    "resources",
-                    "Connect services later",
-                    "Supabase and Drive boundaries are prepared.",
-                  ],
                 ].map(([slug, title, desc]) => (
                   <Link key={slug} href={`/admin/${slug}`}>
                     <Icon
@@ -191,17 +184,19 @@ export function AdminScreen({ section }: { section: string }) {
               </div>
             </Panel>
           </div>
-          <div className="callout">
-            <Icon name="review" />
-            <div>
-              <strong>Demo roles are navigation, not authentication.</strong>
-              <p>
-                Repository commands enforce demo role boundaries for
-                development. Production authorization must use server validation
-                and Supabase RLS.
-              </p>
+          {demo && (
+            <div className="callout">
+              <Icon name="review" />
+              <div>
+                <strong>Demo mode: roles are navigation, not authentication.</strong>
+                <p>
+                  Data lives only in this browser. Production authorization uses
+                  server validation and Supabase RLS.
+                </p>
+                <button onClick={() => setModal("reset")}>Reset local demo</button>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
       {section === "conference" && (
@@ -459,54 +454,6 @@ export function AdminScreen({ section }: { section: string }) {
             </p>
           </Panel>
         </div>
-      )}
-      {section === "resources" && (
-        <>
-          <div className="two-column">
-            <Panel
-              title="Supabase"
-              subtitle="Live conference database and file storage"
-              action={<Chip tone="neutral">Not connected</Chip>}
-            >
-              <dl>
-                <dt>Postgres</dt>
-                <dd>Replace the local repository implementation.</dd>
-                <dt>Auth & RLS</dt>
-                <dd>Enforce conference, role, and committee scope.</dd>
-                <dt>Realtime</dt>
-                <dd>Publish record changes, not timer ticks.</dd>
-                <dt>Storage</dt>
-                <dd>Private, versioned PDFs via storage adapter.</dd>
-              </dl>
-              <p className="footnote">
-                No credentials are requested or stored in this prototype.
-              </p>
-            </Panel>
-            <Panel
-              title="Google Shared Drive"
-              subtitle="Document archive & emergency fallback"
-              action={<Chip tone="neutral">Not connected</Chip>}
-            >
-              <div className="archive-art">
-                <Icon name="documents" />
-                <span>Approved document version</span>
-                <span>↓ automatic mirror later</span>
-                <strong>Conference archive</strong>
-              </div>
-              <p>
-                Drive receives immutable file copies. Workflow state stays in
-                the database. A retryable archive job will track mirroring
-                separately.
-              </p>
-            </Panel>
-          </div>
-          <Panel
-            title="Demo data controls"
-            subtitle="Reset only affects this browser. It does not change any external files."
-          >
-            <button onClick={() => setModal("reset")}>Reset local demo</button>
-          </Panel>
-        </>
       )}
       {section === "audit" && (
         <Panel

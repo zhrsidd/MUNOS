@@ -96,7 +96,7 @@ For each: set **New code expires** to the end of the conference (Qatar time) →
 - [ ] Each committee room gets both sheets. Spare copies stay in the operations room.
 - [ ] Test each committee once from a phone **on mobile data**: resolution QR opens the committee's form; amendment QR says *"Amendments are not currently open in this committee."* (correct when nothing is in debate).
 
-### Google Docs and Drive — Executive with every Chair
+### Google Docs — Executive with every Chair
 
 - [ ] Delegations told in advance: write in Google Docs, **Share → Anyone with the link → Editor**, submit the link on the resolution QR. No login.
 - [ ] Each Chair opens a test delegate Doc on their Chair laptop and can edit it.

@@ -131,13 +131,6 @@ export function Documents({
               />
             )}
           </Panel>
-          <div className="callout small">
-            <Icon name="documents" />
-            <p>
-              Database state drives the workflow. Drive will mirror document
-              versions for archive and fallback.
-            </p>
-          </div>
         </div>
         {resolution && (
           <div>
