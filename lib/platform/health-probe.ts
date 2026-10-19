@@ -1,4 +1,5 @@
 import { buildInfo } from "./build-info";
+import { targetProblem } from "./target-guard";
 // Server-side reachability probe used by /api/health. It never sends a secret
 // to the browser and never returns or changes conference data.
 export type ProbeStatus = "ok" | "degraded" | "down" | "not_configured";
@@ -27,6 +28,11 @@ export async function probe(env: Record<string, string | undefined> = process.en
   const secret = env.SUPABASE_SECRET_KEY;
   const expected = env.NEXT_PUBLIC_DATA_BACKEND === "supabase";
   const cloud = expected && url && publishable;
+  // Target-identity guard: never probe (or report healthy) a project this deployment must not use. Nothing is contacted.
+  if (expected && url && targetProblem(url, env)) {
+    const refused: ProbeResult = { status: "down", detail: "Wrong Supabase project" };
+    return { status: "down", checkedAt: new Date().toISOString(), app: buildInfo, checks: { supabase: refused, database: refused, storage: refused } };
+  }
   const unchecked = Promise.resolve<ProbeResult>({ status: "not_configured" });
   const server = cloud && secret ? { apikey: secret, authorization: `Bearer ${secret}` } : null;
   const [supabase, database, storage] = await Promise.all([

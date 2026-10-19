@@ -9,12 +9,14 @@
 // Session files are written mode 0600 under the git-ignored .test-sessions/; tokens are never printed.
 import { createClient } from "@supabase/supabase-js";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { assertToolTarget } from "../lib/platform/target-guard";
 import { DEFAULT_PACE_SECONDS, MAX_NEW_SIGN_INS_PER_RUN, checkPoolDir, planPool } from "./rehearsal/identity-pool";
-const DEV_REF = "opmydpozhdgkpcnjwpqb";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const env = Object.fromEntries((await readFile(".env.local", "utf8")).split("\n").filter((l) => l.includes("=") && !l.startsWith("#")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).trim()]));
-if (env.NEXT_PUBLIC_SUPABASE_URL !== `https://${DEV_REF}.supabase.co`) { console.error("Refused: .env.local must point at the DEVELOPMENT Supabase project. There is no override."); process.exit(2); }
+// Only a project listed in STAGING_SUPABASE_REFS or DEVELOPMENT_SUPABASE_REFS (the DCMUN development project by default); never production. There is no override.
+let DEV_REF: string;
+try { DEV_REF = assertToolTarget(env.NEXT_PUBLIC_SUPABASE_URL, { ...env, ...process.env }); } catch (error) { console.error(`Refused: ${(error as Error).message}`); process.exit(2); }
 let plan!: ReturnType<typeof planPool>;
 let out!: string;
 try {

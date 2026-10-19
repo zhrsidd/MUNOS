@@ -3,11 +3,12 @@ import nextEnv from '@next/env';
 import {readFile,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {SupabaseTransport} from '../lib/supabase/repository';
+import {assertToolTarget} from '../lib/platform/target-guard';
 import {ConflictError,fingerprint} from '../lib/sync/repository';
 import type {Command} from '../lib/commands';
 nextEnv.loadEnvConfig(process.cwd());
-const ref='opmydpozhdgkpcnjwpqb',url=process.env.NEXT_PUBLIC_SUPABASE_URL!;
-assert.equal(url,`https://${ref}.supabase.co`);
+const url=process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const ref=assertToolTarget(url);
 const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const path=process.env.STAFF_SESSION_FILE ?? '.test-sessions/development.json';
 const saved=JSON.parse(await readFile(path,'utf8')); // Existing identity required; NEVER sign up here.

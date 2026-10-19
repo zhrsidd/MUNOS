@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
-import {clientFor,ids,session} from './remote-context.mts';
+import {clientFor,ids,ref,session} from './remote-context.mts';
 import {SupabaseTransport} from '../lib/supabase/repository';
 import {fingerprint} from '../lib/sync/repository';
 import type {Command} from '../lib/commands';
@@ -35,5 +35,5 @@ await send({type:'document',id:docId,status:'Closed',outcome:'Passed'});
 data=await transport.read();assert.equal(data.documents.find(d=>d.id===docId)?.outcome,'Passed');assert.ok(data.audit.some(a=>a.entityId===docId));marks.push('attendance-fed voting, configured majority, closure and audit');
 // A fresh transport represents a fresh process/browser read, with no local demo snapshot.
 const fresh=await new SupabaseTransport(clientFor(),ids.conference,session.user.id).read();assert.equal(fresh.documents.find(d=>d.id===docId)?.outcome,'Passed');marks.push('fresh repository read persists');
-const report={date:new Date().toISOString(),project:'opmydpozhdgkpcnjwpqb',passed:marks,documentId:docId};
+const report={date:new Date().toISOString(),project:ref,passed:marks,documentId:docId};
 await writeFile('docs/remote-workflow-results.json',JSON.stringify(report,null,2));console.log(report);
