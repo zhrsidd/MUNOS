@@ -3224,3 +3224,6 @@ color: var(--ink-3);
   display: flex;
   align-items: center;
 }
+.modal-error {
+  margin: var(--space-3) 0 0;
+}

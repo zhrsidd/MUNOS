@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useRef, useId } from "react";
 import { freshTimer, parseTimer, pauseTimer, resetTimer, setTimerDuration, startTimer, TIMER_DURATIONS, timerPhase, timerRemaining, timerStorageKey, type LocalTimer } from "@/lib/timer/local-timer";
 import { Delegate, stages } from "@/lib/domain";
-import { useConference } from "@/lib/context";
+import { useActError, useConference } from "@/lib/context";
 export function Chip({
   children,
   tone = "",
@@ -193,14 +193,18 @@ export function Modal({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const saveError = useActError();
+  const clearSaveError = saveError?.clear;
   useEffect(() => {
     const prior = document.activeElement as HTMLElement;
     const dialog = dialogRef.current;
+    clearSaveError?.(); // a stale failure from before this dialog opened is not this dialog's
     dialog?.showModal();
     return () => {
       dialog?.close();
       prior?.focus();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <dialog
@@ -220,6 +224,11 @@ export function Modal({
         </button>
       </div>
       {children}
+      {saveError?.error && (
+        <p className="form-error modal-error" role="alert">
+          {saveError.error} Your entries are kept: change them or try again.
+        </p>
+      )}
     </dialog>
   );
 }

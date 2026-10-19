@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { saveStatus, type SaveStatusInput } from "../lib/save-status";
 
 const input = (o: Partial<SaveStatusInput["health"]> = {}, online = true, access: SaveStatusInput["access"] = "active"): SaveStatusInput => ({
-  health: { mode: "supabase", state: "saved", pending: 0, conflicts: 0, ...o },
+  health: { mode: "supabase", state: "saved", pending: 0, conflicts: 0, lastSynced: "2026-10-19T10:00:00Z", ...o },
   online,
   access,
 });
@@ -31,4 +31,21 @@ test("a connectivity failure is not a permission denial; problems and conflicts 
 });
 test("demo mode says so and never claims a server sync", () => {
   assert.equal(saveStatus(input({ mode: "local" })).label, "Demo · saved in this browser");
+});
+test("a failed read with an empty outbox never claims a sync, even while the browser says it is online", () => {
+  for (const state of ["waiting"] as const) {
+    const s = saveStatus(input({ state, pending: 0 }, true));
+    assert.notEqual(s.label, "All changes synced");
+    assert.equal(s.tone, "attention");
+    assert.equal(s.details, true);
+    assert.match(s.label, /Connection interrupted/);
+  }
+  // Queued work while waiting keeps the more specific wording.
+  assert.equal(saveStatus(input({ state: "waiting", pending: 2 })).label, "Waiting to send · 2 changes");
+});
+test("nothing is called synced before the first successful read", () => {
+  const s = saveStatus(input({ lastSynced: undefined, state: "syncing" }));
+  assert.equal(s.label, "Opening conference…");
+  assert.equal(s.tone, "working");
+  assert.equal(saveStatus(input({ lastSynced: undefined, pending: 1, state: "saved" })).label, "Saved on this device");
 });

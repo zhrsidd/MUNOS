@@ -201,3 +201,15 @@ test('a conflict blocking hundreds of queued actions throttles passive reads; ex
   assert.ok(server.maxConfirmed<=MAX_BATCH);
  }finally{await close();}
 });
+
+test('a failed snapshot read with an empty outbox is not shown as "All changes synced"',async()=>{
+ const {saveStatus}=await import('../lib/save-status');
+ const server=new Server();server.readError=Object.assign(Error('Gateway Timeout'),{status:504});
+ const {repo,close}=await setup(server,[]);
+ try{
+  await repo.ready();await until(()=>server.reads>=1&&repo.getHealth().state==='waiting');
+  const h=repo.getHealth();assert.equal(h.pending,0);
+  const s=saveStatus({health:h,online:true,access:'active'});
+  assert.notEqual(s.label,'All changes synced');assert.equal(s.tone,'attention');assert.equal(s.details,true);
+ }finally{await close();}
+});

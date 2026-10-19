@@ -9,7 +9,7 @@ export interface SaveStatusInfo {
   details: boolean;
 }
 export interface SaveStatusInput {
-  health: Pick<Health, "mode" | "state" | "pending" | "conflicts" | "awaitingConfirmation">;
+  health: Pick<Health, "mode" | "state" | "pending" | "conflicts" | "awaitingConfirmation" | "lastSynced">;
   online: boolean;
   access: StaffAccess["status"];
 }
@@ -26,6 +26,10 @@ export function saveStatus({ health, online, access }: SaveStatusInput): SaveSta
   if (!online) return { label: health.pending ? `Offline · ${changes(health.pending)} saved on this device` : "Offline", tone: "attention", details: false };
   if (health.mode === "local") return { label: "Demo · saved in this browser", tone: "working", details: false };
   if ((health.awaitingConfirmation ?? 0) > 0) return { label: "Sent · updating this view", tone: "working", details: false };
+  // A failed read with nothing queued is not "synced": the screen may be showing old data.
+  if (health.state === "waiting" && health.pending === 0) return { label: "Connection interrupted · showing saved data · open details", tone: "attention", details: true };
+  // Before the first successful read there is nothing to call synced.
+  if (!health.lastSynced && health.pending === 0) return { label: "Opening conference…", tone: "working", details: false };
   if (health.pending > 0) return { label: health.state === "saved" ? "Saved on this device" : `Waiting to send · ${changes(health.pending)}`, tone: "working", details: false };
   return { label: "All changes synced", tone: "ok", details: false };
 }
