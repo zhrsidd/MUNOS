@@ -86,6 +86,7 @@ Authenticated staging replay and the conference-week Pro/Small capacity rehearsa
 ## Loading-screen design follow-up
 
 [LOADING_MOTION_PROPOSAL.md](LOADING_MOTION_PROPOSAL.md) adds four owner-requested logo-based studies, with
-Orbit seal recommended. The alternatives are Slow seal spin, Breathing seal and Assembly dots. Online references,
-timing, reduced motion and integration rules are recorded there. This is a design proposal, not an implemented
-loading-screen claim. Keep the persistent sync strip for background work and never delay ready content.
+Orbit seal selected by the owner and now implemented in the initial staff loading states. The alternatives
+remain Slow seal spin, Breathing seal and Assembly dots. The linked document records online references, timing,
+reduced motion, app verification and remaining limits. Background work keeps the persistent sync strip; ready
+content is not delayed. Row skeletons, other loading primitives and broader transitions remain pending.

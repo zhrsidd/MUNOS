@@ -7,6 +7,7 @@ import { Role } from "@/lib/domain";
 import { soleWorkspacePath } from "@/lib/access";
 import { Icon, Chip, Panel } from "./ui";
 import { Brand } from "./brand";
+import { WorkspaceLoading } from "./workspace-loading";
 import { Tabs } from "./shell";
 import { navigationFor } from "@/lib/navigation";
 import { ChairScreen } from "./chair";
@@ -70,7 +71,7 @@ export function Workspace({ path }: { path: string }) {
   const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId && !s.archived);
   const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && !s.archived && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
   // While access is still loading the picker would flash every workspace, including ones this person cannot enter.
-  if (soleWorkspace || (!path && access.status === "loading")) return <main className="landing"><p role="status">Opening your workspace…</p></main>;
+  if (soleWorkspace || (!path && access.status === "loading")) return <WorkspaceLoading/>;
   if (!path)
     return (
       <main className="landing">

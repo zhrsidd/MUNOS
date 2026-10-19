@@ -3270,3 +3270,72 @@ html { scroll-padding-top: 12rem; }
 .country-popup li small { display: block; color: var(--ink-2); font-size: 12px; }
 .country-popup li.highlighted, .country-popup li:hover { background: var(--action-soft); outline: 1px solid var(--action); outline-offset: -1px; }
 .country-popup p { margin: var(--space-3); }
+
+/* Owner-selected Orbit seal: initial opening only, never a background-sync overlay. */
+.workspace-loading {
+  --loading-seal-size: 112px;
+  --loading-plate-size: 160px;
+  --loading-orbit-size: 176px;
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: var(--space-5);
+  text-align: center;
+  background: var(--paper);
+  color: var(--ink);
+}
+.workspace-loading-emblem {
+  position: relative;
+  width: var(--loading-orbit-size);
+  height: var(--loading-orbit-size);
+  display: grid;
+  place-items: center;
+}
+.workspace-loading-plate {
+  display: grid;
+  place-items: center;
+  width: var(--loading-plate-size);
+  height: var(--loading-plate-size);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.workspace-loading-plate img { width: var(--loading-seal-size); height: var(--loading-seal-size); object-fit: contain; }
+.workspace-loading-orbit {
+  position: absolute;
+  inset: var(--space-1);
+  border: 2px solid transparent;
+  border-top-color: var(--brand);
+  border-right-color: color-mix(in srgb, var(--brand) 25%, transparent);
+  border-radius: 50%;
+  animation: workspace-orbit 3.2s linear infinite;
+}
+.workspace-loading[data-motion="paused"] .workspace-loading-orbit { animation-play-state: paused; }
+.workspace-loading h1 {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-manrope), Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+.workspace-loading h1 span {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--font-dm), Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.workspace-loading > p { margin: var(--space-5) 0 0; color: var(--ink-2); font-size: 13px; }
+@keyframes workspace-orbit { to { transform: rotate(360deg); } }
+@media (max-height: 420px) {
+  .workspace-loading { --loading-seal-size: 80px; --loading-plate-size: 112px; --loading-orbit-size: 128px; }
+  .workspace-loading h1 { margin-top: var(--space-2); }
+  .workspace-loading > p { margin-top: var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-loading-orbit { display: none; animation: none !important; }
+}

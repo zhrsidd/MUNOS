@@ -1,9 +1,10 @@
-# DCMUN loading motion: design proposal
+# DCMUN loading motion: selected Orbit seal
 
 19 October 2026. Four working motion studies use the actual, unaltered `public/dcmun-logo.jpg`.
-These are design alternatives; no loading screen has been wired into the application yet.
+The owner selected Orbit seal. It is now wired into the initial staff loading states on `codex/priority-chair-ui`.
+The other directions below are retained as design-study references.
 
-## Recommended direction: Orbit seal
+## Owner-selected direction: Orbit seal
 
 Keep the entire seal upright on a small white backing. A fine blue arc rotates around its outside, one turn
 per 3.2 seconds, with constant speed. Put DCMUN / Conference OS and “Opening your workspace…” beneath it.
@@ -44,7 +45,7 @@ previews pause. The dots are decorative, not a percentage, stage counter or proo
 No third-party component source or animation package was copied into the app. The proposal does not claim a
 measured production bundle cost or lag-free operation on Chair hardware.
 
-## Integration contract for Claude
+## Integration rules
 
 1. Use the brand loader for the initial access/data opening state. Integrate the same primitive into the current
    staff-access loading gate and initial conference-data wait, so two loading screens cannot compete.
@@ -70,5 +71,43 @@ Four directions were rendered at 760, 390 and 320 px with the real embedded logo
 image decoding, actual orbit movement, static reduced-motion behavior and no browser errors. Light/dark preview
 screens were inspected; dark is a preview accommodation, not an app-wide dark-theme proposal.
 
-These are isolated design-preview checks. App integration, real loading-state transitions, screen-reader
-announcements and production/Chair-device performance have not been verified by this proposal.
+These checks concern the original design preview. App implementation and its verification are recorded below;
+they do not imply screen-reader, authenticated staging or representative Chair-device verification.
+
+
+## App implementation
+
+- One shared component now serves the access-loading gate, the first conference-data opening, sole-workspace
+  entry and wrong-role navigation redirects. Existing permission checks and redirect destinations are unchanged.
+- Only the arc rotates; the actual mark stays upright. The image uses the original `/dcmun-logo.jpg` URL rather
+  than an optimisation endpoint, so the existing offline-shell image cache can serve it.
+- A workspace with data stays rendered for saved/syncing/waiting/conflict/error repository states. Missing data
+  with an error/waiting state shows the existing Retry access/recovery controls instead of an endless spinner.
+  This is a UI recovery path; authentication, transport, persisted data and queued mutations are unchanged.
+- No minimum display timer, artificial progress, exit delay, new animation dependency or public-form loader.
+- Hidden pages and offscreen emblems pause. Reduced motion keeps the mark/text and removes the arc.
+- Worker cache version 0.2.6 prepares the changed shell assets; interception/bypass rules are unchanged.
+
+## App verification
+
+- Typecheck and lint pass with no warnings; production build passes. Full suite: 407 tests, 403 passed,
+  4 existing PostgreSQL 17 concurrency skips, 0 failures. Focused loading/access/health/offline-shell checks:
+  22 passed, 0 skipped.
+- Production-build Chrome at 1280x900, 390x844, 320x640 and 640x320: one loading screen/status, original logo
+  decodes at its prepared URL, no horizontal overflow, and the outer arc actually rotates. The 320 px run uses
+  reduced motion and confirms the arc is absent. Desktop/phone/short-landscape screenshots were inspected.
+- Delayed real IndexedDB opening keeps the initial loading screen visible. Releasing storage displays the
+  actual local-demo workspace in 25-40 ms in this sample, without an animation-cycle wait. Unit checks also cover
+  missing initial data and retain cached content for every repository refresh/error/conflict state.
+- Browser offline/reconnect preserves the ready workspace without a splash. A prepared service worker reloads
+  the workspace offline, and `/dcmun-logo.jpg` is present in cache 0.2.6. Existing API/Auth request bypass tests pass.
+- Page-visibility event simulation and moving the emblem offscreen pause the CSS animation; visibility/position
+  restoration resumes it. These checks exercise the real component; the visibility event is simulated, rather
+  than a claim about every platform's background-tab scheduling.
+- Injected IndexedDB failure exits to the existing “Connection needed” screen and offers Retry access. This
+  test verifies the error UI, not a successful recovery from a persistent storage failure.
+- No new runtime package, database migration, server permission or hosted-environment change.
+
+Not verified: real screen-reader speech, authenticated cloud startup/recovery, representative Chair hardware,
+production deployment or the conference-week Pro/Small capacity rehearsal. Local timings are observations,
+not a device-performance guarantee. The original alternative-design preview remains available for reference.

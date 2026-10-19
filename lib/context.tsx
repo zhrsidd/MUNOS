@@ -8,6 +8,7 @@ import {
 } from "react";
 import {usePathname,useRouter} from "next/navigation";
 import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
+import {WorkspaceLoading} from "../components/workspace-loading";
 import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
 import {requestPersistentStorage} from "./platform/persistent-storage";
 import { DurableStore } from "./sync/store";
@@ -80,9 +81,12 @@ export function ConferenceProvider({
     }
   }
   if(access.status!=="demo"&&access.status!=="active")return <StaffAccessGate access={access}/>;
-  if(wrongRole)return <div className="loading">Opening your authorized workspace…</div>;
-  if (!data)
-    return <div className="loading">{health.message}</div>;
+  if(wrongRole)return <WorkspaceLoading label="Opening your authorized workspace…"/>;
+  if (!data) {
+    if (health.state === "error" || health.state === "waiting")
+      return <StaffAccessGate access={{...access,status:"unavailable",message:health.message}}/>;
+    return <WorkspaceLoading/>;
+  }
   return (
     <Context.Provider
       value={{

@@ -159,3 +159,11 @@ high-priority UI work; Claude remains the primary engineer and can review/clean 
 
 These items are verified as recorded in UI_PRIORITY_PASS.md; they do not close W8 or the staging and
 conference-week validation gates. No schema, repository transport, migration or hosted environment changed.
+
+
+## Orbit seal · owner-selected follow-up
+
+`components/workspace-loading.tsx` implements the selected logo/outer-arc design for initial staff opening and
+workspace redirects. Cached refreshes retain the workspace and use the sync strip. Existing failed-startup
+recovery controls replace the loader when data is unavailable. See [LOADING_MOTION_PROPOSAL.md](LOADING_MOTION_PROPOSAL.md)
+for the implementation and verification; other skeleton/loading primitives and wider transitions remain open.

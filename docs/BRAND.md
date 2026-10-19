@@ -127,3 +127,18 @@ regions for save and sync status; `lang="en"`; touch targets as above; works at 
   Fewest/Most ordering. Ordering stays stable while open; visible counts can refresh. Enter selects, never adds.
 - This first package introduces no motion library, template dependency or new animation. Restrained transitions,
   honest loading states and the supplied 48 px Felix remain subsequent work in the approved queue.
+
+## Orbit seal loading screen · owner selected, 19 October 2026
+
+Use `WorkspaceLoading` for initial access/data opening and workspace redirects. The unaltered seal remains
+upright (112 px), with a 160 px white backing and a 176 px motion area. A fine `--brand` arc rotates once every
+3.2 seconds at constant speed. The short-viewport variant uses an 80 px seal, 112 px backing and 128 px motion
+area. Component sizing variables are scoped under `.workspace-loading`; existing palette/font tokens apply.
+
+Show one polite loading message, with decorative artwork hidden from assistive technology. Reduced motion
+removes the arc. Background tabs and an offscreen emblem pause rotation; listeners and the observer clean up
+on unmount. No animation library, frame timer, fake progress, minimum splash duration or exit hold is added.
+Ready/cached workspaces keep their content and use the sync strip for refreshes. Failed startup with no data
+shows the existing access/recovery controls. Public delegate forms never mount this staff loading screen.
+
+`docs/LOADING_MOTION_PROPOSAL.md` records the selected design, references and verification limits.
