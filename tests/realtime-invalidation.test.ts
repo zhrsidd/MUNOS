@@ -7,6 +7,7 @@ import { createSeed } from '../lib/seed';
 import { SupabaseTransport } from '../lib/supabase/repository';
 import { DurableRepository } from '../lib/sync/repository';
 import { DurableStore } from '../lib/sync/store';
+import { MIN_REFRESH_GAP_MS } from '../lib/sync/backoff';
 
 type Notification = { new: { conference_id: string; committee_id: string | null; topic?: string } };
 class MockChannel {
@@ -264,6 +265,8 @@ test('repository startup and Realtime connection perform one reconciliation, wit
   const h = harness(['approval'], [], true);
   const store = new DurableStore(`realtime-startup-${crypto.randomUUID()}`);
   const repo = new DurableRepository('conference-test', createSeed, store, h.transport);
+  // The test clock is real, so age the persisted refresh time instead of waiting out the coalescing window.
+  const ageRefresh = async () => { await store.update('conference-test', old => ({ ...old!, savedAt: new Date(Date.now() - 10_000).toISOString() })); };
   try {
     await repo.ready();
     await settleUntil(() => !!repo.getHealth().lastSynced && repo.getHealth().state === 'saved');
@@ -279,11 +282,18 @@ test('repository startup and Realtime connection perform one reconciliation, wit
     assert.equal(h.reads(), 1);
     h.emit('documents');
     t.mock.timers.tick(350);
+    for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(h.reads(), 1, 'a notification within MIN_REFRESH_GAP_MS of the last refresh is coalesced, not read immediately');
+    await ageRefresh();
+    t.mock.timers.tick(MIN_REFRESH_GAP_MS + 500);
     await settleUntil(() => h.reads() === 2 && repo.getHealth().state === 'saved');
     assert.equal(h.reads(), 2);
     h.channels[0].onStatus?.('CHANNEL_ERROR');
     assert.equal(repo.getHealth().realtime, false);
     h.channels[0].onStatus?.('SUBSCRIBED');
+    for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));
+    await ageRefresh();
+    t.mock.timers.tick(MIN_REFRESH_GAP_MS + 500);
     await settleUntil(() => h.reads() === 3 && repo.getHealth().state === 'saved');
     t.mock.timers.tick(350);
     for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));

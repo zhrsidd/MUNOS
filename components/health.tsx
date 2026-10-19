@@ -155,7 +155,19 @@ export function SystemHealth() {
           <dt>Unsynced / conflicts</dt>
           <dd>
             {health.pending} / {health.conflicts}
+            {health.awaitingConfirmation ? ` · ${health.awaitingConfirmation} already received by the server, awaiting confirmation` : ""}
           </dd>
+          {(health.errorKind || health.retryAt) && (
+            <>
+              <dt>Sync failure</dt>
+              <dd className="wrap-anywhere">
+                {health.errorKind === "overload" ? "Database busy / timed out" : health.errorKind === "network" ? "Network" : health.errorKind === "conflict" ? "Needs review" : "Other"}
+                {health.errorCode ? ` (${health.errorCode})` : ""}
+                {health.retryAttempt ? ` · automatic retry #${health.retryAttempt}` : ""}
+                {health.retryAt ? ` due ${new Date(health.retryAt).toLocaleTimeString("en-GB")}` : ""}
+              </dd>
+            </>
+          )}
           {health.actorId && (
             <>
               <dt>Device user</dt>
