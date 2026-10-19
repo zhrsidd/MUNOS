@@ -382,12 +382,6 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "scoring" && (
         <ScoringSettings scope={scoreScope} setScope={setScoreScope} />
       )}
-      {section === "awards" && (
-        <Panel title="Awards are chair decisions">
-          <p>Chairs discuss awards using their judgement and the factual participation history in their workspace. There is no award rubric or automatic ranking.</p>
-          <Link className="card-link" href="/chair/awards">Open chair award discussion →</Link>
-        </Panel>
-      )}
       {section === "workflow" && <VetoSettings/>}
       {section === "workflow" && (
         <div className="two-column">

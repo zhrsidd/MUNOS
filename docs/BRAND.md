@@ -114,3 +114,16 @@ the seal as a background.
 
 AA contrast; full keyboard operation; visible focus; status never by colour alone; labelled controls; live
 regions for save and sync status; `lang="en"`; touch targets as above; works at 200% zoom and 320 px width.
+
+## Chair interaction additions · 19 October 2026
+
+- One persistent save/sync strip sits directly under sticky workspace navigation. Its reserved height is 52 px
+  above 600 px and 64 px at or below 600 px. Status text may wrap within that slot; details open System health.
+  The masthead no longer duplicates save state. The masthead/context can scroll away so the sticky navigation
+  does not consume the whole phone viewport. Scroll padding protects focused content from the sticky stack.
+- Country selectors occupy one ordinary control. Results overlay the page, open above when space below is
+  limited, and scroll within a 240 px list (about five options). Written country names accompany flags.
+  Counts explicitly mean delivered, non-voided speeches/POIs in the current session. Search relevance precedes
+  Fewest/Most ordering. Ordering stays stable while open; visible counts can refresh. Enter selects, never adds.
+- This first package introduces no motion library, template dependency or new animation. Restrained transitions,
+  honest loading states and the supplied 48 px Felix remain subsequent work in the approved queue.

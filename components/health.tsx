@@ -220,7 +220,7 @@ export function SystemHealth() {
     </section>
   );
 }
-/** Save and sync state in the masthead, in the shared state language (lib/save-status.ts). */
+/** Always-present sync strip below navigation; reuses the reviewed save-state language. */
 export function SaveStatus() {
   const { status } = useSystemStatus(false);
   const { access } = useConference();
@@ -229,10 +229,13 @@ export function SaveStatus() {
   const online = !status.items.some((i) => i.key === "internet" && i.level !== "green");
   const info = saveStatus({ health: h, online, access: access.status });
   return (
-    <span className={`save-status ${info.tone}`} role="status" aria-live="polite">
-      <span className="status-dot" aria-hidden="true" />
-      {info.details ? <Link href={`/${area}/health`}>{info.label}</Link> : info.label}
-    </span>
+    <div className={`save-status ${info.tone}`}>
+      <div className="save-status-inner">
+        <span className="status-dot" aria-hidden="true" />
+        <span className="save-status-message" role="status" aria-live="polite" aria-atomic="true">{info.label.replace(/ · open details$/, "")}</span>
+        <Link href={`/${area}/health`} className="save-status-details">Open details</Link>
+      </div>
+    </div>
   );
 }
 /** Compact indicator for the sidebar. Client-side signals only; never polls the server. */
@@ -249,21 +252,6 @@ export function SyncStatus() {
     </span>
   );
 }
-/** Operator strip shown above workspaces only when something needs attention. */
-export function StatusStrip() {
-  const { status } = useSystemStatus(false);
-  const h = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
-  const offline = status.items.some((i) => i.key === "internet" && i.level !== "green");
-  // The isolated local demo is always "yellow"; only interrupt demo users for real problems.
-  if (status.level === "green" || (h.mode === "local" && !cloudExpected && status.level === "yellow" && !offline)) return null;
-  return (
-    <div className={`status-strip ${status.level}`} role="status">
-      <span className="status-dot" aria-hidden="true" />
-      <strong>{status.headline}.</strong> <span>{status.message}</span>
-    </div>
-  );
-}
-
 export function DataModeLabel(){
  const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
  return <span>{h.mode==='supabase'?'Supabase development':'Local demo'}</span>;

@@ -15,7 +15,6 @@ import {
   Chip,
   DelegateIdentity,
   Empty,
-  Icon,
   Modal,
   PageHeading,
   Panel,
@@ -134,10 +133,6 @@ export function ChairScreen({
     voting: [
       "Voting",
       "Roll call determines who can vote. Present & Voting delegates cannot abstain.",
-    ],
-    awards: [
-      "Award discussion",
-      "Participation is context. Your judgment decides the awards.",
     ],
   }[section] || [
     "The floor is yours.",
@@ -385,42 +380,6 @@ export function ChairScreen({
         </>
       )}
       {section === "voting" && <VotingConsole committeeId={committeeId} sessionId={sessionId} />}
-      {section === "awards" && (
-        <>
-          <div className="callout">
-            <Icon name="awards" />
-            <div>
-              <strong>Chairs make the final award decisions.</strong>
-              <p>
-                Use participation history alongside your observations of diplomacy,
-                preparation, and constructive contributions. This workspace does
-                not score award criteria, rank delegates, or predict winners.
-              </p>
-            </div>
-          </div>
-          <Panel
-            title="Participation reference"
-            subtitle="Delegations are listed alphabetically. Counts come from recorded participation events."
-          >
-            {[...delegates]
-              .sort((a, b) => a.country.localeCompare(b.country))
-              .map((d) => {
-                const summary = participationSummary(data, d.id);
-                return (
-                  <div className="summary-row" key={d.id}>
-                    <DelegateIdentity delegate={d} />
-                    <span>
-                      {summary.opportunities} recorded contributions
-                    </span>
-                  </div>
-                );
-              })}
-            <Link className="card-link" href="/chair/participation">
-              Review participation history →
-            </Link>
-          </Panel>
-        </>
-      )}
       {detail && (
         <Modal title="Delegate details" onClose={() => setSelected(null)}>
           <DelegateIdentity delegate={detail} detail />

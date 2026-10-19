@@ -43,11 +43,6 @@ export function Icon({ name }: { name: string }) {
         <path d="M5 13H3v8h18v-8h-4M8 17h8" />
       </>
     ),
-    awards: (
-      <>
-        <path d="M8 3h8v6a4 4 0 0 1-8 0V3ZM8 5H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4M12 13v5M8 21h8M9 18h6" />
-      </>
-    ),
     admin: (
       <>
         <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />

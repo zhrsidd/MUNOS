@@ -80,9 +80,11 @@ browser check covers draft, submitted, changes-requested, approved.
 
 ## W6 · Functional quality-of-life
 
-**W6a · Participation sorted by total points ☑ (tests + browser).** Highest total first; tie-breaker alphabetical by country, then
-delegate id. Acceptance: pure comparator with tests (ties, zero, negative, equal names); order is stable while
-points change; same order in the Chair view and any export.
+**W6a · Participation ranking ◐ (owner superseded points ordering, 19 October).** The existing points order is
+implemented, but the approved default is now contribution count, highest first, with country/name/id ties and
+no hidden points tie-break. Keep points and manual scoring visible. Define counted contributions before changing
+the comparator and exports. A separate compact Debate leaderboard must show points, flags and all countries.
+Both ranking changes remain pending; the existing points comparator is not completion of the new requirement.
 
 **W6b · Chair deducts a chosen number of points ◐ (migration, command, UI, tests written; awaiting independent review, not applied to any project).** A custom amount, not fixed steps.
 Stored as a traceable adjustment: amount, reason (required), chair, time, delegate; original participation
@@ -103,7 +105,7 @@ Inventory so far (screen → decision):
 
 | Screen | Decision | Reason |
 | --- | --- | --- |
-| Chair nav (9 items) | 6 everyday + "More" (Group photos, Award discussion, System health) | Match the day's jobs; rare screens stay reachable |
+| Chair nav (9 items) | 6 everyday + "More" (Group photos, System health) | Match the day's jobs; rare screens stay reachable |
 | Chair "Documents" | Renamed Resolutions; preview, timeline, version panel, mock version removed | Facts inline; one next action |
 | Executive nav (15 items) | Grouped: Set up / Run the day / Records | Same pages, findable |
 | Executive "Resources & Drive" | Removed | Retired feature; stale "Not connected" panels |
@@ -140,3 +142,20 @@ export, amendments-by-resolution fix. See `docs/SESSION_MODEL.md` and `docs/BACK
 `docs/REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md`: migrations 20261019100000, 100100, 100200. Not applied anywhere.
 Independent of: session contract (`docs/SESSION_MODEL.md`, still draft) and the conference-week Pro/Small
 performance checks, both unchanged.
+
+## Owner follow-up and first priority pass · 19 October 2026
+
+The current additions and implementation evidence are in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md). These
+supersede older wording where it conflicts. The owner explicitly authorised Codex to implement simple,
+high-priority UI work; Claude remains the primary engineer and can review/clean up this branch.
+
+- Compact local country combobox: implemented for Open/For/Against queues, POI selection and co-submitter yield.
+  Enter selects only; adding/recognising remains a separate action. Current-session delivered speech/POI counts,
+  Fewest/Most first, aliases and typo tolerance are included. No new dependency or network search.
+- Permanent sync strip: implemented immediately below the sticky navigation for every workspace, including
+  System health. The reviewed status helper and in-dialog failed-save alerts are retained.
+- Award discussion: removed from Chair/Executive UI, navigation and capability labels. Old bookmarks redirect;
+  participation history and historical award data remain intact. Worker cache version advanced to 0.2.5.
+
+These items are verified as recorded in UI_PRIORITY_PASS.md; they do not close W8 or the staging and
+conference-week validation gates. No schema, repository transport, migration or hosted environment changed.

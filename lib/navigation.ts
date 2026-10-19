@@ -28,7 +28,7 @@ export function navigationFor(role: Role): NavItem[] {
         { label: "Amendments", slug: "amendments" },
         { label: "Participation", slug: "participation" },
         { label: "Voting", slug: "voting" },
-        { label: "More", children: [{ slug: "photos", label: "Group photos" }, { slug: "awards", label: "Award discussion" }, health] },
+        { label: "More", children: [{ slug: "photos", label: "Group photos" }, health] },
       ];
     case "approval":
       return [

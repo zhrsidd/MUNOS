@@ -37,6 +37,12 @@ const config: NextConfig = {
   poweredByHeader: false,
   turbopack: { root: process.cwd() },
   env: build,
+  async redirects() {
+    return [
+      { source: "/chair/awards", destination: "/chair/participation", permanent: false },
+      { source: "/admin/awards", destination: "/admin/scoring", permanent: false },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: security },

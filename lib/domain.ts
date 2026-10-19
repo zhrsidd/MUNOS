@@ -219,7 +219,6 @@ export const roleCapabilities: Record<Role, string[]> = {
     "queue",
     "voting",
     "documents",
-    "awards",
   ],
   approval: ["review"],
   logistics: ["printing"],

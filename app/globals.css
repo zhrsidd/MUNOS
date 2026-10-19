@@ -2530,15 +2530,12 @@ color: var(--ink-3);
 .status-list li { display:grid; grid-template-columns:auto minmax(120px, 200px) 1fr; gap:12px; align-items:center; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:10px; }
 .status-list li strong { font-weight:600; }
 .status-dot { display:inline-block; flex:none; width:10px; height:10px; border-radius:50%; background:#9aa4b2; }
-.green > .status-dot, .sync-status.green .status-dot, .status-strip.green .status-dot { background:#2f8a62; }
-.yellow > .status-dot, .sync-status.yellow .status-dot, .status-strip.yellow .status-dot { background:#d39b12; }
-.red > .status-dot, .sync-status.red .status-dot, .status-strip.red .status-dot { background:#c8412b; }
+.green > .status-dot, .sync-status.green .status-dot { background:#2f8a62; }
+.yellow > .status-dot, .sync-status.yellow .status-dot { background:#d39b12; }
+.red > .status-dot, .sync-status.red .status-dot { background:#c8412b; }
 .sync-status { display:flex; gap:9px; align-items:flex-start; }
 .sync-status .status-dot { width:8px; height:8px; margin-top:4px; }
-.status-strip { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:10px 14px; border-radius:10px; margin-bottom:16px; border:1px solid; }
-.status-strip.yellow { background:#fff7e5; border-color:#e9d6a3; color:#6b4e0a; }
-.status-strip.red { background:#fff0ed; border-color:#efc8c0; color:#8a2a1b; }
-.status-strip .status-dot { margin-right:4px; }
+
 .tech-details { display:grid; grid-template-columns:minmax(120px, 180px) 1fr; gap:6px 14px; font-size:13px; }
 .tech-details dt { color:var(--muted); }
 .tech-details dd { margin:0; }
@@ -2984,12 +2981,32 @@ color: var(--ink-3);
 .masthead-link {
   font-weight: 600;
 }
+.workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+html { scroll-padding-top: 12rem; }
 .save-status {
-  display: inline-flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.save-status-inner {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  font-size: 13px;
-  color: var(--ink-2);
+  max-width: 1200px;
+  height: 52px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+.save-status-message { line-height: 18px; overflow-wrap: anywhere; }
+.save-status-details { display: inline-flex; align-items: center; min-height: 44px; white-space: nowrap; }
+@media (max-width: 600px) {
+  .save-status-inner { height: 64px; padding: 0 var(--space-4); }
 }
 .save-status .status-dot {
   width: 8px;
@@ -3227,3 +3244,29 @@ color: var(--ink-3);
 .modal-error {
   margin: var(--space-3) 0 0;
 }
+
+/* Search overlays the debate controls, keeping the closed picker the size of a select. */
+.procedure-console .panel { overflow: visible; }
+.country-picker { position: relative; flex: 1; min-width: 160px; max-width: 100%; }
+.country-picker > label { display: block; margin-bottom: var(--space-1); }
+.country-picker input { width: 100%; min-width: 0; }
+.country-popup {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.country-popup.above { top: auto; bottom: calc(100% + var(--space-1)); }
+.country-sort { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: var(--space-1) var(--space-2); font-size: 12px; color: var(--ink-2); }
+.country-sort button { min-height: 44px; padding: var(--space-1) var(--space-2); font-size: 12px; }
+.country-popup ul { list-style: none; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: var(--space-1); }
+.country-popup li { min-height: 48px; padding: var(--space-2); cursor: pointer; border-radius: var(--radius-control); }
+.country-popup li > span { display: block; overflow-wrap: anywhere; }
+.country-popup li small { display: block; color: var(--ink-2); font-size: 12px; }
+.country-popup li.highlighted, .country-popup li:hover { background: var(--action-soft); outline: 1px solid var(--action); outline-offset: -1px; }
+.country-popup p { margin: var(--space-3); }

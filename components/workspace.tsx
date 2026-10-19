@@ -11,7 +11,7 @@ import { Tabs } from "./shell";
 import { navigationFor } from "@/lib/navigation";
 import { ChairScreen } from "./chair";
 import { Documents, Approval, Logistics } from "./documents";
-import { StatusStrip, SystemHealth, SaveStatus, DataModeLabel } from "./health";
+import { SystemHealth, SaveStatus, DataModeLabel } from "./health";
 import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { AccessCodes } from "./access-codes";
@@ -137,7 +137,6 @@ export function Workspace({ path }: { path: string }) {
         <div className="masthead-inner">
           <Brand />
           <div className="masthead-right">
-            <SaveStatus />
             <span className="workspace-name">{roleInfo.name}</span>
             {canSwitch && (
               <Link href="/" className="masthead-link">
@@ -174,10 +173,12 @@ export function Workspace({ path }: { path: string }) {
           )}
         </div>
       </div>
+      <div className="workspace-header">
       <Tabs items={items} role={role} section={section} count={role === "chair" ? { documents: data.documents.filter((d) => d.committeeId === committeeId).length } : undefined} />
+      <SaveStatus />
+      </div>
       <div className="main-shell">
         <main className="workspace-content">
-          {section !== "health" && <StatusStrip />}
           {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} prominent={section === ""} />}
           {section !== "health" && role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
