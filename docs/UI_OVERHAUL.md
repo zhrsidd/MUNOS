@@ -174,3 +174,11 @@ for the implementation and verification; other skeleton/loading primitives and w
 Claude owns the global button, alignment, panel-width and spacing cleanup requested on 19 October 2026.
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md). The functional follow-up is recorded in
 [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); it does not complete the global visual overhaul.
+
+## SC/HSC procedure and majority voting · 19 October 2026
+
+**Pending implementation by Claude.** See [SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md) for the
+owner-confirmed clause workflow, surviving-clause final vote, manual P5 veto outcome on both clause and final
+ballots, and clear-majority controls without invented named ballots. P5 discussions and their individual votes
+are informal and unrecorded. This requires a persistent voting contract and reviewed migration; it is not a
+client-only shortcut or a completed feature of the present veto settings.

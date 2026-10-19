@@ -24,3 +24,12 @@ contribution-ranked Participation view supersedes the earlier points-order requi
 leaderboard separately shows points. Both new rankings and the Executive resolution-status overview are
 implemented in the follow-up package, with local verification in UI_PRIORITY_PASS.md. Global buttons and
 spacing remain assigned to Claude: see [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
+
+## SC/HSC procedure follow-up
+
+High priority before SC/HSC use, pending Claude implementation:
+[SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md). Debate/vote per clause, retain surviving clauses,
+then vote on the whole resolution. A veto on either target requires an informal P5-only discussion/vote;
+Chairs record only Veto overturned/upheld, with no P5 ballots or threshold. Add clear-majority For/Against
+as an honest observed-result method across eligible normal votes. Existing configurable veto support does
+not implement these requirements.

@@ -33,6 +33,16 @@ three views; no extra polling, schema or permission changes.
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md) for the owner's feedback and acceptance checks.
 This functional package does not claim that cleanup is complete.
 
+## SC/HSC procedure follow-up — confirmed requirements, pending implementation
+
+The owner has confirmed clause-by-clause debate/voting, continuing with surviving clauses after failures,
+and a separate whole-resolution final vote. Vetoes on clauses **and** the final vote enter an informal P5-only
+discussion/vote. Chairs record only **Veto overturned** or **Veto upheld**; no P5 ballots, threshold or
+conversation is recorded. Add **Clear majority For / Against** for obvious plenary voting without fabricated
+country choices. Full contract, Chair flow, migration boundaries and acceptance cases:
+[SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md). This is a high-priority prerequisite for SC/HSC use,
+not functionality provided by the existing veto settings or normal voting screen. Claude owns implementation.
+
 ## Remaining priority order
 
 These are the owner's current requirements, including superseding decisions. They are not marked done by this
@@ -63,7 +73,8 @@ package. Continue from the existing Assembly implementation, rather than reintro
    DCMUN knowledge, short popups above Felix, persistent discoverable inbox and blocker-resistant in-app notices.
    No implied generative AI service. Adapt the selected Watermelon Skeleton/Spinner/Combobox/Continuous Tabs/
    Copy Confirm principles to current tokens; no wholesale template or automatic dependency installation.
-8. **Protected contracts next.** Clear-majority observed voting without fabricated named ballots; explicit school
+8. **Protected contracts next.** SC/HSC clause and final-resolution voting, manual P5 veto outcomes and clear-majority
+   observed voting are specified in [SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md), pending implementation. Explicit school
    affiliation so scheduled school photos include Chairs; configurable Main Submitter and Debated Amendment
    points with historical values/idempotency retained. Define and review migrations/contracts independently.
 
