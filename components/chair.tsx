@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useConference } from "@/lib/context";
 import { AttendanceStatus, Delegate } from "@/lib/domain";
 import { participationSummary, votingOutcome, effectiveScoring } from "@/lib/repository";
+import { participationOrder } from "@/lib/commands";
+import { AdjustmentHistory, DeductPoints } from "./point-adjustments";
 import { scoringLabel, scoringValues } from "@/lib/scoring";
 import { eventAmendmentId } from "@/lib/procedure/view";
 import {
@@ -75,6 +77,7 @@ export function ChairScreen({
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [eventEdit, setEventEdit] = useState<string | null>(null);
+  const [deducting, setDeducting] = useState<string | null>(null);
   const committee = data.committees.find((c) => c.id === committeeId)!;
   const session = data.sessions.find((s) => s.id === sessionId);
   const delegates = data.delegates.filter((d) => d.committeeId === committeeId);
@@ -235,8 +238,8 @@ export function ChairScreen({
           <div className="metrics">
             <Metric value={events.length} label="Opportunities recorded" />
             <Metric
-              value={events.reduce((n, e) => n + e.points, 0)}
-              label="Chair-awarded quality points"
+              value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && a.sessionId === sessionId).reduce((m, a) => m + a.points, 0), 0)}
+              label="Points awarded this session (net)"
             />
             <Metric
               value={new Set(events.map((e) => e.delegateId)).size}
@@ -253,11 +256,11 @@ export function ChairScreen({
           </div>
           <Panel
             title="Quick entry"
-            subtitle="Select a delegate, then tap a point value."
+            subtitle="Highest total first. Select a delegate, then tap a point value."
             action={<Search value={search} onChange={setSearch} />}
           >
             <div className="participation-delegates">
-              {filtered.map((d) => (
+              {participationOrder(data, filtered).map((d) => (
                 <div className="participation-row" key={d.id}>
                   <DelegateIdentity delegate={d} />
                   <span className="opportunity-total">
@@ -271,6 +274,9 @@ export function ChairScreen({
                     sessionId={sessionId}
                     resolutionId={resolution?.id || null}
                   />
+                  <button className="text-button" onClick={() => setDeducting(d.id)} aria-label={`Deduct points from ${d.country}`}>
+                    Deduct…
+                  </button>
                 </div>
               ))}
             </div>
@@ -340,6 +346,7 @@ export function ChairScreen({
               </table>
             </div>
           </Panel>
+          <AdjustmentHistory committeeId={committeeId} />
         </>
       )}
       {section === "voting" && <VotingConsole committeeId={committeeId} sessionId={sessionId} />}
@@ -399,6 +406,9 @@ export function ChairScreen({
             </dd>
           </dl>
         </Modal>
+      )}
+      {deducting && delegates.find((d) => d.id === deducting) && (
+        <DeductPoints delegate={delegates.find((d) => d.id === deducting)!} sessionId={sessionId} onClose={() => setDeducting(null)} />
       )}
       {edit && (
         <Modal title="Edit contribution" onClose={() => setEventEdit(null)}>

@@ -212,9 +212,6 @@ export interface DocumentStorageAdapter {
   upload(file: File, documentId: ID): Promise<{ storageKey: string }>;
   signedUrl(storageKey: string): Promise<string>;
 }
-export interface ArchiveAdapter {
-  mirror(version: DocumentVersion): Promise<{ archiveId: string }>;
-}
 export const roleCapabilities: Record<Role, string[]> = {
   chair: [
     "attendance",

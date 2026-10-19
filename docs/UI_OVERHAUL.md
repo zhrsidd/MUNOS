@@ -65,7 +65,7 @@ Acceptance: `grep -ri drive` over code, scripts, package.json and docs returns o
 wording that describes ordinary link sharing; no dedicated dependency, script, env var or setting remains; tests
 and build pass; a retirement checklist is in `docs/OPERATIONS.md`.
 
-## W4 · Resolution documents tab ◐ (Chair tab, Approval detail and print queue done; Approval history needs W6c schema)
+## W4 · Resolution documents tab ☑ (Chair tab, Approval detail, print queue; history via W6c)
 
 Remove the document preview (the demo "paper", version picker and `<pre>` text). The list becomes the page. Each
 resolution is one row showing, without opening anything: title, submitter, status chip, working-document link
@@ -80,11 +80,11 @@ browser check covers draft, submitted, changes-requested, approved.
 
 ## W6 · Functional quality-of-life
 
-**W6a · Participation sorted by total points ☐.** Highest total first; tie-breaker alphabetical by country, then
+**W6a · Participation sorted by total points ☑ (tests + browser).** Highest total first; tie-breaker alphabetical by country, then
 delegate id. Acceptance: pure comparator with tests (ties, zero, negative, equal names); order is stable while
 points change; same order in the Chair view and any export.
 
-**W6b · Chair deducts a chosen number of points ☐ (schema coordinated).** A custom amount, not fixed steps.
+**W6b · Chair deducts a chosen number of points ◐ (migration, command, UI, tests written; awaiting independent review, not applied to any project).** A custom amount, not fixed steps.
 Stored as a traceable adjustment: amount, reason (required), chair, time, delegate; original participation
 history is never edited or deleted, totals are original events plus adjustments. Existing committee permissions
 (Chair of that committee only) enforced on the server and through the outbox/idempotency path. Needs a
@@ -92,7 +92,7 @@ migration and repository change: written up and reviewed independently before it
 Acceptance: unit tests for totals and bounds; a replay and double-submit test (receipt idempotency); a
 cross-committee Chair is refused; history shows original event and adjustment separately.
 
-**W6c · Approval history in the Approval Panel ☐ (depends W4).** Accessible list or table of decisions: decision,
+**W6c · Approval history in the Approval Panel ◐ (migration, UI, tests written; awaiting independent review).** Accessible list or table of decisions: decision,
 comment, reviewer, time, newest first, per resolution. Landmark and heading structure, status by word, keyboard
 focusable, announced updates. Acceptance: axe-style checks (roles, names, contrast) pass in a browser; works
 without colour; shows decisions made offline once synced, labelled with the server time.
@@ -119,3 +119,9 @@ Session restructure (blocked on contract sign-off), Leo notification inbox and s
 ad-blocker-resistant notifications, configurable Debated Amendment and Main Submitter points, print copies =
 delegates + 3 spares, break-shorter-than-lead rule, executive resolution overview, automatic conflict pause and
 export, amendments-by-resolution fix. See `docs/SESSION_MODEL.md` and `docs/BACKLOG.md`.
+
+## Review queue (protected changes)
+
+`docs/REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md`: migrations 20261019100000, 100100, 100200. Not applied anywhere.
+Independent of: session contract (`docs/SESSION_MODEL.md`, still draft) and the conference-week Pro/Small
+performance checks, both unchanged.

@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useConference } from "@/lib/context";
 import type { Resolution } from "@/lib/domain";
+import { approvalHistory, decisionTone, type HistoryEntry } from "@/lib/approval-history";
 import { resolutionFeedback, resolutionNextAction, resolutionOrder, sentBack, type Feedback } from "@/lib/resolution-view";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { ResolutionSources } from "./operations/resolution-links";
@@ -37,6 +38,31 @@ function EarlierFeedback({ items }: { items: Feedback[] }) {
     </details>
   );
 }
+/** Every decision, newest first. Reads as a list: screen readers announce the count and each entry in order. */
+export function ApprovalHistory({ entries, showResolution = false, label = "Approval history" }: { entries: HistoryEntry[]; showResolution?: boolean; label?: string }) {
+  if (!entries.length) return <p className="muted">No decisions recorded yet.</p>;
+  return (
+    <ol className="history" aria-label={label}>
+      {entries.map((e) => (
+        <li key={e.id} className="history-entry">
+          <div className="history-line">
+            <Chip tone={decisionTone[e.kind]}>{e.label}</Chip>
+            {showResolution && (
+              <strong className="history-resolution">
+                {e.code} · {e.title}
+              </strong>
+            )}
+            <span className="muted">
+              Round {e.round}
+              {e.version ? ` · version ${e.version}` : ""} · by {e.reviewer} · <time dateTime={e.at}>{qatarTime(e.at)}</time>
+            </span>
+          </div>
+          {e.comment && <p className="history-comment">{e.comment}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}
 function ResolutionRow({ resolution }: { resolution: Resolution }) {
   const { data, act } = useConference();
   const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
@@ -44,6 +70,7 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
   const next = resolutionNextAction(resolution);
   const back = sentBack(resolution);
   const heading = `resolution-${resolution.id}`;
+  const lastDecision = approvalHistory(data, resolution.id)[0];
   return (
     <article className="resolution-row" aria-labelledby={heading}>
       <header className="resolution-head">
@@ -62,6 +89,11 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
       </div>
       {latest ? <FeedbackNote feedback={latest} changes={back} /> : (resolution.status === "Submitted" || resolution.status === "Review") && <p className="muted">No feedback from the Approval Panel yet.</p>}
       <EarlierFeedback items={earlier} />
+      {lastDecision && !lastDecision.comment && (
+        <p className="decision-line">
+          <strong>{lastDecision.label}</strong> by {lastDecision.reviewer} · <time dateTime={lastDecision.at}>{qatarTime(lastDecision.at)}</time>
+        </p>
+      )}
       <footer className="resolution-next">
         {next.status ? (
           <button className="primary" onClick={() => void act({ type: "document", id: resolution.id, status: next.status! }, "chair")}>
@@ -161,12 +193,24 @@ function ResolutionDetail({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
   const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
   const { latest, earlier } = resolutionFeedback(resolution);
+  const history = approvalHistory(data, resolution.id);
   return (
     <div className="resolution-detail">
       <p className="muted">{submitter ? `Submitted by ${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
       <Sources resolution={resolution} />
-      {latest && <FeedbackNote feedback={latest} changes={false} />}
-      <EarlierFeedback items={earlier} />
+      {history.length ? (
+        <section aria-labelledby={`history-${resolution.id}`}>
+          <h3 id={`history-${resolution.id}`} className="history-heading">
+            Decisions on this resolution
+          </h3>
+          <ApprovalHistory entries={history} label={`Decisions on ${resolution.code}`} />
+        </section>
+      ) : (
+        <>
+          {latest && <FeedbackNote feedback={latest} changes={false} />}
+          <EarlierFeedback items={earlier} />
+        </>
+      )}
     </div>
   );
 }
@@ -310,6 +354,9 @@ export function Approval() {
           text="New submissions will appear here. Approved resolutions are now with Logistics."
         />
       )}
+      <Panel title="Approval history" subtitle="Every decision on every resolution, newest first.">
+        <ApprovalHistory entries={approvalHistory(data)} showResolution />
+      </Panel>
     </>
   );
 }

@@ -3057,3 +3057,87 @@ dd {
     justify-content: flex-start;
   }
 }
+
+/* Approval history (docs/BRAND.md §6: rows, status by word, quiet metadata). */
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.history-entry {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.history-entry:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.history-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: 13px;
+}
+.history-resolution {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.history-comment {
+  margin-top: var(--space-2);
+  max-width: 68ch;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.history-heading {
+  font-size: 14px;
+  margin-bottom: var(--space-2);
+}
+.decision-line {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.decision-line strong {
+  color: var(--ink);
+}
+
+/* Point adjustments */
+.deduct-form {
+  display: grid;
+  gap: var(--space-3);
+}
+.quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.adjustments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adjustment {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.adjustment:first-child {
+  border-top: 0;
+}
+.adjustment-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: 13px;
+}
+.adjustment-reason {
+  margin-top: var(--space-1);
+  max-width: 68ch;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}

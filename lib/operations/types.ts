@@ -42,7 +42,36 @@ export interface PhotoAck {
   revision: number;
   at: string;
 }
+/** A Chair's traceable change to a delegate's total. Signed: a deduction is negative, a restore is positive. */
+export interface PointAdjustment {
+  id: string;
+  delegateId: string;
+  sessionId: string;
+  points: number;
+  reason: string;
+  chairId: string;
+  chairName: string | null;
+  /** Set on a restore: the deduction it undoes. */
+  reverses: string | null;
+  createdAt: string;
+}
+export type DecisionKind = "review_started" | "changes_requested" | "approved";
+/** One Approval Panel decision. Separate from feedback text: `commentId` is null for a comment-free decision. */
+export interface DocumentDecision {
+  id: string;
+  documentId: string;
+  decision: DecisionKind;
+  round: number;
+  versionId: string | null;
+  versionNumber: number | null;
+  reviewerId: string | null;
+  reviewerName: string | null;
+  commentId: string | null;
+  decidedAt: string;
+}
 export interface OperationsData {
+  pointAdjustments?: PointAdjustment[];
+  documentDecisions?: DocumentDecision[];
   submissionLinks?: SubmissionLink[];
   resolutionLinks?: ResolutionLink[];
   photoSlots?: PhotoSlot[];

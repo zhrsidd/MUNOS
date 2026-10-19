@@ -14,67 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      archive_jobs: {
-        Row: {
-          archive_id: string | null
-          attempts: number
-          committee_id: string
-          conference_id: string
-          created_at: string
-          id: string
-          last_error: string | null
-          state: string
-          updated_at: string
-          version_id: string
-        }
-        Insert: {
-          archive_id?: string | null
-          attempts?: number
-          committee_id: string
-          conference_id: string
-          created_at?: string
-          id?: string
-          last_error?: string | null
-          state?: string
-          updated_at?: string
-          version_id: string
-        }
-        Update: {
-          archive_id?: string | null
-          attempts?: number
-          committee_id?: string
-          conference_id?: string
-          created_at?: string
-          id?: string
-          last_error?: string | null
-          state?: string
-          updated_at?: string
-          version_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "archive_jobs_committee_id_conference_id_fkey"
-            columns: ["committee_id", "conference_id"]
-            isOneToOne: false
-            referencedRelation: "committees"
-            referencedColumns: ["id", "conference_id"]
-          },
-          {
-            foreignKeyName: "archive_jobs_conference_id_fkey"
-            columns: ["conference_id"]
-            isOneToOne: false
-            referencedRelation: "conferences"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "archive_jobs_version_id_conference_id_committee_id_fkey"
-            columns: ["version_id", "conference_id", "committee_id"]
-            isOneToOne: false
-            referencedRelation: "document_versions"
-            referencedColumns: ["id", "conference_id", "committee_id"]
-          },
-        ]
-      }
       attendance: {
         Row: {
           committee_id: string

@@ -5,10 +5,12 @@ import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
 import {
   AttendanceStatus,
   ConferenceData,
+  Delegate,
   DocumentStatus,
   Role,
   Vote,
 } from "./domain";
+import type { DecisionKind } from "./operations/types";
 import { applyOperationsCommand, isOperationsCommand, operationsRoles, type OperationsCommand } from "./operations/commands";
 import { conferenceScoring, scoringProblem, scoringValues } from "./scoring";
 import { countryFlag } from "./countries";
@@ -113,13 +115,30 @@ export interface ConferenceRepository {
   reset(): void;
 }
 const id = () => crypto.randomUUID();
+/** Net of deductions and restores for one delegate. */
+export function adjustmentTotal(data: ConferenceData, delegateId: string) {
+  return (data.pointAdjustments ?? []).reduce((n, a) => (a.delegateId === delegateId ? n + a.points : n), 0);
+}
+/** Highest total first. Ties: country A to Z, then id, so the order is the same on every device. */
+export function participationOrder(data: ConferenceData, delegates: Delegate[]) {
+  const total = new Map(delegates.map((d) => [d.id, participationSummary(data, d.id).points]));
+  return [...delegates].sort((a, b) => total.get(b.id)! - total.get(a.id)! || a.country.localeCompare(b.country, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+/** Approval Panel decisions are these transitions; every other status change is not a decision. */
+export function decisionFor(from: DocumentStatus, to: DocumentStatus): DecisionKind | null {
+  if (from === "Submitted" && to === "Review") return "review_started";
+  if ((from === "Submitted" || from === "Review") && to === "Approved") return "approved";
+  if ((from === "Submitted" || from === "Review") && to === "Draft") return "changes_requested";
+  return null;
+}
 export function participationSummary(data: ConferenceData, delegateId: string) {
   const events = data.events.filter(
     (e) => e.delegateId === delegateId && !e.voidedAt,
   );
   return {
     opportunities: events.filter(e=>e.categoryId!=="submitter").length,
-    points: events.reduce((n, e) => n + e.points, 0),
+    // Effective event points plus the Chair's adjustments; the events themselves are never edited by an adjustment.
+    points: events.reduce((n, e) => n + e.points, 0) + adjustmentTotal(data, delegateId),
     speeches: events.filter((e) => e.categoryId === "speech").length,
   };
 }
@@ -314,6 +333,7 @@ export function applyCommand(
         throw Error(
           "Close the current debate before opening another resolution.",
         );
+      const previous = r.status;
       r.revision = (r.revision ?? 0) + 1;
       if(c.status==='Closed' && c.outcome!=='Withdrawn') {
         const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
@@ -325,13 +345,26 @@ export function applyCommand(
       r.status = c.status;
       r.outcome = c.outcome;
       if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
-      if (c.comment)
+      let commentId: string | null = null;
+      if (c.comment) {
+        commentId = nextId();
         r.comments.push({
-          id: nextId(),
+          id: commentId,
           text: c.comment,
           authorId: metadata?.actorId ?? `${role}-demo`,
           createdAt: now,
         });
+      }
+      const decision = decisionFor(previous, c.status);
+      if (decision) {
+        const documentId = r.id;
+        const version = d.versions.find((v) => v.id === r.versionIds.at(-1));
+        const list = (d.documentDecisions ??= []);
+        // A round starts at each submission and ends in changes requested, so the next one is that count + 1.
+        const round = list.filter((x) => x.documentId === documentId && x.decision === "changes_requested").length + 1;
+        // Mirrors the database trigger: only Approval Panel transitions are decisions.
+        list.push({ id: nextId(), documentId, decision, round, versionId: version?.id ?? null, versionNumber: version?.number ?? null, reviewerId: metadata?.actorId ?? `${role}-demo`, reviewerName: null, commentId, decidedAt: now });
+      }
       break;
     }
     case "version": {
@@ -542,7 +575,7 @@ export function applyCommand(
     default:
       if (isBatchCommand(c)) applyBatch(d,c,nextId,now);
       else if (isProcedureCommand(c)) applyProcedure(d,c,nextId,now,metadata?.actorId ?? "chair-demo");
-      else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
+      else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now, metadata?.actorId ?? `${role}-demo`);
   }
   if (!["queue","queueAdd","queueOrder","queueRemove","poiAdd","poiOrder","poiAllowance","debateMode"].includes(c.type)) d.audit.unshift({
     id: nextId(),
