@@ -3223,3 +3223,14 @@ html { scroll-padding-top: 12rem; }
 @media (max-width: 700px) {
   .participation-row .scorer { display: grid; grid-template-columns: repeat(2, max-content); justify-content: start; gap: var(--space-3) var(--space-5); }
 }
+/* About (ported from PHESMUN PR #1): a public page with the seal, credits and licence wording. */
+.about-page { min-height: 100vh; display: grid; place-items: center; padding: var(--space-5) var(--space-4); background: var(--bg); }
+.about-card { max-width: 560px; width: 100%; padding: var(--space-6); }
+.about-card > * { margin-left: 0; margin-right: 0; }
+.about-card > p { margin: 0 0 var(--space-3); color: var(--ink-2); }
+.about-card h1 { margin: var(--space-1) 0 var(--space-3); }
+.about-card h2 { font-size: 15px; margin: var(--space-5) 0 var(--space-1); }
+.about-card .small { font-size: 13px; }
+.about-logo { display: block; margin-bottom: var(--space-2); }
+.about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }
+@media (max-width: 700px) { .about-card { padding: var(--space-5) var(--space-4); } }
