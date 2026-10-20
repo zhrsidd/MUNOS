@@ -17,7 +17,7 @@ Statuses below describe the reviewed branch; implemented locally does not mean r
 | Global ugly buttons, uneven spacing, panel widths and action alignment | Claude's dedicated [visual cleanup brief](CLAUDE_VISUAL_CLEANUP.md), across every workspace and dialog; pending. |
 | Compact home/workspace chooser with useful first-viewport role cards | [Assembly home proposal](HOME_SCREEN_PROPOSAL.md) and local reference implemented 20 October; desktop/phone screenshots included. Claude review remains; role gates and auto-entry preserved. |
 | Declutter and remove useless tabs/duplicate actions | Continue the all-workspace inventory in [UI_OVERHAUL.md](UI_OVERHAUL.md); preserve roll call and side-by-side For/Against speeches. |
-| Resolution documents overhaul and easy-to-see approval comments | Preview/mock-version clutter removed; latest full feedback visible. Preserve in the visual pass. |
+| Resolution documents overhaul and easy-to-see approval comments | Preview/mock-version clutter removed; latest full feedback visible. New requirement: replace names with code — Main Submitter country and remove name entry; [21 October brief](UI_HANDOFF_ADDITIONS_2026-10-21.md). |
 | Approval history and chosen-amount deductions/restores | Code and migrations written; independent review accepted them for staging replay. [Review packet](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md); migrations remain unapplied. |
 | No PDF submissions; native Docs and Anyone-with-link access | First larger priority: enforce on client/server, preserve historical files, add honest access checks/recheck states. |
 | Drive mirroring and award discussion removal | Retired; preserve ordinary Google Docs links and history. Complete/check server-timer and projector retirement; keep the local speaker timer. |
@@ -30,10 +30,14 @@ Statuses below describe the reviewed branch; implemented locally does not mean r
 | Chairs included in their school's scheduled group photo | Pending: explicit Chair-school affiliation and matching, with existing reminder/acknowledgement behavior retained. |
 | Main Submitter and Debated Amendment points configurable | Pending reviewed contract/migration; Main Submitter is still fixed at +5 in the current code. Preserve old event values and exactly-once credit. |
 | Port PHESMUN About and check feature parity through PR #13 | Pending: correct credits (Zuhayr Siddique and John Paul Ribeiru); list verified ports, better equivalents and deliberate retirements. |
-| Leo becomes Felix, with all proposed Leo improvements | Pending: owner-approved Launcher head at 48 px, six expression frames, blink/eyes/mouth while typing and cheerful petting hover; deterministic DCMUN content, short popups above Felix, discoverable persistent inbox, blocker-resistant in-app notices, motion-off/reduced motion. Include supplied assets; do not substitute a new mascot or claim assets are ported until present. |
+| Leo becomes Felix, with all proposed Leo improvements | Pending: owner-approved Launcher head at 48 px, six expression frames, blink/eyes/mouth while typing and cheerful petting hover; deterministic DCMUN content, short popups above Felix, discoverable persistent inbox, blocker-resistant in-app notices, motion-off/reduced motion. Include supplied assets; do not substitute a new mascot or claim assets are ported until present. New requirement: faster bounded reply typing, gentle facial cadence and prompt stop; [21 October brief](UI_HANDOFF_ADDITIONS_2026-10-21.md). |
 | Orbit seal loading, suitable Watermelon components and gentle transitions | Orbit initial loading implemented; adapt Skeleton, Spinner, Combobox, Continuous Tabs and Copy Confirm principles as suitable. Broader transitions/loading states remain pending; no delayed ready content or unnecessary dependency. |
 | Existing session and reliability work | Keep [SESSION_MODEL.md](SESSION_MODEL.md) and its sign-off gate; do not confuse the removed procedure proposal with removal of the session work. Preserve offline recovery, export, conflicts, permissions and print copies = delegates + 3 spares. |
 | Release and capacity verification | Staging replay, signed-in flows, rollback and realistic 19-committee rehearsal remain outstanding. Size the rehearsal for the owner's 57 Chairs, about 10 Approval devices, 5–6 printing devices and Executive/spares, with 1–2 active Chairs per committee. |
+
+## Owner additions · 21 October 2026
+
+Read [Felix speed and resolution identity](UI_HANDOFF_ADDITIONS_2026-10-21.md). Add faster, bounded Felix reply typing with calm facial animation, and replace resolution names with **code — Main Submitter country** (for example **GA1/01 — France**), including title-free new submission flows. Both are requirements for Claude; not implemented by this documentation update. Original Watermelon selections and Felix assets have been resupplied in the 21 October handoff pack.
 
 ## Implemented in this package
 
