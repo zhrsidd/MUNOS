@@ -1,0 +1,134 @@
+.home {
+  min-height: 100svh;
+  background: var(--paper);
+  color: var(--ink);
+  border-top: var(--space-1) solid var(--brand);
+}
+.frame, .main {
+  width: min(100%, 960px);
+  margin-inline: auto;
+  padding-inline: var(--space-5);
+}
+.header { background: var(--surface); }
+.header .frame {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 80px;
+  padding-block: var(--space-4);
+}
+.access {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+.context { background: var(--ink); color: var(--surface); }
+.context .frame {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  padding-block: var(--space-3);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.context strong { font-weight: 600; }
+.main { padding-block: var(--space-6) var(--space-5); }
+.intro { margin-bottom: var(--space-5); }
+.eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: .08em;
+  font-weight: 700;
+}
+.intro h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -.03em;
+}
+.intro > p:last-child {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 68ch;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 24px;
+  grid-template-rows: 1fr auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  min-height: 160px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.card:hover, .card:focus-visible { color: var(--ink); border-color: var(--action); background: var(--action-soft); }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--action-soft);
+  color: var(--action);
+}
+.icon svg { width: 22px; height: 22px; }
+.copy { min-width: 0; overflow-wrap: anywhere; }
+.copy h2 { margin: 0 0 var(--space-2); font-size: 18px; line-height: 1.3; }
+.copy > span { color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.arrow { color: var(--action); align-self: center; }
+.arrow svg { width: 20px; height: 20px; }
+.enter { grid-column: 2 / 4; color: var(--action); font-size: 12px; font-weight: 650; }
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.skip {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-4);
+  z-index: 10;
+  padding: var(--space-3);
+  background: var(--surface);
+  color: var(--action);
+  transform: translateY(-200%);
+}
+.skip:focus { transform: none; outline: 3px solid var(--focus); }
+@media (max-width: 600px) {
+  .frame, .main { padding-inline: var(--space-4); }
+  .header .frame { min-height: 64px; padding-block: var(--space-3); }
+  .header :global(.brand) { font-size: 18px; }
+  .header :global(.brand-logo) { width: 36px; height: 36px; }
+  .access { max-width: 100px; }
+  .context .frame { gap: var(--space-1); }
+  .main { padding-block: var(--space-5); }
+  .intro { margin-bottom: var(--space-4); }
+  .choices { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  .card { min-height: 100px; padding: var(--space-4); gap: var(--space-3); grid-template-rows: 1fr; align-items: center; }
+  .copy h2 { font-size: 16px; margin-bottom: var(--space-1); }
+  .enter { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}

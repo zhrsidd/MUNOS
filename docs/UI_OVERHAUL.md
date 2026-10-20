@@ -181,3 +181,10 @@ Pending implementation by Claude: [CLEAR_MAJORITY_VOTING.md](CLEAR_MAJORITY_VOTI
 Clear majority For / Against actions that record the Chair's observed result without filling country ballots.
 Keep counted voting, Divide the House, existing veto rules, history, permissions and offline durability.
 The complete current coverage checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md).
+
+## Home screen proposal and local reference · 20 October 2026
+
+[HOME_SCREEN_PROPOSAL.md](HOME_SCREEN_PROPOSAL.md) supplies the compact Assembly workspace chooser, desktop
+and phone screenshots, state rules and verification evidence for Claude. Single-workspace auto-entry and
+role filtering are preserved. This home reference is implemented locally; Claude's global button, panel-width
+and spacing overhaul remains open.

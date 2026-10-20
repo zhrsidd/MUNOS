@@ -7,6 +7,8 @@ Owner instruction, 19 October 2026:
 The full feature checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); this document specifies the visual work.
 
 Claude owns this cleanup across the application. Treat it as a usability priority, not optional polish.
+The [Assembly home proposal](HOME_SCREEN_PROPOSAL.md) now includes a working local reference and tracked
+desktop/phone screenshots. Review and build on it when cleaning up the other workspaces.
 The separate functional package (Debate points leaderboard, contribution-ranked Participation and Executive
 resolution status) should remain reviewable independently.
 

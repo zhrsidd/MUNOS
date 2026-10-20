@@ -150,3 +150,13 @@ is present and keyboard scrolling is available. Executive resolution status uses
 source-link and history patterns: latest feedback is visible in full, older history is disclosed on demand.
 Both use the existing palette and spacing tokens. Global control/spacing cleanup is assigned to Claude in
 [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
+
+## Assembly home · 20 October 2026
+
+The workspace chooser uses the same seal lockup and navy conference band as the Assembly identity. One
+28 px heading precedes a two-column grid, becoming compact single-column rows at 600 px. Each role is one
+whole-card link with a 40 px icon and aligned arrow: 24/16 px padding, 16/12 px gaps, 18/16 px titles. Hover
+changes colour only; keyboard uses the standard 3 px focus ring. Colour transitions take 120 ms and are
+disabled under reduced motion. No status counters or sync claims are decorative content.
+
+See [HOME_SCREEN_PROPOSAL.md](HOME_SCREEN_PROPOSAL.md) for screenshots, access states and implementation.

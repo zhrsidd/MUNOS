@@ -3,10 +3,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
-import { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain";
 import { soleWorkspacePath } from "@/lib/access";
-import { Icon, Chip, Panel } from "./ui";
+import { Panel } from "./ui";
 import { Brand } from "./brand";
+import { WorkspaceHome } from "./workspace-home";
+import { workspaces as roles } from "@/lib/workspaces";
 import { WorkspaceLoading } from "./workspace-loading";
 import { Tabs } from "./shell";
 import { navigationFor } from "@/lib/navigation";
@@ -21,32 +23,6 @@ import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
 import { DelegateSubmissions } from "./operations/resolution-links";
-const roles: { id: Role; name: string; description: string; icon: string }[] = [
-  {
-    id: "chair",
-    name: "Chair Console",
-    description: "Lead the debate. Give every delegate a voice.",
-    icon: "debate",
-  },
-  {
-    id: "approval",
-    name: "Approval Panel",
-    description: "Review resolutions and keep submissions moving.",
-    icon: "review",
-  },
-  {
-    id: "logistics",
-    name: "Admins",
-    description: "The right document, printed at the right time.",
-    icon: "print",
-  },
-  {
-    id: "admin",
-    name: "Executive",
-    description: "Set up the conference. Keep the day running.",
-    icon: "settings",
-  },
-];
 export function Workspace({ path }: { path: string }) {
   const {
     data,
@@ -56,14 +32,14 @@ export function Workspace({ path }: { path: string }) {
     access,
   } = useConference();
   const [now] = useState(()=>Date.now());
-    const router = useRouter();
+  const router = useRouter();
   // A staff member with exactly one workspace goes straight in; the picker is only for people with a choice.
   const soleWorkspace = !path ? soleWorkspacePath(access) : null;
   useEffect(() => { if (soleWorkspace) router.replace(soleWorkspace); }, [soleWorkspace, router]);
   const role = (path.split("/")[0] || "chair") as Role;
   const section = path.split("/")[1] || "";
   const activeCommittees = data.committees.filter(c => !c.archived && (!(role==='chair') || access.status!=='active' || access.committeeIds.includes(c.id)));
-  const availableRoles = access.status === "active" ? roles.filter(r => access.roles.includes(r.id)) : roles;
+  const availableRoles = access.status === "active" ? access.roles : roles.map(r => r.id);
   const committee =
     activeCommittees.find((c) => c.id === requestedCommitteeId) ||
     activeCommittees.find(c=>c.code === "GA1") || activeCommittees[0];
@@ -72,63 +48,7 @@ export function Workspace({ path }: { path: string }) {
   const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && !s.archived && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
   // While access is still loading the picker would flash every workspace, including ones this person cannot enter.
   if (soleWorkspace || (!path && access.status === "loading")) return <WorkspaceLoading/>;
-  if (!path)
-    return (
-      <main className="landing">
-        <header>
-          <Brand />
-          <Chip tone="neutral">{access.status === "active" ? "Staff workspace" : "Interactive demo"}</Chip>
-        </header>
-        <div className="landing-content">
-          <div className="eyebrow">ONE CONFERENCE. EVERY TEAM IN SYNC.</div>
-          <h1>
-            A calmer
-            <br />
-            conference day.
-          </h1>
-          <p className="landing-intro">
-            Less switching tabs. More moving things forward.
-            <br />
-            Choose your workspace to get started.
-          </p>
-          <div className="role-grid">
-            {availableRoles.map((r, i) => (
-              <Link className="role-card" key={r.id} href={`/${r.id}`}>
-                <div className={`role-icon color-${i}`}>
-                  <Icon name={r.icon} />
-                </div>
-                <h2>{r.name}</h2>
-                <p>{r.description}</p>
-                <span>
-                  Enter workspace <Icon name="arrow" />
-                </span>
-              </Link>
-            ))}
-          </div>
-          <div className="landing-note">
-            <span className="dot" />
-            Shared workflow, one source of truth <span>•</span> Development edition · check System health for connection status
-          </div>
-          <div className="landing-bottom">
-            <div>
-              <strong>From first speech to final vote.</strong>
-              <p>
-                Attendance feeds voting. Participation informs opportunity.
-                Approved resolutions become print jobs.
-              </p>
-            </div>
-            <span className="edition">
-              DCMUN-inspired
-              <br />
-              Demonstration edition · 2026
-            </span>
-          </div>
-        </div>
-        <footer>
-          {access.status === "active" ? "Choose one of your assigned workspaces. Conference access is controlled by your staff grant." : "Illustrative data, not official conference records. Local demo roles are for exploration."}
-        </footer>
-      </main>
-    );
+  if (!path) return <WorkspaceHome conference={data.conference} availableRoles={availableRoles} demo={access.status === "demo"} />;
   const roleInfo = roles.find((r) => r.id === role)!;
   const items = navigationFor(role);
   const canSwitch = access.status !== "active" || access.roles.length > 1;

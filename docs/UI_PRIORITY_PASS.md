@@ -15,7 +15,7 @@ Statuses below describe the reviewed branch; implemented locally does not mean r
 | Claude primary engineer across the whole app | `AGENTS.md` updated; Codex provides review/specialist support. |
 | DCMUN seal identity, DeutschLab principles, Assembly direction | [BRAND.md](BRAND.md); preserve and finish applying tokens to shared components. |
 | Global ugly buttons, uneven spacing, panel widths and action alignment | Claude's dedicated [visual cleanup brief](CLAUDE_VISUAL_CLEANUP.md), across every workspace and dialog; pending. |
-| Compact home/workspace chooser with useful first-viewport role cards | Pending; preserve authorised roles, no-access states and sole-workspace auto-entry. |
+| Compact home/workspace chooser with useful first-viewport role cards | [Assembly home proposal](HOME_SCREEN_PROPOSAL.md) and local reference implemented 20 October; desktop/phone screenshots included. Claude review remains; role gates and auto-entry preserved. |
 | Declutter and remove useless tabs/duplicate actions | Continue the all-workspace inventory in [UI_OVERHAUL.md](UI_OVERHAUL.md); preserve roll call and side-by-side For/Against speeches. |
 | Resolution documents overhaul and easy-to-see approval comments | Preview/mock-version clutter removed; latest full feedback visible. Preserve in the visual pass. |
 | Approval history and chosen-amount deductions/restores | Code and migrations written; independent review accepted them for staging replay. [Review packet](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md); migrations remain unapplied. |
@@ -84,8 +84,9 @@ package. Continue from the existing Assembly implementation, rather than reintro
    ties, no points tie-break; define counted amendments and submitter credit first. Preserve editing focus and
    align exports. Separate compact, bounded Debate leaderboard contains every country, flag and point total,
    explicitly labelled scope, including ties/zero/negative totals. Replace the suggestions panel there.
-5. **Compact entry screen and shared layout cleanup.** Useful role cards in the first viewport; authorised
-   roles and sole-workspace auto-entry preserved. Consistent buttons, wrapping, content widths and alignment
+5. **Compact entry screen and shared layout cleanup.** [Home proposal and local reference](HOME_SCREEN_PROPOSAL.md)
+   implemented with useful first-viewport role cards; authorised roles and sole-workspace auto-entry preserved.
+   Claude review and global cleanup remain. Consistent buttons, wrapping, content widths and alignment
    across workspaces at phone widths and 200% zoom. Preserve roll call, documents and side-by-side speeches.
 6. **About and parity.** Accurate PHESMUN About credits (Zuhayr Siddique and John Paul Ribeiru); audit merged
    features through PR #13, recording verified equivalents, deliberate retirements and omissions. No recovery
@@ -156,3 +157,9 @@ content is not delayed. Row skeletons, other loading primitives and broader tran
 Not verified: authenticated staging/cloud behavior, screen-reader announcements, actual browser 200% zoom,
 representative Chair hardware or the conference-week workload. The global button and spacing overhaul remains
 Claude's task; these features do not mark it complete.
+
+## Home screen proposal · 20 October 2026
+
+[HOME_SCREEN_PROPOSAL.md](HOME_SCREEN_PROPOSAL.md) contains the owner-requested Assembly home design,
+tracked desktop/mobile screenshots, access-state rules, a working local reference and verification limits.
+This completes the local home proposal, not the all-workspace button/spacing overhaul.
