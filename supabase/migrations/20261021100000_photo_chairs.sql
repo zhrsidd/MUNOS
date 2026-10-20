@@ -1,6 +1,8 @@
 -- Delegates and Chairs in school group photos (docs/plans/PROTECTED_FEATURES_PLAN.md §2).
 -- A Chair may have a school; that school's photo slots then remind the Chair's committees, as delegates do.
--- Additive: one nullable column with a conference-scoped FK, two private helpers, one new operations command.
+-- One nullable column with a conference-scoped FK, two private helpers, one new operations command, and a Chair-list
+-- version on photo acknowledgements so a changed list is reminded again (section 5: one defaulted column, and the
+-- acknowledgement unique key becomes an index because acknowledgements are append-only history).
 -- Chairs cannot read public.staff (Executive-only RLS, unchanged). They receive only the narrow photoChairs
 -- projection: name, committee and school of Chairs with a school, for committees they can already access.
 -- private.apply_operations_mutation and public.operations_snapshot are PATCHED with exact anchors. Fail closed.
@@ -48,13 +50,62 @@ begin
 end $$;
 revoke all on function private.ops_staff_school(uuid,jsonb) from public, anon, authenticated;
 
--- 5) Wire the command into the operations dispatcher and photoChairs into the operations snapshot.
+-- 5) An acknowledgement is for one Chair list as well as one slot revision. `chairs` holds the sorted staff ids of
+--    the committee's Chairs in that photo as the acknowledging device showed them (photoChairsVersion in
+--    lib/operations/photo-reminders.ts); '' is no Chairs, so existing acknowledgements keep their meaning. The list
+--    is derived from current data, so it changes with every kind of change to a Chair's school, committees or role
+--    (staffSchool, the staff command, direct edits). A reminder is silenced only while the LATEST acknowledgement of
+--    that slot revision and stage is for the current list. So an earlier acknowledgement no longer silences a changed
+--    list, even if the list later changes back, and a stale acknowledgement queued offline is recorded as history but
+--    cannot silence the updated list. Append-only: a row is added whenever the latest one's list differs (so the
+--    unique key is replaced by an index); rows are never deleted or rewritten. apply_operations_mutation locks the
+--    committee row first, so acknowledgements of one committee are serialised and clock_timestamp() orders them.
+alter table public.photo_acknowledgements add column chairs text not null default ''
+ constraint photo_acknowledgements_chairs_format check (length(chairs) <= 1850 and
+  chairs ~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*)?$');
+do $unique$
+declare names text[];
+begin
+ select array_agg(conname) into names from pg_constraint
+  where conrelid = 'public.photo_acknowledgements'::regclass and contype = 'u'
+    and pg_get_constraintdef(oid) = 'UNIQUE (slot_id, committee_id, stage, slot_revision)';
+ if coalesce(array_length(names, 1), 0) <> 1 then raise exception 'photo_acknowledgements unique key changed; review before applying'; end if;
+ execute format('alter table public.photo_acknowledgements drop constraint %I', names[1]);
+end $unique$;
+create index photo_acknowledgements_latest on public.photo_acknowledgements(slot_id, committee_id, stage, slot_revision, created_at);
+
+create or replace function private.ops_photo_ack(conf uuid, cid uuid, actor uuid, command jsonb) returns uuid
+language plpgsql set search_path='' as $$
+declare slot public.photo_slots; chair_list text := coalesce(command->>'chairs', '');
+begin
+ select * into slot from public.photo_slots where id = private.uuid_or_null(command->>'slotId') and conference_id = conf;
+ if not found then raise exception 'Photo slot unavailable' using errcode='22023'; end if;
+ if command->>'stage' not in ('warning','due') then raise exception 'Unknown reminder stage' using errcode='22023'; end if;
+ if length(chair_list) > 1850 or chair_list !~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*)?$' then
+   raise exception 'Unknown Chair list' using errcode='22023';
+ end if;
+ -- Acknowledging an older revision or Chair list is harmless: it is kept as history and does not silence the
+ -- current reminder (the client compares revision and the latest Chair list, lib/operations/photo-reminders.ts).
+ -- A repeat of the latest acknowledgement adds nothing.
+ if (select a.chairs from public.photo_acknowledgements a
+     where a.slot_id = slot.id and a.committee_id = cid and a.stage = command->>'stage' and a.slot_revision = (command->>'revision')::bigint
+     order by a.created_at desc, a.id desc limit 1) is distinct from chair_list then
+   insert into public.photo_acknowledgements(conference_id, committee_id, slot_id, stage, slot_revision, chairs, actor_id, created_at, updated_at)
+   values (conf, cid, slot.id, command->>'stage', (command->>'revision')::bigint, chair_list, actor, clock_timestamp(), clock_timestamp());
+ end if;
+ return slot.id;
+end; $$;
+revoke all on function private.ops_photo_ack(uuid,uuid,uuid,jsonb) from public, anon, authenticated;
+
+-- 6) Wire the command into the operations dispatcher, and photoChairs and acknowledgement Chair lists into the
+--    operations snapshot.
 do $patch$
 declare definition text;
  scope_anchor constant text := ' when ''sessionImport'', ''photoSlot'', ''photoImport'' then cid := null;';
  stale_anchor constant text := ' elsif kind = ''submissionLink'' then';
  dispatch_anchor constant text := ' when ''photoAck'' then entity := private.ops_photo_ack(conf, cid, actor, command);';
  snapshot_anchor constant text := 'from public.photo_acknowledgements a where a.conference_id = conf)';
+ ack_anchor constant text := '''revision'',a.slot_revision,''at'',a.created_at) order by a.created_at)';
 begin
  definition := pg_get_functiondef('private.apply_operations_mutation(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
  if length(definition) - length(replace(definition, scope_anchor, '')) <> length(scope_anchor) then raise exception 'apply_operations_mutation scope anchor changed; review before applying'; end if;
@@ -67,5 +118,8 @@ begin
  execute definition;
  definition := pg_get_functiondef('public.operations_snapshot(uuid)'::regprocedure);
  if length(definition) - length(replace(definition, snapshot_anchor, '')) <> length(snapshot_anchor) then raise exception 'operations_snapshot anchor changed; review before applying'; end if;
+ if length(definition) - length(replace(definition, ack_anchor, '')) <> length(ack_anchor) then raise exception 'operations_snapshot acknowledgement anchor changed; review before applying'; end if;
+ -- Recorded order (the client's "latest acknowledgement" relies on it), with the same tie-break as ops_photo_ack.
+ definition := replace(definition, ack_anchor, '''revision'',a.slot_revision,''chairs'',a.chairs,''at'',a.created_at) order by a.created_at, a.id)');
  execute replace(definition, snapshot_anchor, snapshot_anchor || E',\n  ''photoChairs'', private.photo_chairs(conf)');
 end $patch$;

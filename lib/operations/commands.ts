@@ -1,5 +1,6 @@
 import type { ConferenceData, Role } from "../domain";
 import { GOOGLE_DOC_ID } from "../submissions/google-doc";
+import { latestPhotoAck } from "./photo-reminders";
 // Extension commands travel through the same durable outbox as core commands, but are
 // applied server-side by public.apply_operations_mutation (see the operations migrations).
 export type OperationsCommand =
@@ -24,7 +25,8 @@ export type OperationsCommand =
     }
   | ({ type: "photoSlot"; action: "create" | "update"; slotId?: string } & PhotoSlotFields)
   | { type: "photoImport"; rows: PhotoSlotFields[] }
-  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number }
+  /** `chairs` is the participant version the Chair saw (photoChairsVersion); absent means no Chairs. */
+  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number; chairs?: string }
   /** A Chair's school for group photos; null clears it. */
   | { type: "staffSchool"; staffId: string; schoolId: string | null }
   | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
@@ -202,8 +204,12 @@ export function applyOperationsCommand(
     case "photoAck": {
       if (!d.photoSlots?.some((s) => s.id === c.slotId)) throw Error("Photo slot not found.");
       const acks = (d.photoAcks ??= []);
-      if (!acks.some((a) => a.slotId === c.slotId && a.committeeId === c.committeeId && a.stage === c.stage && a.revision === c.revision))
-        acks.push({ slotId: c.slotId, committeeId: c.committeeId, stage: c.stage, revision: c.revision, at: now });
+      // Append-only, mirroring private.ops_photo_ack: recorded unless the latest acknowledgement of this revision and
+      // stage already has this Chair list. A stale one (older Chair list) is kept as history and silences nothing.
+      const chairs = c.chairs ?? "";
+      const latest = latestPhotoAck(acks, c.slotId, c.committeeId, c.stage, c.revision);
+      if (!latest || (latest.chairs ?? "") !== chairs)
+        acks.push({ slotId: c.slotId, committeeId: c.committeeId, stage: c.stage, revision: c.revision, chairs, at: now });
       break;
     }
   }

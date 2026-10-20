@@ -83,9 +83,9 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 ## School group photos and chair reminders
 
-**Model.** `public.photo_slots` (school, start, optional end, location, note, active/cancelled, warning minutes, revision) and `public.photo_acknowledgements` (committee, slot, stage `warning`/`due`, slot revision). Delegate → school → committee comes from the existing delegate records; nothing is duplicated.
+**Model.** `public.photo_slots` (school, start, optional end, location, note, active/cancelled, warning minutes, revision) and `public.photo_acknowledgements` (committee, slot, stage `warning`/`due`, slot revision, and the committee's Chairs in that photo when acknowledged). Delegate → school → committee comes from the existing delegate records; a Chair's school is `staff."schoolId"` (Executive → Chairs & staff); nothing is duplicated.
 
-**Who is reminded.** For a slot, the committees with at least one delegate from that school. Executive → *Group photos* shows each slot with e.g. `GA1 · 2  WHO · 1  HRC · 3` and acknowledgement status (✓ warned, ✓✓ delegates sent).
+**Who is reminded.** For a slot, the committees with at least one delegate or Chair from that school (a Chair of several committees is listed in each). Executive → *Group photos* shows each slot with e.g. `GA1 · 2  WHO · 1  HRC · 3` and acknowledgement status (✓ warned, ✓✓ delegates sent).
 
 **Reminder behaviour (Chair Console, every screen).**
 
@@ -99,7 +99,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 Acknowledging the warning hides it until the photo is due; "Delegates sent" hides the due banner. Acknowledgements are per committee and shared by every device in that committee.
 
-**Reliability.** Reminders are **derived on each device** from slot timestamps and the device clock every 15 seconds — no server request, no one-off push. A refreshed, reconnected, offline or late-opened Chair Console computes the same reminders from its cached snapshot. Realtime only makes schedule changes arrive sooner; without it the regular recovery read (≤ 60 s) delivers them. A reschedule increments the slot revision, so earlier acknowledgements stop counting and chairs are alerted again. Acknowledgements go through the normal offline outbox. Times are stored as instants and shown in conference time; only the device's clock (not its time zone) must be right. Browser push notifications are not used.
+**Reliability.** Reminders are **derived on each device** from slot timestamps and the device clock every 15 seconds — no server request, no one-off push. A refreshed, reconnected, offline or late-opened Chair Console computes the same reminders from its cached snapshot. Realtime only makes schedule changes arrive sooner; without it the regular recovery read (≤ 60 s) delivers them. A reschedule increments the slot revision, so earlier acknowledgements stop counting and chairs are alerted again. Likewise, when the committee's Chairs in a photo change (a Chair's school, committees or role), the latest acknowledgement no longer matches the list shown and the committee is alerted again; an older or stale queued acknowledgement is kept as history but never silences a changed list. Acknowledgements go through the normal offline outbox. Times are stored as instants and shown in conference time; only the device's clock (not its time zone) must be right. Browser push notifications are not used.
 
 **Import.** Executive → Group photos → *Import CSV*: `school,date,start_time,end_time,location[,note]`. School names are matched against existing schools after normalizing case, accents, punctuation, `&`/"and" and spacing (`"Doha College "` → Doha College). Near misses (`"Doha Collge"`) are offered as a suggestion that must be confirmed; unknown names must be chosen or the row unticked. Schools are never created by the import. Same school + start time as an existing slot is skipped.
 

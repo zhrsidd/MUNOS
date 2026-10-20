@@ -1,5 +1,5 @@
 import type { ConferenceData, Delegate, School } from "../domain";
-import type { PhotoChair, PhotoSlot } from "./types";
+import type { PhotoAck, PhotoChair, PhotoSlot } from "./types";
 // Reminders are DERIVED from authoritative slot timestamps and the local clock, never delivered as
 // one-off events. A refreshed, reconnected or late-opened Chair Console computes the same answer.
 export type PhotoStage = "upcoming" | "warning" | "due" | "past" | "cancelled";
@@ -9,6 +9,8 @@ export interface PhotoReminder {
   delegates: Delegate[];
   /** This committee's Chairs from the slot's school. */
   chairs: PhotoChair[];
+  /** photoChairsVersion(chairs): sent with an acknowledgement so it silences only this Chair list. */
+  chairsVersion: string;
   stage: PhotoStage;
   /** Whole minutes until the start (rounded up), negative once started. */
   minutesUntil: number;
@@ -37,6 +39,26 @@ export function photoChairs(data: ConferenceData): PhotoChair[] {
     data.staff.filter((s) => s.role === "chair" && s.schoolId).flatMap((s) => s.committeeIds.map((committeeId) => ({ staffId: s.id, name: s.name, committeeId, schoolId: s.schoolId! })))
   );
 }
+/** The participant version an acknowledgement is for: one committee's Chairs in one photo, as sorted staff ids
+ *  ("" when none, which also matches acknowledgements recorded before Chairs joined photos). It is derived from
+ *  current data, so any change to a Chair's school, committees or role changes it. Must match the format
+ *  private.ops_photo_ack accepts. */
+export function photoChairsVersion(chairs: readonly Pick<PhotoChair, "staffId">[]): string {
+  return [...new Set(chairs.map((c) => c.staffId))].sort().join(",");
+}
+/** The most recent acknowledgement of this slot revision and stage by one committee (acks are in recorded order). */
+export function latestPhotoAck(acks: readonly PhotoAck[], slotId: string, committeeId: string, stage: "warning" | "due", revision: number) {
+  let latest: PhotoAck | undefined;
+  for (const a of acks) if (a.slotId === slotId && a.committeeId === committeeId && a.stage === stage && a.revision === revision) latest = a;
+  return latest;
+}
+/** Silenced only when the latest acknowledgement of this revision and stage was for the Chair list shown now. An
+ *  earlier acknowledgement, of a list since changed, or a stale one queued offline and recorded later, stays as
+ *  history but does not silence the changed reminder (no A→B→A reuse of an old acknowledgement). */
+function silenced(acks: readonly PhotoAck[], slot: PhotoSlot, committeeId: string, chairsVersion: string, stage: "warning" | "due") {
+  const latest = latestPhotoAck(acks, slot.id, committeeId, stage, slot.revision);
+  return latest !== undefined && (latest.chairs ?? "") === chairsVersion;
+}
 /** Reminders for one committee: only slots for schools with delegates or Chairs in that committee. */
 export function committeePhotoReminders(data: ConferenceData, committeeId: string, now: number): PhotoReminder[] {
   const committeeChairs = photoChairs(data).filter((c) => c.committeeId === committeeId);
@@ -45,15 +67,16 @@ export function committeePhotoReminders(data: ConferenceData, committeeId: strin
     .map((slot) => {
       const delegates = data.delegates.filter((d) => d.committeeId === committeeId && d.schoolId === slot.schoolId).sort((a, b) => a.country.localeCompare(b.country));
       const chairs = committeeChairs.filter((c) => c.schoolId === slot.schoolId).sort((a, b) => a.name.localeCompare(b.name));
+      const chairsVersion = photoChairsVersion(chairs);
       const live = stageAt(slot, now);
-      const acked = (stage: "warning" | "due") => acks.some((a) => a.slotId === slot.id && a.stage === stage && a.revision === slot.revision);
+      const acked = (stage: "warning" | "due") => silenced(acks, slot, committeeId, chairsVersion, stage);
       const acknowledged = { warning: acked("warning"), due: acked("due") };
       // A cancelled slot is announced only during the window in which its reminder would have shown.
       const stage: PhotoStage = slot.enabled ? live : "cancelled";
       const attention = slot.enabled
         ? (live === "warning" && !acknowledged.warning) || (live === "due" && !acknowledged.due)
         : (live === "warning" || live === "due") && !acknowledged.warning && !acknowledged.due;
-      return { slot, school: data.schools.find((s) => s.id === slot.schoolId), delegates, chairs, stage, minutesUntil: Math.ceil((Date.parse(slot.startsAt) - now) / minute), acknowledged, attention };
+      return { slot, school: data.schools.find((s) => s.id === slot.schoolId), delegates, chairs, chairsVersion, stage, minutesUntil: Math.ceil((Date.parse(slot.startsAt) - now) / minute), acknowledged, attention };
     })
     .filter((r) => r.delegates.length > 0 || r.chairs.length > 0)
     .sort((a, b) => a.slot.startsAt.localeCompare(b.slot.startsAt));
@@ -67,9 +90,10 @@ export function affectedCommittees(data: ConferenceData, slot: PhotoSlot) {
   return data.committees
     .filter((c) => delegates.has(c.id) || chairs.some((x) => x.committeeId === c.id))
     .map((c) => {
-      const acked = (stage: "warning" | "due") => (data.photoAcks ?? []).some((a) => a.slotId === slot.id && a.committeeId === c.id && a.stage === stage && a.revision === slot.revision);
       const assigned = data.staff.filter((s) => s.role === "chair" && s.committeeIds.includes(c.id));
       const leaving = chairs.filter((x) => x.committeeId === c.id);
+      const version = photoChairsVersion(leaving);
+      const acked = (stage: "warning" | "due") => silenced(data.photoAcks ?? [], slot, c.id, version, stage);
       return {
         committee: c,
         delegates: delegates.get(c.id) ?? 0,

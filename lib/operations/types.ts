@@ -47,6 +47,8 @@ export interface PhotoAck {
   committeeId: string;
   stage: "warning" | "due";
   revision: number;
+  /** The committee's Chairs in that photo when acknowledged (photoChairsVersion). Absent or "" means no Chairs. */
+  chairs?: string;
   at: string;
 }
 /** A Chair's traceable change to a delegate's total. Signed: a deduction is negative, a restore is positive. */
