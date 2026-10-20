@@ -4,6 +4,8 @@ Owner instruction, 19 October 2026:
 
 > “buttons are also really ugly and spacing is uneven and messed up everywhere.”
 
+The full feature checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); this document specifies the visual work.
+
 Claude owns this cleanup across the application. Treat it as a usability priority, not optional polish.
 The separate functional package (Debate points leaderboard, contribution-ranked Participation and Executive
 resolution status) should remain reviewable independently.

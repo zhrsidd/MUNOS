@@ -3,6 +3,38 @@
 Owner-authorised Codex implementation, 19 October 2026. Base: Claude branch `0a43c73`.
 Branch: `codex/priority-chair-ui`. Claude can review and clean up this package independently.
 
+## Claude handoff coverage · 20 October 2026
+
+This is the active feature handoff, alongside [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
+The owner removed the SC/HSC clause-by-clause and informal P5-outcome proposal from this handoff on 20 October.
+General clear-majority voting remains a separate request. Do not revive the removed proposal from Git history.
+Statuses below describe the reviewed branch; implemented locally does not mean released or verified in staging.
+
+| Owner request | Handoff / current status |
+| --- | --- |
+| Claude primary engineer across the whole app | `AGENTS.md` updated; Codex provides review/specialist support. |
+| DCMUN seal identity, DeutschLab principles, Assembly direction | [BRAND.md](BRAND.md); preserve and finish applying tokens to shared components. |
+| Global ugly buttons, uneven spacing, panel widths and action alignment | Claude's dedicated [visual cleanup brief](CLAUDE_VISUAL_CLEANUP.md), across every workspace and dialog; pending. |
+| Compact home/workspace chooser with useful first-viewport role cards | Pending; preserve authorised roles, no-access states and sole-workspace auto-entry. |
+| Declutter and remove useless tabs/duplicate actions | Continue the all-workspace inventory in [UI_OVERHAUL.md](UI_OVERHAUL.md); preserve roll call and side-by-side For/Against speeches. |
+| Resolution documents overhaul and easy-to-see approval comments | Preview/mock-version clutter removed; latest full feedback visible. Preserve in the visual pass. |
+| Approval history and chosen-amount deductions/restores | Code and migrations written; independent review accepted them for staging replay. [Review packet](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md); migrations remain unapplied. |
+| No PDF submissions; native Docs and Anyone-with-link access | First larger priority: enforce on client/server, preserve historical files, add honest access checks/recheck states. |
+| Drive mirroring and award discussion removal | Retired; preserve ordinary Google Docs links and history. Complete/check server-timer and projector retirement; keep the local speaker timer. |
+| Executive resolution status across committees | Implemented locally in `9b3b9e2`, including feedback and source links; review and cloud verification remain. |
+| Participation ranked by contributions; compact Debate points list | Implemented locally in `9b3b9e2`; [counting contract](PARTICIPATION_VIEWS.md), focus freeze and manual scoring preserved. |
+| Searchable speech/POI dropdown, Enter picks first, compact footprint, opportunity ordering | Implemented locally; review keyboard, eligibility and Fewest/Most behavior during cleanup. |
+| Permanent minimal sync strip under navigation | Implemented locally; preserve fixed geometry, truthful read/save states and native-dialog failure alerts. |
+| Passed amendments remain available after debate/session changes | Pending: exact text/type/clause/submitter/outcome, resolution-grouped history, bounded reads, honest copy feedback and working-Doc links. |
+| Clear majority For / Against | Pending; separate [voting brief](CLEAR_MAJORITY_VOTING.md), with no fabricated country ballots. |
+| Chairs included in their school's scheduled group photo | Pending: explicit Chair-school affiliation and matching, with existing reminder/acknowledgement behavior retained. |
+| Main Submitter and Debated Amendment points configurable | Pending reviewed contract/migration; Main Submitter is still fixed at +5 in the current code. Preserve old event values and exactly-once credit. |
+| Port PHESMUN About and check feature parity through PR #13 | Pending: correct credits (Zuhayr Siddique and John Paul Ribeiru); list verified ports, better equivalents and deliberate retirements. |
+| Leo becomes Felix, with all proposed Leo improvements | Pending: owner-approved Launcher head at 48 px, six expression frames, blink/eyes/mouth while typing and cheerful petting hover; deterministic DCMUN content, short popups above Felix, discoverable persistent inbox, blocker-resistant in-app notices, motion-off/reduced motion. Include supplied assets; do not substitute a new mascot or claim assets are ported until present. |
+| Orbit seal loading, suitable Watermelon components and gentle transitions | Orbit initial loading implemented; adapt Skeleton, Spinner, Combobox, Continuous Tabs and Copy Confirm principles as suitable. Broader transitions/loading states remain pending; no delayed ready content or unnecessary dependency. |
+| Existing session and reliability work | Keep [SESSION_MODEL.md](SESSION_MODEL.md) and its sign-off gate; do not confuse the removed procedure proposal with removal of the session work. Preserve offline recovery, export, conflicts, permissions and print copies = delegates + 3 spares. |
+| Release and capacity verification | Staging replay, signed-in flows, rollback and realistic 19-committee rehearsal remain outstanding. Size the rehearsal for the owner's 57 Chairs, about 10 Approval devices, 5–6 printing devices and Executive/spares, with 1–2 active Chairs per committee. |
+
 ## Implemented in this package
 
 1. **Compact country search for speeches, POIs and yield.** Uses the current eligible-delegate lists, existing
@@ -32,16 +64,6 @@ three views; no extra polling, schema or permission changes.
 **Claude: the owner explicitly requests a global button and spacing overhaul.**
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md) for the owner's feedback and acceptance checks.
 This functional package does not claim that cleanup is complete.
-
-## SC/HSC procedure follow-up — confirmed requirements, pending implementation
-
-The owner has confirmed clause-by-clause debate/voting, continuing with surviving clauses after failures,
-and a separate whole-resolution final vote. Vetoes on clauses **and** the final vote enter an informal P5-only
-discussion/vote. Chairs record only **Veto overturned** or **Veto upheld**; no P5 ballots, threshold or
-conversation is recorded. Add **Clear majority For / Against** for obvious plenary voting without fabricated
-country choices. Full contract, Chair flow, migration boundaries and acceptance cases:
-[SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md). This is a high-priority prerequisite for SC/HSC use,
-not functionality provided by the existing veto settings or normal voting screen. Claude owns implementation.
 
 ## Remaining priority order
 
@@ -73,10 +95,10 @@ package. Continue from the existing Assembly implementation, rather than reintro
    DCMUN knowledge, short popups above Felix, persistent discoverable inbox and blocker-resistant in-app notices.
    No implied generative AI service. Adapt the selected Watermelon Skeleton/Spinner/Combobox/Continuous Tabs/
    Copy Confirm principles to current tokens; no wholesale template or automatic dependency installation.
-8. **Protected contracts next.** SC/HSC clause and final-resolution voting, manual P5 veto outcomes and clear-majority
-   observed voting are specified in [SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md), pending implementation. Explicit school
-   affiliation so scheduled school photos include Chairs; configurable Main Submitter and Debated Amendment
-   points with historical values/idempotency retained. Define and review migrations/contracts independently.
+8. **Protected contracts next.** [Clear-majority For / Against](CLEAR_MAJORITY_VOTING.md), recorded as an observed
+   result without fabricated named ballots; explicit school affiliation so scheduled school photos include
+   Chairs; configurable Main Submitter and Debated Amendment points with historical values/idempotency retained.
+   Define and review migrations/contracts independently.
 
 Staffing note: organisers should arrange both Chairs' presence; this is not a new software control.
 

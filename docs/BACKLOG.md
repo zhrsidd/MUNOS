@@ -25,11 +25,8 @@ leaderboard separately shows points. Both new rankings and the Executive resolut
 implemented in the follow-up package, with local verification in UI_PRIORITY_PASS.md. Global buttons and
 spacing remain assigned to Claude: see [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
 
-## SC/HSC procedure follow-up
+## Clear-majority voting
 
-High priority before SC/HSC use, pending Claude implementation:
-[SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md). Debate/vote per clause, retain surviving clauses,
-then vote on the whole resolution. A veto on either target requires an informal P5-only discussion/vote;
-Chairs record only Veto overturned/upheld, with no P5 ballots or threshold. Add clear-majority For/Against
-as an honest observed-result method across eligible normal votes. Existing configurable veto support does
-not implement these requirements.
+Pending Claude implementation: [CLEAR_MAJORITY_VOTING.md](CLEAR_MAJORITY_VOTING.md). Record the Chair's
+observed majority For / Against without inventing named country choices or counts; preserve existing counted
+voting and veto behavior. See [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md) for the complete active handoff.

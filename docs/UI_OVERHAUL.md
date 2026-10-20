@@ -87,7 +87,7 @@ automatic submitter credit, are in [PARTICIPATION_VIEWS.md](PARTICIPATION_VIEWS.
 align. A separate bounded Debate list shows all committee countries, flags and conference-total net points,
 including zero and negative values. Unit tests and production-build browser checks cover both views.
 
-**W6b · Chair deducts a chosen number of points ◐ (migration, command, UI, tests written; awaiting independent review, not applied to any project).** A custom amount, not fixed steps.
+**W6b · Chair deducts a chosen number of points ◐ (code and migration reviewed for staging replay; no staging application recorded).** A custom amount, not fixed steps.
 Stored as a traceable adjustment: amount, reason (required), chair, time, delegate; original participation
 history is never edited or deleted, totals are original events plus adjustments. Existing committee permissions
 (Chair of that committee only) enforced on the server and through the outbox/idempotency path. Needs a
@@ -95,7 +95,7 @@ migration and repository change: written up and reviewed independently before it
 Acceptance: unit tests for totals and bounds; a replay and double-submit test (receipt idempotency); a
 cross-committee Chair is refused; history shows original event and adjustment separately.
 
-**W6c · Approval history in the Approval Panel ◐ (migration, UI, tests written; awaiting independent review).** Accessible list or table of decisions: decision,
+**W6c · Approval history in the Approval Panel ◐ (code and migration reviewed for staging replay; no staging application recorded).** Accessible list or table of decisions: decision,
 comment, reviewer, time, newest first, per resolution. Landmark and heading structure, status by word, keyboard
 focusable, announced updates. Acceptance: axe-style checks (roles, names, contrast) pass in a browser; works
 without colour; shows decisions made offline once synced, labelled with the server time.
@@ -175,10 +175,9 @@ Claude owns the global button, alignment, panel-width and spacing cleanup reques
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md). The functional follow-up is recorded in
 [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); it does not complete the global visual overhaul.
 
-## SC/HSC procedure and majority voting · 19 October 2026
+## Clear-majority voting · retained owner request
 
-**Pending implementation by Claude.** See [SC_HSC_VOTING_CONTRACT.md](SC_HSC_VOTING_CONTRACT.md) for the
-owner-confirmed clause workflow, surviving-clause final vote, manual P5 veto outcome on both clause and final
-ballots, and clear-majority controls without invented named ballots. P5 discussions and their individual votes
-are informal and unrecorded. This requires a persistent voting contract and reviewed migration; it is not a
-client-only shortcut or a completed feature of the present veto settings.
+Pending implementation by Claude: [CLEAR_MAJORITY_VOTING.md](CLEAR_MAJORITY_VOTING.md). Add compact
+Clear majority For / Against actions that record the Chair's observed result without filling country ballots.
+Keep counted voting, Divide the House, existing veto rules, history, permissions and offline durability.
+The complete current coverage checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md).
