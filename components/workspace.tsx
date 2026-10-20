@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PLATFORM } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
@@ -154,7 +155,7 @@ export function Workspace({ path }: { path: string }) {
           )}
         </main>
         <footer className="workspace-footer">
-          Conference OS{" "}
+          {PLATFORM.name} · Created by {PLATFORM.creator} · <Link href="/about">About</Link>{" "}
           <span>
             Illustrative DCMUN-inspired data · <DataModeLabel />
           </span>
