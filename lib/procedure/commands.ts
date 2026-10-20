@@ -1,7 +1,7 @@
 import type {ConferenceData, ParticipationEvent} from '../domain';
 import type {ProcedureCommand, Speech} from './types';
 import {activeAmendment,activeLane,laneEntries,poiEntries} from './view';
-import {MAIN_SUBMITTER_POINTS,scoringValues} from '../scoring';
+import {mainSubmitterPoints,scoringValues} from '../scoring';
 export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>string,now:string,actor:string){
  const committee=d.committees.find(x=>x.id===('committeeId' in c?c.committeeId:d.sessions.find(s=>s.id===c.sessionId)?.committeeId));
  if(!committee)throw Error('Committee unavailable.');
@@ -61,7 +61,7 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
   const s=active();if(!scoringValues(d,committee.id,'speech').includes(c.points))throw Error('Choose a configured speech value.');
   if(d.events.some(e=>e.speechId===s.id&&e.categoryId==='speech'))throw Error('Speech already recorded. Edit its event in Participation.');
   event(s,s.delegateId,'speech',c.points);
-  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter'))event(s,s.delegateId,'submitter',MAIN_SUBMITTER_POINTS);
+  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter'))event(s,s.delegateId,'submitter',mainSubmitterPoints(d,committee.id));
   break;
  }
  case 'speechFinish': {const s=active();s.state='finished';s.revision++;d.poiQueue=pois.filter(p=>p.speechId!==s.id);break;}
