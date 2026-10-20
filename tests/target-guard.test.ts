@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assertToolTarget,checkProductionTarget,checkToolTarget,KNOWN_DEVELOPMENT_REFS,NEVER_SUPABASE_REFS,parseRefs,PHESMUN_PRODUCTION_REF,supabaseRef,targetConfig,targetProblem} from '../lib/platform/target-guard';
+import {assertToolTarget,checkProductionTarget,checkToolTarget,NEVER_SUPABASE_REFS,parseRefs,PHESMUN_PRODUCTION_REF,supabaseRef,targetConfig,targetProblem} from '../lib/platform/target-guard';
 import {probe} from '../lib/platform/health-probe';
 
-const PROD='prodprodprodprodprod';const STAGE='stagestagestagestage';const DEV=KNOWN_DEVELOPMENT_REFS[0];const OTHER='otherotherotherother1';
+const PROD='prodprodprodprodprod';const STAGE='stagestagestagestage';const DEV='devdevdevdevdevdevde';const OTHER='otherotherotherother1';
 const url=(ref:string)=>`https://${ref}.supabase.co`;
 
 test('hosted URL parsing refuses credentials, ports, http, wrong hosts and malformed refs',()=>{
@@ -19,7 +19,8 @@ test('ref lists: blanks ignored, duplicates collapsed, any invalid entry is a co
 });
 
 test('configuration: a project has one role; the PHESMUN production project can never be configured anywhere',()=>{
- assert.deepEqual(targetConfig({}).development,[...KNOWN_DEVELOPMENT_REFS],'development default is the known DCMUN dev project');
+ assert.deepEqual(targetConfig({}).development,[],'no project is allowed by default; the deleted development project is not a fallback');
+ assert.deepEqual(targetConfig({DEVELOPMENT_SUPABASE_REFS:DEV}).development,[DEV]);
  assert.deepEqual(targetConfig({DEVELOPMENT_SUPABASE_REFS:''}).development,[],'an explicit empty list means none');
  assert.throws(()=>targetConfig({EXPECTED_SUPABASE_REF:PROD,STAGING_SUPABASE_REFS:PROD}),/exactly one role/);
  assert.throws(()=>targetConfig({STAGING_SUPABASE_REFS:STAGE,DEVELOPMENT_SUPABASE_REFS:STAGE}),/exactly one role/);
@@ -43,7 +44,9 @@ test('production target: must equal the configured project; no expectation, a wr
 test('tools: only an explicitly listed staging or development project; never production; fail closed without a list',()=>{
  const env={EXPECTED_SUPABASE_REF:PROD,STAGING_SUPABASE_REFS:STAGE};
  assert.deepEqual(checkToolTarget(url(STAGE),env),{ok:true,ref:STAGE});
- assert.deepEqual(checkToolTarget(url(DEV),env),{ok:true,ref:DEV},'the known development project is allowed by default');
+ assert.equal(checkToolTarget(url(DEV),env).ok,false,'no development project is allowed unless listed');
+ assert.deepEqual(checkToolTarget(url(DEV),{...env,DEVELOPMENT_SUPABASE_REFS:DEV}),{ok:true,ref:DEV});
+ assert.equal(checkToolTarget(url('opmydpozhdgkpcnjwpqb'),env).ok,false,'the deleted development project is not a fallback');
  assert.equal(checkToolTarget(url(PROD),env).ok,false,'production is never a tool target');
  assert.equal(checkToolTarget(url(OTHER),env).ok,false,'an unlisted project is refused');
  assert.equal(checkToolTarget(url(DEV),{DEVELOPMENT_SUPABASE_REFS:''}).ok,false,'no allow-list at all: refuse');

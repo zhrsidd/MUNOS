@@ -2,7 +2,7 @@
 
 ## Environment and deployment scope
 
-Development only: `opmydpozhdgkpcnjwpqb` (Mumbai). No production project exists. `.env.local` is ignored. `.env.example` contains placeholders. Only URL, publishable key, conference UUID and non-secret mode/version flags belong in `NEXT_PUBLIC_*`.
+One DCMUN project: `kllhswucdhqqywnzxado` (Mumbai, Pro organisation). It is the development project now and becomes the conference production database at cutover; no second project is planned and the earlier development project `opmydpozhdgkpcnjwpqb` was deleted. See [Single-project cutover](docs/DEPLOYMENT.md#single-project-cutover). `.env.local` is ignored. `.env.example` contains placeholders. Only URL, publishable key, conference UUID and non-secret mode/version flags belong in `NEXT_PUBLIC_*`.
 
 The local Supabase CLI may be signed into another account. Remote schema work was performed through the authenticated Supabase connector, explicitly scoped to the project above. Reauthenticate the CLI before using linked commands; do not change project references to work around permissions.
 

@@ -7,8 +7,6 @@ export type TargetCheck = { ok: true; ref: string } | { ok: false; ref: string |
 /** The PHESMUN production project. DCMUN and MUNOS must never connect to it, in any environment, by any override. */
 export const PHESMUN_PRODUCTION_REF = "gglltljhdpkfjnyjmnif";
 export const NEVER_SUPABASE_REFS: readonly string[] = [PHESMUN_PRODUCTION_REF];
-/** The DCMUN development project. Used when DEVELOPMENT_SUPABASE_REFS is not set so existing development workflows keep working. */
-export const KNOWN_DEVELOPMENT_REFS: readonly string[] = ["opmydpozhdgkpcnjwpqb"];
 
 const REF = /^[a-z0-9]{20}$/;
 
@@ -48,7 +46,7 @@ export function targetConfig(env: Env): TargetConfig {
   const expected = (env.EXPECTED_SUPABASE_REF ?? "").trim();
   if (expected && !REF.test(expected)) throw Error("EXPECTED_SUPABASE_REF is not a valid project ref");
   const staging = parseRefs(env.STAGING_SUPABASE_REFS, "STAGING_SUPABASE_REFS");
-  const development = env.DEVELOPMENT_SUPABASE_REFS === undefined ? [...KNOWN_DEVELOPMENT_REFS] : parseRefs(env.DEVELOPMENT_SUPABASE_REFS, "DEVELOPMENT_SUPABASE_REFS");
+  const development = parseRefs(env.DEVELOPMENT_SUPABASE_REFS, "DEVELOPMENT_SUPABASE_REFS");
   const roles: [string, string[]][] = [["EXPECTED_SUPABASE_REF", expected ? [expected] : []], ["STAGING_SUPABASE_REFS", staging], ["DEVELOPMENT_SUPABASE_REFS", development]];
   for (let i = 0; i < roles.length; i++) for (let j = i + 1; j < roles.length; j++) {
     const shared = roles[i][1].find((ref) => roles[j][1].includes(ref));
