@@ -15,7 +15,7 @@ export interface SubmissionLink {
 export interface ResolutionLink {
   documentId: string;
   workingDocId: string | null;
-  /** The Chair's copy in the Approval Panel folder (made manually in Google Drive for now). */
+  /** The Chair's copy in the Approval Panel folder (made manually in Google Drive). */
   approvalCopyDocId: string | null;
   /** The Chair's check that the shared document opens. */
   access: "unchecked" | "ok" | "problem";
@@ -42,7 +42,43 @@ export interface PhotoAck {
   revision: number;
   at: string;
 }
+/** A Chair's traceable change to a delegate's total. Signed: a deduction is negative, a restore is positive. */
+export interface PointAdjustment {
+  id: string;
+  delegateId: string;
+  sessionId: string;
+  points: number;
+  reason: string;
+  chairId: string;
+  chairName: string | null;
+  /** Set on a restore: the deduction it undoes. */
+  reverses: string | null;
+  createdAt: string;
+}
+export type DecisionKind = "review_started" | "changes_requested" | "approved";
+/** One Approval Panel decision. Separate from feedback text: `commentId` is null for a comment-free decision. */
+export interface DocumentDecision {
+  id: string;
+  documentId: string;
+  /** Safe resolution identity, carried so history still renders after the resolution leaves the reader's lifecycle view. */
+  committeeId?: string;
+  code?: string;
+  title?: string;
+  /** The feedback text linked to this decision; null for a comment-free decision. */
+  comment?: string | null;
+  /** "comment" is a note written before decisions were recorded (no known decision). */
+  decision: DecisionKind | "comment";
+  round: number;
+  versionId: string | null;
+  versionNumber: number | null;
+  reviewerId: string | null;
+  reviewerName: string | null;
+  commentId: string | null;
+  decidedAt: string;
+}
 export interface OperationsData {
+  pointAdjustments?: PointAdjustment[];
+  documentDecisions?: DocumentDecision[];
   submissionLinks?: SubmissionLink[];
   resolutionLinks?: ResolutionLink[];
   photoSlots?: PhotoSlot[];

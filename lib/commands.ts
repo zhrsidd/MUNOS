@@ -5,13 +5,16 @@ import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
 import {
   AttendanceStatus,
   ConferenceData,
+  Delegate,
   DocumentStatus,
   Role,
   Vote,
 } from "./domain";
+import type { DecisionKind } from "./operations/types";
 import { applyOperationsCommand, isOperationsCommand, operationsRoles, type OperationsCommand } from "./operations/commands";
 import { conferenceScoring, scoringProblem, scoringValues } from "./scoring";
 import { countryFlag } from "./countries";
+import { contributionCount, delegationOrder, isContribution } from "./participation-view";
 export { effectiveScoring } from "./scoring";
 // CODEX REVIEW REQUIRED: extension commands (OperationsCommand) join the union and are
 // delegated to lib/operations; core command handling is unchanged.
@@ -56,13 +59,6 @@ export type Command =
       sessionId: string;
       resolutionId: string;
       choice: Vote["choice"];
-    }
-  | {
-      type: "timer";
-      sessionId: string;
-      remaining: number;
-      startedAt: number | null;
-      duration: number;
     }
   | {
       type: "committee";
@@ -120,13 +116,40 @@ export interface ConferenceRepository {
   reset(): void;
 }
 const id = () => crypto.randomUUID();
+/** Net of deductions and restores for one delegate. */
+export function adjustmentTotal(data: ConferenceData, delegateId: string) {
+  return (data.pointAdjustments ?? []).reduce((n, a) => (a.delegateId === delegateId ? n + a.points : n), 0);
+}
+/** Most contributions first, independently of awarded points. */
+export function participationOrder(data: ConferenceData, delegates: Delegate[]) {
+  const contributions = new Map(delegates.map(d => [d.id, new Set<string>()]));
+  for (const event of data.events) if (isContribution(event)) contributions.get(event.delegateId)?.add(event.id);
+  return [...delegates].sort((a, b) => contributions.get(b.id)!.size - contributions.get(a.id)!.size || delegationOrder(a, b));
+}
+/**
+ * While a row is being edited or keyboard focus sits in the list, keep the order the person was looking at, so the
+ * row they are working on does not move under them. Delegates not in the frozen order go last, in live order.
+ */
+export function frozenOrder(live: Delegate[], frozen: string[] | null) {
+  if (!frozen) return live;
+  const at = new Map(frozen.map((id, i) => [id, i]));
+  return [...live].sort((a, b) => (at.get(a.id) ?? Infinity) - (at.get(b.id) ?? Infinity));
+}
+/** Approval Panel decisions are these transitions; every other status change is not a decision. */
+export function decisionFor(from: DocumentStatus, to: DocumentStatus): DecisionKind | null {
+  if (from === "Submitted" && to === "Review") return "review_started";
+  if ((from === "Submitted" || from === "Review") && to === "Approved") return "approved";
+  if ((from === "Submitted" || from === "Review") && to === "Draft") return "changes_requested";
+  return null;
+}
 export function participationSummary(data: ConferenceData, delegateId: string) {
   const events = data.events.filter(
     (e) => e.delegateId === delegateId && !e.voidedAt,
   );
   return {
-    opportunities: events.filter(e=>e.categoryId!=="submitter").length,
-    points: events.reduce((n, e) => n + e.points, 0),
+    opportunities: contributionCount(events),
+    // Effective event points plus the Chair's adjustments; the events themselves are never edited by an adjustment.
+    points: events.reduce((n, e) => n + e.points, 0) + adjustmentTotal(data, delegateId),
     speeches: events.filter((e) => e.categoryId === "speech").length,
   };
 }
@@ -164,7 +187,6 @@ const allowed: Record<Command["type"], Role[]> = {
   newDocument: ["chair"],
   queue: ["chair"],
   vote: ["chair"],
-  timer: ["chair"],
   committee: ["admin"],
   delegate: ["admin"],
   import: ["admin"],
@@ -322,6 +344,7 @@ export function applyCommand(
         throw Error(
           "Close the current debate before opening another resolution.",
         );
+      const previous = r.status;
       r.revision = (r.revision ?? 0) + 1;
       if(c.status==='Closed' && c.outcome!=='Withdrawn') {
         const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
@@ -333,13 +356,26 @@ export function applyCommand(
       r.status = c.status;
       r.outcome = c.outcome;
       if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
-      if (c.comment)
+      let commentId: string | null = null;
+      if (c.comment) {
+        commentId = nextId();
         r.comments.push({
-          id: nextId(),
+          id: commentId,
           text: c.comment,
           authorId: metadata?.actorId ?? `${role}-demo`,
           createdAt: now,
         });
+      }
+      const decision = decisionFor(previous, c.status);
+      if (decision) {
+        const documentId = r.id;
+        const version = d.versions.find((v) => v.id === r.versionIds.at(-1));
+        const list = (d.documentDecisions ??= []);
+        // A round starts at each submission and ends in changes requested, so the next one is that count + 1.
+        const round = list.filter((x) => x.documentId === documentId && x.decision === "changes_requested").length + 1;
+        // Mirrors the database trigger: only Approval Panel transitions are decisions.
+        list.push({ id: nextId(), documentId, committeeId: r.committeeId, code: r.code, title: r.title, comment: c.comment?.trim() || null, decision, round, versionId: version?.id ?? null, versionNumber: version?.number ?? null, reviewerId: metadata?.actorId ?? `${role}-demo`, reviewerName: null, commentId, decidedAt: now });
+      }
       break;
     }
     case "version": {
@@ -411,13 +447,6 @@ export function applyCommand(
         .sort((a, b) => a.position - b.position);
       if (c.advance && q[0]) {
         d.queue = d.queue.filter((x) => x.id !== q[0].id);
-        const duration = d.timers[c.sessionId]?.duration || 90;
-        d.timers[c.sessionId] = {
-          revision: (d.timers[c.sessionId]?.revision ?? 0) + 1,
-          duration,
-          remaining: duration,
-          startedAt: null,
-        };
       } else if (c.delegateId && !q.some((x) => x.delegateId === c.delegateId))
         d.queue.push({
           id: nextId(),
@@ -454,14 +483,6 @@ export function applyCommand(
       d.votes.push({ id: nextId(), ...c, createdAt: now, revision });
       break;
     }
-    case "timer":
-      d.timers[c.sessionId] = {
-        revision: (d.timers[c.sessionId]?.revision ?? 0) + 1,
-        remaining: c.remaining,
-        startedAt: c.startedAt,
-        duration: c.duration,
-      };
-      break;
     case "committee":
       if (!c.code.trim() || d.committees.some((x) => x.code === c.code.trim()))
         throw Error("Use a unique committee code.");
@@ -565,7 +586,7 @@ export function applyCommand(
     default:
       if (isBatchCommand(c)) applyBatch(d,c,nextId,now);
       else if (isProcedureCommand(c)) applyProcedure(d,c,nextId,now,metadata?.actorId ?? "chair-demo");
-      else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now);
+      else if (isOperationsCommand(c)) applyOperationsCommand(d, c, nextId, now, metadata?.actorId ?? `${role}-demo`);
   }
   if (!["queue","queueAdd","queueOrder","queueRemove","poiAdd","poiOrder","poiAllowance","debateMode"].includes(c.type)) d.audit.unshift({
     id: nextId(),

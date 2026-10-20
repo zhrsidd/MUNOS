@@ -24,7 +24,9 @@ export type OperationsCommand =
     }
   | ({ type: "photoSlot"; action: "create" | "update"; slotId?: string } & PhotoSlotFields)
   | { type: "photoImport"; rows: PhotoSlotFields[] }
-  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number };
+  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number }
+  | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
+  | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string };
 export interface PhotoSlotFields {
   schoolId: string;
   startsAt: string;
@@ -34,7 +36,7 @@ export interface PhotoSlotFields {
   enabled?: boolean;
   warnMinutes?: number;
 }
-export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck"] as const satisfies readonly OperationsCommand["type"][];
+export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
   resolutionLink: ["chair", "admin"],
@@ -42,7 +44,18 @@ export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   photoSlot: ["admin"],
   photoImport: ["admin"],
   photoAck: ["chair"],
+  pointAdjustment: ["chair"],
 };
+export const MAX_DEDUCTION = 20;
+export const REASON_MIN = 3;
+export const REASON_MAX = 300;
+/** Mirrors private.ops_point_adjustment. */
+export function deductionProblem(amount: unknown, reason: unknown): string | null {
+  if (typeof amount !== "number" || !Number.isInteger(amount) || amount < 1 || amount > MAX_DEDUCTION) return `Enter a whole number of points from 1 to ${MAX_DEDUCTION}.`;
+  const text = typeof reason === "string" ? reason.trim() : "";
+  if (text.length < REASON_MIN || text.length > REASON_MAX) return `Give a reason of ${REASON_MIN} to ${REASON_MAX} characters.`;
+  return null;
+}
 function checkSlot(d: ConferenceData, f: PhotoSlotFields) {
   if (!d.schools.some((s) => s.id === f.schoolId)) throw Error("Choose a valid school.");
   if (Number.isNaN(Date.parse(f.startsAt))) throw Error("Enter a valid photo time.");
@@ -72,6 +85,7 @@ export function applyOperationsCommand(
   c: OperationsCommand,
   nextId: () => string,
   now: string,
+  actorId = "chair-demo",
 ) {
   switch (c.type) {
     case "submissionLink": {
@@ -150,6 +164,29 @@ export function applyOperationsCommand(
         slots.push({ id, ...fields, enabled: true, revision: 1 });
       }
       slots.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      break;
+    }
+    case "pointAdjustment": {
+      // One id, drawn first, like the server's derived id.
+      const id = nextId();
+      const delegate = d.delegates.find((x) => x.id === c.delegateId);
+      if (!delegate) throw Error("Delegate unavailable.");
+      const list = (d.pointAdjustments ??= []);
+      if (c.action === "deduct") {
+        const problem = deductionProblem(c.amount, c.reason);
+        if (problem) throw Error(problem);
+        const session = d.sessions.find((s) => s.id === c.sessionId);
+        if (!session || session.committeeId !== delegate.committeeId) throw Error("Session unavailable.");
+        list.push({ id, delegateId: delegate.id, sessionId: session.id, points: -c.amount, reason: c.reason.trim(), chairId: actorId, chairName: null, reverses: null, createdAt: now });
+      } else {
+        const original = list.find((a) => a.id === c.adjustmentId);
+        if (!original) throw Error("Adjustment unavailable.");
+        if (original.points >= 0 || original.delegateId !== delegate.id) throw Error("Only a deduction for this delegate can be restored.");
+        if (list.some((a) => a.reverses === original.id)) throw Error("This deduction was already restored.");
+        const reason = (c.reason ?? "").trim() || "Deduction restored";
+        if (reason.length < REASON_MIN || reason.length > REASON_MAX) throw Error(`Give a reason of ${REASON_MIN} to ${REASON_MAX} characters.`);
+        list.push({ id, delegateId: delegate.id, sessionId: original.sessionId, points: -original.points, reason, chairId: actorId, chairName: null, reverses: original.id, createdAt: now });
+      }
       break;
     }
     case "photoAck": {

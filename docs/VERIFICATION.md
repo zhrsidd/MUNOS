@@ -27,7 +27,7 @@ This is staff-app load, not distinct-device enrollment or delegate submission lo
 - Rerun typecheck, lint, full tests and build on the final code; record final desktop/mobile role screens, runtime errors, refreshed persistence, offline close/reopen, exactly-once replay and two-device conflict recovery.
 - Preserve the recorded advisor warnings and explicitly disposition relevant release risks; repeat advisors if schema changes again.
 - Address tail latency; test actual school-network staff devices and separate delegate bursts.
-- Protected staging/production, monitoring and rollback rehearsal remain outstanding. Drive failure tests await the future integration.
+- Protected staging/production, monitoring and rollback rehearsal remain outstanding.
 
 PR #6 remains draft. Review acceptance does not imply any PR has been merged. Local demo/fallback behavior is not production-ready cloud behavior.
 

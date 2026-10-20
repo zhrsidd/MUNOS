@@ -35,6 +35,7 @@ export function systemStatus(i: StatusInput): SystemStatus {
   if (demo && i.cloudExpected) add("database", "Conference database", "red", "Not connected. This device is not set up for the conference.");
   else if (demo) add("database", "Conference database", "yellow", "Local demo · not connected to a conference database");
   else if (health.state === "waiting" && !i.online) add("database", "Conference database", "yellow", "Waiting for internet");
+  else if (health.state === "waiting" && health.errorKind === "overload") add("database", "Conference database", "yellow", "Busy · retrying automatically");
   else if (health.state === "waiting") add("database", "Conference database", "yellow", "Unreachable · retrying automatically");
   else if (health.latency !== null && health.latency > SLOW_MS) add("database", "Conference database", "yellow", `Slow (${(health.latency / 1000).toFixed(1)} s)`);
   else add("database", "Conference database", "green", health.latency === null ? "Connected" : `Connected · ${health.latency} ms`);
@@ -48,6 +49,7 @@ export function systemStatus(i: StatusInput): SystemStatus {
   if (health.state === "error") add("device", "This device", "red", "Recording is paused on this device. Check Technical details or renew device access.");
   else if (health.conflicts) add("device", "This device", "red", reviewChanges(health.conflicts));
   else if (health.pending && staleMinutes >= STALE_MINUTES) add("device", "This device", "red", `${changes(health.pending)} not synced for ${Math.floor(staleMinutes)} minutes`);
+  else if (health.pending && health.awaitingConfirmation) add("device", "This device", "yellow", `${changes(health.pending)} saved here · ${health.awaitingConfirmation} received by the server, confirming`);
   else if (health.pending) add("device", "This device", "yellow", `${changes(health.pending)} saved here · will sync automatically`);
   else add("device", "This device", "green", "All changes synced");
 
@@ -68,6 +70,7 @@ function summarize(i: StatusInput, items: StatusItem[], level: Level, demo: bool
   if (has("device", "red")) return { headline: "Changes are waiting too long", message: `${changes(health.pending)} saved on this device have not synced for over 15 minutes. Keep this device open and tell the Executive.` };
   if (!i.online) return { headline: "Internet unavailable", message: health.pending ? `${changes(health.pending)} saved on this device and will sync automatically.` : "Committee operations can continue. Changes will be saved on this device and sync automatically." };
   if (demo) return { headline: "Demo mode", message: "This is an isolated demonstration. Nothing is sent to a conference database." };
+  if (has("database", "yellow") && health.state === "waiting" && health.errorKind === "overload") return { headline: "Conference database busy", message: health.pending ? `${changes(health.pending)} saved on this device and will sync automatically. Waiting is safe; pressing Retry repeatedly makes it slower.` : "Committee operations can continue on this device. The database is busy; retrying automatically." };
   if (has("database", "yellow") && health.state === "waiting") return { headline: "Conference database unreachable", message: health.pending ? `${changes(health.pending)} saved on this device and will sync automatically.` : "Committee operations can continue on this device. Retrying automatically." };
   if (has("realtime", "yellow")) return { headline: "Live updates temporarily unavailable", message: "Committee operations can continue. Other screens refresh at least once a minute." };
   if (has("storage", "yellow")) return { headline: "Document storage is temporarily unavailable", message: "Resolution uploads and file opening may fail. Debate, attendance and voting are not affected." };

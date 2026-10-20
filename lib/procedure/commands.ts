@@ -98,6 +98,5 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
   r.voteMode=c.mode;r.voteType=c.voteType;r.sessionId=sid;r.revision=(r.revision??0)+1;break;
  }
  }
- if(['speechStart','speechYield','speechFinish'].includes(c.type)) {const old=d.timers[sid];const duration=old?.duration??90;d.timers[sid]={duration,remaining:duration,startedAt:null,revision:(old?.revision??0)+1};}
 
 }

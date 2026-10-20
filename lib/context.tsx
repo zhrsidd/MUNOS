@@ -8,6 +8,7 @@ import {
 } from "react";
 import {usePathname,useRouter} from "next/navigation";
 import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
+import {WorkspaceLoading} from "../components/workspace-loading";
 import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
 import {requestPersistentStorage} from "./platform/persistent-storage";
 import { DurableStore } from "./sync/store";
@@ -19,6 +20,9 @@ const Context = createContext<{
   access: StaffAccess;
   act: (c: Command, role: Role) => Promise<boolean>;
   notice: string;
+  /** The last failed save, for the dialog that is open. A background toast is not reachable from a native modal. */
+  actError: string;
+  clearActError: () => void;
   committeeId: string;
   setCommitteeId: (id: string) => void;
   selectedSessionId: string;
@@ -41,6 +45,7 @@ export function ConferenceProvider({
   const wrongRole=access.status==="active"&&requestedRole&&!access.roles.includes(requestedRole);
   useEffect(()=>{if(wrongRole&&access.roles.length)router.replace(staffRolePath(access.roles[0]));},[wrongRole,access.roles,router]);
   const [notice, setNotice] = useState("");
+  const [actError, setActError] = useState("");
   const [committeeId, setCommitteeId] = useState("ga1");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   useEffect(() => repository.initialize(), []);
@@ -55,29 +60,33 @@ export function ConferenceProvider({
     });
   },[contextConferenceId]);
   async function act(c: Command, role: Role) {
+    setActError("");
     try {
       await repository.execute(c, role);
       setNotice(
-        c.type === "timer"
-          ? ""
-          : c.type === "event"
-            ? "Participation event updated"
-            : c.type === "participation"
-              ? "Participation recorded"
-              : c.type === "document"
-                ? `Resolution moved to ${c.status}`
-                : repository.getHealth().message,
+        c.type === "event"
+          ? "Participation event updated"
+          : c.type === "participation"
+            ? "Participation recorded"
+            : c.type === "document"
+              ? `Resolution moved to ${c.status}`
+              : repository.getHealth().message,
       );
       return true;
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Unable to save");
+      const message = e instanceof Error ? e.message : "Unable to save";
+      setNotice(message);
+      setActError(message);
       return false;
     }
   }
   if(access.status!=="demo"&&access.status!=="active")return <StaffAccessGate access={access}/>;
-  if(wrongRole)return <div className="loading">Opening your authorized workspace…</div>;
-  if (!data)
-    return <div className="loading">{health.message}</div>;
+  if(wrongRole)return <WorkspaceLoading label="Opening your authorized workspace…"/>;
+  if (!data) {
+    if (health.state === "error" || health.state === "waiting")
+      return <StaffAccessGate access={{...access,status:"unavailable",message:health.message}}/>;
+    return <WorkspaceLoading/>;
+  }
   return (
     <Context.Provider
       value={{
@@ -85,6 +94,8 @@ export function ConferenceProvider({
         access,
         act,
         notice,
+        actError,
+        clearActError: () => setActError(""),
         committeeId,
         setCommitteeId: id=>{setCommitteeId(id);setSelectedSessionId("");void preferences.savePreferences(`context:${data.conference.id}`,{committeeId:id,sessionId:""});},
         selectedSessionId,
@@ -98,6 +109,11 @@ export function ConferenceProvider({
       </div>
     </Context.Provider>
   );
+}
+/** For shared components that may render outside the provider (tests, public pages). */
+export function useActError() {
+  const context = useContext(Context);
+  return context ? { error: context.actError, clear: context.clearActError } : null;
 }
 export function useConference() {
   const context = useContext(Context);

@@ -19,17 +19,17 @@ async function setup(server:CountingServer,pending:Mutation[]){
  const key=crypto.randomUUID(),store=new DurableStore(key);await store.update(key,()=>({key,base:createSeed(),pending,savedAt:new Date().toISOString()}));
  const repo=new DurableRepository(key,createSeed,store,server);return {key,store,repo,close:async()=>{repo.dispose();await store.close();}};
 }
-test('batch acknowledgement keeps required read-back, one in-flight sync, and no extra final read',async()=>{
+test('batch acknowledgement keeps required read-back, one in-flight sync, and ONE read for the whole batch',async()=>{
  const server=new CountingServer();server.readGate=gate();const a=mutation(),b=mutation();const {repo,store,key,close}=await setup(server,[a,b]);
  try{
   await repo.ready();await until(()=>server.reads===1);
-  assert.equal(server.sends,1);assert.deepEqual((await store.read(key))!.pending.map(m=>m.id),[a.id,b.id],'acknowledgement alone must not remove durable intent');
+  assert.equal(server.sends,2,'both actions are sent before the single confirming read');assert.deepEqual((await store.read(key))!.pending.map(m=>m.id),[a.id,b.id],'acknowledgement alone must not remove durable intent');
   await Promise.all(Array.from({length:12},()=>repo.flush()));repo.retry();repo.retry();
   assert.equal(server.reads,1);assert.equal(server.maximum,1);
   server.readGate.release();await until(()=>repo.getHealth().pending===0);await pause();
-  assert.equal(server.sends,2);assert.equal(server.reads,2,'one read-back per mutation; no third final snapshot');assert.equal(server.maximum,1);
+  assert.equal(server.sends,2);assert.equal(server.reads,1,'one read-back for the batch; no per-action snapshots and no final snapshot');assert.equal(server.maximum,1);
   assert.equal((await store.read(key))!.base.events.length,createSeed().events.length+2);
-  await repo.flush();assert.equal(server.reads,3,'empty-outbox recovery polling still reads');
+  await repo.flush();assert.equal(server.reads,2,'empty-outbox recovery polling still reads');
  }finally{server.readGate.release();await close();}
 });
 test('intent appended while the acknowledgement read is in flight stays in the same batch',async()=>{
@@ -41,13 +41,13 @@ test('intent appended while the acknowledgement read is in flight stays in the s
   assert.equal(server.sends,2);assert.equal(server.reads,2);assert.equal(server.maximum,1);
  }finally{server.readGate.release();await close();}
 });
-test('failed read-back retains acknowledged UUID and retry is exactly once',async()=>{
+test('failed read-back retains the acknowledged action and the retry confirms it WITHOUT resending',async()=>{
  const server=new CountingServer();server.failRead=true;const m=mutation();const {repo,store,key,close}=await setup(server,[m]);
  try{
   await repo.ready();await until(()=>server.reads===1&&repo.getHealth().state==='waiting');await pause();
   assert.equal((await store.read(key))!.pending[0].id,m.id);assert.equal(server.receipts.size,1);
   server.failRead=false;await repo.flush();assert.equal(repo.getHealth().pending,0);
-  assert.equal(server.sends,2);assert.equal(server.reads,2);assert.equal(server.receipts.size,1);assert.equal(server.data.events.length,createSeed().events.length+1);
+  assert.equal(server.sends,1,'already acknowledged: not replayed');assert.equal(server.reads,2);assert.equal(server.receipts.size,1);assert.equal(server.data.events.length,createSeed().events.length+1);
  }finally{await close();}
 });
 test('lost send response retains UUID and recovers with one successful read-back',async()=>{
