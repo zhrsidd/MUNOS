@@ -1,6 +1,6 @@
 # Implementation plans for Codex review: clear majority, Chairs in school photos, configurable points
 
-Status: **proposal, 20 October 2026. Nothing here is implemented, and no migration has been written or applied.** Each plan needs Codex review, then owner approval, before any migration is written. The owner briefs are [CLEAR_MAJORITY_VOTING.md](../CLEAR_MAJORITY_VOTING.md) and [UI_PRIORITY_PASS.md](../UI_PRIORITY_PASS.md) (the "Pending" rows) and, for photos, [OPERATIONS_EXTENSIONS.md](../OPERATIONS_EXTENSIONS.md#school-group-photos-and-chair-reminders).
+Status: **proposal, 20 October 2026; owner decisions recorded the same day (see each "Owner decisions" section).** Implementation may proceed as draft PRs, so Codex can review each plan together with its code. No migration is applied and no protected change is merged until Codex has reviewed it and the owner approves. The owner briefs are [CLEAR_MAJORITY_VOTING.md](../CLEAR_MAJORITY_VOTING.md) and [UI_PRIORITY_PASS.md](../UI_PRIORITY_PASS.md) (the "Pending" rows) and, for photos, [OPERATIONS_EXTENSIONS.md](../OPERATIONS_EXTENSIONS.md#school-group-photos-and-chair-reminders).
 
 All three plans follow the same rules:
 
@@ -80,8 +80,10 @@ Close the resolution with a declared result instead of counted ballots. No new t
 
 ### Owner decisions
 
-* Should the shortcut be available on **procedural** votes as well as substantive non-veto votes? Proposed: yes.
-* With ballots already recorded, should an observed close be **allowed with a warning** (proposed) or refused until they are cleared?
+Decided by the owner, 20 October:
+
+* The shortcut is available on **procedural** votes as well as substantive non-veto votes.
+* With ballots already recorded, an observed close is **allowed with a warning**; the earlier ballots are kept and not counted.
 
 ---
 
@@ -145,8 +147,10 @@ Close the resolution with a declared result instead of counted ballots. No new t
 
 ### Owner decisions
 
-* Chairs only, or every staff member with a school (Approval, Logistics, Executive)? Proposed: Chairs only.
-* Is a non-blocking Executive notice enough when both Chairs would leave a committee? Proposed: yes.
+Decided by the owner, 20 October:
+
+* School photos include **all delegates and Chairs with a school**. Approval, Logistics and Executive staff are not included.
+* A **non-blocking Executive notice** is enough when every Chair of a committee would be at the same photo.
 
 ---
 
@@ -239,16 +243,34 @@ Close the resolution with a declared result instead of counted ballots. No new t
 
 ### Owner decisions
 
-* Allowed range for Main Submitter: proposed one value, 1–20.
-* Should debated amendments stay manual (proposed) or credit the amendment's submitter automatically when debate starts?
+Decided by the owner, 20 October:
+
+* Main Submitter is **one value from 1 to 20** (default +5).
+* Debated amendment credit **stays manual**.
 
 ---
+
+## 4. Voting-rule setting (added 20 October)
+
+The owner agreed to an Executive setting for the voting rule. Today `voting_rule` exists on conferences and committees and both backends honour it (`tests/voting-rules.test.ts`), but no screen or command sets it.
+
+* **App:** in Executive → Conference, add a "Voting rule" select (Simple majority / Two-thirds). In Executive → Committees, add a per-committee override with "Use conference rule" as the default.
+* **Commands:** add `votingRule` to the existing `conference` command and to the `committeeUpdate` batch command. A committee's value may be null, meaning inherit.
+* **Database:** patch the `conference` branch of `private.apply_mutation` and the `committeeUpdate` branch of `private.apply_staff_batch` to write `voting_rule`, which keeps its existing CHECK constraint. No table change is needed.
+* **Edge cases:**
+  * Changing the rule while a vote is open takes effect when it closes. Closing recomputes from the current rule, as it does today, so the Voting panel must show the rule in force.
+  * Resolutions that are already closed keep their stored outcome.
+* **Acceptance tests:**
+  * Client and PostgreSQL: only the Executive can set the rule, and a committee null value inherits the conference rule.
+  * The next close uses the new rule.
+  * Closed outcomes are unchanged.
 
 ## Order and review
 
 1. **Configurable points** first. It changes functions only, adds no table columns, and has the smallest surface.
 2. **Chairs in photos.** Adds one nullable column and changes notification targeting.
 3. **Clear majority.** Changes the vote-closing contract, so it gets the most careful review and a staging replay.
+4. **Voting-rule setting.** Small, and can follow clear majority, or come earlier if DCMUN needs two-thirds for any committee.
 
 For each one, the sequence is:
 
