@@ -45,6 +45,6 @@ export function groupByResolution(amendments: Amendment[], documents: Resolution
 }
 
 /** Exact text a Chair pastes into the working Google Doc. The wording is copied unchanged. */
-export function amendmentCopyText(a: Amendment, submitter: Delegate | undefined) {
+export function amendmentCopyText(a: Amendment, submitter: Pick<Delegate, 'country'> | undefined) {
   return `${a.type} · ${a.clause}${submitter ? ` · ${submitter.country}` : ''}\n${a.wording}`;
 }
