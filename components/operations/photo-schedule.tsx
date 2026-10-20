@@ -206,7 +206,7 @@ export function PhotoSchedule() {
       <PageHeading
         eyebrow="EXECUTIVE"
         title="Group photos"
-        description="School photo slots. Only chairs with delegates from that school are reminded — 10 minutes before and at the time."
+        description="School photo slots. Committees with delegates or Chairs from that school are reminded — 10 minutes before and at the time."
         action={
           <div className="actions">
             <button onClick={() => setModal({ kind: "import" })}>Import CSV</button>
@@ -226,7 +226,7 @@ export function PhotoSchedule() {
                   <th>Time</th>
                   <th>School</th>
                   <th>Location</th>
-                  <th>Committees to send delegates</th>
+                  <th>Committees affected</th>
                   <th>Status</th>
                   <th />
                 </tr>
@@ -251,13 +251,15 @@ export function PhotoSchedule() {
                           {affected.length ? (
                             <span className="committee-acks">
                               {affected.map((a) => (
-                                <span key={a.committee.id} title={a.dueAcknowledged ? "Delegates sent" : a.warningAcknowledged ? "Chair acknowledged" : "Not yet acknowledged"}>
-                                  {a.committee.code} · {a.delegates} {a.dueAcknowledged ? "✓✓" : a.warningAcknowledged ? "✓" : ""}
+                                <span key={a.committee.id} className={a.noChairLeft ? "danger-text" : undefined} title={`${a.noChairLeft ? "Every Chair of this committee is in this photo; arrange cover. " : ""}${a.dueAcknowledged ? "Delegates sent" : a.warningAcknowledged ? "Chair acknowledged" : "Not yet acknowledged"}`}>
+                                  {a.committee.code} · {a.delegates}
+                                  {a.chairs ? ` + ${a.chairs === 1 ? "Chair" : `${a.chairs} Chairs`}` : ""} {a.dueAcknowledged ? "✓✓" : a.warningAcknowledged ? "✓" : ""}
+                                  {a.noChairLeft && " · no Chair left"}
                                 </span>
                               ))}
                             </span>
                           ) : (
-                            <span className="danger-text">No delegates from this school</span>
+                            <span className="danger-text">No delegates or Chairs from this school</span>
                           )}
                         </td>
                         <td>{statusChip(s, now)}</td>
@@ -275,7 +277,7 @@ export function PhotoSchedule() {
           </div>
         </Panel>
       ))}
-      <p className="muted">✓ chair acknowledged the warning · ✓✓ chair confirmed delegates were sent. Times are conference time ({CONFERENCE_TIMEZONE}).</p>
+      <p className="muted">“GA1 · 2 + Chair” means two delegates and a Chair. “No Chair left” means every Chair of that committee is in the photo, so arrange cover. ✓ chair acknowledged the warning · ✓✓ chair confirmed delegates were sent. Times are conference time ({CONFERENCE_TIMEZONE}).</p>
       {modal?.kind === "form" && (
         <Modal title={modal.form.slotId ? "Edit photo slot" : "Add photo slot"} onClose={() => setModal(null)}>
           <SlotForm initial={modal.form} close={() => setModal(null)} />

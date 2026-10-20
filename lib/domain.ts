@@ -58,6 +58,8 @@ export interface Staff {
   /** Directory contact, not an authentication identity. Published only for assigned Chairs. */
   email?: string | null;
   contactRevision?: number;
+  /** A Chair's school, so they are included in that school's group photo. Executive-only data. */
+  schoolId?: ID | null;
   id: ID;
   name: string;
   role: Role;

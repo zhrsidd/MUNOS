@@ -21,9 +21,19 @@ export function useClock(intervalMs = 15_000) {
 }
 const when = (r: PhotoReminder) => `${zonedTime(r.slot.startsAt)}${r.slot.endsAt ? `–${zonedTime(r.slot.endsAt)}` : ""}`;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const chairNames = (r: PhotoReminder) => r.chairs.map((c) => `Chair ${c.name}`).join(" and ");
+/** "2 delegates and Chair Ana Ruiz", "Chair Ana Ruiz" or "3 delegates". */
+function attendees(r: PhotoReminder) {
+  return [r.delegates.length ? plural(r.delegates.length, "delegate") : "", chairNames(r)].filter(Boolean).join(" and ");
+}
 function DelegateList({ reminder, absent }: { reminder: PhotoReminder; absent: ReadonlySet<string> }) {
   return (
     <ul className="photo-delegates">
+      {reminder.chairs.map((c) => (
+        <li key={c.staffId}>
+          <b>Chair</b> — {c.name}
+        </li>
+      ))}
       {reminder.delegates.map((d) => (
         <li key={d.id}>
           {d.flag} <b>{d.country}</b> — {d.name}
@@ -35,7 +45,7 @@ function DelegateList({ reminder, absent }: { reminder: PhotoReminder; absent: R
 }
 /** Pure presentation of one reminder: school, location, affected delegates and the acknowledgement action. */
 export function PhotoAlert({ reminder, absent, open, onToggle, onAcknowledge }: { reminder: PhotoReminder; absent: ReadonlySet<string>; open: boolean; onToggle: () => void; onAcknowledge: (stage: "warning" | "due") => void }) {
-  const { slot, school, delegates, stage } = reminder;
+  const { slot, school, delegates, chairs, stage } = reminder;
   if (stage === "cancelled")
     return (
       <div className="photo-card cancelled" role="status">
@@ -43,7 +53,7 @@ export function PhotoAlert({ reminder, absent, open, onToggle, onAcknowledge }: 
           <small>GROUP PHOTO CANCELLED</small>
           <strong>{school?.name}</strong>
           <p>
-            {when(reminder)} · {slot.location}. Delegates do not need to leave.
+            {when(reminder)} · {slot.location}. Nobody needs to leave.
           </p>
         </div>
         <button onClick={() => onAcknowledge("warning")}>Dismiss</button>
@@ -60,18 +70,25 @@ export function PhotoAlert({ reminder, absent, open, onToggle, onAcknowledge }: 
           {slot.note && <> · {slot.note}</>}
         </p>
         {due ? (
-          <p>
-            Please send {delegates.length === 1 ? "this delegate" : `these ${delegates.length} delegates`} to <b>{slot.location}</b>:
-          </p>
+          delegates.length ? (
+            <p>
+              Please send {delegates.length === 1 ? "this delegate" : `these ${delegates.length} delegates`} to <b>{slot.location}</b>
+              {chairs.length ? <>; {chairNames(reminder)} also attends</> : null}:
+            </p>
+          ) : (
+            <p>
+              {chairNames(reminder)}: please go to <b>{slot.location}</b>.
+            </p>
+          )
         ) : (
-          <p>{plural(delegates.length, "delegate")} from this committee should attend.</p>
+          <p>{attendees(reminder)} from this committee should attend.</p>
         )}
         {open && <DelegateList reminder={reminder} absent={absent} />}
       </div>
       <div className="photo-actions">
-        {!due && <button onClick={onToggle}>{open ? "Hide delegates" : "View delegates"}</button>}
+        {!due && <button onClick={onToggle}>{open ? "Hide names" : "View names"}</button>}
         <button className="primary" onClick={() => onAcknowledge(due ? "due" : "warning")}>
-          {due ? "Delegates sent" : "Acknowledge"}
+          {due ? (delegates.length ? "Delegates sent" : "On my way") : "Acknowledge"}
         </button>
       </div>
     </div>
@@ -117,10 +134,10 @@ export function ChairPhotos({ committeeId }: { committeeId: string }) {
       <PageHeading
         eyebrow={committee?.code ?? ""}
         title="Group photos"
-        description="When delegates from this room must leave for their school's photo. A reminder appears here 10 minutes before, even after a refresh or a lost connection."
+        description="When delegates or Chairs from this room must leave for their school's photo. A reminder appears here 10 minutes before, even after a refresh or a lost connection."
       />
       {!reminders.length ? (
-        <Empty title="No group photos for this committee" text="None of this committee's schools has a photo slot yet." />
+        <Empty title="No group photos for this committee" text="No school with delegates or Chairs in this committee has a photo slot yet." />
       ) : (
         days.map((day) => (
           <Panel key={day} title={day}>
@@ -134,7 +151,7 @@ export function ChairPhotos({ committeeId }: { committeeId: string }) {
                     </strong>
                     <p>
                       {r.slot.location}
-                      {r.slot.note && ` · ${r.slot.note}`} · {r.delegates.map((d) => `${d.flag} ${d.country}`).join(", ")}
+                      {r.slot.note && ` · ${r.slot.note}`} · {[...r.chairs.map((c) => `Chair ${c.name}`), ...r.delegates.map((d) => `${d.flag} ${d.country}`)].join(", ")}
                     </p>
                   </div>
                   <span>

@@ -35,6 +35,13 @@ export interface PhotoSlot {
   /** Increments on every change; acknowledgements of an older revision no longer silence reminders. */
   revision: number;
 }
+/** A Chair with a school, one row per assigned committee: the only staff data a Chair device receives. */
+export interface PhotoChair {
+  staffId: string;
+  name: string;
+  committeeId: string;
+  schoolId: string;
+}
 export interface PhotoAck {
   slotId: string;
   committeeId: string;
@@ -83,4 +90,5 @@ export interface OperationsData {
   resolutionLinks?: ResolutionLink[];
   photoSlots?: PhotoSlot[];
   photoAcks?: PhotoAck[];
+  photoChairs?: PhotoChair[];
 }

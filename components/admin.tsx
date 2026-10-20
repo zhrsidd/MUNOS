@@ -346,7 +346,7 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "staff" && (
         <Panel
           title="Staff assignments"
-          subtitle="Assigned Chair contact emails are shown on the committee submission form. Directory contacts do not grant app access."
+          subtitle="Assigned Chair contact emails are shown on the committee submission form. A Chair's school includes them in that school's group photo. Directory contacts do not grant app access."
         >
           <div className="table-scroll">
             <table>
@@ -356,6 +356,7 @@ export function AdminScreen({ section }: { section: string }) {
                   <th>Role</th>
                   <th>Committee scope</th>
                   <th>Contact email</th>
+                  <th>Photo school</th>
                 </tr>
               </thead>
               <tbody>
@@ -374,6 +375,7 @@ export function AdminScreen({ section }: { section: string }) {
                         .join(", ") || "Conference-wide"}
                     </td>
                     <td><StaffContact key={`${s.id}-${s.contactRevision}`} id={s.id} email={s.email ?? ""} name={s.name} /></td>
+                    <td>{s.role === "chair" ? <StaffSchool id={s.id} schoolId={s.schoolId ?? null} name={s.name} /> : <span className="muted">Chairs only</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -839,6 +841,18 @@ function StaffContact({id,email,name}:{id:string;email:string;name:string}) {
     <input type="email" maxLength={254} aria-label={`${name} contact email`} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Contact email" />
     <button disabled={draft.trim()===email}>Save</button>
   </form>;
+}
+
+function StaffSchool({ id, schoolId, name }: { id: string; schoolId: string | null; name: string }) {
+  const { data, act } = useConference();
+  return (
+    <select aria-label={`${name} photo school`} value={schoolId ?? ""} onChange={(e) => void act({ type: "staffSchool", staffId: id, schoolId: e.target.value || null }, "admin")}>
+      <option value="">No school</option>
+      {data.schools.map((school) => (
+        <option key={school.id} value={school.id}>{school.name}</option>
+      ))}
+    </select>
+  );
 }
 
 /** Executive → Scoring. Works on a blank conference: required procedure categories always show, with

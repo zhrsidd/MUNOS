@@ -8,6 +8,8 @@ export function operationsFingerprint(data: ConferenceData, command: OperationsC
       return String(data.resolutionLinks?.find(link => link.documentId === command.documentId)?.revision ?? 0);
     case "photoSlot":
       return command.action === "update" ? String(data.photoSlots?.find(slot => slot.id === command.slotId)?.revision ?? 0) : null;
+    case "staffSchool":
+      return data.staff.find(staff => staff.id === command.staffId)?.schoolId ?? "none";
     case "submissionLink": {
       const link = data.submissionLinks?.find(item => item.committeeId === command.committeeId);
       return link ? `${link.id}|${link.shareWith}` : "none";

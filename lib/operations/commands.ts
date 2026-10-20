@@ -25,6 +25,8 @@ export type OperationsCommand =
   | ({ type: "photoSlot"; action: "create" | "update"; slotId?: string } & PhotoSlotFields)
   | { type: "photoImport"; rows: PhotoSlotFields[] }
   | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number }
+  /** A Chair's school for group photos; null clears it. */
+  | { type: "staffSchool"; staffId: string; schoolId: string | null }
   | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
   | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string };
 export interface PhotoSlotFields {
@@ -36,7 +38,7 @@ export interface PhotoSlotFields {
   enabled?: boolean;
   warnMinutes?: number;
 }
-export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment"] as const satisfies readonly OperationsCommand["type"][];
+export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
   resolutionLink: ["chair", "admin"],
@@ -45,6 +47,7 @@ export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   photoImport: ["admin"],
   photoAck: ["chair"],
   pointAdjustment: ["chair"],
+  staffSchool: ["admin"],
 };
 export const MAX_DEDUCTION = 20;
 export const REASON_MIN = 3;
@@ -187,6 +190,13 @@ export function applyOperationsCommand(
         if (reason.length < REASON_MIN || reason.length > REASON_MAX) throw Error(`Give a reason of ${REASON_MIN} to ${REASON_MAX} characters.`);
         list.push({ id, delegateId: delegate.id, sessionId: original.sessionId, points: -original.points, reason, chairId: actorId, chairName: null, reverses: original.id, createdAt: now });
       }
+      break;
+    }
+    case "staffSchool": {
+      const staff = d.staff.find((s) => s.id === c.staffId);
+      if (!staff || staff.role !== "chair") throw Error("Choose a Chair.");
+      if (c.schoolId !== null && !d.schools.some((s) => s.id === c.schoolId)) throw Error("Choose a valid school.");
+      staff.schoolId = c.schoolId;
       break;
     }
     case "photoAck": {
