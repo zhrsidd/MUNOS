@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PLATFORM } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
@@ -23,6 +24,7 @@ import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
 import { DelegateSubmissions } from "./operations/resolution-links";
+import { FelixHelper } from "./felix-helper";
 export function Workspace({ path }: { path: string }) {
   const {
     data,
@@ -154,12 +156,13 @@ export function Workspace({ path }: { path: string }) {
           )}
         </main>
         <footer className="workspace-footer">
-          Conference OS{" "}
+          {PLATFORM.name} · Created by {PLATFORM.creator} · <Link href="/about">About</Link>{" "}
           <span>
             Illustrative DCMUN-inspired data · <DataModeLabel />
           </span>
         </footer>
       </div>
+      <FelixHelper key={`${role}:${role === "chair" ? committeeId : "conference"}`} role={role} committeeId={role === "chair" ? committeeId : undefined} committeeCode={committee?.code} sessionName={session?.name} />
     </div>
   );
 }

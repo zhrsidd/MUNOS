@@ -43,7 +43,7 @@ async function worker(){
   handlers.get('fetch')!({request:{url:key(path),method,mode},respondWith:promise=>{response=promise;}});
   return response;
  };
- const cached=async(path:string)=>(await (await caches.open('conference-os-0.2.7')).match(path))?.text();
+ const cached=async(path:string)=>(await (await caches.open('conference-os-0.2.8')).match(path))?.text();
  return{caches,fetched,lifecycle,navigate,cached,offline:()=>{online=false;},reply:(path:string,status:number,body:string)=>replies.set(path,{status,body})};
 }
 
@@ -60,7 +60,7 @@ test('offline shell installs all staff health routes without API, Supabase or Au
 test('prepared staff health routes directly reload offline and activation replaces the previous cache',async()=>{
  const w=await worker();await w.caches.open('conference-os-0.2.2');await w.caches.open('unrelated-cache');
  await w.lifecycle('install');await w.lifecycle('activate');
- assert.deepEqual(await w.caches.keys(),['unrelated-cache','conference-os-0.2.7']);
+ assert.deepEqual(await w.caches.keys(),['unrelated-cache','conference-os-0.2.8']);
  w.offline();
  for(const path of healthPaths){
   const response=await w.navigate(path);assert.ok(response,`${path} navigation must be intercepted`);
