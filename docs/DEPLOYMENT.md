@@ -25,7 +25,7 @@ GitHub zhrsidd/MUNOS
 
 ## Environments
 
-**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical/optional integration-test context, not the selected default. This setting must be applied and verified before merging if the current Preview configuration would fail the guard. Codex's connected Vercel accounts were denied access to the `dcmun` team, so this change is **pending a team-authorized operator** and has not been applied or verified here.
+**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical/optional integration-test context, not the selected default. **Applied and verified 20 October 2026:** Preview `NEXT_PUBLIC_DATA_BACKEND` was changed from `supabase` to `local` by a team-authorized Vercel connection (Production untouched). A fresh Preview of this branch (`dpl_6Zo7x5BTfZ6Lm4bj6vRrkBtnEUtQ`, commit `a5975e9`) built successfully, and its `/api/health` reported `environment: preview`, status `ok`, and Supabase, database and storage all `not_configured` (browser demo). The leftover Preview Supabase variables for the deleted development project are now unused; removing them is a separate owner decision.
 
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
