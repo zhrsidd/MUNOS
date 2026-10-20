@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useConference } from "@/lib/context";
 import { approvalHistory, latestFeedback } from "@/lib/approval-history";
 import { resolutionOverview } from "@/lib/resolution-overview";
-import { ApprovalHistory } from "./documents";
+import { ApprovalHistory, DeclarationLine } from "./documents";
 import { ResolutionSources } from "./operations/resolution-links";
 import { Chip, Empty, PageHeading, Panel } from "./ui";
 
@@ -29,6 +29,7 @@ export function ExecutiveResolutionOverview() {
         return <article className="executive-resolution-row" key={r.id} aria-label={`${r.code} · ${r.title}`}>
           <div className="executive-resolution-heading"><div><small>{r.code} · {submitter}</small><h3>{r.title}</h3></div><Chip>{status}</Chip></div>
           <p className="muted">Approval: {status === "Changes requested" ? status : approval} · Printing: {printing}{r.outcome ? ` · Outcome: ${r.outcome}${r.outcomeMethod === "observed" ? " (observed majority, no counts)" : ""}` : ""}</p>
+          <DeclarationLine resolutionId={r.id} />
           <ResolutionSources resolution={r} storageKey={null} fileName="" />
           {feedback && <blockquote className="executive-resolution-feedback"><strong>Latest Approval Panel feedback · {feedback.reviewer}</strong><p>{feedback.comment}</p></blockquote>}
           <details><summary>Approval history</summary><ApprovalHistory entries={approvalHistory(data, r.id)} /></details>

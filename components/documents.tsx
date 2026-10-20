@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useConference } from "@/lib/context";
 import type { Resolution } from "@/lib/domain";
 import { approvalHistory, decisionTone, type HistoryEntry } from "@/lib/approval-history";
+import { observedDeclaration } from "@/lib/repository";
 import { resolutionNextAction, resolutionOrder, sentBack } from "@/lib/resolution-view";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { ResolutionSources } from "./operations/resolution-links";
@@ -63,6 +64,20 @@ export function ApprovalHistory({ entries, showResolution = false, label = "Appr
     </ol>
   );
 }
+/** An observed (clear majority) result: who declared it and when. It has no country votes or totals to show. */
+export function DeclarationLine({ resolutionId }: { resolutionId: string }) {
+  const { data } = useConference();
+  const declared = observedDeclaration(data, resolutionId);
+  if (!declared) return null;
+  const kept = declared.keptBallots;
+  const tail = kept ? `; ${kept} earlier ballot${kept === 1 ? "" : "s"} kept, not counted.` : ".";
+  return (
+    <p className="decision-line">
+      <strong>Clear majority declared</strong> by {declared.by} · <time dateTime={declared.at}>{qatarTime(declared.at)}</time>
+      {` Qatar time. No country votes or totals recorded${tail}`}
+    </p>
+  );
+}
 function ResolutionRow({ resolution }: { resolution: Resolution }) {
   const { data, act } = useConference();
   const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
@@ -102,6 +117,7 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
           <strong>{lastDecision.kind === "approved" ? "Approved — no comment added" : lastDecision.label}</strong> by {lastDecision.reviewer} · <time dateTime={lastDecision.at}>{qatarTime(lastDecision.at)}</time> Qatar time
         </p>
       )}
+      <DeclarationLine resolutionId={resolution.id} />
       <footer className="resolution-next">
         {back && <Sources resolution={resolution} />}
         {resubmit}
