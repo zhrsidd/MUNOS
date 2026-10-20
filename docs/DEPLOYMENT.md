@@ -25,6 +25,8 @@ GitHub zhrsidd/MUNOS
 
 ## Environments
 
+**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical/optional integration-test context, not the selected default. This setting must be applied and verified before merging if the current Preview configuration would fail the guard. Codex's connected Vercel accounts were denied access to the `dcmun` team, so this change is **pending a team-authorized operator** and has not been applied or verified here.
+
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
 | Trigger | `npm run dev` | any push / PR, **including `main`** | push to the `production` branch only |
