@@ -1,26 +1,18 @@
 import { amendmentBackend } from '@/lib/amendments/backend';
 import { amendmentMessages } from '@/lib/amendments/rules';
 import { handleAmendment } from '@/lib/amendments/service';
+import { readBoundedBody } from '@/lib/http/bounded-body';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'no-store' };
+const MAX_AMENDMENT_BODY = 32_768;
 // Bounded streaming read also protects requests without a Content-Length header.
 export async function POST(request: Request) {
-  const reader = request.body?.getReader();
-  if (!reader) return Response.json({ ok: false, error: 'invalid_amendment', message: amendmentMessages.invalid_amendment }, { status: 400, headers });
-  const parts: Uint8Array[] = []; let size = 0;
+  const invalid = (status: number) => Response.json({ ok: false, error: 'invalid_amendment', message: amendmentMessages.invalid_amendment }, { status, headers });
+  const body = await readBoundedBody(request, MAX_AMENDMENT_BODY);
+  if (!body.ok) return invalid(body.reason === 'too_large' ? 413 : 400);
   try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > 32_768) { await reader.cancel(); return Response.json({ ok: false, error: 'invalid_amendment', message: amendmentMessages.invalid_amendment }, { status: 413, headers }); }
-      parts.push(value);
-    }
-    const bytes = new Uint8Array(size); let offset = 0;
-    for (const part of parts) { bytes.set(part, offset); offset += part.length; }
-    const input: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    const { status, body } = await handleAmendment(input, amendmentBackend());
-    return Response.json(body, { status, headers });
-  } catch { return Response.json({ ok: false, error: 'invalid_amendment', message: amendmentMessages.invalid_amendment }, { status: 400, headers }); }
-  finally { reader.releaseLock(); }
+    const input: unknown = JSON.parse(new TextDecoder().decode(body.bytes));
+    const { status, body: result } = await handleAmendment(input, amendmentBackend());
+    return Response.json(result, { status, headers });
+  } catch { return invalid(400); }
 }
