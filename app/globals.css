@@ -3198,14 +3198,29 @@ html { scroll-padding-top: 12rem; }
 .executive-resolution-feedback { margin: var(--space-4) 0; padding: var(--space-3); border-left: var(--space-1) solid var(--action); background: var(--action-soft); white-space: pre-wrap; }
 .executive-resolution-feedback p { margin-bottom: 0; }
 .executive-resolution-row details { margin-top: var(--space-3); }
-/* Participation quick entry on touch screens: ~44 px targets, compact groups that wrap rather than squeeze.
-   After the narrow-width rules above so it wins for touch devices of any width. */
-@media (pointer: coarse) {
-  .participation-row .scorer > div > div { gap: var(--space-1); }
-  .participation-row .scorer button { min-width: 40px; min-height: 44px; padding: 0 var(--space-2); font-size: 13px; }
+/* Participation quick entry on touch or narrow screens (including 200% zoom): 44 × 44 px targets with 8 px gaps
+   (audit F5), compact groups that wrap rather than squeeze. After the narrow-width rules above so it wins. */
+@media (pointer: coarse), (max-width: 700px) {
+  .participation-row .scorer > div > div { gap: var(--space-2); }
+  .participation-row .scorer button { min-width: 44px; min-height: 44px; padding: 0 var(--space-2); font-size: 13px; }
 }
 /* On a phone the four groups no longer fit one line at 44 px: a two-column grid keeps them aligned
    (Speech | POI, Main Submitter | Amendment) instead of leaving one group alone on a second line. */
 @media (max-width: 700px) {
-  .participation-row .scorer { display: grid; grid-template-columns: repeat(2, max-content); justify-content: start; gap: var(--space-3) var(--space-5); }
+  .participation-row .scorer { display: grid; grid-template-columns: repeat(2, max-content); justify-content: start; gap: var(--space-3) var(--space-4); }
 }
+/* Below 360 px two 44 px columns would overflow the row: one group per line. */
+@media (max-width: 359px) {
+  .participation-row .scorer { grid-template-columns: max-content; }
+}
+/* About (ported from PHESMUN PR #1): a public page with the seal, credits and licence wording. */
+.about-page { min-height: 100vh; display: grid; place-items: center; padding: var(--space-5) var(--space-4); background: var(--bg); }
+.about-card { max-width: 560px; width: 100%; padding: var(--space-6); }
+.about-card > * { margin-left: 0; margin-right: 0; }
+.about-card > p { margin: 0 0 var(--space-3); color: var(--ink-2); }
+.about-card h1 { margin: var(--space-1) 0 var(--space-3); }
+.about-card h2 { font-size: 15px; margin: var(--space-5) 0 var(--space-1); }
+.about-card .small { font-size: 13px; }
+.about-logo { display: block; margin-bottom: var(--space-2); }
+.about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }
+@media (max-width: 700px) { .about-card { padding: var(--space-5) var(--space-4); } }
