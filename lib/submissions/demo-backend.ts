@@ -5,7 +5,7 @@ import { SubmissionRejected, type SubmissionBackend } from "./service";
 // submission page can be exercised without Supabase. It never runs in a cloud deployment.
 // Demo tokens look like demo_<committeeId>_<hex> and resolve against the demo seed.
 interface Stored { code: string; source: string; committeeId: string }
-const store = (globalThis as { __demoSubmissions?: { byId: Map<string, Stored>; files: Map<string, number> } }).__demoSubmissions ??= { byId: new Map(), files: new Map() };
+const store = (globalThis as { __demoSubmissions?: { byId: Map<string, Stored> } }).__demoSubmissions ??= { byId: new Map() };
 export function demoSubmissionBackend(): SubmissionBackend {
   const seed = createSeed();
   return {
@@ -21,13 +21,11 @@ export function demoSubmissionBackend(): SubmissionBackend {
       };
       return info;
     },
-    async upload(path, bytes) { store.files.set(path, bytes.length); },
-    async remove(path) { store.files.delete(path); },
     async submit(a) {
       const prior = store.byId.get(a.submissionId);
       if (prior) return { status: "replayed", code: prior.code };
       const [, committeeId] = a.token.split("_");
-      const source = a.googleDocId ? `doc:${a.googleDocId}` : `file:${a.file?.sha256}`;
+      const source = `doc:${a.googleDocId}`;
       const duplicate = [...store.byId.values()].find((s) => s.committeeId === committeeId && s.source === source);
       if (duplicate) return { status: "duplicate", code: duplicate.code };
       const committee = seed.committees.find((c) => c.id === committeeId);

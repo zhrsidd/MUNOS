@@ -41,7 +41,7 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 - [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print → In Debate.
 - [ ] Amendment QR end to end: amendment page shows the resolution in debate → submit → Chair amendment inbox → Accepted for Debate → In Debate → Closed (Passed) → Chair edits the Google Doc by hand.
 - [ ] Public form shows only committee, delegation selector, title, link, checkbox and fallback — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
-- [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §4): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).
+- [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §4): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair; files are refused); a Viewer-only link (Chair marks *Can't access*).
 - [ ] Group-photo slot with a reminder 10 minutes out.
 - [ ] Offline: on each staff role's prepared device, cut the network and reload that role's System health page (`/chair/health`, `/approval/health`, `/logistics/health`, `/admin/health`); it renders and **Export device recovery file** works.
 

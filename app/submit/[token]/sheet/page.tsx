@@ -27,7 +27,7 @@ export default async function SubmissionSheet({ params }: { params: Promise<{ to
         <li>Tap <b>Submit</b> and keep the reference number. Your Chair sends it on to the Approval Panel.</li>
       </ol>
       <p className="room-sheet-url">{url}</p>
-      <p>Only the main submitter submits. Cannot use Google Docs? The page also accepts a PDF or Word file.</p>
+      <p>Only the main submitter submits. Google Docs only: files (PDF or Word) are not accepted.</p>
       <PrintButton />
     </main>
   );
