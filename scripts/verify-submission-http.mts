@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import {randomUUID,createHash} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import nextEnv from '@next/env';
@@ -32,16 +32,12 @@ const changed=await post({title:'Different payload on the same UUID'});assert.eq
 const invalid=await post({submissionId:randomUUID(),googleDoc:'https://example.com/not-a-doc'});assert.equal(invalid.status,400);results.invalidHostDenied=true;
 const foreign=await post({submissionId:randomUUID(),submitterId:randomUUID()});assert.equal(foreign.status,400);results.invalidSubmitterDenied=true;
 const invalidToken=await post({token:randomUUID().replaceAll('-',''),submissionId:randomUUID()});assert.equal(invalidToken.status,404);results.invalidTokenDenied=true;
-const fileId=randomUUID();
-const pdf=new Blob([`%PDF-1.4\n% Development-only submission rehearsal ${randomUUID()}\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n`],{type:'application/pdf'});
-const uploaded=await post({submissionId:fileId,title:'Development fallback-file rehearsal'},pdf);assert.equal(uploaded.status,201);results.fallbackUploaded=uploaded.body.code;
-const repeatedFile=await post({submissionId:fileId,title:'Development fallback-file rehearsal'},pdf);assert.equal(repeatedFile.body.status,'replayed');
-const badFile=await post({submissionId:randomUUID()},new Blob(['not a PDF'],{type:'application/pdf'}));assert.equal(badFile.status,400);results.invalidFileDenied=true;
-const documentId=`${fileId.slice(0,24)}000000000001`;
-const digest=createHash('sha256').update(Buffer.from(await pdf.arrayBuffer())).digest('hex');
-const key=`${ids.conference}/${ids.ga1}/${documentId}/${fileId.slice(0,24)}000000000002-${digest}.pdf`;
-const downloaded=await server.storage.from('resolutions').download(key);assert.ifError(downloaded.error);assert.equal(await downloaded.data!.text(),await pdf.text());results.fallbackPersistedExactlyOnce=true;
-const pub=await fetch(`${url}/storage/v1/object/public/resolutions/${key}`);assert.notEqual(pub.status,200);results.fallbackNotPublic=true;
-await writeFile('.test-sessions/http-browser.json',JSON.stringify({url:`${origin}/submit/${link.token}`,googleDoc,submission,documentId,fileId}),{mode:0o600});
+// Google Docs only: a file is refused, alone or with a valid link.
+const pdf=new Blob([`%PDF-1.4\n% Development-only Docs-only refusal check ${randomUUID()}\n%%EOF\n`],{type:'application/pdf'});
+for(const values of [{submissionId:randomUUID()},{submissionId:randomUUID(),googleDoc}]){
+ const refused=await post(values,pdf);assert.equal(refused.status,400);assert.equal(refused.body.error,'docs_only');
+}
+results.fileRefused=true;
+await writeFile('.test-sessions/http-browser.json',JSON.stringify({url:`${origin}/submit/${link.token}`,googleDoc,submission}),{mode:0o600});
 await writeFile('docs/submission-http-results.json',JSON.stringify(results,null,2)+'\n');
 console.log(JSON.stringify(results,null,2));

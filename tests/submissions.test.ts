@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {handleSubmission,SubmissionRejected,derivedIds,type SubmissionBackend,type SubmitArgs} from '../lib/submissions/service';
-import {kindFromBytes,type LinkInfo} from '../lib/submissions/rules';
+import {handleSubmission,SubmissionRejected,type SubmissionBackend,type SubmitArgs} from '../lib/submissions/service';
+import type {LinkInfo} from '../lib/submissions/rules';
 import {demoSubmissionBackend} from '../lib/submissions/demo-backend';
 import React,{createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
@@ -11,16 +11,12 @@ const docId='1aBcD_efGhIjKlMnOpQrStUvWxYz0123456789-xyz';
 const docLink=`https://docs.google.com/document/d/${docId}/edit?usp=sharing`;
 const pdf=(text='resolution')=>new File([`%PDF-1.7\n${text}`],'GA1 draft.pdf',{type:'application/pdf'});
 class FakeBackend implements SubmissionBackend{
- files=new Map<string,number>();submissions=new Map<string,SubmitArgs>();failUpload=false;reject?:SubmissionRejected;crash=false;loseResponse=false;
+ submissions=new Map<string,SubmitArgs>();reject?:SubmissionRejected;crash=false;loseResponse=false;
  async linkInfo(t:string):Promise<LinkInfo|null>{return t===token?{linkId:'l',conferenceId:'conf',committeeId:'ga1',conferenceName:'DCMUN',committeeCode:'GA1',committeeName:'General Assembly',shareWith:'ga1@dcmun.example',submitters:[{id:submitter,country:'France',flag:'🇫🇷'}]}:null;}
- async upload(path:string,bytes:Uint8Array){if(this.failUpload)throw Error('storage down');this.files.set(path,bytes.length);}
- async remove(path:string){this.files.delete(path);}
  async submit(a:SubmitArgs){
   if(this.reject)throw this.reject;if(this.crash)throw Error('db down');
   if(this.submissions.has(a.submissionId))return {status:'replayed' as const,code:'GA1 / 01'};
-  const same=(s:SubmitArgs)=>(a.googleDocId&&s.googleDocId===a.googleDocId)||(a.file&&s.file?.sha256===a.file.sha256);
-  const original=[...this.submissions.values()].find(same);
-  if(original)return {status:'duplicate' as const,code:'GA1 / 01',storageKey:original.file?.storageKey};
+  if([...this.submissions.values()].some(s=>s.googleDocId===a.googleDocId))return {status:'duplicate' as const,code:'GA1 / 01'};
   this.submissions.set(a.submissionId,a);if(this.loseResponse){this.loseResponse=false;throw Error('response lost after commit');}return {status:'created' as const,code:'GA1 / 01'};
  }
 }
@@ -31,8 +27,8 @@ test('Google Doc link (normal path): stores only the canonical document id, neve
  try{
   const first=await handleSubmission(form({submissionId:id}),backend);
   assert.equal(first.status,201);assert.deepEqual(first.body,{ok:true,status:'created',code:'GA1 / 01'});
-  const stored=backend.submissions.get(id)!;assert.equal(stored.googleDocId,docId);assert.equal(stored.file,undefined);
-  assert.equal(backend.files.size,0,'nothing uploaded');assert.equal(fetched,false,'Google is never contacted');
+  const stored=backend.submissions.get(id)!;assert.equal(stored.googleDocId,docId);
+  assert.equal(fetched,false,'Google is never contacted');
  }finally{globalThis.fetch=realFetch;}
  const retry=await handleSubmission(form({submissionId:id}),backend);assert.equal(retry.body.ok&&retry.body.status,'replayed','lost-response retry');
  const again=await handleSubmission(form({googleDoc:`docs.google.com/document/u/0/d/${docId}/view`}),backend);
@@ -46,23 +42,25 @@ test('malformed, non-Google and missing links are rejected; nothing is created',
   [{googleDoc:`https://evil.example/document/d/${docId}`},'invalid_google_doc',/not a Google Docs link/],
   [{googleDoc:`javascript:alert(1)`},'invalid_google_doc',/not a Google Docs link/],
   [{googleDoc:`https://docs.google.com/document/d/e/2PACX-${docId}/pub`},'invalid_google_doc',/Publish to the web/],
+  [{googleDoc:`https://docs.google.com/document/d/${docId}/edit?usp=sharing&ouid=1234&rtpof=true&sd=true`},'invalid_google_doc',/Word file opened in Google Docs/],
   [{googleDoc:''},'missing_source',/Paste the link/],
  ] as const){
   const r=await handleSubmission(form(fields as Record<string,string>),backend);
   assert.equal(r.status,400,error);assert.equal(!r.body.ok&&r.body.error,error);assert.match(!r.body.ok?r.body.message:'',pattern);
  }
- const none=await handleSubmission(form({},{}),backend);assert.equal(!none.body.ok&&none.body.error,'missing_source','no link and no file');
+ const none=await handleSubmission(form({},{}),backend);assert.equal(!none.body.ok&&none.body.error,'missing_source','no link');
  assert.equal(backend.submissions.size,0);
 });
-test('fallback file upload: stored under the committee path; invalid files and sizes rejected; same file is a duplicate',async()=>{
- const backend=new FakeBackend();const id=crypto.randomUUID();
- const first=await handleSubmission(form({submissionId:id,file:pdf()},{}),backend);
- assert.equal(first.status,201);assert.equal(backend.submissions.get(id)!.googleDocId,undefined);
- const key=[...backend.files.keys()][0];assert.ok(key.startsWith(`conf/ga1/${derivedIds(id).documentId}/${derivedIds(id).versionId}-`));assert.match(key,/-[0-9a-f]{64}\.pdf$/);
- const dup=await handleSubmission(form({file:pdf()},{}),backend);assert.equal(dup.body.ok&&dup.body.status,'duplicate');assert.equal(backend.files.size,1,'duplicate upload removed');
- for(const [file,error,status] of [[new File([new Uint8Array([0x89,0x50,0x4e,0x47])],'resolution.pdf'),'invalid_file',400],[new File(['hello'],'notes.txt'),'invalid_file',400],[new File([],'empty.pdf'),'invalid_file',400],[new File([new Uint8Array(4*1024*1024+1)],'big.pdf'),'too_large',413]] as const){
-  const r=await handleSubmission(form({file},{}),backend);assert.equal(r.status,status,error);assert.equal(!r.body.ok&&r.body.error,error);
+test('Google Docs only: any file is refused before anything is created, even alongside a valid Doc link',async()=>{
+ const backend=new FakeBackend();
+ for(const [base,label] of [[{},'file only'],[{googleDoc:docLink},'file plus a valid link']] as const){
+  for(const file of [pdf(),new File(['x'],'resolution.docx'),new File([],'empty.pdf')]){
+   const r=await handleSubmission(form({file},base),backend);
+   assert.equal(r.status,400,label);assert.equal(!r.body.ok&&r.body.error,'docs_only',label);assert.match(!r.body.ok?r.body.message:'',/Google Docs links only/);
+  }
  }
+ assert.equal(backend.submissions.size,0,'nothing created');
+ const noBackend=await handleSubmission(form({file:pdf()},{}),null);assert.equal(!noBackend.body.ok&&noBackend.body.error,'docs_only','refused even before configuration is checked');
 });
 test('valid and invalid committee tokens; wrong submitter; title',async()=>{
  const backend=new FakeBackend();
@@ -71,43 +69,22 @@ test('valid and invalid committee tokens; wrong submitter; title',async()=>{
  }
  assert.equal((await handleSubmission(form({}),backend)).status,201,'valid token accepted');
 });
-test('upload failure never advances the workflow; ambiguous database failure retains the uploaded file; rate limit',async()=>{
- const backend=new FakeBackend();backend.failUpload=true;
- const storage=await handleSubmission(form({file:pdf()},{}),backend);
- assert.equal(storage.status,503);assert.equal(!storage.body.ok&&storage.body.error,'storage_unavailable');assert.equal(backend.submissions.size,0);
- assert.match(!storage.body.ok?storage.body.message:'',/Google Doc link instead/);
- const doc=await handleSubmission(form({}),backend);assert.equal(doc.status,201,'Google Doc path works while file storage is down');
- backend.failUpload=false;backend.crash=true;
- const crash=await handleSubmission(form({file:pdf('x')},{}),backend);assert.equal(crash.status,500);assert.equal(backend.files.size,1,"an ambiguous failure must not delete possibly committed bytes");
+test('ambiguous database failure and rate limit',async()=>{
+ const backend=new FakeBackend();backend.crash=true;
+ const crash=await handleSubmission(form({}),backend);assert.equal(crash.status,500);assert.match(!crash.body.ok?crash.body.message:'',/could not confirm/);
  backend.crash=false;backend.reject=new SubmissionRejected('rate_limited');
  const limited=await handleSubmission(form({googleDoc:docLink.replace('xyz','xya')}),backend);assert.equal(limited.status,429);
 });
 test('cloud mode without the server key reports not configured',async()=>{
  const r=await handleSubmission(form({}),null);assert.equal(r.status,503);assert.equal(!r.body.ok&&r.body.error,'not_configured');
 });
-test('fallback upload survives a lost commit response and a retry confirms it exactly once',async()=>{
+test('a lost commit response and a retry with the same submission id confirm it exactly once',async()=>{
  const backend=new FakeBackend();backend.loseResponse=true;const id=crypto.randomUUID();
- const first=await handleSubmission(form({submissionId:id,file:pdf('committed')},{}),backend);
+ const first=await handleSubmission(form({submissionId:id}),backend);
  assert.equal(first.status,500);assert.match(!first.body.ok?first.body.message:'',/could not confirm/);
- assert.equal(backend.submissions.size,1);assert.equal(backend.files.size,1,'committed bytes retained');
- const retry=await handleSubmission(form({submissionId:id,file:pdf('committed')},{}),backend);
+ const retry=await handleSubmission(form({submissionId:id}),backend);
  assert.equal(retry.status,200);assert.equal(retry.body.ok&&retry.body.status,'replayed');
- assert.equal(backend.submissions.size,1);assert.equal(backend.files.size,1);
-});
-test('a duplicate sharing the original storage path never deletes accepted file bytes',async()=>{
- const backend=new FakeBackend(),id=crypto.randomUUID();
- await handleSubmission(form({submissionId:id,file:pdf()},{}),backend);
- const suffix=id.endsWith('1')?'2':'1';const samePrefix=id.slice(0,-1)+suffix;
- const duplicate=await handleSubmission(form({submissionId:samePrefix,file:pdf()},{}),backend);
- assert.equal(duplicate.body.ok&&duplicate.body.status,'duplicate');
- assert.equal(backend.files.size,1,'accepted upload remains');
- assert.equal('storageKey' in duplicate.body,false,'internal cleanup metadata is not public');
-});
-test('file signatures: pdf, docx, legacy doc',()=>{
- assert.equal(kindFromBytes('a.PDF',new TextEncoder().encode('%PDF-1.4')),'pdf');
- assert.equal(kindFromBytes('a.docx',new Uint8Array([0x50,0x4b,3,4])),'docx');
- assert.equal(kindFromBytes('a.doc',new Uint8Array([0xd0,0xcf,0x11,0xe0])),'doc');
- assert.equal(kindFromBytes('a.docx',new TextEncoder().encode('%PDF-1.4')),null);
+ assert.equal(backend.submissions.size,1);
 });
 test('local demo backend resolves seed committees only, does not invent Chair mailboxes and detects duplicate documents',async()=>{
  const demo=demoSubmissionBackend();
@@ -125,9 +102,9 @@ test('before hydration the resolution form cannot submit natively, accept unsync
  const form=html.match(/<form[^>]*>/)![0];
  assert.match(form,/method="post"/,'a native submission is never a GET reload');
  assert.doesNotMatch(form,/action=/,'no native action target');
- assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, title, link, checkbox and file cannot be edited before React state exists');
+ assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, title, link and checkbox cannot be edited before React state exists');
  assert.match(html,/<button class="button primary submit-button" disabled="">Loading form…<\/button>/,'submit (and Enter-key implicit submission) is blocked');
- assert.match(html,/<button type="button" class="link-button" disabled="">/,'the file/Google Doc toggle is not a silent no-op');
+ assert.doesNotMatch(html,/type="file"|Upload a file/,'Google Docs only: no file input or upload toggle');
  assert.match(html,/<p class="muted" role="status">If this form does not load, ask your Chair how to submit your resolution\.<\/p>/,'stalled hydration (JS on, never loads) still tells the delegate what to do');
  assert.match(html,/<noscript>.*This form needs JavaScript to submit\. Ask your Chair how to submit your resolution\..*<\/noscript>/,'JavaScript disabled is never a silent dead form');
 });
@@ -136,7 +113,8 @@ test('after hydration the resolution form is enabled and unchanged',t=>{
  const html=renderToStaticMarkup(createElement(SubmissionForm,{token,link:formLink}));
  assert.doesNotMatch(html,/<fieldset disabled/);
  assert.match(html,/<button class="button primary submit-button">Submit resolution<\/button>/);
- assert.match(html,/<button type="button" class="link-button">Can&#x27;t use Google Docs\? Upload a file instead<\/button>/);
+ assert.doesNotMatch(html,/type="file"|Upload a file/,'no file path after hydration either');
+ assert.match(html,/Files \(PDF or Word\) are not accepted/,'the instructions say so before the delegate starts');
  assert.doesNotMatch(html,/Loading form…|If this form does not load/);
  for(const s of ['France','Chair One','chair@dcmun.example','Google Doc link'])assert.ok(html.includes(s),s);
 });

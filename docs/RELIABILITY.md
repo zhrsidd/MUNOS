@@ -13,7 +13,7 @@ Target: ~100 simultaneous users, 150–200 headroom, one school network, no IT t
 | Photo acknowledgement | 1 outbox write per committee per slot stage | ≈ schools × affected committees × 2 over the whole conference. |
 | Schedule / photo import | 1 write per import | One atomic command; ≤ 500 sessions / ≤ 300 slots. |
 | Delegate submission page | 1 RPC per page view, cached 30 s per link per server instance | A room scanning the QR at once costs one lookup. |
-| Delegate submission | Google Doc link: 1 lookup + 1 RPC (no Storage, no Google API call). Fallback file: + 1 Storage upload | ~150 submissions per conference. Committee-row lock held for one short transaction. |
+| Delegate submission | Google Doc link: 1 lookup + 1 RPC (no Storage, no Google API call). Files are refused (Docs only since 20 Oct 2026) | ~150 submissions per conference. Committee-row lock held for one short transaction. |
 
 Realtime: no new channels. Extension writes insert into the existing `operational_changes` table, so every device keeps its one filtered subscription. Changes affecting several committees insert one small row per affected committee (photo slots, schedule import) so only those chairs refresh early; everyone else picks changes up on the normal recovery read.
 
