@@ -1,0 +1,113 @@
+# Felix: the Conference OS helper
+
+Felix is the Doha College mascot and a small, deterministic helper mounted in every staff workspace (Chair,
+Approval Panel, Admins/printing, Executive). It is a port of the earlier conference's rule-based assistant, with
+DCMUN content and the owner-requested improvements. Implemented in the `claude/felix` branch (20 October 2026);
+not yet released.
+
+## What it is, and is not
+
+- **Rule-based.** Questions are normalised and matched to workflow concepts (`lib/felix/match.ts`), then to a
+  reviewed knowledge base (`lib/felix/knowledge.ts`). The same question in the same state always gets the same
+  answer. There is no generative-AI service, no network call, no backend, migration or new dependency.
+- **Read-only.** Felix reads only what the workspace already loaded (`lib/felix/context.ts`) plus the same
+  repository health store the sync strip uses. It never changes conference data, retries or discards changes.
+- **Immediate.** Replies are computed and shown at once: there is no typewriter effect, "thinking" delay or
+  simulated streaming.
+- **Links are real destinations.** `safeLink` accepts only `/role` + a slug from `destinationSlugs(role)`
+  (`lib/navigation.ts`); anything else is dropped, including stored links. Tests check every answer, reminder and
+  example against the navigation and the app's route list.
+
+## Interface
+
+- **Launcher**: the owner-selected Launcher face at 48 × 48 CSS px inside a 56 × 56 button, bottom-right, 16 px
+  from the edges (or the safe-area inset if larger). Accessible name "Open Felix" / "Close Felix" with
+  `aria-expanded`; images have empty alt text. An unread count badge is backed by a described-by sentence.
+- **Panel** (non-modal dialog) above the launcher: 380 × 560 px on desktop; on phones it spans the width with an
+  8 px margin and fits the viewport height. Two views: **Ask** (conversation, suggestions, composer) and
+  **Inbox**. Footer: "Still stuck? Message the Executive." and the **Animate Felix** switch.
+- **Focus**: opening by click, tap or Enter moves focus into the composer (or the Inbox heading when opened from a
+  notice); nothing else moves focus. Escape (in the panel or on the launcher) closes it and returns focus to the
+  launcher. Following a link closes the panel.
+- **Short notices** appear above the launcher as real DOM text inside a polite `role="status"` region: at most
+  12 words, "Open Inbox" and a "Dismiss notice" button (Escape also dismisses). Each notice pops up once; dismissing
+  it leaves it unread in the Inbox. Hidden while the panel is open.
+- **Space**: page content gets extra bottom padding so the end of every page scrolls clear of the launcher (and of
+  a notice while one shows); the existing save toast moves to the left of the launcher.
+
+## Inbox and reminders
+
+`lib/felix/reminders.ts` builds reminders from loaded data, per role (Chairs only for their committee):
+
+- every role: conflicts and "this device cannot save" (urgent, link to System health); changes waiting to sync
+  (information; not in the local demo);
+- Chair: group photo warning/now/cancelled (from `committeePhotoReminders`, the same rules as the banner), no
+  sessions / no current session, roll call not started, changes requested, delegate submissions and "Can't access"
+  submissions, submitted amendments, passed amendments to apply to the Google Doc by hand, drafts, printed
+  resolutions; information on debate, accepted amendments, resolutions with Approval or awaiting print;
+- Approval Panel: new submissions and resolutions in review; Admins: the print queue with its stored copy total;
+  Executive: information only (with Approval, awaiting print, amendments awaiting Chairs).
+
+Only urgent and action reminders enter the **Inbox** (`lib/felix/inbox.ts`); information is given in answers to
+"What should I do next?". Rules, all pure functions with tests:
+
+- one entry per reminder key; refreshed wording keeps its read state;
+- a newer reminder of the same kind replaces an older **unread** one (e.g. "2 submissions" → "3 submissions");
+  read ones stay as history;
+- a situation that passes stays listed as "No longer current" (newest 20 kept); if it comes back it is a new,
+  unread occurrence;
+- **read** means the entry was shown in the open Inbox. "New" labels mark entries first shown during the current
+  visit. Nothing claims server delivery; browser notification APIs are never used, so blocked notification
+  permissions make no difference.
+
+## Storage (this browser only)
+
+| Key | Contents |
+| --- | --- |
+| `felix-chat-v1:<scope>` | last 60 messages |
+| `felix-inbox-v1:<scope>` | inbox entries with read/popped state |
+| `felix-motion-v1` | `"off"` when the person turned animation off (device-wide) |
+
+`<scope>` is `chair:<committeeId>` for Chairs and the role name otherwise. Every reader tolerates missing, corrupt
+or hostile values and drops links outside the role. If storage is unavailable Felix works for the page only.
+
+## Artwork and motion
+
+Assets are the owner-selected frames (idle = the Launcher image, half-blink, blink, closed-beak, happy-squint,
+content), downscaled from the 1254 px originals with Pillow LANCZOS to transparent WebP at 96 px (1x–2x) and
+144 px (3x) in `public/felix/` (about 88 KB for all twelve), same full canvas for every frame. They are plain
+`<img srcset>` so they work offline; `public/sw.js` precaches all twelve (cache `conference-os-0.2.8`).
+
+`lib/felix/motion.ts` adapts the supplied `felix-motion.js` controller: one 260 ms blink every 5.2–8.4 s, no
+bobbing; typing in the Felix composer cycles the beak and stops after 950 ms of quiet; hover/pointer movement or
+keyboard focus (`:focus-visible`) on the launcher plays the 1.12 s happy sequence with at most 5° tilt and 1.05
+scale, 1.25 s cooldown; touch only opens/closes. Reduced motion, the Animate Felix switch, a hidden tab, an
+offscreen launcher or frames that failed to decode hold the static idle face and cancel timers. Frames are fetched
+only after the launcher mounts and only while motion is allowed. Expressions never represent saving, syncing,
+errors or delivery: the sync strip does that.
+
+## Knowledge review (20 October 2026)
+
+Reviewed against the MUNOS code, not the source app:
+
+- **Removed:** Award discussion (now: awards are Chair judgement; Participation for reference), Resources & Drive,
+  automatic Debated Amendment credit (no such code in MUNOS), the delegates + spares print formula (MUNOS stores
+  a copy count per resolution; Felix says "print the number of copies shown on the job"), PDF/file submission for
+  new resolutions, the projector/server timer (the speaker timer is local to the device), schools/import column
+  details that could not be confirmed, every reference to the previous mascot, conference and attribution.
+- **Added or rewritten:** Google Docs-only submissions with "Anyone with the link → Editor" or a direct share to a
+  Chair, "Can't access" / "Access fixed", Approval-folder copy; changes requested and "Resubmit after editing →";
+  Approval history; contributions vs points and deductions/restores; sync strip wording ("Saved on this device" is
+  not "synced"); passed amendments history; group photo acknowledgements; access-code redemption, rotation and
+  revocation (cloud-only, not queued); offline reload scope matching `public/sw.js` per role.
+- **Not claimed:** a clear-majority shortcut (pending), two-thirds voting configuration UI, automated Doc access
+  checks (specification only), anything about server delivery of notices.
+
+## Limits
+
+- Felix knows only what the page has loaded; it cannot see other devices, contact details or code values.
+- Read state and chat are per browser; another device or a cleared browser starts fresh.
+- Unclear questions get a list of topics rather than a guess; out-of-scope roles are told which workspace does the
+  job without a link.
+
+Tests: `tests/felix.test.ts`, `tests/felix-inbox.test.ts`, `tests/felix-motion.test.ts`.
