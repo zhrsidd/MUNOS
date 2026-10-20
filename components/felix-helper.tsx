@@ -39,7 +39,7 @@ const subscribeReduced = (listener: () => void) => {
   media.addEventListener("change", listener);
   return () => media.removeEventListener("change", listener);
 };
-const useSystemReducedMotion = () => useSyncExternalStore(subscribeReduced, () => window.matchMedia(reducedQuery).matches, () => false);
+const useSystemReducedMotion = () => useSyncExternalStore(subscribeReduced, () => typeof window !== "undefined" && window.matchMedia(reducedQuery).matches, () => false);
 
 /**
  * Wires the expression controller to the browser: reduced motion, hidden tab, offscreen launcher and the person's

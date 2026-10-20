@@ -8,7 +8,7 @@ import { createSeed } from "../lib/seed";
 import { applyCommand } from "../lib/commands";
 import { destinationSlugs } from "../lib/navigation";
 import { conceptsIn, matchIntent, normalise } from "../lib/felix/match";
-import { KNOWLEDGE, topicsFor } from "../lib/felix/knowledge";
+import { KNOWLEDGE, topicsFor, type Answer } from "../lib/felix/knowledge";
 import { answerQuestion, destinationHrefs, safeLink, situation } from "../lib/felix/answer";
 import { buildReminders, formatReminders, SHORT_WORDS } from "../lib/felix/reminders";
 import { felixContext, type FelixContext } from "../lib/felix/context";
@@ -140,7 +140,7 @@ test("every href Felix can return is a real navigation destination of that role"
       const answer = entry.answers[role];
       if (!answer) continue;
       for (const ctx of contexts.filter(c => c.role === role)) {
-        const a = typeof answer === "function" ? answer(ctx) : answer;
+        const a: Answer = typeof answer === "function" ? answer(ctx) : answer;
         if (a.href) assert.ok(hrefs.includes(a.href), `${entry.id}/${role}: ${a.href} is not a ${role} destination`);
       }
     }

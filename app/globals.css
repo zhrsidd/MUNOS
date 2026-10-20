@@ -3373,6 +3373,8 @@ html { scroll-padding-top: 12rem; }
 .felix-motion-toggle input { display: inline-block; width: 18px; min-height: 0; height: 18px; margin: 0; padding: 0; }
 /* Keep the end of every page reachable above the launcher, and keep save notices clear of it. */
 .assembly:has(.felix-launcher) .workspace-content { padding-bottom: calc(var(--space-6) + 56px + var(--space-4)); }
+/* While a short notice is showing, leave room for it too (it is at most about three lines). */
+.assembly:has(.felix-popup) .workspace-content { padding-bottom: calc(var(--space-6) + 56px + var(--space-4) + 128px); }
 body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area-inset-right)) + 56px + var(--space-3)); max-width: calc(100vw - 56px - 3 * var(--space-4)); }
 @media (max-width: 600px) {
   .felix-panel { left: max(var(--space-2), env(safe-area-inset-left)); right: max(var(--space-2), env(safe-area-inset-right)); width: auto; height: calc(100dvh - var(--felix-above) - var(--space-2)); max-height: 640px; }
