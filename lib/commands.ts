@@ -43,6 +43,8 @@ export type Command =
       status: DocumentStatus;
       comment?: string;
       outcome?: "Passed" | "Failed" | "Withdrawn";
+      /** Close with a declared clear majority instead of counted ballots. */
+      method?: "observed";
     }
   | { type: "version"; id: string; fileName: string; text: string }
   | {
@@ -346,7 +348,12 @@ export function applyCommand(
         );
       const previous = r.status;
       r.revision = (r.revision ?? 0) + 1;
-      if(c.status==='Closed' && c.outcome!=='Withdrawn') {
+      if(c.method!==undefined && c.method!=='observed')throw Error('Unknown voting method.');
+      if(c.status==='Closed' && c.outcome!=='Withdrawn' && c.method==='observed') {
+        const problem=observedMajorityProblem(d,r.id);
+        if(problem)throw Error(problem);
+        if(c.outcome!=='Passed'&&c.outcome!=='Failed')throw Error('Choose Passed or Failed.');
+      } else if(c.status==='Closed' && c.outcome!=='Withdrawn') {
         const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
         const ballots=d.votes.filter(v=>v.sessionId===r.sessionId && v.resolutionId===r.id);
         if(!eligible.length || ballots.length!==eligible.length)throw Error('Record every eligible ballot before closing.');
@@ -356,6 +363,7 @@ export function applyCommand(
       r.status = c.status;
       r.outcome = c.outcome;
       if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
+      if(c.status === "Closed" && c.method === "observed" && c.outcome !== "Withdrawn") Object.assign(r,{outcomeMethod:"observed",declaredBy:metadata?.actorId ?? `${role}-demo`,declaredAt:now});
       let commentId: string | null = null;
       if (c.comment) {
         commentId = nextId();
@@ -615,6 +623,16 @@ export function votingOutcome(data: ConferenceData, resolutionId: string): "Pass
  const yes=votes.filter(v=>v.choice==='For').length, no=votes.filter(v=>v.choice==='Against').length;
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
  return yes+no>0 && (rule==='two_thirds'?yes*3>=(yes+no)*2:yes>no)?'Passed':'Failed';
+}
+/** Why a clear (observed) majority cannot close this vote, or null. Mirrors private.apply_mutation: an observation
+ *  can only establish a simple-majority result in a normal vote where no veto could apply. */
+export function observedMajorityProblem(data:ConferenceData,resolutionId:string):string|null{
+ const r=data.documents.find(r=>r.id===resolutionId);if(!r)return 'Resolution not found.';
+ const committee=data.committees.find(c=>c.id===r.committeeId);
+ if(r.voteMode==='divide')return 'Divide the House needs a counted roll call.';
+ if((committee?.votingRule ?? data.conference.votingRule ?? 'simple_majority')!=='simple_majority')return 'A two-thirds vote needs counted ballots.';
+ if((r.voteType ?? 'substantive')==='substantive' && committee?.vetoEnabled)return 'Only counted ballots can show that no veto was cast.';
+ return null;
 }
 export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
  const r=data.documents.find(r=>r.id===resolutionId); if(!r)return []; if(r.status==="Closed")return r.vetoedBy??[];

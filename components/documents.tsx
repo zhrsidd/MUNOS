@@ -88,7 +88,7 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
         </div>
         <div className="resolution-status">
           <Chip tone={back ? "review" : ""}>{back ? "Changes requested" : resolution.status}</Chip>
-          {resolution.outcome && <Chip tone="blue">{resolution.outcome}</Chip>}
+          {resolution.outcome && <Chip tone="blue">{resolution.outcome}{resolution.outcomeMethod === "observed" ? " · observed majority" : ""}</Chip>}
         </div>
       </header>
       {!back && (
