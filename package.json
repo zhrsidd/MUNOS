@@ -17,7 +17,8 @@
     "verify:deployment": "tsx scripts/verify-deployment.mts",
     "rehearsal:plan": "tsx scripts/rehearsal-plan.mts",
     "rehearsal:run": "tsx scripts/rehearsal-run.mts",
-    "rehearsal:identities": "tsx scripts/rehearsal-identities.mts"
+    "rehearsal:identities": "tsx scripts/rehearsal-identities.mts",
+    "smoke:project": "tsx scripts/smoke-project.mts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
