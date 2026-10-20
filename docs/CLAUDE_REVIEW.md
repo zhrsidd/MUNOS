@@ -1,5 +1,7 @@
 # Claude stack review — 6 October 2026
 
+**Historical review.** The authorship split, two-RPC read path and future Drive/amendment deferrals below describe 6 October, not current governance or scope. Follow root `AGENTS.md` and [START_HERE.md](START_HERE.md): Claude is primary engineer across the application, the read path has since been bundled, Drive mirroring is retired, and the amendment QR workflow exists. Retain these findings as evidence, not a fresh task list.
+
 Reviewed heads: #1 `61f4a5f`, #2 `a9a6169`, #3 `9cf9360`, #4 `8a49051`, #5 `217ee2c`.
 
 | PR | Review result |
