@@ -1,5 +1,7 @@
 # Release checklist — from development to the conference
 
+20 October handoff alignment: root `AGENTS.md` governs ownership (Claude primary engineer; Codex independent reviewer). John Paul Ribeiru approves releases; the owner approves production configuration and organisation/cost before hosted resource creation or upgrades. The state paragraph below is an **8 October historical checkpoint**, not a current environment inspection. [START_HERE.md](START_HERE.md) and the [PR #22 gate](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate) record current review requirements.
+
 One page of gates. Work top to bottom. **Do not start a section until every box in the section above it is ticked.** Each gate names who signs it off. Record dates and evidence links next to each box.
 
 Release model ([DEPLOYMENT.md](DEPLOYMENT.md)): `main` → automatic **Preview** (development Supabase). Production is built **only** from the `production` branch, which is moved deliberately. Merging to `main` never deploys Production.
@@ -12,7 +14,8 @@ State at the time of writing (8 October 2026): `main` = `6160f27` (PR #15: Syste
 
 - [ ] Staff familiarisation rehearsal run on development: [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md) (no load). — Executive
 - [ ] Runbook and emergency sheet reviewed by the Executive and printed drafts marked up. — Executive
-- [ ] Only bug fixes merged to `main`; every merge has green CI and a checked `main` Preview. — Codex / Claude
+- [ ] Complete independent PR #22 review and the linked authenticated staging migration/sync gate before any authorised merge; every merge has green CI and a checked resulting `main` Preview. Preserve the separately authorised UI scope; this is not a production release. — Claude / independent reviewer
+- [x] After the authorised PR #22 merge, refresh Graphify and verify its indexed commit matches the resulting `main` commit. — technical contact *(20 Oct: indexed `852642c` = PR #22 merge commit; spot checks passed; see [START_HERE](START_HERE.md))*
 - [x] ~~System health on every staff device~~ — **resolved by PR #15** (merged `723147a`): Chair `/chair/health`, Approval `/approval/health`, Admins `/logistics/health`, Executive `/admin/health`; verified on the `main` Preview with each role (Chair still cannot open `/admin/health`). — Codex, verified by Claude
 - [x] ~~Offline reload of staff health pages~~ — **resolved by PR #16** (merged `6160f27`): `public/sw.js` now prepares `/chair/health`, `/approval/health`, `/logistics/health` and `/admin/health`; verified in a real browser with the network cut (each role reloads its own page offline). — Codex, verified by Claude
 - [x] First-Executive bootstrap procedure written ([FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), `scripts/bootstrap-first-executive.sql`) and **tested on development on 8 October 2026** through the normal app flow (redeem → Executive → rotate → bootstrap code rejected on a new device → bootstrapped device still valid). — Claude
@@ -25,7 +28,7 @@ Supabase plan and compute — technical lead:
 - [ ] Billing owner confirmed; spend cap/alerts understood; region **ap-south-1 (Mumbai)**, same as Vercel functions `bom1`.
 
 Rehearsal on the upgraded instance — Claude runs, Executive observes ([STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)):
-- [ ] **REQUIRED capacity gate (STAGING_REHEARSAL.md → C2):** fresh synthetic fixture; realistic **multi-committee** run with **50 simulated staff** across the real committees plus delegate public-form traffic — 150–200 resolution page loads and a safe number of real submissions on one link (≤ 18; the documented command plans 11; delegates create no Supabase Auth sessions). **Required:** one distinct Chair rehearsal identity/grant scope per simulated real committee (`npm run rehearsal:identities -- --chairs 14`, then `scripts/rehearsal-fixture.mts`); the harness report must say `READINESS RUN`. The earlier single-committee fixture (one Chair identity, committees simulated as sessions inside one committee) overstated shared-row contention and is retained only for historical comparison; it can never satisfy this gate. Intentional rate-limit testing is separate. A 100-staff run is an optional stress test, not a gate.
+- [ ] **REQUIRED capacity gate (STAGING_REHEARSAL.md → C2):** fresh synthetic fixture; **110-device, 19-committee** rehearsal per `AGENTS.md`, using the owner’s staffing profile (57 Chairs, about 10 Approval devices, 5–6 printing devices, Executive/spares, with 1–2 active Chairs per committee). Record active versus connected/idle devices and the agreed role mix. Use one distinct scoped Chair rehearsal identity per real committee, with Chair traffic in all 19 committees and a report labelled `READINESS RUN`. Add separate delegate public-form traffic: 150–200 resolution page loads and safely bounded real submissions per link (≤ 18); no delegate Auth sessions. Verify current harness/fixture support before running; do not extrapolate old 14-committee or 50/100-staff results to this gate. Intentional rate-limit tests remain separate.
 - [ ] Offline / reconnect / recovery rehearsal (exact steps in STAGING_REHEARSAL.md), including one `PT409` "needs review" and one recovery export.
 - [ ] Supabase *Logs* and *Observability* and Vercel *Logs* reviewed for the whole run window.
 
@@ -41,7 +44,7 @@ If anything fails: stop. Fix on `main`, re-verify the Preview, rerun the failed 
 
 ## 2. Production setup — only after section 1 passes
 
-Supabase production project — technical lead with Codex:
+Supabase production project — technical lead / named integration owner, independently reviewed:
 - [ ] Create the production project (Pro, Small compute, ap-south-1). Database password stored in the password manager only.
 - [ ] Apply every migration in `supabase/migrations/` **in order, exactly once** (`supabase db push` against the linked production project); record the ledger (`supabase migration list`) — it must equal the development ledger.
 - [ ] Authentication → **Anonymous sign-ins enabled** (staff devices get their identity when an access code is entered). Email/password sign-ups not needed.
@@ -56,7 +59,7 @@ Vercel Production — Claude:
 - [ ] **Public QR gate (conference-week configuration; do not change before):** Deployment Protection changed so the **Production** domain opens without a Vercel account — delegates must reach `/submit/*` (resolution QR) and `/amend/*` (amendment QR) from their own phones. Previews stay protected. This does not open staff access: staff workspaces still require a MUNOS staff access code and an active grant (enforced by the app and database RLS), and the public delegate routes never open a staff session or workspace. **Verify from a normal phone that is not signed in to Vercel** (mobile data): the conference URL shows the staff access-code screen, and one resolution QR and one amendment QR open their forms — before declaring the release.
 - [ ] Conference domain added to Production (optional).
 
-Release — technical lead, recorded in [RELEASES.md](RELEASES.md):
+Release — technical lead, approved by John Paul Ribeiru and recorded in [RELEASES.md](RELEASES.md):
 - [ ] Choose the `main` commit that passed section 1. Advance `production` to it **intentionally** (fast-forward; never force-push).
 - [ ] Production build is READY; `npm run verify:deployment -- <production-url> <sha>` passes.
 - [ ] System health on one device: `<version> · <sha7> · production`, Supabase `ok`, Storage `ok`, GREEN.

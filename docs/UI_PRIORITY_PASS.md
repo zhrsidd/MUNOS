@@ -1,5 +1,7 @@
 # UI priorities and first implementation package
 
+Repository review follow-through: [START_HERE.md](START_HERE.md) records the shared agent context, governance and post-merge Graphify refresh; the [PR #22 acceptance gate](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate) covers migrations and the sync changes. Existing owner decisions and feature statuses below are retained; none is upgraded to staging or release acceptance by this documentation update.
+
 Owner-authorised Codex implementation, 19 October 2026. Base: Claude branch `0a43c73`.
 Branch: `codex/priority-chair-ui`. Claude can review and clean up this package independently.
 

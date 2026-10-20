@@ -1,5 +1,7 @@
 # Reliability review — Claude-owned subsystems
 
+**Historical subsystem assessment.** Authorship labels, capacity assumptions and “not yet run” statements below belong to this earlier checkpoint. Current responsibilities follow root `AGENTS.md`; current release validation is the 110-device / 19-committee gate in [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md), with PR #22's additional [sync acceptance gate](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate). The active Google Docs-only submission requirement supersedes fallback-file advice once implemented; preserve historical attachments.
+
 Target: ~100 simultaneous users, 150–200 headroom, one school network, no IT team. This review covers only what Claude added (deployment, health, submission, schedule import, group photos). Core load characteristics are in [VERIFICATION.md](VERIFICATION.md).
 
 ## Load added per device

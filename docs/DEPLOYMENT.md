@@ -1,6 +1,6 @@
 # Deployment, releases and rollback
 
-Owner: Claude (platform). Schema/migrations remain Codex-owned; see [AGENTS.md](../AGENTS.md).
+Owner: Claude, primary engineer across the application including platform, schema and migrations. Codex supplies independent review, verification and specialist support; shared architecture is serialized under one named integration owner. Root [AGENTS.md](../AGENTS.md) is authoritative; see [START_HERE.md](START_HERE.md).
 
 ## Architecture
 
@@ -102,15 +102,15 @@ Still to do, **only after the conference-week gates in [RELEASE_CHECKLIST.md](RE
 3. Verify the Preview: `npm run verify:deployment -- <preview-url>` (for protected previews, run it from a browser session or use a bypass token), then click through the changed screens.
 4. Merge to `main`. Vercel builds a **Preview** of `main` (development Supabase). Verify it the same way.
 
-Database migrations are applied separately (Codex-owned) and must be **backward compatible** with the currently deployed application: apply the migration first, then deploy the code that uses it. A Vercel rollback never reverts the database.
+Database migrations are coordinated separately by the named integration owner, independently reviewed and replayed on staging before release, and must be **backward compatible** with the currently deployed application: apply the migration first, then deploy the code that uses it. A Vercel rollback never reverts the database.
 
 ## Releasing to Production
 
-Production changes only by a deliberate, recorded step. Do it only when every gate in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) up to "Production setup" is ticked.
+Production changes only by a deliberate, recorded step approved by John Paul Ribeiru, with the owner approving production configuration changes. Do it only when every gate in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) up to "Production setup" is ticked, including the PR #22 staging/migration/sync gate where applicable. Historical environment/project/branch values below must be rechecked; this handoff does not establish current hosted state or a known-good release.
 
 1. Pick the exact `main` commit to release. It must have green CI and a verified `main` Preview.
-2. Apply any migrations that commit needs to the **production** Supabase project first (Codex-owned; each exactly once; record the ledger).
-3. Fast-forward the `production` branch to that commit — through a pull request from `main` into `production`, merged with a merge commit, or `git push origin <sha>:production` by the technical lead. Never force-push `production`.
+2. Under the approved release plan, the named integration owner applies the committed, staging-replayed migrations that commit needs to the **production** Supabase project first (each exactly once; record the ledger and verify compatibility with the currently deployed app).
+3. Advance `production` to that **exact verified commit** through the approved branch-protection workflow; never force-push. A new merge commit has a different SHA: if the workflow creates one, verify that resulting commit before release rather than claiming it is the already-verified SHA. Do not add incidental code changes to the release.
 4. Vercel builds Production from `production`. Verify: `npm run verify:deployment -- <production-url> <sha>`; System health on one device shows `<version> · <sha7> · production`, Supabase `ok`, Storage `ok`.
 5. Record the release in [RELEASES.md](RELEASES.md).
 

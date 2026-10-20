@@ -1,5 +1,7 @@
 # Remaining product and release work
 
+Current handoff context and governance: [START_HERE.md](START_HERE.md). PR #22's independent review, authenticated staging migration replay and sync acceptance remain explicit gates in the [review packet](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate); after an authorised merge, refresh Graphify to the resulting `main` commit. The session redesign remains a separate draft contract.
+
 The initial backlog was superseded by the approved core integration. Staff access codes, central sessions, the amendment QR workflow and System health in every staff workspace (PR #12–#16), QR resolution submission, shared current-session selection, school group-photo reminders and configurable Security Council veto rules are implemented, with verification limits recorded in [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
 
 Public workspace labels are **Admins** and **Executive**; internal role identifiers and routes are unchanged. Award rubric controls and the Award discussion page are retired. Historical participation records remain available; award decisions stay with Chairs.

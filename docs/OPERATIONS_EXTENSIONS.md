@@ -1,6 +1,6 @@
 # Operations extensions (Claude-owned)
 
-New, independent conference-operations systems built around the Codex-owned core. This page describes the current extension contract after Codex integration review. The original review checklist is retained below for traceability; review outcomes and corrections are in [CLAUDE_REVIEW.md](CLAUDE_REVIEW.md).
+Conference-operations extensions built around the shared core. Current responsibility follows root `AGENTS.md`: Claude is primary engineer across core and extensions; Codex provides independent review/verification. Authorship is not a restriction. This page records the extension contract after the original Codex integration review. The original review checklist is retained below for traceability; review outcomes and corrections are in [CLAUDE_REVIEW.md](CLAUDE_REVIEW.md).
 
 ## Extension pattern
 
