@@ -126,7 +126,8 @@ regions for save and sync status; `lang="en"`; touch targets as above; works at 
   Counts explicitly mean delivered, non-voided speeches/POIs in the current session. Search relevance precedes
   Fewest/Most ordering. Ordering stays stable while open; visible counts can refresh. Enter selects, never adds.
 - This first package introduces no motion library, template dependency or new animation. Restrained transitions,
-  honest loading states and the supplied 48 px Felix remain subsequent work in the approved queue.
+  honest loading states and the supplied 48 px Felix remain subsequent work in the approved queue (Felix: see the
+  Felix section below).
 
 ## Orbit seal loading screen · owner selected, 19 October 2026
 
@@ -160,3 +161,14 @@ changes colour only; keyboard uses the standard 3 px focus ring. Colour transiti
 disabled under reduced motion. No status counters or sync claims are decorative content.
 
 See [HOME_SCREEN_PROPOSAL.md](HOME_SCREEN_PROPOSAL.md) for screenshots, access states and implementation.
+
+## Felix · 20 October 2026
+
+Felix, the Doha College mascot, is the staff helper (see [FELIX.md](FELIX.md)). The supplied Launcher face is
+48 × 48 px in a 56 px round `--surface` launcher with a `--line` hairline and the popover shadow, fixed 16 px from
+the bottom-right corner (safe-area aware). Short notices above it follow the toast rule (≤ 12 words, real text,
+dismissible) and use the callout pattern: 3 px left rule in `--action`, or `--attention` with its tint when urgent.
+The panel uses existing tokens: hairline sections, 40 px controls, one primary Send button. Exception to "nothing
+animates while typing": Felix's own composer may move his beak, as the owner requested; no other screen does.
+Expressions are decorative and never carry save, sync or error meaning. Reduced motion and the Animate Felix
+switch hold the face still.
