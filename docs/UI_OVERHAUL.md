@@ -188,3 +188,25 @@ The complete current coverage checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_
 and phone screenshots, state rules and verification evidence for Claude. Single-workspace auto-entry and
 role filtering are preserved. This home reference is implemented locally; Claude's global button, panel-width
 and spacing overhaul remains open.
+
+## 19 October UI/QoL brief, Chair feedback and independent audit · reconciled 20 October 2026
+
+Source documents, kept verbatim: [UI/QoL brief](briefs/UI_QOL_BRIEF_2026-10-19.md), [Chair feedback additions](briefs/CHAIR_FEEDBACK_ADDITIONS.md), [Watermelon selection](WATERMELON_UI_SELECTION.md) ([MIT licence](WATERMELON_LICENSE.txt)), [PHESMUN parity at 0a43c73](briefs/PORT_PARITY_2026-10-19.md) (historical; superseded by the audit's §D) and the [independent audit](briefs/INDEPENDENT_AUDIT_2026-10-20.md). The brief supersedes Participation sorted by points and uploaded resolution files. Status as of 20 October:
+
+| Item | Status |
+| --- | --- |
+| §1 Docs-only submissions | Docs-only enforced (PR #27). Access verification states/recheck need a reviewed migration; advisory only (audit "Google Docs security assessment"). |
+| §2 Executive resolution status | On main (`admin/resolution-status`). |
+| §3 Contribution ranking and Debate points list | On main ([PARTICIPATION_VIEWS.md](PARTICIPATION_VIEWS.md)). |
+| §4 Clear majority | Draft PR #37 (migration not applied). |
+| §5 Award discussion removed | On main; old bookmarks redirect. |
+| §6 Felix | In progress on `claude/felix` with the supplied Launcher art and six frames. |
+| §7 Chairs in school photos | Draft PR #36 (migration not applied). |
+| §8 Configurable Main Submitter/Debated amendment | Draft PR #35 (migration not applied). |
+| §9 About and parity | About: draft PR #38. Parity gaps from audit §D (print copies F3, optional email/committee import, staff edit/remove) are separate items. |
+| §10 Buttons, panels, home | Button system PR #31 and alignment PR #32 merged; home proposal on main; remaining sweep continues. |
+| Chair feedback: country search, sync strip, passed amendments | On main; audit F2 (offline durability of passed history) open. |
+| Restrained motion and Watermelon patterns | Pending; CSS/Web Animations first, no new dependency without measurement. |
+| Audit F1 cutover isolation | Pending: cutover packet. |
+| Audit F4 bounded bodies | Draft PR #39. |
+| Audit F5 touch targets | PR #32 gives 40 × 44 px on touch; raise to 44 × 44 with 8 px gaps as the audit proposes. |
