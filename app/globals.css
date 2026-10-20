@@ -3238,3 +3238,148 @@ html { scroll-padding-top: 12rem; }
 .about-logo { display: block; margin-bottom: var(--space-2); }
 .about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }
 @media (max-width: 700px) { .about-card { padding: var(--space-5) var(--space-4); } }
+
+/* ------------------------------------------------------------------------------------------------------------
+   Felix (components/felix-helper.tsx, docs/FELIX.md). The Doha College mascot: a 48 px face in a 56 px launcher
+   in the bottom-right corner (safe-area aware), short notices above it, and a panel that fits the viewport.
+   Expressions are decorative only; save/sync state stays in the sync strip. Reduced motion holds Felix still.
+   ------------------------------------------------------------------------------------------------------------ */
+.felix {
+  --felix-size: 56px;
+  --felix-right: max(var(--space-4), env(safe-area-inset-right));
+  --felix-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  --felix-above: calc(var(--felix-bottom) + var(--felix-size) + var(--space-2));
+}
+.felix-launcher {
+  position: fixed;
+  right: var(--felix-right);
+  bottom: var(--felix-bottom);
+  z-index: 40;
+  width: var(--felix-size);
+  height: var(--felix-size);
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 8px 24px #14233f1f;
+}
+.felix-launcher:hover { background: var(--surface); border-color: var(--action); }
+.felix-face { display: block; width: 48px; height: 48px; object-fit: contain; pointer-events: none; user-select: none; }
+.felix-face.is-petting { animation: felix-pet 1.12s ease-in-out; }
+@keyframes felix-pet {
+  25% { transform: translateY(-1px) rotate(-5deg) scale(1.05); }
+  58% { transform: translateY(-1px) rotate(4deg) scale(1.04); }
+  82% { transform: rotate(-1deg) scale(1.01); }
+}
+.felix-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  border: 2px solid var(--surface);
+  border-radius: 10px;
+  background: var(--action);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.felix-icon-button {
+  flex: 0 0 40px;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 22px;
+  font-weight: 400;
+}
+/* Short notices sit directly above the launcher, never across the page. */
+.felix-popup-region { position: fixed; right: var(--felix-right); bottom: var(--felix-above); z-index: 40; width: min(300px, calc(100vw - 2 * var(--space-4))); }
+.felix-popup {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--action);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  box-shadow: 0 8px 24px #14233f1f;
+  font-size: 13px;
+  color: var(--ink);
+}
+.felix-popup.urgent { border-left-color: var(--attention); background: var(--attention-soft); }
+.felix-popup p { overflow-wrap: anywhere; }
+.felix-popup small { display: block; color: var(--ink-2); font-size: 12px; }
+.felix-popup-kind { font-weight: 700; }
+.felix-popup.urgent .felix-popup-kind { color: var(--attention); }
+.felix-popup-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.felix-popup-actions .text-button { min-height: 40px; padding: 0 var(--space-2); color: var(--action); font-size: 13px; font-weight: 600; }
+/* The panel: above the launcher on every screen size, sized to the viewport so nothing scrolls sideways. */
+.felix-panel {
+  position: fixed;
+  right: var(--felix-right);
+  bottom: var(--felix-above);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 2 * var(--space-4)));
+  height: min(560px, calc(100dvh - var(--felix-above) - var(--space-4)));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  box-shadow: 0 12px 32px #14233f2b;
+  color: var(--ink);
+}
+.felix-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); }
+.felix-head > div { display: grid; flex: 1; min-width: 0; }
+.felix-head h2 { font-size: 15px; line-height: 1.4; font-weight: 650; color: var(--ink); }
+.felix-head small { color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.felix-avatar { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; }
+.felix-avatar .felix-face { width: 32px; height: 32px; }
+.felix-views { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); }
+.felix-views button { flex: 1; font-size: 13px; }
+.felix-views button[aria-pressed="true"] { background: var(--action-soft); border-color: var(--action); color: var(--action); }
+.felix-log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4); display: grid; align-content: start; gap: var(--space-3); }
+.felix-message { max-width: 92%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-container); font-size: 13px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.felix-from-felix { justify-self: start; background: var(--sunken); color: var(--ink); }
+.felix-from-you { justify-self: end; background: var(--action-soft); color: var(--ink); }
+.felix-message a { display: block; margin-top: var(--space-2); font-weight: 600; text-decoration: underline; }
+.felix-suggestions { display: grid; gap: var(--space-2); }
+.felix-suggestions button { justify-content: flex-start; text-align: left; font-size: 13px; font-weight: 500; }
+.felix-composer { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line); }
+.felix-composer input { flex: 1; min-width: 0; font-size: 14px; color: var(--ink); }
+.felix-inbox { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4); }
+.felix-inbox h3 { margin-bottom: var(--space-3); font-size: 15px; font-weight: 650; }
+.felix-inbox ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.felix-inbox li { display: grid; gap: var(--space-1); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); font-size: 13px; overflow-wrap: anywhere; }
+.felix-inbox li.inactive { color: var(--ink-3); }
+.felix-inbox li a { font-weight: 600; }
+.felix-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); color: var(--ink-3); font-size: 12px; }
+.felix-new { padding: 0 var(--space-2); border-radius: var(--radius-control); background: var(--action-soft); color: var(--action); font-weight: 700; }
+.felix-empty, .felix-fine { color: var(--ink-3); font-size: 12px; }
+.felix-fine { margin-top: var(--space-3); }
+.felix-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--line); background: var(--paper); color: var(--ink-2); font-size: 12px; }
+.felix-foot small { flex-basis: 100%; color: var(--ink-3); font-size: 12px; }
+.felix-motion-toggle { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; margin: 0; color: var(--ink-2); font-size: 12px; }
+.felix-motion-toggle input { display: inline-block; width: 18px; min-height: 0; height: 18px; margin: 0; padding: 0; }
+/* Keep the end of every page reachable above the launcher, and keep save notices clear of it. */
+.assembly:has(.felix-launcher) .workspace-content { padding-bottom: calc(var(--space-6) + 56px + var(--space-4)); }
+/* While a short notice is showing, leave room for it too (it is at most about three lines). */
+.assembly:has(.felix-popup) .workspace-content { padding-bottom: calc(var(--space-6) + 56px + var(--space-4) + 128px); }
+body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area-inset-right)) + 56px + var(--space-3)); max-width: calc(100vw - 56px - 3 * var(--space-4)); }
+@media (max-width: 600px) {
+  .felix-panel { left: max(var(--space-2), env(safe-area-inset-left)); right: max(var(--space-2), env(safe-area-inset-right)); width: auto; height: calc(100dvh - var(--felix-above) - var(--space-2)); max-height: 640px; }
+  .felix-popup-region { width: min(300px, calc(100vw - 2 * var(--space-4))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .felix-face, .felix-face.is-petting { animation: none !important; transform: none !important; }
+}
