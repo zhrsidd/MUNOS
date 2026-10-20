@@ -1,8 +1,8 @@
-# Implementation plans for Codex review: clear majority, Chairs in school photos, configurable points
+# Implementation plans: clear majority, Chair photos, configurable points and voting rule
 
-Status: **proposal, 20 October 2026; owner decisions recorded the same day (see each "Owner decisions" section).** Implementation may proceed as draft PRs, so Codex can review each plan together with its code. No migration is applied and no protected change is merged until Codex has reviewed it and the owner approves. The owner briefs are [CLEAR_MAJORITY_VOTING.md](../CLEAR_MAJORITY_VOTING.md) and [UI_PRIORITY_PASS.md](../UI_PRIORITY_PASS.md) (the "Pending" rows) and, for photos, [OPERATIONS_EXTENSIONS.md](../OPERATIONS_EXTENSIONS.md#school-group-photos-and-chair-reminders).
+Status: **documentation reviewed by Codex, 20 October 2026; owner decisions and independent-review conditions recorded below.** Merging this plan does not approve the feature implementations or apply their migrations. Implementation may proceed as draft PRs, so Codex can review each plan together with its code. No migration is applied and no protected change is merged until Codex has reviewed it and the owner approves. The owner briefs are [CLEAR_MAJORITY_VOTING.md](../CLEAR_MAJORITY_VOTING.md) and [UI_PRIORITY_PASS.md](../UI_PRIORITY_PASS.md) (the "Pending" rows) and, for photos, [OPERATIONS_EXTENSIONS.md](../OPERATIONS_EXTENSIONS.md#school-group-photos-and-chair-reminders).
 
-All three plans follow the same rules:
+All four plans follow the same rules:
 
 * Each feature is a separate PR with its own additive migration. Migrations are never edited after they are applied.
 * Function bodies change through `pg_temp.patch_once` anchors, as in `20261009120000_procedure_usability`. A patch fails loudly if its anchor does not match exactly once.
@@ -41,7 +41,8 @@ Close the resolution with a declared result instead of counted ballots. No new t
   * require `"voteMode"` not to be `divide`, and the effective rule to be `simple_majority`;
   * **refuse when the committee has `vetoEnabled` and the vote is substantive.** Missing ballots cannot establish that no veto was cast, so counted voting is required there;
   * require `outcome` to be `Passed` or `Failed`, then store `outcome`, `"outcomeMethod"='observed'`, `"declaredBy"=actor` and `"declaredAt"=client_time`;
-  * skip the eligible-ballot count and the counted-rule comparison;
+  * retain a nonzero eligible-attendance requirement; skip only named-ballot completeness and the counted-rule comparison;
+  * reject a mismatched ballot/session context; the UI action and confirmation must retain the same session safeguard as counted voting;
   * leave any ballots recorded earlier untouched: not deleted and not counted;
   * `"vetoedBy"` stays empty.
 * The `method` key is optional, and an absent key keeps today's counted path byte for byte.
@@ -130,7 +131,7 @@ Decided by the owner, 20 October:
 | Case | Behaviour |
 | --- | --- |
 | Chair assigned to two committees | Listed in both committees' reminders |
-| Chair's school set or changed after acknowledgements | The slot revision does not change; a newly affected committee simply has no acknowledgement yet and is reminded |
+| Chair's school or committee/role assignment changes after acknowledgements | Version the affected participant list or advance the relevant slot revision so old acknowledgements no longer silence the changed reminder; preserve history and refuse stale queued acknowledgements for the current version |
 | Chair with no school | Unchanged from today |
 | A committee has Chairs but no delegates from the school | The slot now appears for it (previously hidden) |
 | Cancelled slot | Same cancelled banner rules, now also for Chair-only committees |
@@ -208,7 +209,7 @@ Decided by the owner, 20 October:
   * `submitter` must be one integer from 1 to 20;
   * other categories keep their current rules.
 * `private.apply_procedure` `speechScore`: replace the literal `5` with `(private.scoring_values(conf,cid,'submitter'))[1]`.
-* `event` correction: validate the category's value only when `points` actually changes, so correcting an old event (for example a stored +5 after the value becomes +4) is not refused for a value it already had.
+* `event` correction: preserve historical stored values and allow undo regardless of today's configuration. The existing command changes points or undoes; it has no metadata-only correction. A no-op same-points correction is not a required contract change.
 
 **App:**
 
@@ -230,13 +231,13 @@ Decided by the owner, 20 October:
 | Committee override for Main Submitter | Allowed; that committee uses it, others inherit |
 | Main Submitter set to several values or 0 | Refused (one value, 1–20) |
 | Speech already scored, value changed before the next resolution | Exactly-once is per resolution; the next resolution uses the new value |
-| Offline device with an old snapshot | Its queued speech score carries no submitter value; the server applies its current value, and the device shows the server's value after the read-back |
+| Offline device with an old snapshot | Capture and validate the effective submitter scoring setting in the queued command; retain a visible conflict if it changed. Processing-time scoring is an alternative only with explicit owner acceptance and truthful provisional/repriced UI, not silent replay repricing |
 | Conference created before this migration without an `amendment` row | Falls back to `[3]` until the Executive saves a value |
 
 ### Acceptance tests
 
 1. Client and PostgreSQL: configuring Main Submitter `[4]` makes the next Main Submitter speech award +4, still once per resolution. `[4,5]`, `[0]` and `[21]` are refused.
-2. Events stored at +5 before the change are unchanged. Correcting such an event without changing its points succeeds.
+2. Events stored at +5 before the change are unchanged. Undoing one still succeeds after configuration changes; new point changes obey the current contract. Test a queued automatic award against a later configuration change.
 3. A committee override applies only to that committee.
 4. On a blank conference, `amendment` can be configured, and the default `[3]` applies before that.
 5. Existing `procedure-usability*` and `participation-view` tests pass. The test that asserts "cannot be configured" is updated to the new contract in the same PR.
@@ -281,3 +282,14 @@ For each one, the sequence is:
 5. Read-only verification, then `npm run smoke:project`.
 
 Nothing is merged or applied without that approval.
+
+## Independent implementation review conditions · 20 October 2026
+
+Codex reviewed the implementation PR heads separately from this plan. The plan may be merged as documentation; **PRs #35, #36 and #37 remain unapproved until their findings are resolved**. A clean Git merge or green existing CI does not supersede these conditions.
+
+- **Points (#35):** cover the previously reproduced optimistic +5 → server +7 replay without a configuration precondition. Resolve the offline contract above and test the selected policy. Historical points and exactly-once behavior remain required.
+- **Photos (#36):** test an already-acknowledged delegate committee gaining a Chair from the same school, affiliation clearing/change, assignment/role changes, and stale offline acknowledgements. Updating the participant display without invalidating the acknowledgement is insufficient.
+- **Observed voting (#37):** refuse no-attendance/all-absent closes in client and SQL; guard a session switch before confirmation; retain old ballots honestly; show the declaring Chair/time in history. Make the observed-result CHECK explicitly reject a NULL outcome (the RPC's Passed/Failed validation alone does not make the CHECK enforce this).
+- **Integration:** review the revised exact heads, replay the combined migration sequence in isolation and rerun the relevant parity/authorization/offline tests. The owner has authorized Codex to merge changes that pass review; that authorization does not authorize applying hosted migrations, changing conference records or releasing Production.
+
+No new local runtime verification was available during this documentation reconciliation. Exact-head CI and source review are the current evidence; earlier independent reproductions remain applicable where implementation code is unchanged.
