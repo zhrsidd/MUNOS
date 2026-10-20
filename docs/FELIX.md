@@ -91,8 +91,7 @@ errors or delivery: the sync strip does that.
 Reviewed against the MUNOS code, not the source app:
 
 - **Removed:** Award discussion (now: awards are Chair judgement; Participation for reference), Resources & Drive,
-  automatic Debated Amendment credit (no such code in MUNOS), the delegates + spares print formula (MUNOS stores
-  a copy count per resolution; Felix says "print the number of copies shown on the job"), PDF/file submission for
+  automatic Debated Amendment credit (no such code in MUNOS), PDF/file submission for
   new resolutions, the projector/server timer (the speaker timer is local to the device), schools/import column
   details that could not be confirmed, every reference to the previous mascot, conference and attribution.
 - **Added or rewritten:** Google Docs-only submissions with "Anyone with the link → Editor" or a direct share to a
