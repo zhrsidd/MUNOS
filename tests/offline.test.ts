@@ -18,7 +18,7 @@ test('offline actions survive restart, lost response and duplicate retry exactly
  const initial=repo.getSnapshot()!.events.length;
  await repo.execute(speech,'chair');await repo.execute(speech,'chair');
  await repo.execute({type:'attendance',delegateId:'d0',sessionId:'s1',status:'Present & Voting'},'chair');
- await repo.execute({type:'timer',sessionId:'s1',remaining:90,duration:90,startedAt:Date.now()},'chair');
+ await repo.execute({type:'attendance',delegateId:'d1',sessionId:'s1',status:'Present'},'chair');
  await repo.execute({type:'queue',sessionId:'s1',advance:true},'chair');
  await tick();assert.equal(repo.getHealth().pending,5);assert.equal(repo.getSnapshot()!.events.length,initial+2);
  repo.dispose();await store.close();

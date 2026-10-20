@@ -41,7 +41,7 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 - [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print → In Debate.
 - [ ] Amendment QR end to end: amendment page shows the resolution in debate → submit → Chair amendment inbox → Accepted for Debate → In Debate → Closed (Passed) → Chair edits the Google Doc by hand.
 - [ ] Public form shows only committee, delegation selector, title, link, checkbox and fallback — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
-- [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §12): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).
+- [ ] Sharing matrix (see GOOGLE_WORKSPACE_ACCESS_MODEL.md §4): personal Gmail Doc on *Anyone with the link → Editor*; another school's Workspace Doc; a school account that blocks link sharing (direct share to a Chair, or file fallback); a Viewer-only link (Chair marks *Can't access*).
 - [ ] Group-photo slot with a reminder 10 minutes out.
 - [ ] Offline: on each staff role's prepared device, cut the network and reload that role's System health page (`/chair/health`, `/approval/health`, `/logistics/health`, `/admin/health`); it renders and **Export device recovery file** works.
 
@@ -149,11 +149,6 @@ Run with 25–50 simulated staff devices in the background and real people on th
 ## Realtime
 
 Realtime is an enhancement. Verify: available (changes appear within ~1 s), disconnected (E2: ≤ 60 s via recovery reads, immediately on refocus), reconnecting (refetch on resubscribe). Core actions never wait for Realtime. `npm run test:load` additionally measures Realtime connect/reconnect for up to 200 channels.
-
-## Drive rehearsal — FUTURE (design only)
-
-Run when the Drive integration exists ([GOOGLE_DRIVE_ARCHITECTURE.md](GOOGLE_DRIVE_ARCHITECTURE.md)):
-committee-folder setup twice (no duplicates) · Submit to Approval creates exactly one copy in the right committee folder · retry after a forced timeout adopts the existing copy · Drive unavailable → Conference OS unaffected, status "Failed — will retry" → recovers automatically · permission error (Doc not shared with the Group) → "Needs attention" with a plain reason · PDF snapshot re-run updates, not duplicates.
 
 ## Phase F — Rollback drill (30 min, staging project only)
 

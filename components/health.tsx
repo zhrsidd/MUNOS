@@ -1,5 +1,10 @@
 "use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useConference } from "@/lib/context";
+import { staffRoleForPath } from "@/lib/access";
+import { saveStatus } from "@/lib/save-status";
 import { repository } from "@/lib/repository";
 import { buildInfo, releaseLabel } from "@/lib/platform/build-info";
 import type { HealthReport } from "@/lib/platform/health-probe";
@@ -155,7 +160,19 @@ export function SystemHealth() {
           <dt>Unsynced / conflicts</dt>
           <dd>
             {health.pending} / {health.conflicts}
+            {health.awaitingConfirmation ? ` · ${health.awaitingConfirmation} already received by the server, awaiting confirmation` : ""}
           </dd>
+          {(health.errorKind || health.retryAt) && (
+            <>
+              <dt>Sync failure</dt>
+              <dd className="wrap-anywhere">
+                {health.errorKind === "overload" ? "Database busy / timed out" : health.errorKind === "network" ? "Network" : health.errorKind === "conflict" ? "Needs review" : "Other"}
+                {health.errorCode ? ` (${health.errorCode})` : ""}
+                {health.retryAttempt ? ` · automatic retry #${health.retryAttempt}` : ""}
+                {health.retryAt ? ` due ${new Date(health.retryAt).toLocaleTimeString("en-GB")}` : ""}
+              </dd>
+            </>
+          )}
           {health.actorId && (
             <>
               <dt>Device user</dt>
@@ -175,8 +192,6 @@ export function SystemHealth() {
                 ? "/api/health did not respond"
                 : `${server.status} · Supabase ${server.checks.supabase.status}${server.checks.supabase.latencyMs !== undefined ? ` (${server.checks.supabase.latencyMs} ms)` : ""} · Database ${server.checks.database?.status ?? "not reported"} · Storage ${server.checks.storage.status} · server build ${server.app.commit.slice(0, 7) || "local"} · ${new Date(server.checkedAt).toLocaleTimeString("en-GB")}`}
           </dd>
-          <dt>Drive archive</dt>
-          <dd>Not configured</dd>
         </dl>
       </details>
       {repository
@@ -205,6 +220,24 @@ export function SystemHealth() {
     </section>
   );
 }
+/** Always-present sync strip below navigation; reuses the reviewed save-state language. */
+export function SaveStatus() {
+  const { status } = useSystemStatus(false);
+  const { access } = useConference();
+  const h = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
+  const area = staffRoleForPath(usePathname() ?? "") ?? "chair";
+  const online = !status.items.some((i) => i.key === "internet" && i.level !== "green");
+  const info = saveStatus({ health: h, online, access: access.status });
+  return (
+    <div className={`save-status ${info.tone}`}>
+      <div className="save-status-inner">
+        <span className="status-dot" aria-hidden="true" />
+        <span className="save-status-message" role="status" aria-live="polite" aria-atomic="true">{info.label.replace(/ · open details$/, "")}</span>
+        <Link href={`/${area}/health`} className="save-status-details">Open details</Link>
+      </div>
+    </div>
+  );
+}
 /** Compact indicator for the sidebar. Client-side signals only; never polls the server. */
 export function SyncStatus() {
   const { status } = useSystemStatus(false);
@@ -219,21 +252,6 @@ export function SyncStatus() {
     </span>
   );
 }
-/** Operator strip shown above workspaces only when something needs attention. */
-export function StatusStrip() {
-  const { status } = useSystemStatus(false);
-  const h = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
-  const offline = status.items.some((i) => i.key === "internet" && i.level !== "green");
-  // The isolated local demo is always "yellow"; only interrupt demo users for real problems.
-  if (status.level === "green" || (h.mode === "local" && !cloudExpected && status.level === "yellow" && !offline)) return null;
-  return (
-    <div className={`status-strip ${status.level}`} role="status">
-      <span className="status-dot" aria-hidden="true" />
-      <strong>{status.headline}.</strong> <span>{status.message}</span>
-    </div>
-  );
-}
-
 export function DataModeLabel(){
  const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
  return <span>{h.mode==='supabase'?'Supabase development':'Local demo'}</span>;

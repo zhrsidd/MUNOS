@@ -205,14 +205,12 @@ export interface ConferenceData extends OperationsData, BatchData {
   criteria: AwardCriterion[];
   awardScores: AwardScore[];
   audit: AuditEntry[];
-  timers: Record<ID, TimerState>;
+  /** Deprecated: the speaker timer is local to the device. The server still returns this until the schema owner removes its table; the client ignores it. */
+  timers?: Record<ID, TimerState>;
 }
 export interface DocumentStorageAdapter {
   upload(file: File, documentId: ID): Promise<{ storageKey: string }>;
   signedUrl(storageKey: string): Promise<string>;
-}
-export interface ArchiveAdapter {
-  mirror(version: DocumentVersion): Promise<{ archiveId: string }>;
 }
 export const roleCapabilities: Record<Role, string[]> = {
   chair: [
@@ -221,7 +219,6 @@ export const roleCapabilities: Record<Role, string[]> = {
     "queue",
     "voting",
     "documents",
-    "awards",
   ],
   approval: ["review"],
   logistics: ["printing"],

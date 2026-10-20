@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {AccessGatedTransport,activeStaffGrants,cachedStaffAccess,grantAccess,NO_CONFERENCE_ACCESS,staffRoleForPath,type AccessGrant} from '../lib/access';
+import {AccessGatedTransport,activeStaffGrants,cachedStaffAccess,grantAccess,NO_CONFERENCE_ACCESS,soleWorkspacePath,staffRoleForPath,type AccessGrant} from '../lib/access';
 import {DurableRepository,type Transport} from '../lib/sync/repository';
 import {DurableStore,type Mutation} from '../lib/sync/store';
 import {createSeed} from '../lib/seed';
@@ -87,4 +87,18 @@ test('prepared legacy device reopens offline; expired lease retains exportable o
   if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else Reflect.deleteProperty(globalThis,'navigator');
   for(const key of ['NEXT_PUBLIC_DATA_BACKEND','NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY','NEXT_PUBLIC_CONFERENCE_ID']){if(previousEnv[key]===undefined)delete process.env[key];else process.env[key]=previousEnv[key];}
  }
+});
+
+test('a staff member with exactly one workspace skips the picker; anyone with a choice, no access or demo mode sees it',()=>{
+ const one=grantAccess([chair],'a',undefined,now);
+ assert.equal(soleWorkspacePath(one),'/chair');
+ assert.equal(soleWorkspacePath(grantAccess([{role:'approval',committee_id:null,expires_at:future}],'a',undefined,now)),'/approval');
+ assert.equal(soleWorkspacePath(grantAccess([{role:'admin',committee_id:null,expires_at:future}],'a',undefined,now)),'/admin');
+ // Two chair grants on different committees are still the single Chair workspace.
+ assert.equal(soleWorkspacePath(grantAccess([chair,{...chair,committee_id:'ga2'}],'a',undefined,now)),'/chair');
+ // A multi-role executive keeps the picker.
+ assert.equal(soleWorkspacePath(grantAccess([{role:'admin',committee_id:null,expires_at:future},{role:'logistics',committee_id:null,expires_at:future}],'a',undefined,now)),null);
+ assert.equal(soleWorkspacePath(grantAccess([],'a',undefined,now)),null);
+ assert.equal(soleWorkspacePath({status:'demo',roles:['chair']}),null);
+ assert.equal(soleWorkspacePath({status:'loading',roles:[]}),null);
 });

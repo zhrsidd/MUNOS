@@ -15,7 +15,8 @@ export class RepositoryController {
  private generation=0;
  private unsubscribe?:()=>void;
  private expiryTimer?:ReturnType<typeof setTimeout>;
- private pollTimer?:ReturnType<typeof setInterval>;
+ private pollTimer?:ReturnType<typeof setTimeout>;
+ private lastAccessCheck=0;
  private checking?:Promise<void>;
  private signingOut=false;
  private explicitSignOut=false;
@@ -62,8 +63,8 @@ export class RepositoryController {
    else if(session?.user.id!==this.access.actorId&&event!=='INITIAL_SESSION')this.deny('loading','Checking staff access…',session?.user.id,session?.user.email);
    if(event!=='INITIAL_SESSION')setTimeout(()=>{void this.retryAccess();},0);
   });
-  window.addEventListener('online',this.retryAccess);window.addEventListener('focus',this.retryAccess);
-  this.pollTimer=setInterval(()=>{void this.retryAccess();},60000);
+  window.addEventListener('online',this.retryAccess);window.addEventListener('focus',this.onFocus);
+  this.scheduleAccessPoll();
   await this.retryAccess();
  }
  private async connectActive(){
@@ -71,9 +72,17 @@ export class RepositoryController {
   this.unsubscribe=repo.subscribe(()=>{if(repo!==this.active)return;this.health=repo.getHealth();this.emit();if(this.health.detail.startsWith("Access has changed"))void this.retryAccess();});
   try{await repo.ready();this.health=repo.getHealth();this.emit();}catch{this.deny('unavailable','Device storage is unavailable. Enable browser storage before recording changes.');}
  }
+ // Access is re-verified about once a minute. The interval is jittered ±20% so devices that opened together do not poll in
+ // lockstep, and focus events (tab switching) are throttled: each check is a database round trip that was slow on Day 1.
+ private scheduleAccessPoll(){
+  clearTimeout(this.pollTimer);
+  this.pollTimer=setTimeout(()=>{void this.retryAccess().finally(()=>this.scheduleAccessPoll());},Math.round(60000*(0.8+0.4*Math.random())));
+ }
+ private onFocus=()=>{if(Date.now()-this.lastAccessCheck<20000)return;void this.retryAccess();};
  retryAccess=():Promise<void>=>{
   if(!this.isCloud())return Promise.resolve();
   if(this.checking)return this.checking;
+  this.lastAccessCheck=Date.now();
   this.checking=this.checkAccess().catch(()=>{
    if(this.access.status!=='active')this.deny('unavailable','Unable to check staff access. Reconnect and retry.');
   }).finally(()=>{this.checking=undefined;});return this.checking;

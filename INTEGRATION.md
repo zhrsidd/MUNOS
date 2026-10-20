@@ -52,7 +52,7 @@ Documents: **Google Docs is the resolution editor; Conference OS tracks the work
 
 Sharing: prefer “Anyone with the link → Editor”. If school restrictions prevent this, show the actual assigned Chairs’ names and configured contact emails, derived from staff assignments; do not fabricate committee mailboxes or treat legacy `share_with` as authoritative. The form confirmation is “I have made sure the Chairs can edit this document.” Staff email is contact metadata, not an access grant or authentication identity. The contact migration is applied; a browser save/reload and remote assigned-contact lookup passed. The temporary test contact was then cleared.
 
-Drive (design only, not implemented): Supabase stays the live record; Google Docs holds editable resolution text; a conference-owned Shared Drive holds Approval copies, PDF snapshots and generated read-only exports. Drive side effects run as retryable, idempotent jobs after the Supabase change commits, so a Drive failure never blocks the conference. Folder layout, failure states, credentials and the CODEX REVIEW REQUIRED — DESIGN ONLY schema proposals are in [docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md); `npm run drive:plan` prints the proposed folder tree without contacting Google. Automation identity research (separate from human Chair edit access): [docs/GOOGLE_WORKSPACE_ACCESS_MODEL.md](docs/GOOGLE_WORKSPACE_ACCESS_MODEL.md).
+Google Drive is not integrated: no mirroring, archive or API access. The Chair copies a resolution into the Approval Panel's folder by hand.
 
 Auth UI and credential redemption, hardened replacement-device recovery, deployment/monitoring and school-network rehearsal precede conference use. See the operations runbook and verification report.
 

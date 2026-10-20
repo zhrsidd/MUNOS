@@ -1,5 +1,17 @@
 import type { NextConfig } from "next";
 import { version } from "./package.json";
+import { checkProductionTarget, NEVER_SUPABASE_REFS, supabaseRef } from "./lib/platform/target-guard";
+
+// Target-identity guard: a cloud build never points at the PHESMUN production project, and a Vercel Production build must point at
+// exactly the project named in EXPECTED_SUPABASE_REF. It fails the build instead of deploying a wrong target.
+if (process.env.NEXT_PUBLIC_DATA_BACKEND === "supabase") {
+  const ref = supabaseRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (ref && NEVER_SUPABASE_REFS.includes(ref)) throw Error(`Target guard: ${ref} is the PHESMUN production project. Refusing to build against it.`);
+  if (process.env.VERCEL_ENV === "production") {
+    const target = checkProductionTarget(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env);
+    if (!target.ok) throw Error(`Target guard: ${target.reason}. Refusing to build for Production.`);
+  }
+}
 
 // Build identity is fixed at build time so every screen can say exactly which
 // deployment it is running. Vercel provides the VERCEL_* system variables.
@@ -25,6 +37,12 @@ const config: NextConfig = {
   poweredByHeader: false,
   turbopack: { root: process.cwd() },
   env: build,
+  async redirects() {
+    return [
+      { source: "/chair/awards", destination: "/chair/participation", permanent: false },
+      { source: "/admin/awards", destination: "/admin/scoring", permanent: false },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: security },

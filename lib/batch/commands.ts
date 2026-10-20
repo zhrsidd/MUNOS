@@ -10,7 +10,7 @@ export function batchFingerprint(d:ConferenceData,c:BatchCommand):string|null{
 export function materializeCommitteeSessions(d:ConferenceData,committeeId:string,nextId:()=>string){
  for(const slot of [...(d.sessionSlots??[])].filter(s=>!s.archived).sort((a,b)=>a.id.localeCompare(b.id)))d.sessions.push({id:nextId(),committeeId,slotId:slot.id,name:slot.name,startsAt:slot.startsAt,endsAt:slot.endsAt,state:'scheduled',archived:false});
 }
-export function sessionUsed(d:ConferenceData,id:string){return d.attendance.some(x=>x.sessionId===id)||d.documents.some(x=>x.sessionId===id)||d.events.some(x=>x.sessionId===id)||d.queue.some(x=>x.sessionId===id)||d.votes.some(x=>x.sessionId===id)||!!d.timers[id]||!!d.speeches?.some(x=>x.sessionId===id)||!!d.debateStates?.some(x=>x.sessionId===id)||!!d.amendments?.some(x=>x.sessionId===id)||d.committees.some(x=>x.currentSessionId===id);}
+export function sessionUsed(d:ConferenceData,id:string){return d.attendance.some(x=>x.sessionId===id)||!!d.pointAdjustments?.some(x=>x.sessionId===id)||d.documents.some(x=>x.sessionId===id)||d.events.some(x=>x.sessionId===id)||d.queue.some(x=>x.sessionId===id)||d.votes.some(x=>x.sessionId===id)||!!d.speeches?.some(x=>x.sessionId===id)||!!d.debateStates?.some(x=>x.sessionId===id)||!!d.amendments?.some(x=>x.sessionId===id)||d.committees.some(x=>x.currentSessionId===id);}
 export function applyBatch(d:ConferenceData,c:BatchCommand,nextId:()=>string,now:string){
  if(c.type==='committeeUpdate'||c.type==='committeeLifecycle'){
   const committee=d.committees.find(x=>x.id===c.id);if(!committee)throw Error('Committee unavailable.');

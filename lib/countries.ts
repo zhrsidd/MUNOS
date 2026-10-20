@@ -206,7 +206,10 @@ export function countryKey(name:string){
  return name.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[’'`.]/g,'').replace(/&/g,' and ').replace(/\bsaint\b/g,'st').replace(/[^a-z0-9]+/g,' ').trim().replace(/^the /,'');
 }
 const INDEX=new Map<string,string>();
-for(const line of TABLE.split('\n')){const [code,names]=line.split(':');for(const n of names.split('|'))INDEX.set(countryKey(n),code);}
+const NAMES=new Map<string,string[]>();
+for(const line of TABLE.split('\n')){const [code,names]=line.split(':');NAMES.set(code,names.split('|'));for(const n of names.split('|'))INDEX.set(countryKey(n),code);}
+/** Search aliases only; the stored delegation name remains the displayed identity. */
+export function countrySearchNames(name:string):string[]{return NAMES.get(countryCode(name)??'')??[name];}
 /** ISO 3166-1 alpha-2 code for a country name or alias, or null when unknown. */
 export function countryCode(name:string):string|null{return INDEX.get(countryKey(name))??null;}
 export function flagFromCode(code:string):string{return /^[A-Z]{2}$/.test(code)?String.fromCodePoint(...[...code].map(c=>0x1f1e6+c.charCodeAt(0)-65)):UNKNOWN_FLAG;}

@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useConference } from "@/lib/context";
-import { suggestedDelegates } from "@/lib/repository";
+import { PointsLeaderboard } from "./points-leaderboard";
 import type { Command } from "@/lib/commands";
 import type { Delegate } from "@/lib/domain";
 import type { Lane, SpeechKind } from "@/lib/procedure/types";
 import { activeAmendment, activeLane, activePoi, FLOOR_NOT_WITH_CHAIR, laneEntries, nextPoi, nextSpeaker, poiEntries } from "@/lib/procedure/view";
 import { scoringValues } from "@/lib/scoring";
 import { Chip, DelegateIdentity, Panel, Timer } from "./ui";
+import { CountryPicker } from "./country-picker";
+import { sessionOpportunities } from "@/lib/country-search";
 
 type QueueRow = { id: string; delegateId: string; position: number };
 
@@ -65,7 +67,7 @@ function OrderedQueue({ entries, delegates, scope, onOrder, actions }: {
 
 export function DebateConsole({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
   const { data, act } = useConference();
-  const [selection, setSelection] = useState("");
+  const [selection, setSelection] = useState<Record<Lane, string>>({ open: "", for: "", against: "" });
   const [poiSelection, setPoiSelection] = useState("");
   const [yieldSelection, setYieldSelection] = useState("");
   const [classification, setClassification] = useState<Exclude<SpeechKind, "Co-Submitter" | "Main Submitter">>("Other");
@@ -92,13 +94,12 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
   const poiWaiting = poiQueue.filter(p => !p.recognizedAt);
   const allowanceOpen = active?.state === "pois" && (active.poiLimit === null || active.poiCount < active.poiLimit);
   const next = nextSpeaker(data, sessionId);
-  const selectedDelegate = present.some(d => d.id === selection) ? selection : present[0]?.id ?? "";
+  const counts = sessionOpportunities(data.events, sessionId);
   const poiDelegates = present.filter(d => d.id !== active?.delegateId && !poiQueue.some(p => p.delegateId === d.id));
-  const selectedPoi = poiDelegates.some(d => d.id === poiSelection) ? poiSelection : poiDelegates[0]?.id ?? "";
+  const selectedPoi = poiDelegates.some(d => d.id === poiSelection) ? poiSelection : "";
   const yieldDelegates = present.filter(d => d.id !== active?.delegateId);
-  const selectedYield = yieldDelegates.some(d => d.id === yieldSelection) ? yieldSelection : yieldDelegates[0]?.id ?? "";
+  const selectedYield = yieldDelegates.some(d => d.id === yieldSelection) ? yieldSelection : "";
   const mainSubmitter = present.find(d => d.id === resolution?.submitterId);
-  const suggested = suggestedDelegates(data, sessionId).filter(d => d.id !== active?.delegateId).slice(0, 3);
   const lanes: Lane[] = mode === "open" ? ["open"] : ["for", "against"];
   async function send(command: Command) {
     if (busy) return;
@@ -156,7 +157,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
               <div className="procedure-buttons">{speechValues.map(points => <button key={points} disabled={busy || !!speechRecorded} aria-label={`Record ${speaker.country} speech for ${points} points`} onClick={() => void send({ type: "speechScore", sessionId, speechId: active.id, points })}>+{points}</button>)}</div>
             </div>
             {active.classification === "Main Submitter" && <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (selectedYield) void send({ type: "speechYield", sessionId, speechId: active.id, delegateId: selectedYield }); }}>
-              <label>Yield to a Co-Submitter<select value={selectedYield} onChange={e => setYieldSelection(e.target.value)}><option value="" disabled>Choose a present delegate</option>{yieldDelegates.map(d => <option key={d.id} value={d.id}>{d.country} · {d.name}</option>)}</select></label>
+              <CountryPicker label="Yield to a Co-Submitter" delegates={yieldDelegates} value={selectedYield} onChange={setYieldSelection} counts={counts} kind="speeches" disabled={busy} />
               <button disabled={busy || !selectedYield}>Yield floor</button>
             </form>}
             <button className="primary" disabled={busy} onClick={() => void send({ type: "speechFinish", sessionId, speechId: active.id })}>Finish · return floor to Chair</button>
@@ -168,7 +169,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
           </>}
         </div>
       </Panel>
-      <Timer sessionId={sessionId} />
+      <Timer committeeId={committeeId} resetKey={active?.id ?? "floor-free"} />
     </div>
     {active && <Panel title="Points of information" subtitle="Recognize the first POI, let the delegate ask it, then record its configured value. Recognition alone records nothing." action={<Chip tone="neutral">{active.poiCount} heard · {active.poiLimit === null ? "Any" : active.poiLimit} allowed</Chip>}>
       <div className="procedure-pois">
@@ -179,7 +180,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
           <div className="procedure-buttons">{poiValues.map(points => <button key={points} disabled={busy} aria-label={`Record ${country(poiActive.delegateId)} POI for ${points} points`} onClick={() => void send({ type: "poiScore", sessionId, speechId: active.id, entryId: poiActive.id, points })}>+{points}</button>)}<button disabled={busy} onClick={() => void send({ type: "poiRemove", sessionId, speechId: active.id, entryId: poiActive.id })}>Withdraw POI</button></div>
         </div> : poiNext ? <button className="primary next-speaker" disabled={busy || !allowanceOpen} onClick={() => void send({ type: "poiRecognize", sessionId, speechId: active.id, entryId: poiNext.id })}>Next POI · {country(poiNext.delegateId)}</button> : null}
         {!poiActive && poiNext && !allowanceOpen && <p className="footnote">Set or extend the allowance before recognizing another POI.</p>}
-        <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (selectedPoi) void send({ type: "poiAdd", sessionId, speechId: active.id, delegateId: selectedPoi }); }}><label>Raised placard<select value={selectedPoi} onChange={e => setPoiSelection(e.target.value)}><option value="" disabled>Choose a present delegate</option>{poiDelegates.map(d => <option key={d.id} value={d.id}>{d.country} · {d.name}</option>)}</select></label><button disabled={busy || !selectedPoi}>Add to POI queue</button></form>
+        <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (selectedPoi) void send({ type: "poiAdd", sessionId, speechId: active.id, delegateId: selectedPoi }); }}><CountryPicker label="Raised placard" delegates={poiDelegates} value={selectedPoi} onChange={setPoiSelection} counts={counts} kind="pois" disabled={busy} /><button disabled={busy || !selectedPoi}>Add to POI queue</button></form>
         {poiWaiting.length > 0 ? <OrderedQueue entries={poiWaiting} delegates={delegates} scope={`POI queue ${active.id}`} onOrder={ids => void send({ type: "poiOrder", sessionId, speechId: active.id, ids: poiActive ? [poiActive.id, ...ids] : ids })} actions={entry => <button disabled={busy} aria-label={`Remove ${country(entry.delegateId)} from POI queue`} onClick={() => void send({ type: "poiRemove", sessionId, speechId: active.id, entryId: entry.id })}>×</button>} /> : <p className="footnote">No raised placards waiting for this speech.</p>}
       </div>
     </Panel>}
@@ -193,18 +194,15 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
         {lanes.map(lane => {
           const entries = laneEntries(data, sessionId, lane);
           const available = present.filter(d => !entries.some(q => q.delegateId === d.id));
-          const chosen = available.some(d => d.id === selectedDelegate) ? selectedDelegate : available[0]?.id ?? "";
+          const chosen = available.some(d => d.id === selection[lane]) ? selection[lane] : "";
           return <section className="procedure-lane" key={lane} aria-label={`${lane} speeches`}>
             <div className="procedure-lane-heading"><h3>{lane === "open" ? "Speaker queue" : lane === "for" ? "Speeches for" : "Speeches against"}</h3><Chip tone={lane === currentLane ? "blue" : "neutral"}>{entries.length} waiting{mode === "closed" && lane === phase ? " · current phase" : ""}</Chip></div>
-            <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (chosen) void send({ type: "queueAdd", sessionId, delegateId: chosen, lane }); }}><label>Add delegate<select value={chosen} onChange={e => setSelection(e.target.value)}><option value="" disabled>Choose a present delegate</option>{available.map(d => <option key={d.id} value={d.id}>{d.country} · {d.name}</option>)}</select></label><button disabled={busy || !chosen}>+ Queue</button></form>
+            <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (chosen) void send({ type: "queueAdd", sessionId, delegateId: chosen, lane }); }}><CountryPicker label={`Add delegate${lane === "open" ? "" : ` · ${lane}`}`} delegates={available} value={chosen} onChange={id => setSelection(current => ({ ...current, [lane]: id }))} counts={counts} kind="speeches" disabled={busy} /><button disabled={busy || !chosen}>+ Queue</button></form>
             {entries.length ? <OrderedQueue entries={entries} delegates={delegates} scope={`${lane} speaker queue`} onOrder={ids => void send({ type: "queueOrder", sessionId, lane, ids })} actions={entry => <button disabled={busy} aria-label={`Remove ${country(entry.delegateId)} from ${lane} speaker queue`} onClick={() => void send({ type: "queueRemove", sessionId, entryId: entry.id })}>×</button>} /> : <p className="footnote">No delegates waiting. Add a raised placard above.</p>}
           </section>;
         })}
       </div>
     </Panel>
-    <Panel title="Make room for another voice" subtitle="Suggestions prioritize fewer opportunities, independently of quality points.">
-      <div className="procedure-suggestions">{suggested.map(d => <div key={d.id}><DelegateIdentity delegate={d} /><button disabled={busy || data.queue.some(q => q.sessionId === sessionId && q.delegateId === d.id && (q.lane ?? "open") === currentLane)} onClick={() => void send({ type: "queueAdd", sessionId, delegateId: d.id, lane: currentLane })}>+ Queue</button></div>)}</div>
-      {!present.length && <p className="footnote">Mark delegates present in <Link href="/chair/roll-call">Roll call</Link> to begin.</p>}
-    </Panel>
+    <PointsLeaderboard delegates={delegates} />
   </div>;
 }

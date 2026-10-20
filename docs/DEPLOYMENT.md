@@ -34,6 +34,20 @@ GitHub zhrsidd/MUNOS
 
 Preview must never point at the production database. Production must never point at the development database.
 
+### Target guard
+
+`lib/platform/target-guard.ts` enforces that rule in code. It **fails closed**: a missing, malformed or contradictory configuration refuses, and there is no override flag.
+
+| Where | Rule |
+| --- | --- |
+| Every build and the `/api/health` probe | The PHESMUN production project (`gglltljhdpkfjnyjmnif`) is **always refused**, in every environment. |
+| Vercel **Production** build and probe | `NEXT_PUBLIC_SUPABASE_URL` must be exactly the project in `EXPECTED_SUPABASE_REF`. If that variable is unset the build **fails** (this is a change from before: a Production build now requires it). A refused probe reports `down` ("Wrong Supabase project") and contacts nothing. |
+| Load, rehearsal, fixture and verification scripts (`scripts/*.mts`, via `remote-context.mts` and the direct guards) | The project must be listed in `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS` (the DCMUN development project `opmydpozhdgkpcnjwpqb` is the default when `DEVELOPMENT_SUPABASE_REFS` is unset). The production project is never a tool target. With no allow-list the tool refuses. A refusal throws **before any connection**. |
+
+A project has exactly one role: listing the same ref as production and staging, or listing the PHESMUN production project anywhere, is a configuration error and refuses. Refusal messages name project refs only (public in the URL), never keys.
+
+Before the DCMUN staging project is used for rehearsal, add its ref to `STAGING_SUPABASE_REFS`; before the DCMUN production deployment, set `EXPECTED_SUPABASE_REF` in the Vercel **Production** environment only.
+
 ## Environment variables
 
 Set these in Vercel → Project → Settings → Environment Variables, separately for **Preview** and **Production**.

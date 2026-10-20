@@ -60,12 +60,12 @@ function LinkWorkingDoc({ documentId }: { documentId: string }) {
     <span className="link-field">
       <input value={value} aria-label="Working Google Doc link" placeholder="Paste the Google Doc link" onChange={(e) => setValue(e.target.value)} />
       <button disabled={!parsed.ok} title={!parsed.ok && value ? googleDocMessages[parsed.problem] : undefined} onClick={() => parsed.ok && void act({ type: "resolutionLink", documentId, action: "workingDoc", docId: parsed.id }, "chair").then((ok) => ok && setValue(""))}>
-        Link Google Doc
+        Link working document
       </button>
     </span>
   );
 }
-/** Document preview caption: the working Google Doc, the Approval copy and any uploaded file. */
+/** The working Google Doc, the Approval copy and any uploaded file. */
 export function ResolutionSources({ resolution, storageKey, fileName }: { resolution: Resolution; storageKey: string | null; fileName: string }) {
   const { data } = useConference();
   const chair = usePathname()?.startsWith("/chair");
@@ -75,7 +75,7 @@ export function ResolutionSources({ resolution, storageKey, fileName }: { resolu
       {link?.approvalCopyDocId && <GoogleDocButton docId={link.approvalCopyDocId} label="Open approval copy" primary={!chair} />}
       {link?.workingDocId && <GoogleDocButton docId={link.workingDocId} label="Open working Google Doc" primary={chair || !link.approvalCopyDocId} />}
       {storageKey && <OpenSubmittedFile storageKey={storageKey} fileName={fileName} />}
-      {!link?.workingDocId && !storageKey && (chair ? <LinkWorkingDoc documentId={resolution.id} /> : <span className="muted">{fileName} · no Google Doc linked</span>)}
+      {!link?.workingDocId && !storageKey && (chair ? <LinkWorkingDoc documentId={resolution.id} /> : <span className="muted">No working document linked yet.</span>)}
       {link?.access === "problem" && <Chip tone="draft">Chair can&apos;t access document</Chip>}
     </span>
   );
@@ -130,7 +130,7 @@ function SubmissionCard({ resolution, link, shareWith }: { resolution: Resolutio
         <button className="primary" disabled={(!!copy.trim() && !parsedCopy.ok) || link.access === "problem"} onClick={() => void sendToApproval()}>
           Submit to Approval
         </button>
-        <small className="muted">Make your copy in the Approval Panel&apos;s Drive folder first (manual for now).</small>
+        <small className="muted">Make your copy in the Approval Panel&apos;s Google Drive folder first.</small>
       </div>
     </article>
   );

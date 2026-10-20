@@ -46,7 +46,6 @@ The example defaults to an isolated local demo. For the development database, se
 | `/submit/{token}` | Public, mobile page where delegates register their Google Doc resolution with the Chair (no account; file upload fallback) |
 | `/submit/{token}/sheet` | Printable committee room sheet with QR code |
 | `/api/health` | Build identity and Supabase/Storage reachability (JSON) |
-| `/projector` | Lightweight display |
 
 ## Verify
 
@@ -62,11 +61,11 @@ npm start -- --port 3001
 
 ## Deployment
 
-Vercel Preview for every branch/PR **and for `main`**; Production only from the `production` branch, advanced deliberately; CI on every PR; build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL. Release gates: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). Staff practice: [docs/STAFF_REHEARSAL.md](docs/STAFF_REHEARSAL.md). Conference-week load rehearsal: [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) (`npm run rehearsal:plan`, guarded `npm run rehearsal:run`). Drive design: [docs/GOOGLE_DRIVE_ARCHITECTURE.md](docs/GOOGLE_DRIVE_ARCHITECTURE.md) (`npm run drive:plan`, dry run).
+Vercel Preview for every branch/PR **and for `main`**; Production only from the `production` branch, advanced deliberately; CI on every PR; build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL. Release gates: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). Staff practice: [docs/STAFF_REHEARSAL.md](docs/STAFF_REHEARSAL.md). Conference-week load rehearsal: [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) (`npm run rehearsal:plan`, guarded `npm run rehearsal:run`).
 
 ## Deferred
 
-Google Drive automation (Approval-folder copies, PDF snapshots, archive), production Supabase setup, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+Production Supabase setup, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
 Operations extensions (resolution submission, group-photo reminders; the earlier schedule import is superseded by central sessions) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
 

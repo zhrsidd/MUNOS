@@ -2,6 +2,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import type {ConferenceData,Role} from '../domain';
 import {ConflictError,DurableRepository,type Transport} from '../sync/repository';
 import {DurableStore,type Mutation} from '../sync/store';
+import {transportError} from '../sync/backoff';
 import {isOperationsCommand} from '../operations/commands';
 import type {OperationsData} from '../operations/types';
 // CODEX REVIEW REQUIRED: read() normally makes ONE RPC — conference_state_snapshot, or executive_state_snapshot for
@@ -18,13 +19,13 @@ export class SupabaseTransport implements Transport {
  async read():Promise<ConferenceData>{
   if(this.recoveryOnly)throw Error("Renew device access before syncing.");
   if(!this.bundledUnavailable){
-   const {data,error}=await this.client.rpc(this.isExecutive()?'executive_state_snapshot':'conference_state_snapshot',{conf:this.conferenceId});
+   const {data,error,status}=await this.client.rpc(this.isExecutive()?'executive_state_snapshot':'conference_state_snapshot',{conf:this.conferenceId});
    if(!error){
     if(!data?.conference?.id)throw Error('Conference access has not been granted.');
     return data as ConferenceData;
    }
    // Never fall back on authorization, timeout or any other failure: only a missing bundled function.
-   if(!missingFunction(error))throw error;
+   if(!missingFunction(error))throw transportError(error,status);
    this.bundledUnavailable=true;
   }
   return this.readSeparately();
@@ -33,10 +34,10 @@ export class SupabaseTransport implements Transport {
  private async readSeparately():Promise<ConferenceData>{
   const [core,operations]=await Promise.all([this.client.rpc(this.isExecutive()?'executive_snapshot':'conference_snapshot',{conf:this.conferenceId}),this.client.rpc('operations_snapshot',{conf:this.conferenceId})]);
   const {data,error}=core;
-  if(error)throw error;
+  if(error)throw transportError(error,core.status);
   if(!data?.conference?.id)throw Error('Conference access has not been granted.');
   // Before the extension migration is applied the core conference still works without extension data.
-  if(operations.error && !missingFunction(operations.error))throw operations.error;
+  if(operations.error && !missingFunction(operations.error))throw transportError(operations.error,operations.status);
   return {...(data as ConferenceData),...((operations.data??{}) as OperationsData)};
  }
  async send(m:Mutation){
@@ -46,10 +47,10 @@ export class SupabaseTransport implements Transport {
    const {data:{session}}=await this.client.auth.getSession();
    if(session && session.user.id!==this.actorId)throw new ConflictError("Device identity changed. Export saved actions for recovery.");
   }
-  const {error}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:m.command,requested_role:m.role,expected:m.expected,client_time:m.createdAt});
+  const {error,status}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:m.command,requested_role:m.role,expected:m.expected,client_time:m.createdAt});
   if(error){
    if(error.code === 'PT409' || error.code === '40001' || error.code === '42501' || /^(22|23)/.test(error.code))throw new ConflictError(error.code==='42501'?'Access has changed. Ask an administrator to review this saved change.':error.message);
-   throw error;
+   throw transportError(error,status);
   }
  }
  subscribe(refresh:()=>void,state:(connected:boolean)=>void){

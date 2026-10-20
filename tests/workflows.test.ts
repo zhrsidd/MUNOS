@@ -224,42 +224,11 @@ test("session and committee foreign-key boundaries are enforced", () => {
     /present/,
   );
 });
-test("timers persist transitions per session and advancing resets only that session", () => {
+test("the speaker timer is not part of conference state: queue advance and speech transitions write no timer", () => {
   let data = createSeed();
-  data = applyCommand(
-    data,
-    {
-      type: "timer",
-      sessionId: "s1",
-      duration: 120,
-      remaining: 80,
-      startedAt: 123,
-    },
-    "chair",
-  );
-  data = applyCommand(
-    data,
-    {
-      type: "timer",
-      sessionId: "s2",
-      duration: 60,
-      remaining: 60,
-      startedAt: null,
-    },
-    "chair",
-  );
-  data = applyCommand(
-    data,
-    { type: "queue", sessionId: "s1", advance: true },
-    "chair",
-  );
-  assert.deepEqual(data.timers.s1, {
-    revision: 2,
-    duration: 120,
-    remaining: 120,
-    startedAt: null,
-  });
-  assert.equal(data.timers.s2.duration, 60);
+  assert.equal(data.timers, undefined, "the seed carries no stored timers");
+  data = applyCommand(data, { type: "queue", sessionId: "s1", advance: true }, "chair");
+  assert.equal(data.timers, undefined, "advancing the queue no longer resets a stored timer");
 });
 test("committee scoring overrides do not change other committees", () => {
   let data = createSeed();

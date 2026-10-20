@@ -5,6 +5,7 @@ import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
 import { applyCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
+import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
   actorId: string;
   read(): Promise<ConferenceData>;
@@ -16,6 +17,12 @@ export interface Health {
   mode: "local" | "supabase"; state: "saved" | "syncing" | "waiting" | "conflict" | "error";
   pending: number; conflicts: number; realtime: boolean; latency: number | null;
   message: string; detail: string; actorId?: string; lastSynced?: string;
+  /** Diagnostics only (System health → Technical details): never changes what is saved or sent. */
+  errorKind?: ErrorKind; errorCode?: string;
+  /** Automatic-retry attempt number and when the next attempt is due, while a sync is failing. */
+  retryAttempt?: number; retryAt?: string;
+  /** Actions the server has accepted that this device has not yet confirmed with a snapshot read. */
+  awaitingConfirmation?: number;
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
   if(isBatchCommand(c))return batchFingerprint(data,c);
@@ -31,7 +38,6 @@ export function fingerprint(data: ConferenceData, c: Command): string | null {
     case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
     case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
     case "event": return String(data.events.find(e=>e.id===c.id)?.revision ?? 0);
-    case "timer": return String(data.timers[c.sessionId]?.revision ?? 0);
     case "document": case "version": return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
     case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
     default: return isOperationsCommand(c)?operationsFingerprint(data,c):null;
@@ -53,6 +59,16 @@ export class DurableRepository implements ConferenceRepository {
   private stopLive?: () => void;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private attempts = 0;
+  private lastKind: ErrorKind = "other";
+  // Actions the server acknowledged in this page session. They stay in the durable outbox until a snapshot confirms them,
+  // but are not sent again, so a failed read-back no longer replays the whole queue. Lost on reload: replay is then idempotent.
+  private acked = new Set<string>();
+  private disposed = false;
+  // Coalescing only applies after THIS page session has completed a sync: the first read after opening is never skipped.
+  private hasSynced = false;
+  private lastReadAt = 0;
+  private deferTimer?: ReturnType<typeof setTimeout>;
+  private onlineTimer?: ReturnType<typeof setTimeout>;
   health: Health;
   constructor(public readonly key: string, private seed: () => ConferenceData, private store = new DurableStore(), private transport?: Transport, detail = "") {
     this.health = { mode: transport ? "supabase" : "local", state: "saved", pending: 0, conflicts: 0, realtime: false, latency: null, message: "Preparing durable storage…", detail, actorId: transport?.actorId };
@@ -64,7 +80,8 @@ export class DurableRepository implements ConferenceRepository {
   private publish(checkpoint: Checkpoint) {
     this.checkpoint = checkpoint; this.data = project(checkpoint);
     const conflicts = checkpoint.pending.filter(m=>m.state==="conflict").length;
-    this.health = { ...this.health, pending: checkpoint.pending.length, conflicts,
+    const awaiting = checkpoint.pending.filter(m=>this.acked.has(m.id)).length;
+    this.health = { ...this.health, pending: checkpoint.pending.length, conflicts, awaitingConfirmation: awaiting || undefined,
       state: conflicts ? "conflict" : checkpoint.pending.length ? "waiting" : "saved",
       message: conflicts ? `${conflicts} ${conflicts === 1 ? "change needs" : "changes need"} review in System health. Your changes are retained.` : checkpoint.pending.length ? "Saved on this device — waiting for connection" : this.transport ? "Synced" : "Saved on this device · local demo" };
     this.emit();
@@ -78,12 +95,12 @@ export class DurableRepository implements ConferenceRepository {
     } catch (error) { this.initialized=false; throw error; }
     if (typeof window !== "undefined") {
       this.channel = new BroadcastChannel(`conference:${this.key}`);
-      this.channel.onmessage = () => { void this.reload().then(()=>{ if(this.checkpoint?.pending.length) this.retry(); }); };
-      window.addEventListener("online", this.retry);
-      window.addEventListener("focus", this.retry);
-      this.stopLive = this.transport?.subscribe?.(this.retry, connected=>{
+      this.channel.onmessage = () => { void this.reload().then(()=>{ if(this.checkpoint?.pending.length) this.refresh(); }); };
+      window.addEventListener("online", this.onOnline);
+      window.addEventListener("focus", this.refresh);
+      this.stopLive = this.transport?.subscribe?.(this.refresh, connected=>{
         this.health={...this.health,realtime:connected}; this.emit();
-        if(connected) this.retry();
+        if(connected) this.refresh();
       });
     }
     if (this.transport) void this.flush();
@@ -101,54 +118,122 @@ export class DurableRepository implements ConferenceRepository {
       return this.transport ? {...old,pending:[...old.pending,mutation],savedAt:mutation.createdAt} : {...old,base:next,savedAt:mutation.createdAt};
     }));
     this.channel?.postMessage("saved");
-    void this.flush();
+    // While the SERVER is timing out, the durable outbox is sent by the retry timer: a new action must not add another
+    // request against a database that is already saturated. Other failures (e.g. no network) cost the server nothing.
+    // Behind a conflict nothing can be sent, so a new action must not cost a snapshot read: treat it as a passive refresh.
+    if(this.attempts===0 || this.lastKind!=="overload") void this.flush(this.pendingBlocked());
   };
   private schedule() {
     clearTimeout(this.retryTimer);
-    if(!this.transport) return;
-    const delay=this.attempts ? Math.min(60000,1000*2**Math.min(this.attempts,6)) : 60000;
-    this.retryTimer=setTimeout(this.retry,delay+Math.random()*1000);
+    if(!this.transport || this.disposed) return;
+    const failing=this.attempts>0;
+    const delay=failing ? retryDelay(this.attempts,this.lastKind) : pollDelay(this.health.realtime);
+    this.retryTimer=setTimeout(failing ? this.retry : this.poll,delay);
+    if(failing) { this.health={...this.health,retryAttempt:this.attempts,retryAt:new Date(Date.now()+delay).toISOString()}; this.emit(); }
   }
+  /** Explicit attempt: Retry button, conflict dismissal, backoff timer. Always runs. */
   retry = () => { void this.flush(); };
-  async flush() {
+  /** Safety-net timer when healthy. Sends anything waiting; otherwise skips the read if a peer tab just refreshed. */
+  private poll = () => { void this.flush(true); };
+  /**
+   * Passive triggers (focus, Realtime, peer tabs). They never override failure backoff — the retry timer owns recovery
+   * — and never re-read within MIN_REFRESH_GAP_MS of a refresh when nothing is waiting to send.
+   */
+  refresh = () => { if(!this.transport || this.attempts>0) return; void this.flush(true); };
+  /** Network returned: retry soon, spread over a few seconds so every device on the Wi-Fi does not reconnect in the same instant. */
+  private onOnline = () => {
+    if(!this.transport || this.disposed) return;
+    this.attempts=0; clearTimeout(this.onlineTimer);
+    this.onlineTimer=setTimeout(this.retry,Math.random()*3000);
+  };
+  /** The oldest queued action is a conflict: every action behind it waits for an operator, so nothing can be sent. */
+  private pendingBlocked() { return this.checkpoint?.pending[0]?.state==="conflict"; }
+  /**
+   * Milliseconds a PASSIVE refresh should still wait (<= 0: go). Never coalesces while there is sendable work. With an empty
+   * outbox any tab's refresh counts (persisted time); behind a conflict only this tab's last read counts, over a longer gap,
+   * because new local actions also touch the persisted time.
+   */
+  private refreshWait() {
+    const c=this.checkpoint;
+    if(!this.hasSynced || !c) return 0;
+    if(c.pending.length) return this.pendingBlocked() ? BLOCKED_REFRESH_GAP_MS-(Date.now()-this.lastReadAt) : 0;
+    const age=Date.now()-Date.parse(c.savedAt);
+    return Number.isFinite(age) ? MIN_REFRESH_GAP_MS-age : 0;
+  }
+  private deferRefresh() {
+    if(this.deferTimer || this.disposed) return;
+    // Re-enters through refresh(): a timer set while healthy must not bypass backoff that began after it was armed.
+    this.deferTimer=setTimeout(()=>{this.deferTimer=undefined;this.refresh();},Math.max(250,this.refreshWait())+Math.random()*500);
+  }
+  /** One snapshot read confirms every action in the batch; only those exact actions leave the outbox. */
+  private async confirm(batch: Mutation[]) {
+    const start=performance.now(); const base=await this.transport!.read();
+    this.lastReadAt=Date.now();
+    this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
+    const ids=new Set(batch.map(m=>m.id));
+    this.publish(await this.store.update(this.key,old=>({...old!,base,pending:old!.pending.filter(m=>!ids.has(m.id)),savedAt:new Date().toISOString()})));
+    ids.forEach(id=>this.acked.delete(id));
+  }
+  async flush(passive=false) {
     if (!this.transport || this.flushing) return;
     this.flushing=true;
     const sync = async () => {
       await this.reload();
+      if(passive && this.refreshWait()>0) { this.deferRefresh(); return; }
       this.health={...this.health,state:"syncing",message:"Syncing…"}; this.emit();
       // Stop at a conflict, preserving subsequent intent until an operator resolves it.
-      let item=this.checkpoint?.pending[0];
-      let readBackCompleted=false;
-      while(item && item.state!=="conflict") {
-        try { await this.transport!.send(item); }
-        catch(error) {
-          if(error instanceof ConflictError) {
-            this.publish(await this.store.update(this.key,old=>({...old!,pending:old!.pending.map(m=>m.id===item!.id?{...m,state:"conflict",message:error.message}:m)})));
+      let settled=false;
+      for(;;) {
+        // Send up to MAX_BATCH actions in order, then confirm them all with ONE snapshot read. An action the server already
+        // acknowledged (this page session) is not sent again, but stays in the outbox until that read succeeds.
+        const batch: Mutation[]=[];
+        for(const item of this.checkpoint?.pending ?? []) {
+          if(item.state==="conflict") break;
+          // The cap covers the WHOLE confirmation batch, including actions acknowledged by an earlier failed attempt. Those
+          // are an in-order prefix, so they are confirmed before any further action is sent.
+          if(batch.length>=MAX_BATCH) break;
+          if(!this.acked.has(item.id)) {
+            try { await this.transport!.send(item); }
+            catch(error) {
+              if(error instanceof ConflictError) {
+                this.publish(await this.store.update(this.key,old=>({...old!,pending:old!.pending.map(m=>m.id===item.id?{...m,state:"conflict",message:error.message}:m)})));
+                // Earlier actions in this batch were accepted; settle them best-effort. The conflict is what is reported.
+                if(batch.length) await this.confirm(batch).catch(()=>undefined);
+              }
+              throw error;
+            }
+            // A lost response or refresh before the read-back retries the SAME UUID at the server (idempotent).
+            this.acked.add(item.id);
+            this.health={...this.health,awaitingConfirmation:this.checkpoint!.pending.filter(m=>this.acked.has(m.id)).length||undefined}; this.emit();
           }
-          throw error;
+          batch.push(item);
         }
-        // A lost response or refresh before this transaction retries the SAME UUID at the server.
-        const start=performance.now(); const base=await this.transport!.read();
-        this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
-        this.publish(await this.store.update(this.key,old=>({...old!,base,pending:old!.pending.filter(m=>m.id!==item!.id),savedAt:new Date().toISOString()})));
-        readBackCompleted=true;
-        item=this.checkpoint?.pending[0];
+        if(batch.length) { await this.confirm(batch); settled=true; }
+        const head=this.checkpoint?.pending[0];
+        if(!batch.length || !head || head.state==="conflict") break;
       }
-      // The last acknowledged mutation already read back and persisted the server snapshot.
-      // Empty-outbox polling and an existing conflict still reconcile as before.
-      if(!readBackCompleted || item) {
+      // The last confirmation already persisted the server snapshot. Empty-outbox polling and an existing conflict still reconcile.
+      if(!settled || this.checkpoint?.pending[0]) {
         const start=performance.now(); const base=await this.transport!.read();
+        this.lastReadAt=Date.now();
         this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
-        this.publish(await this.store.update(this.key,old=>({...old!,base})));
+        this.publish(await this.store.update(this.key,old=>({...old!,base,savedAt:new Date().toISOString()})));
       }
-      this.attempts=0; this.channel?.postMessage("synced");
+      this.hasSynced=true; this.attempts=0; this.lastKind="other";
+      this.health={...this.health,errorKind:undefined,errorCode:undefined,retryAttempt:undefined,retryAt:undefined};
+      this.channel?.postMessage("synced");
     };
     try {
       if(typeof navigator!=="undefined" && navigator.locks) await navigator.locks.request(`sync:${this.key}`,sync);
       else await sync(); // Server idempotency still protects duplicate sends across tabs.
     } catch(error) {
       this.attempts++;
-      this.health={...this.health,state:this.health.conflicts?"conflict":"waiting",message:this.health.conflicts?"Changes need review in System health.":this.health.pending?"Saved on this device — waiting for connection":"Connection unavailable. Showing the last saved conference.",detail:error instanceof ConflictError?error.message:"Connection interrupted. Automatic retry is enabled."}; this.emit();
+      clearTimeout(this.deferTimer); this.deferTimer=undefined;
+      const kind: ErrorKind=error instanceof ConflictError ? "conflict" : classifyError(error);
+      this.lastKind=kind;
+      this.health={...this.health,state:this.health.conflicts?"conflict":"waiting",message:this.health.conflicts?"Changes need review in System health.":this.health.pending?"Saved on this device — waiting for connection":"Connection unavailable. Showing the last saved conference.",
+        detail:error instanceof ConflictError?error.message:kind==="overload"?"The conference database is busy. Your changes are safe on this device. Automatic retry is enabled.":"Connection interrupted. Automatic retry is enabled.",
+        errorKind:kind,errorCode:errorCode(error)}; this.emit();
     } finally {this.flushing=false;this.schedule();}
   }
   async exportRecovery() { return JSON.stringify(await this.store.read(this.key),null,2); }
@@ -159,5 +244,5 @@ export class DurableRepository implements ConferenceRepository {
     this.channel?.postMessage("saved"); this.retry();
   }
   reset = () => { if(this.transport) throw Error("Cloud conference reset is disabled."); void this.store.update(this.key,()=>({key:this.key,base:this.seed(),pending:[],savedAt:new Date().toISOString()})).then(c=>{this.publish(c);this.channel?.postMessage("saved");}); };
-  dispose() {clearTimeout(this.retryTimer);this.channel?.close();this.stopLive?.(); if(typeof window!=="undefined"){window.removeEventListener("online",this.retry);window.removeEventListener("focus",this.retry);} }
+  dispose() {this.disposed=true;clearTimeout(this.retryTimer);clearTimeout(this.deferTimer);clearTimeout(this.onlineTimer);this.channel?.close();this.stopLive?.(); if(typeof window!=="undefined"){window.removeEventListener("online",this.onOnline);window.removeEventListener("focus",this.refresh);} }
 }
