@@ -23,6 +23,7 @@ import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
 import { DelegateSubmissions } from "./operations/resolution-links";
+import { FelixHelper } from "./felix-helper";
 export function Workspace({ path }: { path: string }) {
   const {
     data,
@@ -160,6 +161,7 @@ export function Workspace({ path }: { path: string }) {
           </span>
         </footer>
       </div>
+      <FelixHelper key={`${role}:${role === "chair" ? committeeId : "conference"}`} role={role} committeeId={role === "chair" ? committeeId : undefined} committeeCode={committee?.code} sessionName={session?.name} />
     </div>
   );
 }
