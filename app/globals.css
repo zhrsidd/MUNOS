@@ -827,6 +827,24 @@ color: var(--ink-3);
   gap: 18px;
   margin-bottom: 25px;
 }
+/* Voting procedure header: controls, notices and counts share the panel inset; one centre line for the controls. */
+.voting-setup {
+  display: grid;
+  gap: var(--space-4);
+}
+.voting-setup .metrics {
+  margin-bottom: 0;
+}
+.voting-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.voting-mode label > select {
+  width: auto;
+  margin-top: 0;
+}
 .metric {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -925,7 +943,8 @@ color: var(--ink-3);
   margin-top: 3px;
 }
 .participation-row .scorer {
-  gap: 12px;
+  gap: var(--space-2) var(--space-3);
+  flex-wrap: wrap;
 }
 .participation-row .scorer button {
   min-width: 27px;
@@ -1136,7 +1155,7 @@ select,
 textarea {
   display: block;
   width: 100%;
-  min-height: 39px;
+  min-height: 40px;
 border: 1px solid var(--line);
   border-radius: 6px;
 background: #fff;
@@ -1462,8 +1481,27 @@ color: var(--ink-3);
   width: 190px;
   font-size: 12px;
 }
-.definition-row button {
+/* Every row gets the panel inset (form rows already get it from .panel > form) and the same action column,
+   aligned with the input rather than the label above it. */
+.panel > .definition-row {
+  margin: 22px 24px;
+}
+.definition-row > button,
+.definition-lock {
+  flex: 0 0 136px;
+  align-self: flex-end;
+}
+.definition-row input[readonly] {
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+.definition-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   font-size: 12px;
+  color: var(--ink-3);
 }
 .criterion-form {
   padding-bottom: 22px;
@@ -2207,7 +2245,8 @@ color: var(--ink-3);
   .definition-row label {
     width: 100%;
   }
-  .definition-row button {
+  .definition-row > button,
+  .definition-lock {
     margin-left: auto;
   }
   .form-grid {
@@ -2471,10 +2510,13 @@ color: var(--ink-3);
 .procedure-console button[aria-pressed="true"] { background:var(--blue); color:white; border-color:var(--blue); }
 .procedure-console button:focus-visible, .procedure-console select:focus-visible, .procedure-console input:focus-visible { outline:3px solid #8cb3ed; outline-offset:3px; }
 .procedure-inline-form { display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
-.procedure-inline-form label { min-width:160px; flex:1; }
+/* margin 0: the global label margin would lift the field 19 px above the buttons it is aligned with (align-items:end). */
+.procedure-inline-form label { min-width:160px; flex:1; margin-bottom:0; }
 .procedure-console label { display:grid; gap:7px; font-weight:600; font-size:12px; }
 .procedure-console select, .procedure-console input { min-width:0; max-width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:white; font:inherit; font-weight:400; }
 .procedure-custom label { flex:0 1 130px; min-width:100px; }
+/* The custom-total field reads as a compact control beside its buttons, not a full-width form field. */
+.procedure-custom input { text-align:center; font-weight:600; color:var(--ink); }
 .procedure-controls { padding:20px 24px; display:flex; align-items:end; flex-wrap:wrap; gap:24px; border-bottom:1px solid var(--line); }
 .procedure-console fieldset { border:0; padding:0; margin:0; min-width:0; }
 .procedure-console legend { padding:0; margin-bottom:8px; font-size:12px; font-weight:600; }
@@ -3170,3 +3212,14 @@ html { scroll-padding-top: 12rem; }
 .executive-resolution-feedback { margin: var(--space-4) 0; padding: var(--space-3); border-left: var(--space-1) solid var(--action); background: var(--action-soft); white-space: pre-wrap; }
 .executive-resolution-feedback p { margin-bottom: 0; }
 .executive-resolution-row details { margin-top: var(--space-3); }
+/* Participation quick entry on touch screens: ~44 px targets, compact groups that wrap rather than squeeze.
+   After the narrow-width rules above so it wins for touch devices of any width. */
+@media (pointer: coarse) {
+  .participation-row .scorer > div > div { gap: var(--space-1); }
+  .participation-row .scorer button { min-width: 40px; min-height: 44px; padding: 0 var(--space-2); font-size: 13px; }
+}
+/* On a phone the four groups no longer fit one line at 44 px: a two-column grid keeps them aligned
+   (Speech | POI, Main Submitter | Amendment) instead of leaving one group alone on a second line. */
+@media (max-width: 700px) {
+  .participation-row .scorer { display: grid; grid-template-columns: repeat(2, max-content); justify-content: start; gap: var(--space-3) var(--space-5); }
+}

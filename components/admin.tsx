@@ -891,9 +891,13 @@ function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope:
               <div className="definition-row" key={`${scope}-${s.id}`}>
                 <div>
                   <strong>{s.label}</strong>
-                  <p>Fixed +{s.values[0]}, once per resolution, on the Main Submitter’s first scored speech · locked</p>
+                  <p>Fixed, once per resolution, on the Main Submitter’s first scored speech</p>
                 </div>
-                <span className="muted">Not configurable</span>
+                <label>
+                  Points
+                  <input readOnly value={`+${s.values[0]}`} aria-label={`${s.label} points, fixed`} />
+                </label>
+                <span className="definition-lock">Not configurable</span>
               </div>
             );
           const builtIn = !data.scoring.some((x) => x.id === s.id);
