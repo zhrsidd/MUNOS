@@ -20,5 +20,19 @@ create trigger documents_print_copies before insert or update of status on publi
 
 -- Existing records: resolutions waiting in the print queue (Approved, not yet printed) are recounted so the queue is
 -- right. Printed, In Debate and Closed resolutions keep the count they were printed with (history is not rewritten).
--- The update changes only copies, so neither this trigger nor the status triggers fire.
-update public.documents set copies=private.print_copies(conference_id,committee_id) where status='Approved';
+-- A recount is a change to the document like any other: only rows whose number actually changes are updated, and each
+-- advances revision and updated_at as private.apply_mutation does and emits the same committee-scoped 'documents'
+-- notification, so open devices refresh and a Printed queued offline against the old quantity is rejected as stale
+-- (PT409) instead of being applied. Committee rows are locked first, in id order, as apply_mutation locks its committee
+-- before checking the expected revision, so no mutation can check a revision this update is about to change.
+-- The update does not set status, so neither this trigger nor the status triggers fire. No audit_log row: it needs an
+-- actor and this is a migration, not a person.
+do $$ begin
+ perform 1 from public.committees where id in (select committee_id from public.documents where status='Approved') order by id for update;
+ with recount as (
+  update public.documents set copies=private.print_copies(conference_id,committee_id),revision=revision+1,updated_at=now()
+   where status='Approved' and copies<>private.print_copies(conference_id,committee_id)
+   returning conference_id,committee_id)
+ insert into public.operational_changes(conference_id,committee_id,topic,mutation_id)
+  select conference_id,committee_id,'documents',gen_random_uuid() from recount;
+end $$;

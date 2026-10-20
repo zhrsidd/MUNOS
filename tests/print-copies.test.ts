@@ -76,3 +76,68 @@ test('real PostgreSQL: approval sets copies server-side with the roster at that 
   await as(print);await assert.rejects(()=>query('select private.print_copies($1,$2)',[ids.conference,ids.ga1]),/permission denied/);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL upgrade: queued Approved records are recounted as a revisioned change, notified, and a stale Printed is rejected',async()=>{
+ // Records are seeded on the schema BEFORE 20261021120000_print_copies, then the migration is applied, so this exercises
+ // the existing-record backfill rather than the insert trigger.
+ const {db,ids,query,as,asOwner,grant,upgrade}=await freshDatabase({upgradeAt:'20261021120000_print_copies.sql'});
+ const print='75000000-0000-4000-8000-000000000013';
+ try{
+  await grant(print,'logistics');
+  await asOwner();
+  const roster=async(cid:string)=>Number((await query<{n:number}>('select count(*)::int n from public.delegates where committee_id=$1',[cid]))[0].n);
+  const ga1=await roster(ids.ga1),who=await roster(ids.who);
+  const whoApproved='3b8f14fb-923d-4980-a37a-edd2a50f813e',gaReview='548c2e6f-84b8-4116-a2f1-ccfa8f1d5d27';
+  assert.notEqual(who+3,30,'fixture: the seeded WHO / 01 count must differ from its roster count');
+  const doc=(code:string)=>({id:crypto.randomUUID(),code});
+  const stale=doc('GA1 / U1'),counted=doc('GA1 / U2'),printed=doc('GA1 / U3'),closed=doc('GA1 / U4');
+  const insert=async(d:{id:string;code:string},status:string,copies:number,outcome:string|null=null)=>{await db.query(
+   `insert into public.documents(id,conference_id,committee_id,"sessionId","submitterId",code,title,status,outcome,copies) values($1,$2,$3,$4,$5,$6,$6,$7,$8,$9)`,
+   [d.id,ids.conference,ids.ga1,ids.session,ids.france,d.code,status,outcome,copies]);};
+  await insert(stale,'Approved',24);await insert(counted,'Approved',ga1+3);await insert(printed,'Printed',24);await insert(closed,'Closed',24,'Passed');
+  // A fixed past time, so a changed updated_at is visible whatever the clock resolution.
+  await db.query(`update public.documents set updated_at='2000-01-01T08:00:00Z' where conference_id=$1`,[ids.conference]);
+  type Row={id:string;status:string;copies:number;revision:string;updated_at:Date};
+  const rows=async()=>{await asOwner();return new Map((await query<Row>('select id,status,copies,revision::text,updated_at from public.documents where conference_id=$1',[ids.conference])).map(r=>[r.id,r]));};
+  const before=await rows();
+  const changesBefore=new Set((await query<{id:string}>('select id from public.operational_changes')).map(r=>r.id));
+
+  // A Logistics device read the print queue before the upgrade and queued Printed against those revisions.
+  const queued=(id:string,expected=before.get(id)!.revision)=>({key:crypto.randomUUID(),command:{type:'document',id,status:'Printed'},expected});
+  const stalePrint=queued(stale.id),countedPrint=queued(counted.id);
+
+  await upgrade();
+  const after=await rows();
+
+  // Approved rows whose count changes: recounted, revision advanced once, updated_at moved.
+  for(const [id,n] of [[stale.id,ga1+3],[whoApproved,who+3]] as const){
+   assert.equal(after.get(id)!.copies,n);
+   assert.equal(BigInt(after.get(id)!.revision),BigInt(before.get(id)!.revision)+1n,'revision advanced once');
+   assert.ok(after.get(id)!.updated_at>before.get(id)!.updated_at,'updated_at moved');
+  }
+  // Every other row is untouched: the already-correct Approved row and everything outside the print queue.
+  for(const id of [counted.id,printed.id,closed.id,ids.resolution,gaReview]){
+   const [b,a]=[before.get(id)!,after.get(id)!];
+   assert.deepEqual([a.status,a.copies,a.revision,a.updated_at.getTime()],[b.status,b.copies,b.revision,b.updated_at.getTime()],`${b.status} row unchanged`);
+  }
+  assert.equal(after.get(ids.resolution)!.status,'In Debate');
+  assert.equal(after.get(printed.id)!.copies,24,'Printed keeps the count it was printed with');
+  assert.equal(after.get(closed.id)!.copies,24,'Closed keeps its count');
+
+  // One scoped documents notification per recounted row, in the shape document mutations emit.
+  const emitted=(await query<{id:string;conference_id:string;committee_id:string;topic:string}>('select id,conference_id,committee_id,topic from public.operational_changes')).filter(r=>!changesBefore.has(r.id));
+  assert.deepEqual(emitted.map(r=>[r.conference_id,r.committee_id,r.topic]).sort(),[[ids.conference,ids.ga1,'documents'],[ids.conference,ids.who,'documents']].sort());
+
+  // The queued Printed carrying the pre-upgrade revision is now stale and rejected; nothing changes.
+  const send=async(q:ReturnType<typeof queued>)=>{await as(print);await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,q.key,JSON.stringify(q.command),'logistics',q.expected,'2026-11-05T09:00:00Z']);};
+  await assert.rejects(()=>send(stalePrint),(e:{code?:string})=>e.code==='PT409','pre-upgrade Printed must conflict');
+  assert.equal((await rows()).get(stale.id)!.status,'Approved');
+  // A row the upgrade did not touch keeps its revision, so its queued action still applies with the count it showed.
+  await send(countedPrint);
+  assert.deepEqual([(await rows()).get(counted.id)!.status,(await rows()).get(counted.id)!.copies],['Printed',ga1+3]);
+  // After refreshing, Logistics prints the recounted resolution with the new quantity.
+  await send(queued(stale.id,after.get(stale.id)!.revision));
+  const done=(await rows()).get(stale.id)!;
+  assert.deepEqual([done.status,done.copies],['Printed',ga1+3]);
+ }finally{await db.close();}
+});
