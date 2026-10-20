@@ -1,6 +1,8 @@
 /* Static application shell only. Supabase/Auth responses are NEVER cached here. */
-const VERSION = 'conference-os-0.2.7';
-const SHELL = ['/chair','/chair/roll-call','/chair/participation','/chair/documents','/chair/amendments','/chair/voting','/chair/photos','/chair/health','/approval/history','/approval/health','/logistics/completed','/logistics/health','/admin/health','/admin/resolution-status','/dcmun-logo.jpg'];
+/* Felix's face (components/felix-helper.tsx): small static images, cache-first so Felix works offline. Keep in step with FELIX_ASSETS in lib/felix/motion.ts. */
+const FELIX = ['idle','half-blink','blink','closed-beak','happy-squint','content'].flatMap(frame=>[96,144].map(size=>'/felix/felix-'+frame+'-'+size+'.webp'));
+const VERSION = 'conference-os-0.2.8';
+const SHELL = ['/chair','/chair/roll-call','/chair/participation','/chair/documents','/chair/amendments','/chair/voting','/chair/photos','/chair/health','/approval/history','/approval/health','/logistics/completed','/logistics/health','/admin/health','/admin/resolution-status','/dcmun-logo.jpg',...FELIX];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(VERSION);
  for(const path of SHELL){
@@ -21,7 +23,7 @@ self.addEventListener('fetch',event=>{
  const request=event.request,url=new URL(request.url);
  if(request.method!=='GET'||url.origin!==self.location.origin)return;
  const navigation=request.mode==='navigate'&&SHELL.includes(url.pathname);
- const asset=url.pathname.startsWith('/_next/static/')||url.pathname==='/dcmun-logo.jpg';
+ const asset=url.pathname.startsWith('/_next/static/')||url.pathname==='/dcmun-logo.jpg'||FELIX.includes(url.pathname);
  if(!navigation&&!asset)return;
  event.respondWith((async()=>{
   const cache=await caches.open(VERSION);
