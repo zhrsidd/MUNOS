@@ -57,32 +57,44 @@ select,
 textarea {
   font: inherit;
 }
+/* Buttons (docs/BRAND.md): one height and padding everywhere; hierarchy by role, not by size.
+   default = secondary (outlined) · .primary = the one main action per region · .danger = destructive
+   · .text-button / .link-button = tertiary. Dense controls (scorer, attendance, voting) keep their own rules. */
 button,
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 8px 14px;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   cursor: pointer;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    color 0.15s;
 }
 button:hover,
 .button:hover {
   background: var(--action-soft);
   border-color: var(--action);
 }
-button:disabled {
+/* Disabled reads as unavailable but stays legible (no washed-out opacity); the reason belongs next to it. */
+button:disabled,
+button:disabled:hover,
+button.primary:disabled,
+button.danger:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
+  background: var(--sunken);
+  border-color: var(--line);
+  color: var(--ink-3);
 }
 button:focus-visible,
 a:focus-visible,
@@ -108,6 +120,34 @@ button.primary,
 button.primary:hover,
 .button.primary:hover {
   background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+button.danger,
+.button.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--surface));
+}
+button.danger:hover,
+.button.danger:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+/* A confirmed destructive step: filled, so it is never mistaken for the safe choice next to it. */
+button.danger.primary,
+.button.danger.primary {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+button.danger.primary:hover,
+.button.danger.primary:hover {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+@media (pointer: coarse) {
+  button.primary,
+  .button.primary {
+    min-height: 44px;
+  }
 }
 h1,
 h2,
@@ -930,16 +970,27 @@ tr:last-child td {
 td .actions {
   flex-wrap: nowrap;
 }
+/* Row actions are compact but still a comfortable target (40 px on touch). */
 td button {
-  font-size: 12px;
-  min-height: 29px;
-  padding: 4px 9px;
+  font-size: 13px;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+}
+@media (pointer: coarse) {
+  td button {
+    min-height: 40px;
+  }
 }
 .actions {
   display: flex;
-  gap: 9px;
+  gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
+}
+/* Groups wrap instead of squashing labels; a single long label wraps inside its button. */
+.actions > button,
+.actions > .button {
+  max-width: 100%;
 }
 .vote-controls {
   display: flex;
@@ -1244,9 +1295,7 @@ border-color: var(--line);
   margin: 0 24px 23px;
   gap: 15px;
 }
-.decision-actions button {
-  font-size: 12px;
-}
+
 .print-summary {
   display: flex;
   gap: 16px;
