@@ -15,15 +15,15 @@ A 100-person conference is mostly delegates, who have no staff session: it does 
 
 | | Used for | Database |
 | --- | --- | --- |
-| **Vercel Preview** (any PR/branch) | Phases A–E | Development Supabase `opmydpozhdgkpcnjwpqb` |
-| **Staging project** (optional second Vercel project, e.g. `munos-staging`, production branch `staging`) | Phase F rollback drill before Production exists — Instant Rollback only exists for a project's *production* deployments | Development Supabase |
+| **Vercel Preview** (any PR/branch) | Phases A–E | The DCMUN Supabase project `kllhswucdhqqywnzxado` while it is in its development role (listed in `STAGING_SUPABASE_REFS`) |
+| **Staging project** (optional second Vercel project, e.g. `munos-staging`, production branch `staging`) | Phase F rollback drill before Production exists — Instant Rollback only exists for a project's *production* deployments | The same DCMUN Supabase project (development role) |
 | Production (built only from the `production` branch) | **Never** used for load or failure tests. The rollback drill may be repeated there once, before the freeze, with a harmless change | Production Supabase |
 
 Previews have Vercel Authentication on; scripts use a *Protection Bypass for Automation* secret (`VERCEL_AUTOMATION_BYPASS_SECRET`, set only in the operator's shell).
 
 ## Preparation
 
-1. The release candidate is a `main` commit; its automatic Preview uses development Supabase variables and `SUPABASE_SECRET_KEY` (dev).
+1. The release candidate is a `main` commit; its automatic Preview uses the DCMUN project's variables (development role) and `SUPABASE_SECRET_KEY`. Rehearsals run only while the project holds test data; see the cutover steps in [DEPLOYMENT](DEPLOYMENT.md#single-project-cutover).
 2. All migrations applied to the **development** project exactly once (Codex-owned; through `20261008135032` at the time of writing).
 3. `.env.local` points at the development project (the scripts refuse anything else).
 4. **Rehearsal identities — one Chair identity per committee (required for readiness).** `npm run rehearsal:identities -- --chairs 14` (development project only; refuses anything else) prepares **14 Chair sessions — one per simulated real committee** — plus one each for Approval, Admins and Executive, under the git-ignored `.test-sessions/rehearsal/` (files mode 0600, tokens never printed), and writes the pool `.test-sessions/rehearsal-multi-identities.json`. Existing session files are refreshed, never replaced; new anonymous sign-ins are paced (one per 20 s) and capped at 25 per run, under Supabase's default 30 per IP per hour — run it the day before. It grants nothing. Sessions near expiry are refreshed before each run; only one operator may hold these sessions at a time (Supabase rotates refresh tokens). The harness grants these identities through the fixture SQL instead of redeeming staff access codes: code redemption is a one-off per device and is exercised by real people in Phase A/B and Phase D, not in the load loop.

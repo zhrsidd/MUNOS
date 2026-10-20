@@ -28,11 +28,11 @@ GitHub zhrsidd/MUNOS
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
 | Trigger | `npm run dev` | any push / PR, **including `main`** | push to the `production` branch only |
-| Supabase | none (local demo) or dev | **development** project `opmydpozhdgkpcnjwpqb` | **production** project (not yet created) |
-| Data | demo / dev | dev data only | real conference data |
+| Supabase | none (local demo) or the DCMUN project | the **same** DCMUN project, `kllhswucdhqqywnzxado`, while it is in its development role | the **same** project `kllhswucdhqqywnzxado` after cutover (no second project) |
+| Data | demo / test | test data only (the `DCMUN Development Test` conference) | real conference data, from cutover |
 | Who uses it | developers | reviewers, rehearsals | the conference |
 
-Preview must never point at the production database. Production must never point at the development database.
+There is one DCMUN Supabase project (`kllhswucdhqqywnzxado`). It is the development project until cutover and the production project afterwards; it is never both at once in the target guard. The PHESMUN production project is never used. Preview must never run against the project once it holds real conference data.
 
 ### Target guard
 
@@ -42,11 +42,21 @@ Preview must never point at the production database. Production must never point
 | --- | --- |
 | Every build and the `/api/health` probe | The PHESMUN production project (`gglltljhdpkfjnyjmnif`) is **always refused**, in every environment. |
 | Vercel **Production** build and probe | `NEXT_PUBLIC_SUPABASE_URL` must be exactly the project in `EXPECTED_SUPABASE_REF`. If that variable is unset the build **fails** (this is a change from before: a Production build now requires it). A refused probe reports `down` ("Wrong Supabase project") and contacts nothing. |
-| Load, rehearsal, fixture and verification scripts (`scripts/*.mts`, via `remote-context.mts` and the direct guards) | The project must be listed in `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS` (the DCMUN development project `opmydpozhdgkpcnjwpqb` is the default when `DEVELOPMENT_SUPABASE_REFS` is unset). The production project is never a tool target. With no allow-list the tool refuses. A refusal throws **before any connection**. |
+| Load, rehearsal, fixture and verification scripts (`scripts/*.mts`, via `remote-context.mts` and the direct guards) | The project must be listed in `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS` (there is **no default**: the deleted former development project is not a fallback, and an unset list allows nothing). The production project is never a tool target. With no allow-list the tool refuses. A refusal throws **before any connection**. |
 
 A project has exactly one role: listing the same ref as production and staging, or listing the PHESMUN production project anywhere, is a configuration error and refuses. Refusal messages name project refs only (public in the URL), never keys.
 
-Before the DCMUN staging project is used for rehearsal, add its ref to `STAGING_SUPABASE_REFS`; before the DCMUN production deployment, set `EXPECTED_SUPABASE_REF` in the Vercel **Production** environment only.
+#### Single-project cutover
+
+While the project is in its development role set `STAGING_SUPABASE_REFS=kllhswucdhqqywnzxado` (operator shell, `.env.local`, Vercel **Preview**), leave `DEVELOPMENT_SUPABASE_REFS` empty, and set `NEXT_PUBLIC_CONFERENCE_ID` to the test conference. At cutover (early November; compute raised from Micro to Small before 5 November) each step needs explicit approval:
+
+1. Delete the `DCMUN Development Test` conference and every test auth user; confirm no test data remains.
+2. Remove the ref from `STAGING_SUPABASE_REFS` in every environment. From now on the load, rehearsal and verification scripts refuse to run against the project, by design.
+3. Set `EXPECTED_SUPABASE_REF=kllhswucdhqqywnzxado` in the Vercel **Production** environment only, and the real `NEXT_PUBLIC_CONFERENCE_ID`.
+4. Confirm plan, compute size and backups in the Supabase dashboard; rotate `SUPABASE_SECRET_KEY` if it was ever used in a shared Preview.
+5. Create the first Executive with [FIRST_EXECUTIVE_BOOTSTRAP](FIRST_EXECUTIVE_BOOTSTRAP.md), then deploy the `production` branch.
+
+A project has one role at a time, so steps 2 and 3 are one change: the ref moves from staging to production.
 
 ## Environment variables
 
