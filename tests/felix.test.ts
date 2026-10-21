@@ -377,9 +377,9 @@ test("Felix stays local, read-only and free of external services and fake waitin
   const source = FELIX_SOURCES.map(f => readFileSync(f, "utf8")).join("\n");
   assert.doesNotMatch(source, /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\/|\bact\(|apply_conference_mutation|supabase/);
   assert.doesNotMatch(source, /new Notification|Notification\.requestPermission|serviceWorker|PushManager/, "never uses browser notifications");
-  assert.doesNotMatch(source, /Typewriter|setThinking|setInterval/, "no simulated typing or thinking delay");
+  assert.doesNotMatch(source, /Typewriter|setThinking|setInterval/, "no thinking delay; reply pacing lives in components/felix-reveal.tsx");
   const helper = readFileSync("components/felix-helper.tsx", "utf8");
-  assert.doesNotMatch(helper, /setTimeout/, "replies are not delayed");
+  assert.doesNotMatch(helper, /setTimeout/, "replies start with no delay");
   assert.match(helper, /Still stuck\? Message the Executive\./);
 });
 

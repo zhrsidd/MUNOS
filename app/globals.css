@@ -2453,8 +2453,10 @@ color: var(--ink-3);
 .submission-panel > div:not(.qr-box) { flex:1; min-width:220px; display:grid; gap:10px; }
 .panel > .panel-body { margin:22px 24px; }
 .panel > .panel-body input { width:100%; max-width:420px; }
-.link-field { display:flex; gap:8px; }
-.link-field input { flex:1; min-width:0; font-family:ui-monospace, monospace; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:7px; }
+/* A link field and its copy button wrap instead of squeezing the field: on a narrow screen the button drops below
+   the link (touch targets stay 40–44 px) rather than the field collapsing to a few pixels. */
+.link-field { display:flex; flex-wrap:wrap; gap:8px; }
+.link-field input { flex:1 1 14rem; min-width:0; font-family:ui-monospace, monospace; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:7px; }
 @media print {.no-print,
 .workspace-footer { display:none !important; }
   .room-sheet { padding:0; }
@@ -3387,6 +3389,7 @@ html { scroll-padding-top: 12rem; }
 .felix-message { max-width: 92%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-container); font-size: 13px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .felix-from-felix { justify-self: start; background: var(--sunken); color: var(--ink); }
 .felix-from-you { justify-self: end; background: var(--action-soft); color: var(--ink); }
+.felix-show-all { display: inline-block; margin: var(--space-2) 0 0; padding: 0 var(--space-2); min-height: 44px; border: 0; background: none; color: var(--blue); font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .felix-message a { display: block; margin-top: var(--space-2); font-weight: 600; text-decoration: underline; }
 .felix-suggestions { display: grid; gap: var(--space-2); }
 .felix-suggestions button { justify-content: flex-start; text-align: left; font-size: 13px; font-weight: 500; }
