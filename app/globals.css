@@ -3388,3 +3388,28 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
 @media (prefers-reduced-motion: reduce) {
   .felix-face, .felix-face.is-petting { animation: none !important; transform: none !important; }
 }
+
+/* Watermelon-derived feedback patterns (MIT, see docs/WATERMELON_LICENSE.txt; selection in docs/WATERMELON_UI_SELECTION.md).
+   Motion budget: 120-180 ms, opacity/transform only, all of it removed under prefers-reduced-motion. */
+
+/* Copy button: the three labels share one grid cell, so the button always has the width of the longest. */
+.copy-labels { display: inline-grid; }
+.copy-labels > span {
+  grid-area: 1 / 1;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(2px);
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 150ms;
+}
+.copy-labels > span[data-active="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-labels > span { transition: none; }
+}

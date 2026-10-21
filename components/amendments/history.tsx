@@ -7,15 +7,9 @@ import { historyCache, historyCacheKey, historyContext, usableCache, type Histor
 import type { Amendment } from '@/lib/batch/types';
 import { Chip, Empty, Panel } from '@/components/ui';
 import { GoogleDocButton } from '@/components/operations/resolution-links';
+import { CopyButton } from '@/components/copy-button';
 
 const time = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-
-/** Copy feedback is shown only after the clipboard write resolves; a refusal says so instead of pretending. */
-function CopyWording({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const copy = () => { navigator.clipboard.writeText(text).then(() => setState('copied'), () => setState('failed')); };
-  return <><button type="button" onClick={copy}>{state === 'copied' ? 'Copied' : 'Copy wording'}</button>{state === 'failed' && <span className="field-error" role="alert">Copy failed. Select the wording and copy it manually.</span>}</>;
-}
 
 /** Every passed amendment for the committee, grouped by its original resolution, kept after closure and session changes.
  *  Pages fetched online are also kept in a read-only device cache (lib/amendments/history-cache.ts) for offline reloads. */
@@ -82,7 +76,7 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
             return <article key={a.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '1rem' }}>
               <div className="actions"><Chip tone="green">Passed</Chip><strong>{a.type}</strong><span>{a.clause}</span><span className="muted">{submitter ? `${submitter.flag} ${submitter.country}` : 'Delegation not on this device'} · submitted {time(a.createdAt)}</span></div>
               <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{a.wording}</p>
-              <div className="actions"><CopyWording text={amendmentCopyText(a, submitter)} /></div>
+              <div className="actions"><CopyButton text={amendmentCopyText(a, submitter)} label="Copy wording" failedAnnouncement="Copy failed. Select the wording and copy it manually." /></div>
             </article>;
           })}
         </section>;
