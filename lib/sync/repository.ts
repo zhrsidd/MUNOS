@@ -183,6 +183,7 @@ export class DurableRepository implements ConferenceRepository {
   async flush(passive=false) {
     if (!this.transport || this.flushing) return;
     this.flushing=true;
+    let failed=false;
     const sync = async () => {
       await this.reload();
       if(passive && this.refreshWait()>0) { this.deferRefresh(); return; }
@@ -233,6 +234,7 @@ export class DurableRepository implements ConferenceRepository {
       if(typeof navigator!=="undefined" && navigator.locks) await navigator.locks.request(`sync:${this.key}`,sync);
       else await sync(); // Server idempotency still protects duplicate sends across tabs.
     } catch(error) {
+      failed=true;
       this.attempts++;
       clearTimeout(this.deferTimer); this.deferTimer=undefined;
       const kind: ErrorKind=error instanceof ConflictError ? "conflict" : classifyError(error);
@@ -241,6 +243,15 @@ export class DurableRepository implements ConferenceRepository {
         detail:error instanceof ConflictError?error.message:kind==="overload"?"The conference database is busy. Your changes are safe on this device. Automatic retry is enabled.":"Connection interrupted. Automatic retry is enabled.",
         errorKind:kind,errorCode:errorCode(error)}; this.emit();
     } finally {this.flushing=false;this.schedule();}
+    // An action recorded while this flush was already past its batch step (opening/idle/confirmation read) saw `flushing` and
+    // returned. After a SUCCESSFUL run only, send it now instead of at the next poll. A failure follows the backoff path above.
+    if(!failed && this.hasSendableWork()) void this.flush();
+  }
+  /** Unsent or unconfirmed work at the head of the outbox. Behind a conflict (head blocked) nothing is sendable. */
+  private hasSendableWork() {
+    if(!this.transport || this.disposed) return false;
+    const head=this.checkpoint?.pending[0];
+    return !!head && head.state!=="conflict";
   }
   async exportRecovery() { return JSON.stringify(await this.store.read(this.key),null,2); }
   getPending() {return this.checkpoint?.pending ?? [];}
