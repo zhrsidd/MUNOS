@@ -12,8 +12,8 @@ not yet released.
   answer. There is no generative-AI service, no network call, no backend, migration or new dependency.
 - **Read-only.** Felix reads only what the workspace already loaded (`lib/felix/context.ts`) plus the same
   repository health store the sync strip uses. It never changes conference data, retries or discards changes.
-- **Immediate.** Replies are computed and shown at once: there is no typewriter effect, "thinking" delay or
-  simulated streaming. See "Typing speed" below for the measured comparison with Leo.
+- **Typed at 60 characters/s.** Replies are computed at once with no "thinking" delay and typed out at 60
+  characters per second (owner-set, 21 October 2026). See "Typing speed" below.
 - **Links are real destinations.** `safeLink` accepts only `/role` + a slug from `destinationSlugs(role)`
   (`lib/navigation.ts`); anything else is dropped, including stored links. Tests check every answer, reminder and
   example against the navigation and the app's route list.
@@ -95,27 +95,24 @@ typing expression. Leo's timings below were read from the earlier conference's `
 | | Leo (baseline) | Felix |
 | --- | --- | --- |
 | "Thinking" delay before a reply | 500 ms fixed `setTimeout`, with a bouncing-dots bubble (0.7 s loop) | none (0 ms) |
-| Reply reveal | typewriter, one character every 19 ms (about 53 characters/s), no cap; a 420-character answer took about 8 s plus the 500 ms delay; the link showed from the first character, but a new question was refused until the reveal finished, and the whole message list was one polite live region that was rewritten on every character | whole reply at once (0 ms); the link is part of the same paint |
-| Beak while Leo "talks" | two-frame swap every 240 ms (0.48 s loop, about 4 swaps/s) for the whole reveal | none while replying |
+| Reply reveal | typewriter, one character every 19 ms (about 53 characters/s), no cap; a new question was refused until the reveal finished; the whole message list was one polite live region rewritten on every character | typewriter at 60 characters/s, Show all, one announcement of the full reply |
+| Beak while Leo "talks" | two-frame swap every 240 ms (0.48 s loop, about 4 swaps/s) for the whole reveal | none while replying (the face stays calm) |
 | Expression while the person types | none | gentle typing cycle (below) |
 | Typing stops | when the reveal finished | 600 ms after the last keystroke |
 
-**Reply text: decision.** The requested target was about 80 characters/s with a 900 ms cap and never slower than
-Leo. Felix already shows every reply in full on the frame it is sent (measured 3–5 ms from click to the complete
-text and link, a single DOM insertion, in Chromium), which is inside the cap and faster than Leo, so **no typewriter
-is added**. Consequences, all deliberate:
+**Reply text: 60 characters per second (owner decision, 21 October 2026).** Replies start typing on the frame they are
+sent (no "thinking" delay) and reveal at a steady `REVEAL_CHARS_PER_SECOND = 60` (`lib/felix/reveal.ts`), a little
+faster than Leo's 53/s with no 500 ms head start. A 420-character answer takes 7 s; most take 2–5 s. Rules:
 
-- *Show all* is unnecessary: the whole answer is already shown, so there is nothing to skip.
-- The *Animate Felix* switch (and system reduced motion) still cover "let the user disable animation" for the face;
-  there is no text animation to disable. Reduced motion shows replies immediately, as it always does.
-- The question and the whole reply, link included, enter the conversation log in one state update. The log is the
-  one polite live region (`role="log"`), so a finished reply is announced once and never per letter.
-- Nothing delays, staggers or gates a link or action. `tests/felix-motion.test.ts` fails if a timer, animation frame
-  or typewriter is introduced into `components/felix-helper.tsx`.
-
-If a longer or streamed reply is ever added, the owner's targets apply: about 80 characters/s, 900 ms total cap,
-first content immediately, links and actions usable at once, Show all offered, and one announcement of the complete
-reply.
+- The link and the **Show all** button are usable from the first character; Show all completes the reply and returns
+  focus to the composer.
+- Whole reply at once, with no typing, when *Animate Felix* is off or the system asks for reduced motion. Stored
+  history, reopening the panel and switching to the Inbox always show full text; closing the panel or opening the
+  Inbox ends the typing.
+- Assistive technology gets the whole reply in one visually hidden copy added with the message, so the polite
+  `role="log"` announces it once; the visible partial text is `aria-hidden`.
+- Timing uses elapsed time (`Date.now()`), so a slow frame never slows the pace. Pacing lives only in
+  `components/felix-reveal.tsx`; `tests/felix-motion.test.ts` pins the speed and the accessibility rules.
 
 **Typing expression.** Constants live in one place, `MOTION` in `lib/felix/motion.ts`:
 

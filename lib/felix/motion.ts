@@ -13,7 +13,7 @@ export type FelixMotionState = "idle" | "blink" | "typing" | "petting";
  * 21 October 2026 (owner brief "faster, unobtrusive Felix typing"):
  * - typingCycleMs: one gentle cycle, inside the requested 1.0–1.2 s (the 19 October preview was 1.4 s);
  * - typingQuietMs: the face settles 600 ms after the last keystroke (was 950 ms).
- * Reply text is not timed here: replies are shown instantly (0 ms), so there is no reveal to tune.
+ * Reply text is paced in lib/felix/reveal.ts (60 characters/s), not here.
  */
 export const MOTION = { blinkMinMs: 5200, blinkJitterMs: 3200, blinkMs: 260, typingCycleMs: 1100, typingQuietMs: 600, petMs: 1120, petCooldownMs: 1250 } as const;
 

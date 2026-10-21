@@ -3387,6 +3387,7 @@ html { scroll-padding-top: 12rem; }
 .felix-message { max-width: 92%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-container); font-size: 13px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .felix-from-felix { justify-self: start; background: var(--sunken); color: var(--ink); }
 .felix-from-you { justify-self: end; background: var(--action-soft); color: var(--ink); }
+.felix-show-all { display: inline-block; margin: var(--space-2) 0 0; padding: 0 var(--space-2); min-height: 44px; border: 0; background: none; color: var(--blue); font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .felix-message a { display: block; margin-top: var(--space-2); font-weight: 600; text-decoration: underline; }
 .felix-suggestions { display: grid; gap: var(--space-2); }
 .felix-suggestions button { justify-content: flex-start; text-align: left; font-size: 13px; font-weight: 500; }
