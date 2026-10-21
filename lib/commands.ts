@@ -1,6 +1,7 @@
 import {applyBatch,materializeCommitteeSessions} from './batch/commands';
 import { printCopies } from "./print";
 import { compatResolutionTitle } from "./resolution-title";
+import { nextResolutionCode } from "./resolution-number";
 import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
@@ -456,7 +457,11 @@ export function applyCommand(
         id: documentId,
         committeeId: c.committeeId,
         sessionId: c.sessionId,
-        code: `${d.committees.find((x) => x.id === c.committeeId)?.code} / ${String(d.documents.filter((r) => r.committeeId === c.committeeId).length + 1).padStart(2, "0")}`,
+        code: nextResolutionCode(
+          d.committees.find((x) => x.id === c.committeeId)?.code ?? "",
+          d.documents.filter((r) => r.committeeId === c.committeeId),
+          new Set(d.documents.map((r) => r.code)),
+        ),
         title,
         submitterId: c.submitterId,
         status: "Draft",
