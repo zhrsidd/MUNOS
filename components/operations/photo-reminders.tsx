@@ -98,7 +98,7 @@ function ReminderCard({ reminder, committeeId, sessionId, prominent }: { reminde
   const { data, act } = useConference();
   const [open, setOpen] = useState(prominent || reminder.stage === "due");
   const absent = new Set(data.attendance.filter((a) => a.sessionId === sessionId && a.status === "Absent").map((a) => a.delegateId));
-  const acknowledge = (s: "warning" | "due") => void act({ type: "photoAck", committeeId, slotId: reminder.slot.id, stage: s, revision: reminder.slot.revision, chairs: reminder.chairsVersion }, "chair");
+  const acknowledge = (s: "warning" | "due") => void act({ type: "photoAck", committeeId, slotId: reminder.slot.id, stage: s, revision: reminder.slot.revision, epoch: reminder.epoch, chairs: reminder.chairsVersion }, "chair");
   return <PhotoAlert reminder={reminder} absent={absent} open={open} onToggle={() => setOpen(!open)} onAcknowledge={acknowledge} />;
 }
 /** Shown on every Chair Console screen, prominently on Debate. Derived from slot times on this device; works offline and after refresh. */
@@ -110,7 +110,7 @@ export function PhotoReminderBanner({ committeeId, sessionId, prominent = false 
   return (
     <div className={`photo-banner${prominent ? " prominent" : ""}`} aria-label="Group photo alert">
       {active.map((r) => (
-        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.chairsVersion}-${r.stage}`} reminder={r} committeeId={committeeId} sessionId={sessionId} prominent={prominent} />
+        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.epoch}-${r.chairsVersion}-${r.stage}`} reminder={r} committeeId={committeeId} sessionId={sessionId} prominent={prominent} />
       ))}
     </div>
   );

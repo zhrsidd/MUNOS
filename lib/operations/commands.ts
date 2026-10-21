@@ -1,6 +1,6 @@
 import type { ConferenceData, Role } from "../domain";
 import { GOOGLE_DOC_ID } from "../submissions/google-doc";
-import { latestPhotoAck } from "./photo-reminders";
+import { advancePhotoEpochs, photoEpoch } from "./photo-reminders";
 // Extension commands travel through the same durable outbox as core commands, but are
 // applied server-side by public.apply_operations_mutation (see the operations migrations).
 export type OperationsCommand =
@@ -25,8 +25,8 @@ export type OperationsCommand =
     }
   | ({ type: "photoSlot"; action: "create" | "update"; slotId?: string } & PhotoSlotFields)
   | { type: "photoImport"; rows: PhotoSlotFields[] }
-  /** `chairs` is the participant version the Chair saw (photoChairsVersion); absent means no Chairs. */
-  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number; chairs?: string }
+  /** `epoch` and `chairs` are the participant-list epoch and Chair list the Chair saw; absent means 0 and none. */
+  | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number; epoch?: number; chairs?: string }
   /** A Chair's school for group photos; null clears it. */
   | { type: "staffSchool"; staffId: string; schoolId: string | null }
   | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
@@ -198,18 +198,23 @@ export function applyOperationsCommand(
       const staff = d.staff.find((s) => s.id === c.staffId);
       if (!staff || staff.role !== "chair") throw Error("Choose a Chair.");
       if (c.schoolId !== null && !d.schools.some((s) => s.id === c.schoolId)) throw Error("Choose a valid school.");
+      // The Chair list of the old and new school changes in each of the Chair's committees: advance their epochs, as
+      // the PostgreSQL trigger does, so no earlier acknowledgement can silence them again.
+      if ((staff.schoolId ?? null) !== c.schoolId) advancePhotoEpochs(d, staff.committeeIds, [staff.schoolId, c.schoolId]);
       staff.schoolId = c.schoolId;
       break;
     }
     case "photoAck": {
-      if (!d.photoSlots?.some((s) => s.id === c.slotId)) throw Error("Photo slot not found.");
-      const acks = (d.photoAcks ??= []);
-      // Append-only, mirroring private.ops_photo_ack: recorded unless the latest acknowledgement of this revision and
-      // stage already has this Chair list. A stale one (older Chair list) is kept as history and silences nothing.
+      const slot = d.photoSlots?.find((s) => s.id === c.slotId);
+      if (!slot) throw Error("Photo slot not found.");
+      const epoch = c.epoch ?? 0;
       const chairs = c.chairs ?? "";
-      const latest = latestPhotoAck(acks, c.slotId, c.committeeId, c.stage, c.revision);
-      if (!latest || (latest.chairs ?? "") !== chairs)
-        acks.push({ slotId: c.slotId, committeeId: c.committeeId, stage: c.stage, revision: c.revision, chairs, at: now });
+      // Mirrors private.ops_photo_ack. An epoch the list has not reached yet cannot be genuine, so it is refused; an
+      // older one is recorded as history and silences nothing (a stale acknowledgement queued before a list change).
+      if (!Number.isInteger(epoch) || epoch < 0 || (c.revision === slot.revision && epoch > photoEpoch(d, c.committeeId, slot.schoolId))) throw Error("Unknown list version.");
+      const acks = (d.photoAcks ??= []);
+      if (!acks.some((a) => a.slotId === c.slotId && a.committeeId === c.committeeId && a.stage === c.stage && a.revision === c.revision && (a.epoch ?? 0) === epoch && (a.chairs ?? "") === chairs))
+        acks.push({ slotId: c.slotId, committeeId: c.committeeId, stage: c.stage, revision: c.revision, epoch, chairs, at: now });
       break;
     }
   }

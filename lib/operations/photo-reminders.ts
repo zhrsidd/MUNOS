@@ -11,6 +11,8 @@ export interface PhotoReminder {
   chairs: PhotoChair[];
   /** photoChairsVersion(chairs): sent with an acknowledgement so it silences only this Chair list. */
   chairsVersion: string;
+  /** photoEpoch for this committee and school: sent with an acknowledgement so it silences only this epoch. */
+  epoch: number;
   stage: PhotoStage;
   /** Whole minutes until the start (rounded up), negative once started. */
   minutesUntil: number;
@@ -39,25 +41,37 @@ export function photoChairs(data: ConferenceData): PhotoChair[] {
     data.staff.filter((s) => s.role === "chair" && s.schoolId).flatMap((s) => s.committeeIds.map((committeeId) => ({ staffId: s.id, name: s.name, committeeId, schoolId: s.schoolId! })))
   );
 }
+/** The participant list's current epoch for one committee and school (0 until a Chair change ever happened). */
+export function photoEpoch(data: ConferenceData, committeeId: string, schoolId: string): number {
+  return data.photoEpochs?.find((e) => e.committeeId === committeeId && e.schoolId === schoolId)?.epoch ?? 0;
+}
+/** Advances the epoch of each committee x school pair. PostgreSQL does this in triggers on the staff, assignment and
+ *  role tables (private.advance_photo_epoch); the local demo does it when a Chair's school changes. */
+export function advancePhotoEpochs(data: ConferenceData, committeeIds: readonly string[], schoolIds: readonly (string | null | undefined)[]) {
+  const epochs = (data.photoEpochs ??= []);
+  for (const committeeId of new Set(committeeIds))
+    for (const schoolId of new Set(schoolIds)) {
+      if (!schoolId) continue;
+      const row = epochs.find((e) => e.committeeId === committeeId && e.schoolId === schoolId);
+      if (row) row.epoch += 1;
+      else epochs.push({ committeeId, schoolId, epoch: 1 });
+    }
+}
 /** The participant version an acknowledgement is for: one committee's Chairs in one photo, as sorted staff ids
- *  ("" when none, which also matches acknowledgements recorded before Chairs joined photos). It is derived from
- *  current data, so any change to a Chair's school, committees or role changes it. Must match the format
- *  private.ops_photo_ack accepts. */
+ *  ("" when none). It is a second guard behind the epoch: it also changes with any change to the Chair list. Must
+ *  match the format private.ops_photo_ack accepts. */
 export function photoChairsVersion(chairs: readonly Pick<PhotoChair, "staffId">[]): string {
   return [...new Set(chairs.map((c) => c.staffId))].sort().join(",");
 }
-/** The most recent acknowledgement of this slot revision and stage by one committee (acks are in recorded order). */
-export function latestPhotoAck(acks: readonly PhotoAck[], slotId: string, committeeId: string, stage: "warning" | "due", revision: number) {
-  let latest: PhotoAck | undefined;
-  for (const a of acks) if (a.slotId === slotId && a.committeeId === committeeId && a.stage === stage && a.revision === revision) latest = a;
-  return latest;
-}
-/** Silenced only when the latest acknowledgement of this revision and stage was for the Chair list shown now. An
- *  earlier acknowledgement, of a list since changed, or a stale one queued offline and recorded later, stays as
- *  history but does not silence the changed reminder (no A→B→A reuse of an old acknowledgement). */
-function silenced(acks: readonly PhotoAck[], slot: PhotoSlot, committeeId: string, chairsVersion: string, stage: "warning" | "due") {
-  const latest = latestPhotoAck(acks, slot.id, committeeId, stage, slot.revision);
-  return latest !== undefined && (latest.chairs ?? "") === chairsVersion;
+/** Silenced only by an acknowledgement of this slot revision given at the CURRENT participant-list epoch (and for the
+ *  same Chair list). The epoch only ever advances, so an acknowledgement recorded before the list last changed can
+ *  never silence it again, even when the list returns to an earlier state (clear then restore a school, A→B→A, a
+ *  Chair removed and re-added, a role changed away and back). Older acknowledgements, and stale ones queued offline,
+ *  stay as history. */
+function silenced(acks: readonly PhotoAck[], slot: PhotoSlot, committeeId: string, chairsVersion: string, epoch: number, stage: "warning" | "due") {
+  return acks.some(
+    (a) => a.slotId === slot.id && a.committeeId === committeeId && a.stage === stage && a.revision === slot.revision && (a.epoch ?? 0) === epoch && (a.chairs ?? "") === chairsVersion,
+  );
 }
 /** Reminders for one committee: only slots for schools with delegates or Chairs in that committee. */
 export function committeePhotoReminders(data: ConferenceData, committeeId: string, now: number): PhotoReminder[] {
@@ -68,15 +82,16 @@ export function committeePhotoReminders(data: ConferenceData, committeeId: strin
       const delegates = data.delegates.filter((d) => d.committeeId === committeeId && d.schoolId === slot.schoolId).sort((a, b) => a.country.localeCompare(b.country));
       const chairs = committeeChairs.filter((c) => c.schoolId === slot.schoolId).sort((a, b) => a.name.localeCompare(b.name));
       const chairsVersion = photoChairsVersion(chairs);
+      const epoch = photoEpoch(data, committeeId, slot.schoolId);
       const live = stageAt(slot, now);
-      const acked = (stage: "warning" | "due") => silenced(acks, slot, committeeId, chairsVersion, stage);
+      const acked = (stage: "warning" | "due") => silenced(acks, slot, committeeId, chairsVersion, epoch, stage);
       const acknowledged = { warning: acked("warning"), due: acked("due") };
       // A cancelled slot is announced only during the window in which its reminder would have shown.
       const stage: PhotoStage = slot.enabled ? live : "cancelled";
       const attention = slot.enabled
         ? (live === "warning" && !acknowledged.warning) || (live === "due" && !acknowledged.due)
         : (live === "warning" || live === "due") && !acknowledged.warning && !acknowledged.due;
-      return { slot, school: data.schools.find((s) => s.id === slot.schoolId), delegates, chairs, chairsVersion, stage, minutesUntil: Math.ceil((Date.parse(slot.startsAt) - now) / minute), acknowledged, attention };
+      return { slot, school: data.schools.find((s) => s.id === slot.schoolId), delegates, chairs, chairsVersion, epoch, stage, minutesUntil: Math.ceil((Date.parse(slot.startsAt) - now) / minute), acknowledged, attention };
     })
     .filter((r) => r.delegates.length > 0 || r.chairs.length > 0)
     .sort((a, b) => a.slot.startsAt.localeCompare(b.slot.startsAt));
@@ -93,7 +108,8 @@ export function affectedCommittees(data: ConferenceData, slot: PhotoSlot) {
       const assigned = data.staff.filter((s) => s.role === "chair" && s.committeeIds.includes(c.id));
       const leaving = chairs.filter((x) => x.committeeId === c.id);
       const version = photoChairsVersion(leaving);
-      const acked = (stage: "warning" | "due") => silenced(data.photoAcks ?? [], slot, c.id, version, stage);
+      const epoch = photoEpoch(data, c.id, slot.schoolId);
+      const acked = (stage: "warning" | "due") => silenced(data.photoAcks ?? [], slot, c.id, version, epoch, stage);
       return {
         committee: c,
         delegates: delegates.get(c.id) ?? 0,

@@ -1,8 +1,9 @@
 -- Delegates and Chairs in school group photos (docs/plans/PROTECTED_FEATURES_PLAN.md §2).
 -- A Chair may have a school; that school's photo slots then remind the Chair's committees, as delegates do.
--- One nullable column with a conference-scoped FK, two private helpers, one new operations command, and a Chair-list
--- version on photo acknowledgements so a changed list is reminded again (section 5: one defaulted column, and the
--- acknowledgement unique key becomes an index because acknowledgements are append-only history).
+-- Additive: one nullable column with a conference-scoped FK, one small epoch table with triggers, two defaulted
+-- columns on photo_acknowledgements (their unique key widens to include them), private helpers and one new command.
+-- An acknowledgement silences a reminder only at the current participant-list epoch (sections 5 and 6), so a Chair
+-- change reminds the committee again and no earlier acknowledgement can be reused.
 -- Chairs cannot read public.staff (Executive-only RLS, unchanged). They receive only the narrow photoChairs
 -- projection: name, committee and school of Chairs with a school, for committees they can already access.
 -- private.apply_operations_mutation and public.operations_snapshot are PATCHED with exact anchors. Fail closed.
@@ -50,19 +51,95 @@ begin
 end $$;
 revoke all on function private.ops_staff_school(uuid,jsonb) from public, anon, authenticated;
 
--- 5) An acknowledgement is for one Chair list as well as one slot revision. `chairs` holds the sorted staff ids of
---    the committee's Chairs in that photo as the acknowledging device showed them (photoChairsVersion in
---    lib/operations/photo-reminders.ts); '' is no Chairs, so existing acknowledgements keep their meaning. The list
---    is derived from current data, so it changes with every kind of change to a Chair's school, committees or role
---    (staffSchool, the staff command, direct edits). A reminder is silenced only while the LATEST acknowledgement of
---    that slot revision and stage is for the current list. So an earlier acknowledgement no longer silences a changed
---    list, even if the list later changes back, and a stale acknowledgement queued offline is recorded as history but
---    cannot silence the updated list. Append-only: a row is added whenever the latest one's list differs (so the
---    unique key is replaced by an index); rows are never deleted or rewritten. apply_operations_mutation locks the
---    committee row first, so acknowledgements of one committee are serialised and clock_timestamp() orders them.
-alter table public.photo_acknowledgements add column chairs text not null default ''
- constraint photo_acknowledgements_chairs_format check (length(chairs) <= 1850 and
-  chairs ~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*)?$');
+-- 5) Participant-list epochs. The Chairs of one committee's photo for one school change whenever a Chair's school,
+--    committee assignment or role changes. Each change advances an epoch kept per (committee, school); it only ever
+--    increases. An acknowledgement records the epoch it was given at and silences a reminder only at the CURRENT
+--    epoch, so one recorded before the list last changed can never silence it again, even when the list returns to
+--    an earlier state (school cleared then restored, A -> B -> A, a Chair removed and re-added, a role changed away
+--    and back). The epoch is advanced by triggers on public.staff, public.committee_staff and public.conference_staff,
+--    so it covers staffSchool, the staff command and direct edits alike, in the same transaction as the change.
+--    Triggers do not run if session_replication_role is 'replica' (a bulk restore); the acknowledgement's Chair list
+--    (section 6) is a second guard that still catches a changed list in that case, though not one that changed and
+--    returned. Acknowledgements are append-only history: nothing is deleted or rewritten.
+create table public.photo_list_epochs (
+ conference_id uuid not null references public.conferences(id),
+ committee_id uuid not null, school_id uuid not null,
+ epoch bigint not null default 1 check (epoch >= 1),
+ updated_at timestamptz not null default now(),
+ primary key (committee_id, school_id),
+ foreign key (committee_id, conference_id) references public.committees(id, conference_id),
+ foreign key (school_id, conference_id) references public.schools(id, conference_id)
+);
+create index photo_list_epochs_conference on public.photo_list_epochs(conference_id);
+alter table public.photo_list_epochs enable row level security;
+revoke all on public.photo_list_epochs from anon, authenticated;
+grant select on public.photo_list_epochs to authenticated;
+create policy read_authorized on public.photo_list_epochs for select to authenticated
+ using (private.has_access(conference_id, committee_id, array['admin','chair','observer']::public.conference_role[]));
+
+create function private.advance_photo_epoch(conf uuid, committees uuid[], schools uuid[]) returns void
+language sql security definer set search_path='' as $$
+ insert into public.photo_list_epochs(conference_id, committee_id, school_id, epoch)
+ select distinct conf, c, s, 1 from unnest(committees) c cross join unnest(schools) s where c is not null and s is not null
+ on conflict (committee_id, school_id) do update set epoch = public.photo_list_epochs.epoch + 1, updated_at = now();
+$$;
+revoke all on function private.advance_photo_epoch(uuid,uuid[],uuid[]) from public, anon, authenticated;
+
+-- A Chair with a school changed in the given committees (their lists for that school change).
+create function private.photo_epoch_chair(conf uuid, member uuid, committees uuid[]) returns void
+language plpgsql security definer set search_path='' as $$
+declare school uuid;
+begin
+ select s."schoolId" into school from public.staff s
+  where s.id = member and s.conference_id = conf and exists(select 1 from public.conference_staff f where f.staff_id = member and f.conference_id = conf and f.role = 'chair');
+ if school is not null then perform private.advance_photo_epoch(conf, committees, array[school]); end if;
+end $$;
+revoke all on function private.photo_epoch_chair(uuid,uuid,uuid[]) from public, anon, authenticated;
+
+create function private.photo_epoch_trigger() returns trigger language plpgsql security definer set search_path='' as $$
+declare member uuid; conf uuid; committees uuid[];
+begin
+ if tg_table_name = 'staff' then
+   -- The school changed: both the old and the new school's lists change in each of the Chair's committees.
+   if exists(select 1 from public.conference_staff f where f.staff_id = new.id and f.conference_id = new.conference_id and f.role = 'chair') then
+     perform private.advance_photo_epoch(new.conference_id,
+       (select coalesce(array_agg(a.committee_id), '{}') from public.committee_staff a where a.staff_id = new.id and a.conference_id = new.conference_id),
+       array[old."schoolId", new."schoolId"]);
+   end if;
+ elsif tg_table_name = 'committee_staff' then
+   if tg_op in ('UPDATE', 'DELETE') then perform private.photo_epoch_chair(old.conference_id, old.staff_id, array[old.committee_id]); end if;
+   if tg_op in ('UPDATE', 'INSERT') then perform private.photo_epoch_chair(new.conference_id, new.staff_id, array[new.committee_id]); end if;
+ else -- conference_staff: a role gained or lost
+   if tg_op in ('UPDATE', 'DELETE') then
+     if old.role = 'chair' then perform private.photo_epoch_chair(old.conference_id, old.staff_id, (select coalesce(array_agg(a.committee_id), '{}') from public.committee_staff a where a.staff_id = old.staff_id and a.conference_id = old.conference_id)); end if;
+   end if;
+   if tg_op in ('UPDATE', 'INSERT') then
+     if new.role = 'chair' then perform private.photo_epoch_chair(new.conference_id, new.staff_id, (select coalesce(array_agg(a.committee_id), '{}') from public.committee_staff a where a.staff_id = new.staff_id and a.conference_id = new.conference_id)); end if;
+   end if;
+ end if;
+ return null;
+end $$;
+revoke all on function private.photo_epoch_trigger() from public, anon, authenticated;
+
+create trigger photo_epoch after update of "schoolId" on public.staff
+ for each row when (old."schoolId" is distinct from new."schoolId") execute function private.photo_epoch_trigger();
+create trigger photo_epoch_ins_del after insert or delete on public.committee_staff
+ for each row execute function private.photo_epoch_trigger();
+create trigger photo_epoch_upd after update of committee_id, staff_id on public.committee_staff
+ for each row when (old.committee_id is distinct from new.committee_id or old.staff_id is distinct from new.staff_id) execute function private.photo_epoch_trigger();
+create trigger photo_epoch_ins_del after insert or delete on public.conference_staff
+ for each row execute function private.photo_epoch_trigger();
+create trigger photo_epoch_upd after update of role, staff_id on public.conference_staff
+ for each row when (old.role is distinct from new.role or old.staff_id is distinct from new.staff_id) execute function private.photo_epoch_trigger();
+
+-- 6) An acknowledgement records the epoch (above) and the Chair list (sorted staff ids, '' for none) it was given
+--    for. Existing rows default to epoch 0 and '' so they keep their meaning until a Chair list first changes.
+--    The old unique key becomes one that includes both, so history of earlier lists is kept alongside.
+alter table public.photo_acknowledgements
+ add column epoch bigint not null default 0 constraint photo_acknowledgements_epoch_range check (epoch >= 0),
+ add column chairs text not null default ''
+  constraint photo_acknowledgements_chairs_format check (length(chairs) <= 1850 and
+   chairs ~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*)?$');
 do $unique$
 declare names text[];
 begin
@@ -72,11 +149,12 @@ begin
  if coalesce(array_length(names, 1), 0) <> 1 then raise exception 'photo_acknowledgements unique key changed; review before applying'; end if;
  execute format('alter table public.photo_acknowledgements drop constraint %I', names[1]);
 end $unique$;
-create index photo_acknowledgements_latest on public.photo_acknowledgements(slot_id, committee_id, stage, slot_revision, created_at);
+alter table public.photo_acknowledgements add constraint photo_acknowledgements_once unique (slot_id, committee_id, stage, slot_revision, epoch, chairs);
 
 create or replace function private.ops_photo_ack(conf uuid, cid uuid, actor uuid, command jsonb) returns uuid
 language plpgsql set search_path='' as $$
 declare slot public.photo_slots; chair_list text := coalesce(command->>'chairs', '');
+ ack_epoch bigint := coalesce((command->>'epoch')::bigint, 0); rev bigint := (command->>'revision')::bigint; current_epoch bigint;
 begin
  select * into slot from public.photo_slots where id = private.uuid_or_null(command->>'slotId') and conference_id = conf;
  if not found then raise exception 'Photo slot unavailable' using errcode='22023'; end if;
@@ -84,42 +162,44 @@ begin
  if length(chair_list) > 1850 or chair_list !~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*)?$' then
    raise exception 'Unknown Chair list' using errcode='22023';
  end if;
- -- Acknowledging an older revision or Chair list is harmless: it is kept as history and does not silence the
- -- current reminder (the client compares revision and the latest Chair list, lib/operations/photo-reminders.ts).
- -- A repeat of the latest acknowledgement adds nothing.
- if (select a.chairs from public.photo_acknowledgements a
-     where a.slot_id = slot.id and a.committee_id = cid and a.stage = command->>'stage' and a.slot_revision = (command->>'revision')::bigint
-     order by a.created_at desc, a.id desc limit 1) is distinct from chair_list then
-   insert into public.photo_acknowledgements(conference_id, committee_id, slot_id, stage, slot_revision, chairs, actor_id, created_at, updated_at)
-   values (conf, cid, slot.id, command->>'stage', (command->>'revision')::bigint, chair_list, actor, clock_timestamp(), clock_timestamp());
+ -- A device cannot have seen an epoch the list has not reached; refuse it so a future epoch can never be pre-recorded.
+ -- An older epoch (or revision) is a stale acknowledgement, e.g. queued offline before a Chair change: kept as history,
+ -- it never matches the current epoch, so it silences nothing.
+ if ack_epoch < 0 then raise exception 'Unknown list version' using errcode='22023'; end if;
+ if rev = slot.revision then
+   select coalesce(max(e.epoch), 0) into current_epoch from public.photo_list_epochs e where e.committee_id = cid and e.school_id = slot.school_id;
+   if ack_epoch > current_epoch then raise exception 'Unknown list version' using errcode='22023'; end if;
  end if;
+ insert into public.photo_acknowledgements(conference_id, committee_id, slot_id, stage, slot_revision, epoch, chairs, actor_id)
+ values (conf, cid, slot.id, command->>'stage', rev, ack_epoch, chair_list, actor)
+ on conflict (slot_id, committee_id, stage, slot_revision, epoch, chairs) do nothing;
  return slot.id;
 end; $$;
 revoke all on function private.ops_photo_ack(uuid,uuid,uuid,jsonb) from public, anon, authenticated;
 
--- 6) Wire the command into the operations dispatcher, and photoChairs and acknowledgement Chair lists into the
---    operations snapshot.
+-- 7) Wire staffSchool into the operations dispatcher; add photoChairs, photoEpochs and the acknowledgements' epoch and
+--    Chair list to the operations snapshot. Each anchor must match exactly once or the migration fails.
+create or replace function pg_temp.patch_once(definition text, anchor text, replacement text, label text) returns text language plpgsql as $$
+begin
+ if (length(definition) - length(replace(definition, anchor, ''))) <> length(anchor) then raise exception '% changed; review before applying', label; end if;
+ return replace(definition, anchor, replacement);
+end $$;
 do $patch$
 declare definition text;
- scope_anchor constant text := ' when ''sessionImport'', ''photoSlot'', ''photoImport'' then cid := null;';
- stale_anchor constant text := ' elsif kind = ''submissionLink'' then';
- dispatch_anchor constant text := ' when ''photoAck'' then entity := private.ops_photo_ack(conf, cid, actor, command);';
- snapshot_anchor constant text := 'from public.photo_acknowledgements a where a.conference_id = conf)';
- ack_anchor constant text := '''revision'',a.slot_revision,''at'',a.created_at) order by a.created_at)';
 begin
  definition := pg_get_functiondef('private.apply_operations_mutation(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
- if length(definition) - length(replace(definition, scope_anchor, '')) <> length(scope_anchor) then raise exception 'apply_operations_mutation scope anchor changed; review before applying'; end if;
- if length(definition) - length(replace(definition, stale_anchor, '')) <> length(stale_anchor) then raise exception 'apply_operations_mutation stale anchor changed; review before applying'; end if;
- if length(definition) - length(replace(definition, dispatch_anchor, '')) <> length(dispatch_anchor) then raise exception 'apply_operations_mutation dispatch anchor changed; review before applying'; end if;
- definition := replace(definition, scope_anchor, scope_anchor || E'\n when ''staffSchool'' then cid := null;');
+ definition := pg_temp.patch_once(definition, ' when ''sessionImport'', ''photoSlot'', ''photoImport'' then cid := null;',
+  E' when ''sessionImport'', ''photoSlot'', ''photoImport'' then cid := null;\n when ''staffSchool'' then cid := null;', 'apply_operations_mutation scope anchor');
  -- Value-based precondition, mirrored by lib/operations/fingerprint.ts: the Chair's current school or 'none'.
- definition := replace(definition, stale_anchor, E' elsif kind = ''staffSchool'' then\n   select coalesce("schoolId"::text, ''none'') into actual from public.staff where id = private.uuid_or_null(command->>''staffId'') and conference_id = conf;\n   actual := coalesce(actual, ''none'');\n' || stale_anchor);
- definition := replace(definition, dispatch_anchor, dispatch_anchor || E'\n when ''staffSchool'' then affected := private.ops_staff_school(conf, command); entity := private.uuid_or_null(command->>''staffId'');');
+ definition := pg_temp.patch_once(definition, ' elsif kind = ''submissionLink'' then',
+  E' elsif kind = ''staffSchool'' then\n   select coalesce("schoolId"::text, ''none'') into actual from public.staff where id = private.uuid_or_null(command->>''staffId'') and conference_id = conf;\n   actual := coalesce(actual, ''none'');\n elsif kind = ''submissionLink'' then', 'apply_operations_mutation stale anchor');
+ definition := pg_temp.patch_once(definition, ' when ''photoAck'' then entity := private.ops_photo_ack(conf, cid, actor, command);',
+  E' when ''photoAck'' then entity := private.ops_photo_ack(conf, cid, actor, command);\n when ''staffSchool'' then affected := private.ops_staff_school(conf, command); entity := private.uuid_or_null(command->>''staffId'');', 'apply_operations_mutation dispatch anchor');
  execute definition;
  definition := pg_get_functiondef('public.operations_snapshot(uuid)'::regprocedure);
- if length(definition) - length(replace(definition, snapshot_anchor, '')) <> length(snapshot_anchor) then raise exception 'operations_snapshot anchor changed; review before applying'; end if;
- if length(definition) - length(replace(definition, ack_anchor, '')) <> length(ack_anchor) then raise exception 'operations_snapshot acknowledgement anchor changed; review before applying'; end if;
- -- Recorded order (the client's "latest acknowledgement" relies on it), with the same tie-break as ops_photo_ack.
- definition := replace(definition, ack_anchor, '''revision'',a.slot_revision,''chairs'',a.chairs,''at'',a.created_at) order by a.created_at, a.id)');
- execute replace(definition, snapshot_anchor, snapshot_anchor || E',\n  ''photoChairs'', private.photo_chairs(conf)');
+ definition := pg_temp.patch_once(definition, '''revision'',a.slot_revision,''at'',a.created_at)',
+  '''revision'',a.slot_revision,''epoch'',a.epoch,''chairs'',a.chairs,''at'',a.created_at)', 'operations_snapshot acknowledgement anchor');
+ definition := pg_temp.patch_once(definition, 'from public.photo_acknowledgements a where a.conference_id = conf)',
+  E'from public.photo_acknowledgements a where a.conference_id = conf),\n  ''photoChairs'', private.photo_chairs(conf),\n  ''photoEpochs'', (select coalesce(jsonb_agg(jsonb_build_object(''committeeId'',e.committee_id,''schoolId'',e.school_id,''epoch'',e.epoch) order by e.committee_id, e.school_id),''[]'') from public.photo_list_epochs e where e.conference_id = conf)', 'operations_snapshot anchor');
+ execute definition;
 end $patch$;

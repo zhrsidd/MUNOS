@@ -49,7 +49,18 @@ export interface PhotoAck {
   revision: number;
   /** The committee's Chairs in that photo when acknowledged (photoChairsVersion). Absent or "" means no Chairs. */
   chairs?: string;
+  /** The committee's participant-list epoch (PhotoEpoch) when acknowledged. Absent means 0. */
+  epoch?: number;
   at: string;
+}
+/** Advances every time a Chair is added to, removed from or changed within the Chair list of one committee's
+ *  photo for one school (school, committee or role change). Absent means 0. An acknowledgement silences a
+ *  reminder only at the epoch it was given at, so a list that changes and later returns to an earlier state
+ *  can never reuse an earlier acknowledgement. */
+export interface PhotoEpoch {
+  committeeId: string;
+  schoolId: string;
+  epoch: number;
 }
 /** A Chair's traceable change to a delegate's total. Signed: a deduction is negative, a restore is positive. */
 export interface PointAdjustment {
@@ -93,4 +104,5 @@ export interface OperationsData {
   photoSlots?: PhotoSlot[];
   photoAcks?: PhotoAck[];
   photoChairs?: PhotoChair[];
+  photoEpochs?: PhotoEpoch[];
 }

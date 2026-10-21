@@ -5,7 +5,7 @@ import type {Command} from '../lib/commands';
 import type {ConferenceData} from '../lib/domain';
 import {createSeed} from '../lib/seed';
 import {operationsFingerprint} from '../lib/operations/fingerprint';
-import {affectedCommittees,committeePhotoReminders,photoChairs} from '../lib/operations/photo-reminders';
+import {advancePhotoEpochs,affectedCommittees,committeePhotoReminders,photoChairs,photoEpoch} from '../lib/operations/photo-reminders';
 import type {OperationsCommand} from '../lib/operations/commands';
 import type {PhotoSlot} from '../lib/operations/types';
 import {freshDatabase} from './helpers/database';
@@ -103,8 +103,11 @@ test('real PostgreSQL: Executive sets a Chair school; Chairs see only the photoC
  }finally{await db.close();}
 });
 
-// An acknowledgement is for one slot revision AND one Chair list (Codex review of PR #36): a changed list reminds again.
-test('client: a changed Chair list reminds an acknowledged committee again; stale acknowledgements stay history and silence nothing',()=>{
+
+// Participant-list epochs (Codex reviews of PR #36). An acknowledgement silences a reminder only at the epoch it was
+// given at, and a Chair change advances the epoch, so an acknowledgement recorded before the list last changed can never
+// silence it again, even when the list returns to an earlier state.
+test('client: a Chair-list change reminds an acknowledged committee again; clear/restore, A-B-A, remove/re-add and role changes cannot reuse an old acknowledgement',()=>{
  let d:ConferenceData=createSeed();
  d.schools.push({id:'school-b',name:'School B'});
  const run=(c:Command,role:'admin'|'chair'='admin')=>{d=applyCommand(d,c,role,meta());};
@@ -113,64 +116,82 @@ test('client: a changed Chair list reminds an acknowledged committee again; stal
  const slotA=d.photoSlots!.find(s=>s.schoolId===A)!,slotB=d.photoSlots!.find(s=>s.schoolId==='school-b')!;
  const reminder=(committee:string,slot:PhotoSlot)=>committeePhotoReminders(d,committee,NOW).find(r=>r.slot.id===slot.id);
  const attention=(committee:string,slot:PhotoSlot)=>reminder(committee,slot)?.attention;
- const ack=(committee:string,slot:PhotoSlot,chairs=reminder(committee,slot)!.chairsVersion)=>run({type:'photoAck',committeeId:committee,slotId:slot.id,stage:'warning',revision:slot.revision,chairs},'chair');
+ /** Acknowledge what this device shows now, or (stale) an explicit epoch and Chair list queued earlier. */
+ const ack=(committee:string,slot:PhotoSlot,stale?:{epoch:number;chairs:string})=>{const r=reminder(committee,slot)!;run({type:'photoAck',committeeId:committee,slotId:slot.id,stage:'warning',revision:slot.revision,epoch:stale?stale.epoch:r.epoch,chairs:stale?stale.chairs:r.chairsVersion},'chair');};
  const executiveSees=(committee:string,slot:PhotoSlot)=>affectedCommittees(d,slot).find(a=>a.committee.id===committee)?.warningAcknowledged;
  const alex=()=>d.staff.find(s=>s.id==='chair-demo')!;
+ // The demo has no command for committee or role changes. PostgreSQL triggers advance the epoch of each committee whose
+ // Chair list changes; the same helper stands in for them here.
+ const bump=(committees:string[])=>advancePhotoEpochs(d,committees,[alex().schoolId]);
 
- // GA1 acknowledges its delegates-only reminder.
+ // GA1 acknowledges its delegates-only reminder; the Executive then gives its Chair that school.
  ack('ga1',slotA);
  assert.equal(attention('ga1',slotA),false);assert.equal(executiveSees('ga1',slotA),true);
- // The Executive gives GA1's Chair that school: the list changed, so GA1 is reminded again.
  run({type:'staffSchool',staffId:'chair-demo',schoolId:A});
- assert.deepEqual(reminder('ga1',slotA)!.chairs.map(c=>c.staffId),['chair-demo']);
- assert.equal(reminder('ga1',slotA)!.chairsVersion,'chair-demo');
- assert.equal(attention('ga1',slotA),true,'an earlier acknowledgement no longer silences the changed list');
+ assert.equal(reminder('ga1',slotA)!.epoch,1);assert.equal(reminder('ga1',slotA)!.chairsVersion,'chair-demo');
+ assert.equal(attention('ga1',slotA),true,'the earlier acknowledgement no longer silences the changed list');
  assert.equal(executiveSees('ga1',slotA),false);
- assert.equal(attention('ecosoc',slotA),true,'ECOSOC never acknowledged');
- // A stale acknowledgement of the old list (queued offline, or from a client without Chair lists) does not silence it.
- run({type:'photoAck',committeeId:'ga1',slotId:slotA.id,stage:'warning',revision:slotA.revision},'chair');
+ assert.equal(photoEpoch(d,'ecosoc',A),0,'only the Chair\'s committees change');
+ // A stale acknowledgement queued before the change is kept as history and silences nothing; a future epoch is refused.
+ ack('ga1',slotA,{epoch:0,chairs:''});
  assert.equal(attention('ga1',slotA),true);
+ assert.throws(()=>ack('ga1',slotA,{epoch:2,chairs:'chair-demo'}),/Unknown list version/);
  ack('ga1',slotA);
  assert.equal(attention('ga1',slotA),false);assert.equal(executiveSees('ga1',slotA),true);
- // ...even when it is recorded after the acknowledgement of the current list: it is kept, and asks again.
+ ack('ga1',slotA,{epoch:0,chairs:''}); // a stale acknowledgement arriving later does not undo the current one
+ assert.equal(attention('ga1',slotA),false);
  const history=d.photoAcks!.map(a=>({...a}));
- ack('ga1',slotA,'');
- assert.deepEqual(d.photoAcks!.slice(0,history.length),history,'earlier acknowledgements are preserved');
- assert.deepEqual(d.photoAcks!.filter(a=>a.committeeId==='ga1').map(a=>a.chairs),['','chair-demo','']);
- assert.equal(attention('ga1',slotA),true,'a stale acknowledgement cannot silence the updated list');
- ack('ga1',slotA);ack('ga1',slotA);
- assert.equal(d.photoAcks!.filter(a=>a.committeeId==='ga1').length,4,'repeating the latest acknowledgement adds nothing');
- assert.equal(attention('ga1',slotA),false);
 
- // Affiliation change A → B: slot A's list changes back to delegates only, but GA1's last acknowledgement was for the
- // list with its Chair, so it is reminded again (the first acknowledgement is not reused). Slot B now reminds GA1.
- run({type:'staffSchool',staffId:'chair-demo',schoolId:'school-b'});
- assert.deepEqual(reminder('ga1',slotA)!.chairs,[]);
- assert.equal(attention('ga1',slotA),true);
- assert.deepEqual(reminder('ga1',slotB)!.chairs.map(c=>c.name),['Alex Morgan']);assert.equal(attention('ga1',slotB),true);
- ack('ga1',slotA);ack('ga1',slotB);
- // Clearing the school: slot B no longer concerns GA1; slot A is unchanged and stays acknowledged.
+ // Codex: ack at L1, clear the school, restore the school -> reminded again (also while cleared).
  run({type:'staffSchool',staffId:'chair-demo',schoolId:null});
- assert.equal(reminder('ga1',slotB),undefined);assert.deepEqual(affectedCommittees(d,slotB),[]);
- assert.equal(attention('ga1',slotA),false);
+ assert.equal(attention('ga1',slotA),true,'the list changed to none');
+ ack('ga1',slotA);assert.equal(attention('ga1',slotA),false);
+ run({type:'staffSchool',staffId:'chair-demo',schoolId:A});
+ assert.equal(reminder('ga1',slotA)!.chairsVersion,'chair-demo',"the list is back to what the first acknowledgement was for");
+ assert.equal(attention('ga1',slotA),true,'restoring the school must remind again');
+ assert.equal(executiveSees('ga1',slotA),false);
+ ack('ga1',slotA);assert.equal(attention('ga1',slotA),false);
 
- // Committee and role assignments (an Executive or owner edit; derived the same way, so no command is needed).
- run({type:'staffSchool',staffId:'chair-demo',schoolId:A});ack('ga1',slotA);
- alex().committeeIds=['ga1','unhrc']; // a second committee
- assert.deepEqual(reminder('unhrc',slotA)!.chairs.map(c=>c.staffId),['chair-demo'],'a multi-committee Chair is listed in both');
- assert.equal(attention('unhrc',slotA),true);
+ // A -> B -> A: slot B then slot A.
+ run({type:'staffSchool',staffId:'chair-demo',schoolId:'school-b'});
+ assert.equal(attention('ga1',slotA),true,"GA1's list for A lost its Chair");
+ assert.deepEqual(reminder('ga1',slotB)!.chairs.map(c=>c.name),['Alex Morgan']);assert.equal(attention('ga1',slotB),true);
+ ack('ga1',slotB);ack('ga1',slotA);
+ run({type:'staffSchool',staffId:'chair-demo',schoolId:A});
+ assert.equal(reminder('ga1',slotB),undefined,'slot B no longer concerns GA1');
+ assert.equal(attention('ga1',slotA),true,'A -> B -> A must remind again');
+ ack('ga1',slotA);assert.equal(attention('ga1',slotA),false);
+ run({type:'staffSchool',staffId:'chair-demo',schoolId:'school-b'});
+ run({type:'staffSchool',staffId:'chair-demo',schoolId:A});
+ assert.equal(attention('ga1',slotA),true,'and again');
+ ack('ga1',slotA);
+
+ // A Chair of a second committee is listed in both; each committee is reminded only for its own change.
+ alex().committeeIds=['ga1','unhrc'];bump(['unhrc']);
+ assert.deepEqual(reminder('unhrc',slotA)!.chairs.map(c=>c.staffId),['chair-demo']);assert.equal(attention('unhrc',slotA),true);
  assert.equal(attention('ga1',slotA),false,"GA1's own list did not change");
  assert.deepEqual(affectedCommittees(d,slotA).map(a=>[a.committee.id,a.chairs]),[['ga1',1],['ecosoc',0],['unhrc',1]]);
- ack('unhrc',slotA);
- alex().committeeIds=['unhrc']; // moved off GA1
+ ack('unhrc',slotA);assert.equal(attention('unhrc',slotA),false);
+ // Removed from GA1 then re-added.
+ alex().committeeIds=['unhrc'];bump(['ga1']);
  assert.deepEqual(reminder('ga1',slotA)!.chairs,[]);assert.equal(attention('ga1',slotA),true);
- assert.equal(attention('unhrc',slotA),false);
- alex().role='approval'; // no longer a Chair
+ ack('ga1',slotA);
+ alex().committeeIds=['unhrc','ga1'];bump(['ga1']);
+ assert.equal(reminder('ga1',slotA)!.chairsVersion,'chair-demo');
+ assert.equal(attention('ga1',slotA),true,'removed then re-added must remind again');
+ ack('ga1',slotA);assert.equal(attention('unhrc',slotA),false,"UNHRC's list did not change");
+ // Role changed away from Chair and back.
+ alex().role='approval';bump(['ga1','unhrc']);
  assert.equal(reminder('unhrc',slotA),undefined,'a former Chair no longer brings UNHRC into the photo');
- assert.deepEqual(photoChairs(d),[]);
+ assert.equal(attention('ga1',slotA),true);ack('ga1',slotA);
+ alex().role='chair';bump(['ga1','unhrc']);
+ assert.equal(attention('ga1',slotA),true,'role changed away and back must remind again');
+ assert.equal(attention('unhrc',slotA),true);
+
+ assert.deepEqual(d.photoAcks!.slice(0,history.length),history,'earlier acknowledgements are preserved');
 });
 
-test('real PostgreSQL: acknowledgements are versioned by Chair list; changes remind again, stale acknowledgements are kept but silence nothing',async()=>{
+test('real PostgreSQL: triggers advance the participant-list epoch; no acknowledgement recorded before the list last changed can silence it',async()=>{
  const {db,ids,query,as,asOwner,grant}=await freshDatabase();
  const executive='74000000-0000-4000-8000-000000000001',ga1Chair='74000000-0000-4000-8000-000000000002',hrcChair='74000000-0000-4000-8000-000000000003';
  const ALEX='c63bb044-9b54-44fd-a002-7ea23e5477d5',A='ee287c3a-73ea-447c-a0c3-e26e843644c0',B='74000000-0000-4000-8000-0000000000bb';
@@ -181,67 +202,94 @@ test('real PostgreSQL: acknowledgements are versioned by Chair list; changes rem
   const send=async(user:string,command:OperationsCommand,role='admin',expected:string|null=null,id:string=crypto.randomUUID())=>{await as(user);return db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,id,JSON.stringify(command),role,expected,'2026-11-01T00:00:00Z']);};
   let school:string|null=null;
   const setSchool=async(next:string|null)=>{await send(executive,{type:'staffSchool',staffId:ALEX,schoolId:next},'admin',school??'none');school=next;};
-  // A Chair device's view: the merge the repository makes, then the same derivation as the client.
+  // A device's view: the merge the repository makes, then the same derivation as the client.
   const snapshot=async(user:string,core:string)=>{await as(user);const a=(await query<{s:ConferenceData}>(`select public.${core}($1) s`,[ids.conference]))[0].s;const b=(await query<{s:ConferenceData}>('select public.operations_snapshot($1) s',[ids.conference]))[0].s;return {...a,...b} as ConferenceData;};
   const reminder=async(user:string,committee:string,slotId:string)=>committeePhotoReminders(await snapshot(user,'conference_snapshot'),committee,AT).find(r=>r.slot.id===slotId);
   const attention=async(user:string,committee:string,slotId:string)=>(await reminder(user,committee,slotId))?.attention;
-  const ack=async(user:string,committee:string,slotId:string,chairs?:string)=>{const r=(await reminder(user,committee,slotId))!;await send(user,{type:'photoAck',committeeId:committee,slotId,stage:'warning',revision:r.slot.revision,chairs:chairs??r.chairsVersion},'chair');};
-  const rows=async()=>{await asOwner();return query<{id:string;committee_id:string;chairs:string}>('select id,committee_id,chairs from public.photo_acknowledgements order by created_at,id');};
+  /** Acknowledge what the device shows now, or (stale) the epoch and Chair list it queued earlier. */
+  const ack=async(user:string,committee:string,slotId:string,stale?:{epoch:number;chairsVersion:string})=>{const r=stale??(await reminder(user,committee,slotId))!;await send(user,{type:'photoAck',committeeId:committee,slotId,stage:'warning',revision:1,epoch:r.epoch,chairs:r.chairsVersion},'chair');};
+  const rows=async()=>{await asOwner();return query<{id:string;committee_id:string;epoch:string;chairs:string}>('select id,committee_id,epoch,chairs from public.photo_acknowledgements order by created_at,id');};
+  const epoch=async(committee:string,sch:string)=>{await asOwner();return Number((await query<{e:string}>('select coalesce(max(epoch),0) e from public.photo_list_epochs where committee_id=$1 and school_id=$2',[committee,sch]))[0].e);};
   const slots:string[]=[];
   for(const schoolId of [A,B]){const id=crypto.randomUUID();await send(executive,{type:'photoSlot',action:'create',schoolId,startsAt:'2026-11-12T10:30:00Z',endsAt:null,location:'Hall',note:''},'admin',null,id);slots.push(id.slice(0,24)+'000000000001');}
   const [slotA,slotB]=slots;
 
-  // GA1 acknowledges its delegates-only reminder; then GA1's Chair gets that school and GA1 is reminded again.
+  // GA1 acknowledges its delegates-only reminder; the Executive then gives its Chair that school.
   await ack(ga1Chair,ids.ga1,slotA);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
+  const queued=(await reminder(ga1Chair,ids.ga1,slotA))!; // a device that goes offline here
+  assert.equal(queued.epoch,0);
   await setSchool(A);
+  assert.equal(await epoch(ids.ga1,A),1);assert.equal(await epoch(ids.who,A),0,'only the Chair\'s committees change');
   const r=(await reminder(ga1Chair,ids.ga1,slotA))!;
-  assert.deepEqual(r.chairs.map(c=>c.staffId),[ALEX]);assert.equal(r.chairsVersion,ALEX);
+  assert.deepEqual(r.chairs.map(c=>c.staffId),[ALEX]);assert.equal(r.epoch,1);assert.equal(r.chairsVersion,ALEX);
   assert.equal(r.attention,true,'an earlier acknowledgement no longer silences the changed list');
-  // A stale acknowledgement of the old list (queued offline before the change, no Chair list) silences nothing.
-  await send(ga1Chair,{type:'photoAck',committeeId:ids.ga1,slotId:slotA,stage:'warning',revision:1},'chair');
+  // The offline device now replays its acknowledgement of epoch 0: recorded as history, it silences nothing.
+  await ack(ga1Chair,ids.ga1,slotA,queued);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),true);
+  await assert.rejects(()=>ack(ga1Chair,ids.ga1,slotA,{epoch:5,chairsVersion:ALEX}),/Unknown list version/);
+  await assert.rejects(()=>ack(ga1Chair,ids.ga1,slotA,{epoch:1,chairsVersion:'not-a-staff-id'}),/Unknown Chair list/);
   await ack(ga1Chair,ids.ga1,slotA);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
-  const history=await rows();
-  await ack(ga1Chair,ids.ga1,slotA,'');
-  assert.deepEqual((await rows()).slice(0,history.length),history,'earlier acknowledgements are preserved');
-  assert.deepEqual((await rows()).map(a=>a.chairs),['',ALEX,'']);
-  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'a stale acknowledgement cannot silence the updated list');
-  await ack(ga1Chair,ids.ga1,slotA);await ack(ga1Chair,ids.ga1,slotA);
-  assert.equal((await rows()).length,4,'repeating the latest acknowledgement adds nothing');
-  assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
-  await assert.rejects(()=>send(ga1Chair,{type:'photoAck',committeeId:ids.ga1,slotId:slotA,stage:'warning',revision:1,chairs:'not-a-staff-id'},'chair'),/Unknown Chair list/);
-  // The Executive overview applies the same rule to the same data.
+  await ack(ga1Chair,ids.ga1,slotA,queued);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),false,'a stale acknowledgement arriving later does not undo the current one');
   const exec=await snapshot(executive,'executive_snapshot');
   const overview=affectedCommittees(exec,exec.photoSlots!.find(s=>s.id===slotA)!);
   assert.deepEqual(overview.map(a=>[a.committee.id,a.chairs,a.warningAcknowledged]).sort(),[[ids.ga1,1,true],[ids.who,0,false]].sort());
+  const history=await rows();
 
-  // Affiliation change A → B, then clearing.
-  await setSchool(B);
-  assert.deepEqual((await reminder(ga1Chair,ids.ga1,slotA))!.chairs,[]);
-  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'the first acknowledgement is not reused');
-  assert.equal(await attention(ga1Chair,ids.ga1,slotB),true);
-  await ack(ga1Chair,ids.ga1,slotA);await ack(ga1Chair,ids.ga1,slotB);
+  // Codex: ack at L1, clear the school, restore the school -> reminded again.
   await setSchool(null);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'the list changed to none');
+  await ack(ga1Chair,ids.ga1,slotA);assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
+  await setSchool(A);
+  assert.equal((await reminder(ga1Chair,ids.ga1,slotA))!.chairsVersion,ALEX,'the list is back to what the first acknowledgement was for');
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'restoring the school must remind again');
+  await ack(ga1Chair,ids.ga1,slotA);assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
+
+  // A -> B -> A.
+  await setSchool(B);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotB),true);
+  await ack(ga1Chair,ids.ga1,slotB);await ack(ga1Chair,ids.ga1,slotA);
+  await setSchool(A);
   assert.equal(await reminder(ga1Chair,ids.ga1,slotB),undefined);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'A -> B -> A must remind again');
+  await ack(ga1Chair,ids.ga1,slotA);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),false);
 
-  // Committee and role assignments edited directly in the database: the list is derived, so these count too.
-  await setSchool(A);await ack(ga1Chair,ids.ga1,slotA);
+  // Committee and role assignments edited directly in the database: the triggers advance the epoch.
   await asOwner();await query('insert into public.committee_staff(conference_id,committee_id,staff_id) values($1,$2,$3)',[ids.conference,ids.hrc,ALEX]);
   assert.deepEqual((await reminder(hrcChair,ids.hrc,slotA))!.chairs.map(c=>c.staffId),[ALEX],'a multi-committee Chair is listed in both');
   assert.equal(await attention(hrcChair,ids.hrc,slotA),true);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),false,"GA1's own list did not change");
-  await ack(hrcChair,ids.hrc,slotA);
+  await ack(hrcChair,ids.hrc,slotA);assert.equal(await attention(hrcChair,ids.hrc,slotA),false);
   await asOwner();await query('delete from public.committee_staff where committee_id=$1 and staff_id=$2',[ids.ga1,ALEX]);
   assert.deepEqual((await reminder(ga1Chair,ids.ga1,slotA))!.chairs,[]);
   assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'a Chair moved off GA1 reminds GA1 again');
-  assert.equal(await attention(hrcChair,ids.hrc,slotA),false);
+  await ack(ga1Chair,ids.ga1,slotA);
+  await asOwner();await query('insert into public.committee_staff(conference_id,committee_id,staff_id) values($1,$2,$3)',[ids.conference,ids.ga1,ALEX]);
+  assert.equal((await reminder(ga1Chair,ids.ga1,slotA))!.chairsVersion,ALEX);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'removed then re-added must remind again');
+  await ack(ga1Chair,ids.ga1,slotA);
+  assert.equal(await attention(hrcChair,ids.hrc,slotA),false,"HRC's list did not change");
   await asOwner();await query("update public.conference_staff set role='approval' where staff_id=$1",[ALEX]);
   assert.equal(await reminder(hrcChair,ids.hrc,slotA),undefined,'a former Chair no longer brings HRC into the photo');
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true);await ack(ga1Chair,ids.ga1,slotA);
+  await asOwner();await query("update public.conference_staff set role='chair' where staff_id=$1",[ALEX]);
+  assert.equal(await attention(ga1Chair,ids.ga1,slotA),true,'role changed away and back must remind again');
+  assert.equal(await attention(hrcChair,ids.hrc,slotA),true);
+  // A no-op edit does not advance the epoch.
+  const before=await epoch(ids.ga1,A);
+  await asOwner();await query("update public.conference_staff set role='chair' where staff_id=$1",[ALEX]);
+  await asOwner();await query('update public.staff set "schoolId"=$1 where id=$2',[A,ALEX]);
+  assert.equal(await epoch(ids.ga1,A),before);
+
+  // Chairs read epochs only for their own committees; nothing was deleted or rewritten.
+  await as(hrcChair);assert.deepEqual(((await query<{s:{photoEpochs:{committeeId:string}[]}}>('select public.operations_snapshot($1) s',[ids.conference]))[0].s.photoEpochs).every(e=>e.committeeId===ids.hrc),true);
+  await as(ga1Chair);await assert.rejects(()=>db.query('insert into public.photo_list_epochs(conference_id,committee_id,school_id,epoch) values($1,$2,$3,9)',[ids.conference,ids.ga1,B]),/permission denied/);
   const all=await rows();
-  assert.deepEqual(all.slice(0,history.length),history,'nothing was deleted or rewritten');
-  assert.equal(all.length,8);
+  assert.deepEqual(all.slice(0,history.length),history,'earlier acknowledgements are preserved');
+  assert.ok(all.length>history.length);
  }finally{await db.close();}
 });
