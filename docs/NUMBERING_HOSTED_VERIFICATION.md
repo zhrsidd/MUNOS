@@ -50,7 +50,7 @@ Everything below is **Untested (hosted)**: that the hosted `pg_get_functiondef` 
 | --- | --- | --- |
 | A1 | **Owner approval** to apply migration 27 to the preproduction project, recorded next to the run (who, when, exact commit). | [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md) owner-approval gates: any migration 27 or later needs owner approval, independent review, replay on preproduction, then apply once. Feature freeze applies. |
 | A2 | **Independent (Codex) review** of the migration at the exact commit, recorded. The file's header is addressed to Codex; the repository does not record that review. | [AGENTS.md](../AGENTS.md) protected area 3. |
-| A3 | The file on `main` is byte-identical to the reviewed copy. Record its trimmed MD5 (section 3.3). At `276074a` it is `b67f61f8881307e95cd97e32fcf0a6f1` (**Verified**, computed locally). Recompute it at apply time. If the file changes (even a comment), the MD5 and the review change. | Same byte-for-byte rule used on 20 October. |
+| A3 | The file on `main` is byte-identical to the reviewed copy. Record its normalised MD5 (leading and trailing spaces, tabs, carriage returns and newlines removed; section 3.3). At `276074a` it is `b67f61f8881307e95cd97e32fcf0a6f1` (**Verified**, computed locally; the raw-bytes MD5 is `dfa8695d09a518ef352d6420496d8c42`). Recompute it at apply time. If the file changes (even a comment), the MD5 and the review change. | Same byte-for-byte rule used on 20 October. |
 | A4 | Owner confirms that **scoped cloud-agent test access to this project is still in force** (lifecycle "Development" phase). After promotion no agent may run any of this ([INFRASTRUCTURE_LIFECYCLE.md](INFRASTRUCTURE_LIFECYCLE.md), "After promotion"). | The project is still in its development role. |
 | A5 | A reviewed **revert migration** is prepared on a branch, replayed locally and **not applied** (section 7). | Migrations are forward-only; the revert must not be improvised during an incident. |
 | A6 | If the public HTTP path or Chair-vs-public concurrency is to be exercised against hosted: the owner supplies `SUPABASE_SECRET_KEY` in an ignored local environment. It is never pasted into chat, a doc or a ticket. | [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md) owner-approval gates. Without it those two checks stay **Untested (hosted)**, covered only by the PostgreSQL 17 CI test. |
@@ -152,20 +152,24 @@ Hosted `pg_get_functiondef` text is **not** expected to equal a local PGlite or 
 
 **Proposed** shape, because the exact stored form is **Untested (hosted)**. The connector's `apply_migration` stored the file text as the ledger's `statements`, and the 21 October check compared `md5` of the trimmed text with the trimmed file for migrations 22 to 26. Migrations 1 to 21 were applied by the CLI, which may store the file as several statements, so an MD5 comparison for those is not expected to work; they were verified by the schema fingerprint recorded in [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md#verification-against-the-live-project) instead.
 
-Local side (**Verified**: prints the value in A3 for this commit):
+**Both sides must use the same normalisation.** JavaScript `trim()` removes spaces **and newlines**; PostgreSQL `btrim(text)` removes **spaces only** unless told otherwise. The migration file ends with a newline, so `md5(trim(file))` and `md5(btrim(statements))` differ for the very same text. This was reproduced locally (PGlite): for this file, JavaScript `trim()` gives `b67f61f8881307e95cd97e32fcf0a6f1`, the PostgreSQL default `btrim` gives `dfa8695d09a518ef352d6420496d8c42` (which equals the MD5 of the raw bytes, newline included), and `btrim(..., E' \t\r\n')` gives `b67f61f8881307e95cd97e32fcf0a6f1` again. Use the explicit character set on **both** sides, and compare the raw form as well.
+
+Local side (**Verified** locally; prints both values for this commit: normalised `b67f61f8881307e95cd97e32fcf0a6f1`, raw `dfa8695d09a518ef352d6420496d8c42`):
 
 ```
-node -e "const c=require('crypto'),fs=require('fs');console.log(c.createHash('md5').update(fs.readFileSync(process.argv[1],'utf8').trim()).digest('hex'))" supabase/migrations/<file>.sql
+node -e "const c=require('crypto'),fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const h=x=>c.createHash('md5').update(x).digest('hex');console.log('normalised',h(t.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'')),'raw',h(t))" supabase/migrations/<file>.sql
 ```
 
 Hosted side, to run **after** the apply and for the five earlier connector rows if their shape matches (first check the shape):
 
 ```sql
-select version, name, array_length(statements, 1) as parts, md5(btrim(array_to_string(statements, E'\n'))) as md5_trimmed
+select version, name, array_length(statements, 1) as parts,
+       md5(btrim(array_to_string(statements, E'\n'), E' \t\r\n')) as md5_normalised,
+       md5(array_to_string(statements, E'\n'))                      as md5_raw
 from supabase_migrations.schema_migrations where version in ('20261021090000','20261021100000','20261021110000','20261021120000','20261021130000','20261021140000') order by version;
 ```
 
-If `parts` is 1, `md5_trimmed` must equal the local value for that file. If `parts` is greater than 1, record that the shape differs and rely on the function-level checks of section 6.
+If `parts` is 1, `md5_normalised` must equal the local normalised value for that file; `md5_raw` equals the local raw value only if the connector stored the file byte for byte (with or without its final newline). If `parts` is greater than 1, record that the shape differs and rely on the function-level checks of section 6. **The actual hosted ledger serialisation (one element or several, trailing newline kept or stripped, line endings) is unverified**; a mismatch of `md5_raw` alone, with `md5_normalised` equal, is expected to be only a whitespace difference and is recorded, not a stop. A mismatch of `md5_normalised` is a stop.
 
 ## 4. Aborted-transaction dry run
 
@@ -506,7 +510,7 @@ Record in a **new section appended to [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJE
 | Field | Record |
 | --- | --- |
 | Run | Date and time (UTC), operator, who approved (A1), reviewer (A2) |
-| Commit | Exact `main` SHA, file name, trimmed MD5 of the file (A3) |
+| Commit | Exact `main` SHA, file name, normalised and raw MD5 of the file (A3, 3.3) |
 | Target | Ref and URL (T1, T2), region and Postgres version, `EXPECTED_SUPABASE_REF` unset, allow-list used |
 | Data check | T3 results (zero rows, counts) |
 | Ledger before | Row count (26), 3.1 result (zero rows) |
