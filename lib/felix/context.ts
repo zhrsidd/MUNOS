@@ -49,7 +49,7 @@ export type FelixContext = {
 };
 
 /** A resolution named for Felix's reminders and answers: its identity from the delegates in this context. */
-export const felixResolutionLabel = (ctx: Pick<FelixContext, "delegates">, resolution: Pick<Resolution, "code" | "submitterId" | "committeeId">) => resolutionLabel(resolution, ctx.delegates ?? []);
+export const felixResolutionLabel = (ctx: Pick<FelixContext, "delegates">, resolution: Pick<Resolution, "code" | "submitterId" | "committeeId" | "submitterCountry">) => resolutionLabel(resolution, ctx.delegates ?? []);
 
 /**
  * Builds Felix's context from the conference data already in memory. Chairs only see their own committee; other
