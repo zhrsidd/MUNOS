@@ -18,7 +18,8 @@
     "rehearsal:plan": "tsx scripts/rehearsal-plan.mts",
     "rehearsal:run": "tsx scripts/rehearsal-run.mts",
     "rehearsal:identities": "tsx scripts/rehearsal-identities.mts",
-    "smoke:project": "tsx scripts/smoke-project.mts"
+    "smoke:project": "tsx scripts/smoke-project.mts",
+    "test:rehearsal:offline": "node --import tsx scripts/rehearsal/offline-multi-device.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
