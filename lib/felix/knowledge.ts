@@ -302,7 +302,7 @@ export const KNOWLEDGE: Entry[] = [
       logistics: ctx => {
         const queue = ctx.documents.filter(d => d.status === "Approved");
         return {
-          text: `${queue.length ? `${queue.length} approved resolution${queue.length === 1 ? " is" : "s are"} in the print queue, ${queue.reduce((n, d) => n + d.copies, 0)} copies in total. ` : "The print queue is empty right now. "}Only approved resolutions enter it.`,
+          text: `${queue.length ? `${queue.length} approved resolution${queue.length === 1 ? " is" : "s are"} in the print queue, ${queue.reduce((n, d) => n + d.copies, 0)} copies in total. ` : "The print queue is empty right now. "}Only approved resolutions enter it. Each job's copies are one per committee delegate plus 3 spares, counted when the resolution is approved.`,
           steps: ["Open the approved version with “Open approval copy ↗” (or the working Google Doc) and print it.", "Print the number of copies shown on the job.", "Press “✓ Mark printed” so the Chair can open debate. Printed jobs move to Completed."],
           href: "/logistics", linkLabel: "Open Print queue",
         };

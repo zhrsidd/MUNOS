@@ -172,12 +172,13 @@ test("knowledge entries are well formed and reachable from their own examples", 
 
 test("retired and unimplemented features are not described", () => {
   const knowledge = readFileSync("lib/felix/knowledge.ts", "utf8");
-  for (const retired of [/Award discussion/i, /Resources & Drive/i, /Drive mirror/i, /projector/i, /server timer/i, /\+ ?3 spares|plus \d+ spares|PRINT_SPARES/i, /Debated Amendment/i, /Clear majority/i]) {
+  for (const retired of [/Award discussion/i, /Resources & Drive/i, /Drive mirror/i, /projector/i, /server timer/i, /Debated Amendment/i, /Clear majority/i]) {
     assert.doesNotMatch(knowledge, retired, String(retired));
   }
-  // The print answer reads the stored copies; it never invents a delegates-plus-spares formula.
+  // The print answer totals the stored copies and states the approval-time rule (lib/print.ts, PR #43).
   const print = ask("how many copies", ctxFor("logistics", { documents: [doc("a", "Approved", "A", { copies: 24 }), doc("b", "Approved", "B", { copies: 30 })] }));
   assert.match(print.text, /54 copies in total/);
+  assert.match(print.text, /one per committee delegate plus 3 spares, counted when the resolution is approved/);
   assert.match(print.text, /number of copies shown on the job/);
   // New submissions are Google Docs only, shared with Anyone with the link → Editor.
   const share = ask("how should delegates share their doc").text;

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { PRINT_SPARES } from "@/lib/print";
 import Link from "next/link";
 import { useConference } from "@/lib/context";
 import type { Resolution } from "@/lib/domain";
@@ -438,7 +439,7 @@ export function Logistics({ section = "" }: { section?: string }) {
       </div>
       <Panel
         title="Print queue"
-        subtitle="Prepare copies, then mark the job complete."
+        subtitle={`Copies are one per committee delegate plus ${PRINT_SPARES} spares, counted when the resolution is approved. Prepare them, then mark the job complete.`}
       >
         {queue.length ? (
           <div className="print-list">

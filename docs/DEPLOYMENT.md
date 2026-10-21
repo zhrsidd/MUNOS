@@ -25,6 +25,8 @@ GitHub zhrsidd/MUNOS
 
 ## Environments
 
+**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical/optional integration-test context, not the selected default. **Applied and verified 20 October 2026:** Preview `NEXT_PUBLIC_DATA_BACKEND` was changed from `supabase` to `local` by a team-authorized Vercel connection (Production untouched). A fresh Preview of this branch (`dpl_6Zo7x5BTfZ6Lm4bj6vRrkBtnEUtQ`, commit `a5975e9`) built successfully, and its `/api/health` reported `environment: preview`, status `ok`, and Supabase, database and storage all `not_configured` (browser demo). The leftover Preview Supabase variables for the deleted development project are now unused; removing them is a separate owner decision.
+
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
 | Trigger | `npm run dev` | any push / PR, **including `main`** | push to the `production` branch only |
@@ -48,15 +50,32 @@ A project has exactly one role: listing the same ref as production and staging, 
 
 #### Single-project cutover
 
-While the project is in its development role set `STAGING_SUPABASE_REFS=kllhswucdhqqywnzxado` (operator shell, `.env.local`, Vercel **Preview**), leave `DEVELOPMENT_SUPABASE_REFS` empty, and set `NEXT_PUBLIC_CONFERENCE_ID` to the test conference. At cutover (early November; compute raised from Micro to Small before 5 November) each step needs explicit approval:
+While the project is in its development role set `STAGING_SUPABASE_REFS=kllhswucdhqqywnzxado` (operator shell, `.env.local`, Vercel **Preview**), leave `DEVELOPMENT_SUPABASE_REFS` empty, and set `NEXT_PUBLIC_CONFERENCE_ID` to the test conference.
 
-1. Delete the `DCMUN Development Test` conference and every test auth user; confirm no test data remains.
-2. Remove the ref from `STAGING_SUPABASE_REFS` in every environment. From now on the load, rehearsal and verification scripts refuse to run against the project, by design.
-3. Set `EXPECTED_SUPABASE_REF=kllhswucdhqqywnzxado` in the Vercel **Production** environment only, and the real `NEXT_PUBLIC_CONFERENCE_ID`.
-4. Confirm plan, compute size and backups in the Supabase dashboard; rotate `SUPABASE_SECRET_KEY` if it was ever used in a shared Preview.
-5. Create the first Executive with [FIRST_EXECUTIVE_BOOTSTRAP](FIRST_EXECUTIVE_BOOTSTRAP.md), then deploy the `production` branch.
+**Non-production policy (audit F1).** Every Vercel build other than Production, and every server route and health probe in such a deployment, refuses a Supabase project that is not listed in `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS`, and always refuses the project named in `EXPECTED_SUPABASE_REF` (`targetProblem` in `lib/platform/target-guard.ts`). A Preview with `NEXT_PUBLIC_DATA_BACKEND=supabase` and no allow-list therefore fails to build. Production still requires exactly `EXPECTED_SUPABASE_REF`. This guard only covers deployments built after it; **it cannot change deployments that already exist**, because each Vercel deployment keeps the environment it was built with. Old deployments must be deleted (step 3).
 
-A project has one role at a time, so steps 2 and 3 are one change: the ref moves from staging to production.
+At cutover (early November; compute raised from Micro to Small before 5 November) each step needs explicit approval. Record who did each step and when.
+
+1. **Freeze the release.** Record the exact release commit (`main` SHA) and the last known good Production deployment id (rollback target). Confirm CI is green on that SHA and the migration ledger matches the repository.
+2. **Remove test data.** Delete the `DCMUN Development Test` conference, its TEST committee and records, every test auth user and their `user_access` grants, and revoke all test access codes. Confirm with a read-only count that nothing test-labelled remains.
+3. **Delete old Preview deployments.** In Vercel → Deployments, list every Preview (and Development) deployment built while Preview pointed at this project (filter by date and `Preview`), record their URLs for step 9, then **delete every one of them**. Deletion is required: each deployment is immutable and keeps the Supabase URL, publishable key and (server-side) secret key it was built with, so it can still read and write the project from the browser and from its server routes.
+   These are **not** sufficient on their own:
+   - Vercel Authentication controls who can open a deployment, not what it can reach; any authorised visitor could still use it against the promoted database.
+   - Removing aliases still leaves the deployment's own URL working.
+   - Changing environment variables affects only future builds.
+   - Rotating the secret key (step 5) stops old server routes, but not browser reads and writes made with the publishable key.
+
+   Keep an old deployment only if a separately verified mechanism blocks both its client and its server reads and writes. Record that mechanism and its verification here.
+4. **Cut Preview off from the project.** In Vercel → Settings → Environment Variables (Preview): either set `NEXT_PUBLIC_DATA_BACKEND=local` (browser demo), or point the Supabase variables at a genuinely separate test project listed in `STAGING_SUPABASE_REFS`. Remove `kllhswucdhqqywnzxado` from `STAGING_SUPABASE_REFS` in every environment, including operator shells. From now on the load, rehearsal and verification scripts and any new Preview refuse the project, by design.
+5. **Revoke Preview credentials.** Rotate `SUPABASE_SECRET_KEY` in the Supabase dashboard if any version of it was ever set for Preview or pasted anywhere, and set the new key only as a Sensitive **Production** variable. Revoke the anonymous sessions created by test devices (step 2 removes their grants).
+6. **Point Production at the project.** Set `EXPECTED_SUPABASE_REF=kllhswucdhqqywnzxado`, the Supabase URL and publishable key, `NEXT_PUBLIC_DATA_BACKEND=supabase` and the real `NEXT_PUBLIC_CONFERENCE_ID` in the Vercel **Production** environment only. Steps 4 and 6 are one change: a project has one role at a time.
+7. **Confirm capacity.** Plan, compute size (Small) and backups in the Supabase dashboard; the 110-device / 19-committee rehearsal must have passed before this step.
+8. **Bootstrap and deploy.** Create the first Executive with [FIRST_EXECUTIVE_BOOTSTRAP](FIRST_EXECUTIVE_BOOTSTRAP.md), then deploy the recorded release SHA to Production.
+9. **Verify isolation.**
+   - **Old Previews:** open at least one old Preview URL recorded in step 3; it must be gone (Vercel "deployment not found"). If step 3 recorded an exception, confirm that deployment can neither read nor write the project, from the browser or from its server routes.
+   - **New Preview:** open a newly built Preview; it must not reach the project. Expect a refused build, "Wrong Supabase project" on `/api/health`, or the local demo backend.
+   - **Production:** `/api/health` reports the expected project and `ok`.
+10. **Rollback.** If Production misbehaves, promote the deployment recorded in step 1 (Vercel → Deployments → Promote). Migrations are forward-only and additive; a rollback of the app does not require a database rollback.
 
 ## Environment variables
 

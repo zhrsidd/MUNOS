@@ -1,15 +1,19 @@
 import type { NextConfig } from "next";
 import { version } from "./package.json";
-import { checkProductionTarget, NEVER_SUPABASE_REFS, supabaseRef } from "./lib/platform/target-guard";
+import { checkProductionTarget, NEVER_SUPABASE_REFS, supabaseRef, targetProblem } from "./lib/platform/target-guard";
 
-// Target-identity guard: a cloud build never points at the PHESMUN production project, and a Vercel Production build must point at
-// exactly the project named in EXPECTED_SUPABASE_REF. It fails the build instead of deploying a wrong target.
+// Target-identity guard: a cloud build never points at the PHESMUN production project, a Vercel Production build must point at
+// exactly the project named in EXPECTED_SUPABASE_REF, and any other Vercel build (Preview) must point at an allow-listed
+// staging/development project that is not the production one. It fails the build instead of deploying a wrong target.
 if (process.env.NEXT_PUBLIC_DATA_BACKEND === "supabase") {
   const ref = supabaseRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
   if (ref && NEVER_SUPABASE_REFS.includes(ref)) throw Error(`Target guard: ${ref} is the PHESMUN production project. Refusing to build against it.`);
   if (process.env.VERCEL_ENV === "production") {
     const target = checkProductionTarget(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env);
     if (!target.ok) throw Error(`Target guard: ${target.reason}. Refusing to build for Production.`);
+  } else if (process.env.VERCEL_ENV) {
+    const problem = targetProblem(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env);
+    if (problem) throw Error(`Target guard: ${problem}. Refusing to build.`);
   }
 }
 

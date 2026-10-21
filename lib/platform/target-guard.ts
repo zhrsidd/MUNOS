@@ -100,8 +100,11 @@ export function assertToolTarget(url: string | undefined, env: Env = process.env
 }
 
 /**
- * Why a deployment must not use this Supabase URL, or null if it may. Used by the health probe: the PHESMUN production project
- * is always refused; on Vercel Production the URL must also match the configured production project.
+ * Why a deployment must not use this Supabase URL, or null if it may. Used at the build, the health probe and the server
+ * backends. The PHESMUN production project is always refused. Vercel Production must use exactly the configured production
+ * project. Every other Vercel environment (Preview, Development) follows the non-production policy of the operator tools: an
+ * explicitly allow-listed staging or development project, never the production one, and nothing when no list is set
+ * (audit F1). A local build (no VERCEL_ENV) is not a cloud deployment and is checked only for the forbidden project.
  */
 export function targetProblem(url: string | undefined, env: Env): string | null {
   const ref = supabaseRef(url);
@@ -109,6 +112,9 @@ export function targetProblem(url: string | undefined, env: Env): string | null 
   if (env.VERCEL_ENV === "production") {
     const result = checkProductionTarget(url, env);
     if (!result.ok) return result.reason;
+  } else if (env.VERCEL_ENV) {
+    const result = checkToolTarget(url, env);
+    if (!result.ok) return `${env.VERCEL_ENV} deployment refused: ${result.reason}`;
   }
   return null;
 }
