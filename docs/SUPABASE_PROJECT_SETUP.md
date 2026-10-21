@@ -1,6 +1,6 @@
 # New DCMUN Supabase project: setup record
 
-Status 2026-10-20: **all 21 migrations applied and verified; test conference created; development role.** Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
+Status 2026-10-21: **all 26 migrations applied (21 on 20 October, 5 on 21 October); test conference; development role.** The 21 October rollout is recorded in "Migrations 22 to 26" below; the app-level smoke test and signed-in browser checks for it are still to run. Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
 
 ## Identity
 
@@ -30,6 +30,39 @@ PR #22 merged to `main` (`852642c`) before the apply. The 21 files on `main` wer
 | 21 | `20261019100200_retire_archive_jobs` (dropped `public.archive_jobs`) |
 
 The ledger (`supabase_migrations.schema_migrations`) has exactly these 21 rows, with versions and names equal to the filenames.
+
+## Migrations 22 to 26 (21 October 2026, owner-approved)
+
+The owner approved applying the five pending migrations to this project (DCMUN Staging, the single preproduction project) after Codex's independent review and replay on PostgreSQL 17. Applied in timestamp order, through the Supabase connector (`apply_migration`, one migration per call) rather than the CLI, from the exact files on `main` at `542e705` (CI green on that commit).
+
+| # | File | Feature |
+| --- | --- | --- |
+| 22 | `20261021090000_configurable_points` | Main Submitter and Debated amendment points configurable (PR #35) |
+| 23 | `20261021100000_photo_chairs` | Chairs in school group photos, participant-list epochs (PR #36) |
+| 24 | `20261021110000_clear_majority` | Clear majority For / Against, bound to the ballot revision (PR #37) |
+| 25 | `20261021120000_print_copies` | Print copies = committee delegates + 3 (audit F3) |
+| 26 | `20261021130000_identity_projection` | Main Submitter's country for Approval, Logistics and the public amendment page (PR #53) |
+
+Before applying:
+
+* **Preproduction confirmed.** One conference, "DCMUN Development Test"; one TEST document, two TEST delegates, no staff. Ledger: exactly the original 21 rows, with versions and names equal to the repository files, so `--include-all` was not needed.
+* **Dry run on the live database.** All five migrations were run in order in one transaction on this project and the transaction was then aborted on purpose (a final `RAISE EXCEPTION` after a check that every object existed). Every `patch_once` anchor matched the hosted function definitions. Afterwards the ledger still had 21 rows and none of the new objects existed.
+
+After applying:
+
+* **Ledger.** The connector records its own apply-time version, so the five versions were updated to the filename versions. The ledger now has 26 rows with versions and names equal to the filenames. The stored statements were compared with the files by MD5 (trimmed): all five identical.
+* **Grants (live).** `private.photo_chairs` and `private.document_submitter_countries` are executable by `authenticated` only (as designed); every other new `private` function, including `private.submitter_country`, `private.ops_staff_school`, `private.advance_photo_epoch`, `private.print_copies` and the trigger functions, is executable by no client role; `public.amendment_link_info` stays `service_role` only; the three snapshot functions are executable by `authenticated`. `public.photo_list_epochs` has RLS on, SELECT for `authenticated` through `read_authorized`, no INSERT, nothing for `anon`.
+* **Security advisors.** Unchanged in kind: the same four access-code SECURITY DEFINER warnings, the generic anonymous-policy notices and leaked-password protection. Nothing new from these migrations.
+* **Signed-in role simulation on the hosted database (rolled back; no data left).** Using real `auth.users` rows and temporary `user_access` grants for each role inside a transaction that was aborted at the end:
+  * Executive: conference and executive snapshots carry `submitterCountry` (France); `operations_snapshot` carries `photoChairs` and `photoEpochs`; `staffSchool` is dispatched (an unknown Chair is refused with 22023).
+  * Approval: sees no Draft; after Review sees the document with the country, no delegates in the snapshot and 0 rows from `public.delegates`; cannot call `private.submitter_country` (42501).
+  * Logistics: after Approved the print copies were 5 (2 delegates + 3); sees the country and no delegates.
+  * Photos: setting a Chair's school created `photoChairs` and epoch 1; clearing and restoring the school gave epoch 3; the Chair sees the projection but still reads 0 rows from `public.staff`.
+  * Scoring: default Main Submitter `{5}`, Debated amendment `{3}`; one value from 1 to 20 accepted, two values or 0 refused; `apply_procedure` carries the `submitterPoints` check.
+  * Voting: an observed close with a stale or missing `ballotRevision` is refused (PT409); with the right revision and nobody present it is refused (22023); with a present delegate it closes `Closed/Passed/observed` with the declaring Chair recorded.
+  * Afterwards: the document was still `Draft`, revision 1, 24 copies; no SIM rows; ledger 26.
+
+Not yet done: `npm run smoke:project` against the test conference and signed-in browser checks of scoring, photos, voting, Approval and Logistics. They need an Executive access code (`SMOKE_EXECUTIVE_CODE`); the one active Executive credential on the project is unknown to the connector session and the smoke test rotates it, so the owner chooses when to run it. Production (demo mode) is not redeployed until those pass.
 
 ## Verification against the live project
 
