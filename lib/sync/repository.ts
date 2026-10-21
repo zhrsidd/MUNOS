@@ -38,7 +38,10 @@ export function fingerprint(data: ConferenceData, c: Command): string | null {
     case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
     case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
     case "event": return String(data.events.find(e=>e.id===c.id)?.revision ?? 0);
-    case "document": case "version": return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
+    // A clear-majority close is bound to the revision the Chair opened it on, not the one current at confirm time.
+    case "document": case "version":
+      if(c.type==="document"&&c.method==="observed"&&c.status==="Closed"&&c.outcome!=="Withdrawn")return String(c.ballotRevision??"missing");
+      return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
     case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
     default: return isOperationsCommand(c)?operationsFingerprint(data,c):null;
   }
