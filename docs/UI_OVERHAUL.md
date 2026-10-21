@@ -262,13 +262,32 @@ Amendments and Participation, Approval queue/detail/history, Executive resolutio
 status, outcome), Logistics print queue and Completed, delegate submission cards, Felix reminders and answers, the public
 amendment page, the device amendment-history cache and the submission confirmation.
 
-Open, for independent review (none are made here):
-- **Approval and Logistics cannot read delegates** (`delegates` RLS is admin/chair/observer; their snapshots carry none), so
-  in hosted mode their screens and Approval history read `GA1/01 — Main submitter unavailable`. Recommended: add the Main
-  Submitter's country (a `submitterCountry` string only) to the `documents` projection in `conference_snapshot` for the
-  approval and logistics roles, and to `private.decision_history`. `resolutionIdentity` already prefers the reader's delegate
-  and falls back to a published `submitterCountry`, so the UI needs no further change.
-- The public amendment page shows `GA1/01 — Main submitter unavailable` until `amendment_link_info` publishes the resolution's
-  `submitterId` (its `delegates` list is already public; `AmendmentLinkInfo.resolution.submitterId` is read when present).
+Shipped on `claude/identity-projection` (migration `20261021130000_identity_projection.sql`; additive, no table, policy, grant
+or RLS change, no backfill). Hosted Approval, Logistics and the public amendment page now resolve `GA1/01 — France`:
+- **Approval and Logistics** cannot read delegates (`delegates` RLS is admin/chair/observer; their snapshots carry none).
+  `private.submitter_country(conf, committee, delegate)` (SECURITY DEFINER, EXECUTE revoked from public/anon/authenticated)
+  returns only `delegates.country`, and null unless the delegate is in that conference and committee.
+  `private.document_submitter_countries(conf)` (definer, granted to `authenticated` like `private.decision_history`) maps
+  document id to country and repeats the documents SELECT policy: chair/admin/observer see every document in scope, approval
+  Submitted/Review/Approved, logistics Approved/Printed/In Debate/Closed, all under `private.has_access`. Patched in place,
+  with exact anchors that must match once: `conference_snapshot` adds `documents[].submitterCountry` (looked up only for
+  document rows RLS already returns, so no document becomes visible), and `private.decision_history` adds
+  `submitterCountry` to every history entry under its existing access rule (approval/chair/admin/observer), so history for a
+  resolution that has left the reader's view still resolves. `executive_snapshot` gets the same documents field so its
+  projection stays identical to the core snapshot's.
+- **Public amendment page**: `amendment_link_info` now returns `resolution.submitterId` (the delegate list beside it was
+  already public; nothing else was added), so the form shows the country instead of `Main submitter unavailable`.
+- **Client**: `Resolution.submitterCountry` and `DocumentDecision.submitterCountry` (optional, may be null); the formatter
+  prefers the reader's own delegate and uses the published country only when the delegate cannot be found. Approval history
+  entries, the device amendment-history cache (`country`) and Felix read it through the same formatter. Older servers and
+  cache entries without the field still read `Main submitter unavailable`. Applying the migration is gated on independent
+  review and the owner; until it is applied hosted screens keep the honest fallback.
+- Review note for Codex: patched functions are `public.conference_snapshot(uuid)`, `public.executive_snapshot(uuid)`,
+  `private.decision_history(uuid)` and `public.amendment_link_info(text)`; new functions are `private.submitter_country` and
+  `private.document_submitter_countries`. Tests: `tests/identity-projection-db.test.ts` (every role by state, no delegate
+  leak, helper grants, committee/conference scoping, history after a document leaves view, public RPC shape) and the
+  "hosted" cases in `tests/resolution-identity-ui.test.ts`.
+
+Still open:
 - Title is still required by the new-resolution form, the submission form and the `document` create command; removing it
   is the separate contract task.

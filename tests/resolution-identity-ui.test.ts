@@ -14,6 +14,9 @@ import { AmendmentForm } from "../components/amendments/form";
 import { felixContext } from "../lib/felix/context";
 import { answerQuestion } from "../lib/felix/answer";
 import { buildReminders } from "../lib/felix/reminders";
+import { approvalHistory } from "../lib/approval-history";
+import { historyContext, mergeCache, type CachedHistory } from "../lib/amendments/history-cache";
+import { resolutionIdentity } from "../lib/resolution-identity";
 import type { AmendmentLinkInfo } from "../lib/amendments/rules";
 import type { ConferenceData, Resolution, Role } from "../lib/domain";
 
@@ -182,4 +185,85 @@ test("the public amendment form names the resolution by identity; the country ap
   const published = text(renderToStaticMarkup(createElement(AmendmentForm, { token: "t".repeat(40), link: { ...link, resolution: { ...link.resolution!, submitterId: "d1" } } })));
   assert.ok(published.includes("GA1/01 — France"));
   assert.ok(!published.includes("International cooperation"));
+});
+
+// Hosted Approval and Logistics snapshots carry NO delegates; since migration 20261021130000 the server publishes the
+// Main Submitter's country on each document and decision, and the screens must resolve GA1/01 — France from that alone.
+function hosted(): ConferenceData {
+  const d = seed();
+  for (const r of d.documents) r.submitterCountry = country(d, r);
+  d.delegates = [];
+  return d;
+}
+const fromServer = (d: ConferenceData, id: string) => `${doc(d, id).code.replace(/ ?\/ ?/g, "/")} — ${doc(d, id).submitterCountry}`;
+
+test("hosted Approval (no delegates) shows GA1/02 — country from the published submitterCountry, not 'unavailable'", async t => {
+  const data = hosted();
+  data.documentDecisions = [{ id: "dec1", documentId: "r2", decision: "review_started", round: 1, versionId: null, versionNumber: 1, reviewerId: "u", reviewerName: "Priya Nair", commentId: null, decidedAt: "2026-10-19T09:00:00Z", code: "GA1 / 02", submitterCountry: doc(data, "r2").submitterCountry }];
+  const queue = text(await render(t, data, "approval", ["approval"]));
+  for (const id of ["r2", "r4"]) assert.ok(queue.includes(fromServer(data, id)), fromServer(data, id));
+  assert.ok(!queue.includes("Main submitter unavailable"), queue);
+  t.mock.restoreAll();
+  const history = text(await render(t, data, "approval", ["approval", "history"]));
+  assert.ok(history.includes(fromServer(data, "r2")), history);
+  assert.ok(!history.includes("Main submitter unavailable"));
+});
+
+test("hosted Approval history resolves a decision whose document has left the reader's view", async t => {
+  const data = hosted();
+  const country = doc(data, "r1").submitterCountry!;
+  // r1 (In Debate) is not in an Approval reader's documents, yet its decisions are in the history projection.
+  data.documents = data.documents.filter(r => r.id !== "r1");
+  data.documentDecisions = [{ id: "dec9", documentId: "r1", committeeId: "ga1", decision: "approved", round: 1, versionId: null, versionNumber: 1, reviewerId: "u", reviewerName: "Priya Nair", commentId: null, decidedAt: "2026-10-19T09:00:00Z", code: "GA1 / 01", submitterCountry: country }];
+  const entry = approvalHistory(data).find(e => e.id === "dec9")!;
+  assert.equal(entry.identity.text, `GA1/01 — ${country}`);
+  assert.equal(entry.identity.available, true);
+  const html = text(await render(t, data, "approval", ["approval", "history"]));
+  assert.ok(html.includes(`GA1/01 — ${country}`), html);
+  // Without the field (an older server) it stays honest.
+  delete data.documentDecisions[0].submitterCountry;
+  assert.equal(approvalHistory(data).find(e => e.id === "dec9")!.identity.text, "GA1/01 — Main submitter unavailable");
+});
+
+test("hosted Logistics print queue and Completed show the identity from submitterCountry", async t => {
+  const data = hosted();
+  const queue = text(await render(t, data, "logistics", ["logistics"], null));
+  assert.ok(queue.includes(fromServer(data, "r3")), queue);
+  assert.ok(!queue.includes("Main submitter unavailable"));
+  t.mock.restoreAll();
+  doc(data, "r3").status = "Printed";
+  const done = text(await render(t, data, "logistics", ["logistics", "completed"], null));
+  assert.ok(done.includes(fromServer(data, "r3")), done);
+  assert.ok(!done.includes("Main submitter unavailable"));
+});
+
+test("hosted Felix names resolutions from submitterCountry; a delegate in view still wins over the published country", () => {
+  const data = hosted();
+  const approval = buildReminders(felixContext(data, "approval")).map(r => r.text).join(" | ");
+  assert.ok(approval.includes(fromServer(data, "r2")), approval);
+  assert.ok(!approval.includes("Main submitter unavailable"));
+  const print = buildReminders(felixContext(data, "logistics"));
+  assert.ok(print[0].text.includes(fromServer(data, "r3")), print[0].text);
+  const full = seed();
+  doc(full, "r1").submitterCountry = "Stale Country";
+  assert.ok(buildReminders(felixContext(full, "chair", "ga1")).find(r => r.kind === "chair:debate")!.text.startsWith(identity(full, "r1")));
+});
+
+test("the amendment history cache learns the country from submitterCountry, and older cached entries still load", () => {
+  const data = hosted();
+  const amendment = { id: "a1", committeeId: "ga1", resolutionId: "r1", sessionId: "s1", submitterId: "d1", type: "Add", clause: "1", wording: "w", status: "Closed", outcome: "Passed", createdAt: "2026-10-05T06:00:00Z", revision: 1 } as never;
+  const context = historyContext([amendment], data.documents, data.delegates, []);
+  assert.equal(context.resolutions.r1.country, doc(data, "r1").submitterCountry);
+  // An entry cached before `country` existed has none, and merging it keeps working.
+  const legacy: CachedHistory = { key: "k", rows: [amendment], context: { resolutions: { r1: { code: "GA1 / 01", title: "Old" } }, delegations: {}, workingDocs: {} }, savedAt: new Date().toISOString() };
+  const merged = mergeCache(legacy, "k", "ga1", [amendment], context);
+  assert.equal(merged.context.resolutions.r1.country, doc(data, "r1").submitterCountry);
+  assert.equal(resolutionIdentity({ code: "GA1 / 01", submitterCountry: legacy.context.resolutions.r1.country }, []).text, "GA1/01 — Main submitter unavailable");
+});
+
+test("the public amendment form shows the country once amendment_link_info returns the resolution's submitterId", () => {
+  const link: AmendmentLinkInfo = { committee: { id: "ga1", code: "GA1", name: "General Assembly 1" }, resolution: { id: "r1", code: "GA1 / 01", title: "x", submitterId: "d1" }, delegates: [{ id: "d1", country: "France" }, { id: "d2", country: "Japan" }] };
+  assert.ok(text(renderToStaticMarkup(createElement(AmendmentForm, { token: "t".repeat(40), link }))).includes("GA1/01 — France"));
+  const older: AmendmentLinkInfo = { ...link, resolution: { id: "r1", code: "GA1 / 01", title: "x" } };
+  assert.ok(text(renderToStaticMarkup(createElement(AmendmentForm, { token: "t".repeat(40), link: older }))).includes("GA1/01 — Main submitter unavailable"));
 });

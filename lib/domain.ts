@@ -119,6 +119,12 @@ export interface Resolution {
   code: string;
   title: string;
   submitterId: ID;
+  /**
+   * The Main Submitter's country, published by the server (private.document_submitter_countries) to readers whose
+   * snapshot carries no delegates (Approval, Logistics). Country only; null/absent when not published or unreadable.
+   * The identity formatter uses it only when the submitter's delegate cannot be found.
+   */
+  submitterCountry?: string | null;
   status: DocumentStatus;
   outcome?: "Passed" | "Failed" | "Withdrawn";
   versionIds: ID[];

@@ -1,7 +1,7 @@
 /**
  * Felix's answers. Deterministic and local: the same question in the same app state always gets the same answer, and
  * nothing leaves the browser. Felix only describes and links; it never changes conference data. Replies are returned
- * immediately: there is no artificial "thinking" delay and no simulated streaming.
+ * immediately with no "thinking" delay; the panel types them out at lib/felix/reveal.ts pace.
  */
 import type { Role } from "../domain";
 import { destinationSlugs } from "../navigation";

@@ -84,6 +84,8 @@ export interface DocumentDecision {
   committeeId?: string;
   code?: string;
   title?: string;
+  /** The Main Submitter's country, published by private.decision_history so history still resolves `GA1/01 — France` after the resolution leaves this reader's view. */
+  submitterCountry?: string | null;
   /** The feedback text linked to this decision; null for a comment-free decision. */
   comment?: string | null;
   /** "comment" is a note written before decisions were recorded (no known decision). */
