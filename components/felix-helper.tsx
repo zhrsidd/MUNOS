@@ -131,17 +131,19 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
   }, [open, view]);
 
   const showInbox = useCallback(() => {
+    motion.stopTyping();
     const at = new Date().toISOString();
     setInboxOpenedAt(at);
     store.update(entries => markRead(entries, at));
     setView("inbox");
-  }, [store]);
+  }, [store, motion]);
   function openPanel(target: "ask" | "inbox") {
     focusOnOpen.current = true;
     if (target === "inbox") showInbox(); else setView("ask");
     setOpen(true);
   }
   function close(returnFocus: boolean) {
+    motion.stopTyping();
     setOpen(false);
     setInboxOpenedAt(null);
     if (returnFocus) launcherRef.current?.focus();
