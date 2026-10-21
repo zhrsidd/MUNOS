@@ -189,7 +189,7 @@ test('Chair create: the compatibility title satisfies the unchanged SQL; a title
   await asOwner();
   const row=(await query<{title:string;status:string;submitterId:string;code:string}>('select title,status,"submitterId",code from public.documents where id=$1',[doc]))[0];
   assert.deepEqual([row.title,row.status,row.submitterId],[COMPAT_RESOLUTION_TITLE,'Draft',ids.france]);
-  assert.match(row.code,/^GA1 \/ [0-9a-f]{8}$/);
+  assert.equal(row.code,'GA1 / 03','sequential per committee (migration 20261021140000); the seed holds GA1 / 01 and 02');
   const version=(await query<{text:string;number:number;fileName:string}>('select text,number,"fileName" from public.document_versions where "documentId"=$1',[doc]))[0];
   assert.deepEqual([version.text,version.number,version.fileName],[COMPAT_RESOLUTION_TITLE,1,'draft-preview.txt'],'draft version text starts from (and here is) the compatibility title, as the local reducer does');
   // Idempotent replay of the same mutation creates nothing new.

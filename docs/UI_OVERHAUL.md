@@ -376,3 +376,76 @@ legacy title, replays with no 409 and no second document; the same retry without
 retry, an invalid-legacy-title retry and a new-id reload; Chair create, strict
 server, a title-less create through the real `DurableRepository` and `SupabaseTransport` into `apply_conference_mutation` in
 PGlite, history through Draft, Printed, In Debate and Closed).
+
+## Sequential numbering for Chair-created drafts · 21 October 2026
+
+Status: implemented on `claude/sequential-chair-numbering` (protected area: migration and server numbering); needs independent
+review. **Migration `20261021140000_sequential_chair_numbering.sql` is NOT applied to any hosted project** (no staging, no
+production); it is replayed only by tests until reviewed and pushed to staging by the owner's process.
+
+Problem: in hosted mode a Chair-created draft (`newDocument` in `private.apply_mutation`) was numbered
+`<committee> / <first 8 characters of the document id>` (for example `TST / ca7640bb`), while a public submission
+(`public.submit_resolution`) was numbered `TST / 01`, `TST / 02`. The demo reducer (`lib/commands.ts`) already counted
+(`count + 1`), so the demo and hosted disagreed. Now all three paths use one rule.
+
+### Review notes for Codex
+
+Mechanism:
+- New `private.next_resolution_code(conf, committee)` (SECURITY DEFINER, `search_path=''`, EXECUTE revoked from
+  public/anon/authenticated; not an RPC). Result `<committee code> / NN`: NN is the highest existing sequential number in that
+  committee plus one, left-padded to two digits (`99` is followed by `100`). "Sequential" = the code ends in ` / ` plus 2 to 6
+  digits; the suffix is read, not the prefix, so a renamed committee keeps counting. It then skips forward while any document
+  in the conference already has that code (the loop `submit_resolution` always had), so the existing
+  `unique(conference_id, code)` on `public.documents` is never the thing that stops a create.
+- Both `private.apply_mutation` (`newDocument`) and `public.submit_resolution` now call it. Both were patched with
+  `create or replace` from `pg_get_functiondef` and an exact `pg_temp.patch_once` anchor that must match exactly once
+  (the migration raises otherwise). Execute grants are unchanged (checked: `apply_mutation` authenticated, `submit_resolution`
+  service_role, helper owner only). `newDocument` still stores `command->>'title'`; nothing about the title changed.
+- Behaviour change for public submissions, deliberate: the old rule was `count(*) + 1`, which counts legacy hex drafts and
+  leaves gaps (`TST / 02` as the first sequential number). The helper uses the highest sequential number instead. For a
+  committee with no legacy drafts and no deletions the result is identical.
+
+Locking and concurrency (no new lock order):
+- Both callers already take, in this order, a per-request advisory lock (mutation id / submission id) and then
+  `select ... from public.committees where id = <committee> for update`. The helper takes the same committee row lock itself
+  (re-entrant), so numbering is serialised per committee whichever caller gets there first, including Chair create against
+  public submission. Different committees do not block each other. No advisory lock was added.
+- The number is computed and the row inserted in the same transaction under that lock, so there is no read-then-insert race.
+
+Idempotency: `apply_mutation` checks the mutation receipt before any numbering and returns on a replay, so a retried mutation id
+inserts no document and consumes no number; `submit_resolution` replays by submission id the same way. The offline outbox
+contract (receipts, fingerprints, PT409/40001) is untouched.
+
+Legacy handling: no backfill, no renumbering. `TST / ca7640bb` stays as stored, stays unique, and is displayed
+`TST/ca7640bb` by `lib/resolution-identity.ts` (unchanged). Hex suffixes are always exactly 8 characters so they never match the
+2-to-6-digit pattern, even an all-digit one (`12345678`); the counter ignores them and continues after the highest sequential
+number. Gaps are not refilled.
+
+Client: `lib/resolution-number.ts` (`nextResolutionCode`) mirrors the helper and `lib/commands.ts` `newDocument` uses it, so the
+demo reducer and hosted agree (including skipping legacy hex codes). `lib/submissions/demo-backend.ts` (`D01` prefix, an
+in-memory demo of the public form that never touches documents) is intentionally left alone.
+
+Rollout: review, replay on staging, then apply with the normal `supabase db push`; no downtime, no data change. Rollback: a
+later forward migration that restores the previous bodies of the two functions (from `20261006073442_staff_chair_contacts.sql`
+and `20261006023111_chair_procedure.sql`) and drops the helper; documents already numbered `TST / 03` stay valid either way.
+Never edit the applied migration.
+
+Tests:
+- `tests/sequential-chair-numbering-db.test.ts` (PGlite, always runs): 01/02/03, replay consumes nothing, title still stored,
+  Chair and public share a sequence, two committees independent, legacy hex ignored (including an all-digit one), upgrade from
+  the previous migration keeps every existing row byte-identical and continues after it, helper not callable by API roles.
+- `tests/sequential-chair-numbering-concurrency.test.ts` (real PostgreSQL 17, needs `TEST_POSTGRES_URL`, runs in CI): 8
+  Chair creates blocked on one committee lock yield exactly 01..8; 6 Chair creates plus 6 submissions unsynchronised yield
+  exactly 01..12; Chair holding the lock against a submission and the reverse; the same mutation id concurrently adds one
+  document; another committee is not blocked; legacy hex ignored. Contention is observed (`pg_stat_activity` Lock waits), not
+  assumed from sleeps.
+- `tests/resolution-number.test.ts`: the client helper and the demo reducer.
+
+What Codex should check:
+1. The two anchors match exactly once on the real chain and the patched bodies differ from the previous ones only at those
+   two spots (diff `pg_get_functiondef` before and after on staging).
+2. That the helper's own `for update` on the committee row cannot invert lock order with any other path: it is only called
+   after the caller took the same lock, and no path takes a committee lock then a mutation/submission advisory lock.
+3. The `count(*)+1` to `max+1` change for public submissions is acceptable (gaps from legacy drafts stop appearing).
+4. A 7-digit number (over a million drafts in one committee) would no longer match the pattern; not a realistic bound.
+5. Any code outside `<prefix> / <digits>` (for example custom edited codes) is ignored by the counter, never rewritten.
