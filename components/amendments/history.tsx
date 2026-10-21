@@ -10,6 +10,8 @@ import { GoogleDocButton } from '@/components/operations/resolution-links';
 import { CopyButton } from '@/components/copy-button';
 import { PendingButton } from '@/components/pending';
 import { SkeletonRows } from '@/components/skeleton';
+import { ResolutionName } from '@/components/resolution-identity';
+import { resolutionIdentity } from '@/lib/resolution-identity';
 
 const time = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -74,9 +76,13 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
     ) :
       groups.map(g => {
         const workingDoc = links.find(l => l.documentId === g.resolutionId)?.workingDocId ?? offline.context.workingDocs[g.resolutionId];
-        const known = g.resolution ?? offline.context.resolutions[g.resolutionId];
+        // The live resolution reads its Main Submitter from this committee's delegates; a resolution known only from the
+        // device cache uses the country cached with it. Entries cached before the country was stored read "Main submitter unavailable".
+        const cachedResolution = offline.context.resolutions[g.resolutionId];
+        const identity = g.resolution ? resolutionIdentity(g.resolution, data.delegates.filter(d => d.committeeId === committeeId))
+          : cachedResolution ? resolutionIdentity({ code: cachedResolution.code, submitterCountry: cachedResolution.country }, []) : null;
         return <section key={g.resolutionId} style={{ display: 'grid', gap: '.75rem' }}>
-          <h3>{known ? `${known.code} · ${known.title}` : 'Resolution not on this device'}</h3>
+          <h3>{identity ? <ResolutionName identity={identity} /> : 'Resolution not on this device'}</h3>
           {workingDoc && <div className="actions"><GoogleDocButton docId={workingDoc} label="Open working Google Doc" /></div>}
           {g.amendments.map(a => {
             const submitter = data.delegates.find(d => d.id === a.submitterId) ?? offline.context.delegations[a.submitterId];
