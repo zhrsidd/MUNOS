@@ -10,7 +10,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The example defaults to an isolated local demo. For the development database, set `NEXT_PUBLIC_DATA_BACKEND=supabase`, the project URL/publishable key, and conference UUID. Never use a secret/service-role key in browser configuration. See [INTEGRATION.md](INTEGRATION.md) for session provisioning and schema setup. Node 22+ recommended; dependencies and the lockfile are pinned.
+The example defaults to an isolated local demo. For the hosted development database (the single Supabase project in its Development phase, synthetic data only; see [docs/INFRASTRUCTURE_LIFECYCLE.md](docs/INFRASTRUCTURE_LIFECYCLE.md)), set `NEXT_PUBLIC_DATA_BACKEND=supabase`, the project URL/publishable key, and conference UUID. Never use a secret/service-role key in browser configuration. See [INTEGRATION.md](INTEGRATION.md) for session provisioning and schema setup. Node 22+ recommended; dependencies and the lockfile are pinned.
 
 ## Current implementation
 
@@ -63,9 +63,13 @@ npm start -- --port 3001
 
 Vercel Preview for every branch/PR **and for `main`**; Production only from the `production` branch, advanced deliberately; CI on every PR; build identity on every screen and `/api/health`, production freeze and rollback: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the [release record](docs/RELEASES.md). `npm run verify:deployment -- <url>` checks a deployed URL. Release gates: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). Staff practice: [docs/STAFF_REHEARSAL.md](docs/STAFF_REHEARSAL.md). Conference-week load rehearsal: [docs/STAGING_REHEARSAL.md](docs/STAGING_REHEARSAL.md) (`npm run rehearsal:plan`, guarded `npm run rehearsal:run`).
 
+## Infrastructure lifecycle
+
+One hosted Supabase project moves through Development, Final rehearsal, Cutover and Production; no second hosted project or paid branch without owner approval. After promotion, cloud agents have no live database access, destructive tests run on local disposable Postgres, and PHESMUN production is denied everywhere. The lifecycle gates (production lock, registry, production-only write gateway, revocation proof) are required but **not yet implemented**: see [docs/INFRASTRUCTURE_LIFECYCLE.md](docs/INFRASTRUCTURE_LIFECYCLE.md) and [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md).
+
 ## Deferred
 
-Production Supabase setup, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
+Production promotion of the single Supabase project, the conference-week load rehearsal on Supabase Pro/Small (including school-network enrollment) and an actual Vercel rollback rehearsal. Document previews are text and printing is an operator confirmation. Award decisions remain human. Feature toggles currently store configuration rather than disabling every workflow. See [backlog](docs/BACKLOG.md).
 
 Operations extensions (resolution submission, group-photo reminders; the earlier schedule import is superseded by central sessions) and their Codex review items: [docs/OPERATIONS_EXTENSIONS.md](docs/OPERATIONS_EXTENSIONS.md). Organizer runbook: [CONFERENCE_RUNBOOK.md](CONFERENCE_RUNBOOK.md). Reliability review: [docs/RELIABILITY.md](docs/RELIABILITY.md).
 

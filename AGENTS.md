@@ -20,14 +20,22 @@ the conference, Zuhayr Siddique is in charge.
 These are not ownership restrictions. They are places where a mistake costs a conference day, so each needs a
 reviewed, tested change.
 
-1. **Production and environments.** No production Supabase project exists yet. The PHESMUN production project
-   is forbidden everywhere (`lib/platform/target-guard.ts`). Production builds must target exactly
-   `EXPECTED_SUPABASE_REF`. Do not point load tests, rehearsals or scripts at anything not listed as staging or
-   development. Do not change Vercel production configuration without the owner's approval.
+1. **Production and environments.** MUNOS uses **one hosted Supabase project** with a lifecycle of Development,
+   Final rehearsal, Cutover and Production ([docs/INFRASTRUCTURE_LIFECYCLE.md](docs/INFRASTRUCTURE_LIFECYCLE.md)).
+   Do not provision a second hosted project or paid database branch without the owner's approval. The same
+   project is formally promoted to production before any actual conference data is entered; after promotion,
+   cloud agents have no live database access (source review and local synthetic tests only). Use local
+   disposable Postgres for destructive tests. The PHESMUN production project is forbidden everywhere
+   (`lib/platform/target-guard.ts`). Production builds must target exactly `EXPECTED_SUPABASE_REF`. Do not point
+   load tests, rehearsals or scripts at anything not listed as staging or development. The lifecycle gates
+   (production lock, owner-controlled registry, production-only write gateway, revocation proof) are required
+   but **not yet implemented**; see [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md). Do not change
+   Vercel production configuration without the owner's approval.
 2. **Secrets.** Never commit secrets, session tokens, service keys or generated build output. Never print
    credentials in logs, tests, docs or chat. Keep server-only keys out of client bundles.
 3. **Migrations and schema.** Apply schema changes only through committed migrations in `supabase/migrations`,
-   replayed on a staging project before release. Never edit an applied migration. One person substantially
+   replayed from empty on local disposable Postgres and verified in the preproduction phase of the single hosted
+   project before release. Never edit an applied migration. One person substantially
    changes schema, RLS, auth, shared domain types or repository contracts at a time; announce it and have it
    reviewed.
 4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation takes
