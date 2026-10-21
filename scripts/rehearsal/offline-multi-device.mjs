@@ -162,6 +162,7 @@ class Device {
     const page = await this.ctx.newPage();
     page.on('pageerror', e => { this.errors.push(`${current?.id ?? '-'}: ${e.message.split('\n')[0]}`); if (process.env.REHEARSAL_DEBUG === '1') log(`  [${this.name} pageerror] ${e.stack}`); });
     // window.confirm() prompts (fresh ballot, dismiss exported action) are accepted and recorded, never silently skipped.
+    if (process.env.REHEARSAL_DEBUG === '1') page.on('request', r => { if (r.url().includes('/rest/v1/')) log(`  [${this.name} ${r.method()}] ${new URL(r.url()).pathname}`); });
     page.on('dialog', d => { this.dialogs.push(d.message()); void d.accept(); });
     return page;
   }
@@ -193,13 +194,21 @@ class Device {
   }
   async ready(page = this.page) {
     if (HOSTED) {
-      const gate = page.getByLabel('Staff access code');
+      // The access gate can flash while the workspace restores (e.g. after an offline reload), so never block on it: poll, and
+      // type the code only when the gate is the signed-out one ("Enter staff access code") and the device is online.
       const shell = page.locator('.save-status');
-      await Promise.race([gate.waitFor({state: 'visible', timeout: 30_000}), shell.waitFor({state: 'visible', timeout: 30_000})]).catch(() => undefined);
-      if (await gate.isVisible().catch(() => false)) {
-        assert.ok(chairCode, 'a Chair code is required for hosted devices');
-        await gate.fill(chairCode);
-        await page.getByRole('button', {name: 'Open staff workspace'}).click();
+      const input = page.locator('input[type="password"]');
+      const end = Date.now() + 45_000;
+      while (Date.now() < end && !(await shell.isVisible().catch(() => false))) {
+        const signedOut = await page.getByRole('heading', {name: 'Enter staff access code'}).isVisible().catch(() => false);
+        if (signedOut && (await page.evaluate(() => navigator.onLine).catch(() => false))) {
+          assert.ok(chairCode, 'a Chair code is required for hosted devices');
+          try {
+            await input.fill(chairCode, {timeout: 3000});
+            await page.getByRole('button', {name: 'Open staff workspace'}).click({timeout: 3000});
+          } catch { /* the gate went away mid-fill: the loop re-checks */ }
+        }
+        await page.waitForTimeout(500);
       }
     }
     await page.locator('.save-status').waitFor({state: 'visible', timeout: 45_000});
@@ -279,6 +288,11 @@ class Device {
     return Object.fromEntries(rows);
   }
 }
+/** Let an in-flight sync read finish: an action recorded while one is running waits for the next poll (see the doc, finding 2). */
+async function settle(device) {
+  await device.stripIs(/^(All changes synced|Demo · saved in this browser)$/, 30_000);
+  await new Promise(resolve => setTimeout(resolve, 4000));
+}
 async function snapshotFailure(id) {
   mkdirSync(ARTIFACTS, {recursive: true});
   for (const d of devices) { try { await d.page.screenshot({path: path.join(ARTIFACTS, `${id}-${d.name}.png`)}); } catch { /* page closed */ } }
@@ -286,7 +300,8 @@ async function snapshotFailure(id) {
 
 // ------------------------------------------------------------------------------------------------- hosted server view
 /** Authoritative state: the Executive's snapshot (hosted). Demo mode has no server; callers use the device's own base instead. */
-const serverState = async () => hostedCtx.readServer();
+let readChairView = null;
+const serverState = async () => readChairView();
 async function authoritative(device) { return HOSTED ? serverState() : device.base(); }
 
 // ======================================================================================================================
@@ -302,6 +317,7 @@ async function main() {
     chairCode = await hosted.chairCodeFromEnv();
     if (!chairCode && process.env.REHEARSAL_MINT === '1') chairCode = await hosted.mintRoleCode(hostedCtx, 'chair', hostedCtx.committeeId);
     assert.ok(chairCode, 'Set REHEARSAL_CHAIR_CODE, REHEARSAL_CODES_FILE (from offline-hosted.mts mint), or REHEARSAL_MINT=1');
+    readChairView = await hosted.chairAuditor(hostedCtx, chairCode);
     baseUrl = (process.env.REHEARSAL_BASE_URL || '').replace(/\/$/, '');
     assert.match(baseUrl, /^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, 'REHEARSAL_BASE_URL must be https (or a localhost build)');
     log(`HOSTED mode. project=${config.ref} conference=${config.conferenceId} committee=${hostedCtx.committeeId} (${hostedCtx.conferenceName})`);
@@ -436,10 +452,10 @@ async function runScenarios() {
     });
     await hostedCheck('nothing reached the server while A was offline, and B is unchanged', async () => {
       const server = await serverState();
-      assert.equal(server.events.filter(e => e.sessionId === ctx.sessionId).length, ctx.pre.events);
-      assert.equal(attendanceOf(server, ctx.dAtt.id, ctx.sessionId), ctx.pre.att);
-      assert.equal(speechesIn(server, ctx.sessionId).length, ctx.pre.speeches);
-      assert.equal(pointsOf(await B.base(), ctx.dPts.id), ctx.pre.ptsPts);
+      assert.equal(server.events.filter(e => e.sessionId === ctx.sessionId).length, ctx.pre.events, 'server events changed while A was offline');
+      assert.equal(attendanceOf(server, ctx.dAtt.id, ctx.sessionId), ctx.pre.att, 'server attendance changed while A was offline');
+      assert.equal(speechesIn(server, ctx.sessionId).length, ctx.pre.speeches, 'server speeches changed while A was offline');
+      assert.equal(pointsOf(await B.base(), ctx.dPts.id), ctx.pre.ptsPts, 'B points changed while A was offline');
     });
     if (!HOSTED) await check('demo: B (a separate context) did not receive A\'s offline work', async () => assert.equal(pointsOf(await B.base(), ctx.dPts.id), ctx.pre.ptsPts));
   });
@@ -513,13 +529,16 @@ async function runScenarios() {
         await route.continue();
       };
       await A.ctx.route('**/rest/v1/rpc/apply_*_mutation*', rule);
+      try {
+      await A.at('/chair/participation');
+      await settle(A);
       await A.participation(ctx.dPts.country, 'Speech', 1);
       await check('the failed first attempt leaves the action queued on the device, not lost', async () => {
         await eventually('the first request to be seen', async () => seen >= 1);
         assert.equal((await A.pending()).length, 1);
       });
       await A.drained();
-      await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule);
+      } finally { await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule); }
       await check('automatic retry used the SAME mutation (3 attempts) and the server holds exactly one effect', async () => {
         assert.ok(seen >= 3, `expected at least 3 attempts, saw ${seen}`);
         const server = await serverState();
@@ -550,6 +569,8 @@ async function runScenarios() {
     const speeches0 = speechesIn(before, ctx.sessionId).length;
     const speechEvents0 = before.events.filter(e => e.sessionId === ctx.sessionId && e.categoryId === 'speech').length;
     await A.at('/chair');
+    // The debate console only offers "Next speaker" when someone is queued (S2 consumed the queue in hosted mode).
+    if (!(await A.page.getByRole('button', {name: /^Next speaker · /}).isVisible().catch(() => false))) await A.queueAdd(ctx.dQ.country);
     // A fast double tap on Next speaker and on the speech score must start ONE speech and record ONE score.
     const spoke = await A.speech({double: true});
     await check('double-tap: one speech started, one speech score recorded', async () => {
@@ -582,9 +603,12 @@ async function runScenarios() {
         await route.fulfill({response: first});
       };
       await A.ctx.route('**/rest/v1/rpc/apply_*_mutation*', rule);
-      await A.participation(ctx.dPts.country, 'Speech', 2);
-      await A.drained();
-      await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule);
+      try {
+        await A.at('/chair/participation');
+        await settle(A);
+        await A.participation(ctx.dPts.country, 'Speech', 2);
+        await A.drained();
+      } finally { await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule); }
       await check('the server received the identical mutation twice and applied it once (+2, not +4)', async () => {
         assert.ok(sent >= 1);
         assert.equal(pointsOf(await serverState(), ctx.dPts.id), pts0 + 2);
@@ -740,6 +764,18 @@ async function runScenarios() {
     await check('no uncaught page errors on either device in the whole run', async () => {
       assert.deepEqual([...A.errors, ...B.errors], []);
     });
+  });
+
+  // Optional measurement (REHEARSAL_PROBE_SEND_LATENCY=1, hosted): an action recorded while the device's opening sync read is
+  // still in flight. Records how long it waits for the next automatic send with NO focus/online nudges. Informational: it
+  // reports the latency, it does not fail the run.
+  if (HOSTED && process.env.REHEARSAL_PROBE_SEND_LATENCY === '1') await scenario('S10', 'Probe: action recorded during an in-flight sync read', async () => {
+    await A.page.goto(baseUrl + '/chair/participation', {waitUntil: 'domcontentloaded'});
+    await A.page.locator('.participation-row').first().waitFor({timeout: 45_000});
+    const start = Date.now();
+    await A.participation(ctx.dPts.country, 'Speech', 1);
+    await eventually('the action to be sent without any nudge', async () => (await A.pending()).length === 0, {timeout: 170_000, every: 1000});
+    log(`  NOTE send latency with no nudge: ${Math.round((Date.now() - start) / 1000)} s`);
   });
 }
 

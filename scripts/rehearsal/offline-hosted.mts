@@ -81,6 +81,18 @@ export async function mintRoleCode(pre: HostedPreflight, role: Role, committeeId
   return rotateAccessCode(pre.exec, pre.config.conferenceId, role, committeeId, new Date(Date.now() + hours * 3600_000).toISOString());
 }
 
+/**
+ * Authoritative server view for event-level checks. The Executive snapshot does not carry Chair-level rows (events, speeches,
+ * votes), so a third, read-only Chair identity (never used for writes) reads the committee's state through SupabaseTransport.
+ */
+export async function chairAuditor(pre: HostedPreflight, chairCode: string): Promise<() => Promise<ConferenceData>> {
+  const client = device(pre.config);
+  assert.equal(await redeemStaffCode(client, pre.config.conferenceId, chairCode), 'ok', 'Chair code was not accepted for the auditor device');
+  const id = (await client.auth.getSession()).data.session!.user.id;
+  const transport = new SupabaseTransport(client, pre.config.conferenceId, id, [pre.committeeId], false, ['chair']);
+  return () => transport.read();
+}
+
 /** Read the Chair code the rehearsal uses: environment first, then a private codes file. */
 export async function chairCodeFromEnv(env: NodeJS.ProcessEnv = process.env): Promise<string | null> {
   if (env.REHEARSAL_CHAIR_CODE) return env.REHEARSAL_CHAIR_CODE;

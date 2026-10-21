@@ -104,5 +104,33 @@ REHEARSAL_CODES_FILE=/private/codes.json node --import tsx scripts/rehearsal/off
 REHEARSAL_MODE=hosted ... node --import tsx scripts/rehearsal/offline-multi-device.mjs
 ```
 
-Both Chair devices redeem the same Chair code (separate anonymous identities); the Executive session reads authoritative server
-state through `SupabaseTransport`. Hosted mode has not been executed yet; treat its first run as the validation of those paths.
+Both Chair devices redeem the same Chair code (separate anonymous identities). Authoritative server state is read by a third,
+read-only Chair identity through `SupabaseTransport`: the Executive snapshot does not carry events, speeches or votes. The
+Executive session is used for the preflight and for minting codes. Assertions are deltas from a baseline read at the start of the
+scenario, so the run can be repeated on the same fixture. Set `REHEARSAL_PROBE_SEND_LATENCY=1` to add the informational S10 probe.
+
+## Hosted run record (21 October 2026)
+
+Run against the isolated temporary conference "TEST Offline Rehearsal (temporary)" on staging project `kllhswucdhqqywnzxado`
+(deployment built for it, served locally), twice in a row: **S0 to S9 all PASS, 39 assertions, 0 failed**; S10 probe 127 s (below).
+
+Script defects found and fixed during the first hosted runs (not product defects):
+1. `getByLabel('Staff access code')` matched two elements, so strict mode threw and the gate was never filled. The gate is now
+   found by its password input and filled only while the signed-out gate ("Enter staff access code") is showing and the device is
+   online; it is polled and never blocks, because the gate can flash while the workspace restores after an offline reload.
+2. The Executive snapshot has no Chair-level rows, so "the server has nothing / one effect" checks read zero. A read-only Chair
+   auditor identity now provides the server view.
+3. The debate console offers "Next speaker" only when someone is queued; S6 queues a delegate when needed.
+4. Route rules are removed in `finally`, so a failed scenario cannot leak a fault rule into the next one.
+
+### Product finding (not fixed; product code frozen)
+
+**An action recorded while the device's sync read is in flight is not sent until the next automatic poll.**
+`DurableRepository.execute()` calls `flush()`, which returns immediately while another flush is running (`this.flushing`). If
+that flush is already past its batch step (the opening or idle snapshot read), nothing re-checks the outbox when it finishes;
+`schedule()` then waits `pollDelay` (60 s without Realtime, 120 s with, +-20%). Measured by the S10 probe: open
+`/chair/participation`, record points at once, no focus or online event: the action sat in the outbox for **127 s**, then sent and
+applied once. Nothing is lost or duplicated, and focus, going online or a later action sends it sooner, but a Chair who records
+during the opening read can see "Saved on this device" for up to about 2.4 minutes. Suggested fix (needs the sync owner and
+independent review): when a flush finishes, if the outbox has unsent work, flush again. S5 and S6 call `settle()` first so they
+test retry and idempotency rather than this race.
