@@ -357,7 +357,7 @@ All **Proposed** (hosted); the local equivalents are **Verified** (PGlite).
 
 **A literal restore of the previous `submit_resolution` is unsafe after the verification fixture (reproduced locally).** The previous public path pads with `lpad(n::text, 2, '0')`, which truncates: `lpad('102', 2, '0')` is `'10'`. Section 8 deliberately leaves a committee numbered `BND / 01` to `BND / 101`. With that post-test state in place and the previous body restored literally, a public submission computes `count(*) + 1 = 102`, formats it as `BND / 10`, finds it taken, increments, formats `BND / 10`, `BND / 10`, ... and never exits: in a local PGlite replay the call did not return within 60 seconds, holding the committee lock the whole time. The Chair path is unaffected after a revert (it returns to the 8-character hex suffix), which hides the problem until a public submission arrives.
 
-The revert therefore **keeps width-safe padding** in `submit_resolution` (`lpad(n::text, greatest(2, length(n::text)), '0')`, the same expression the helper uses) and restores everything else exactly. This is a deliberate, reviewed deviation from the previous body in that one expression; `apply_mutation` is restored exactly. The alternative of reconciling or deleting the synthetic boundary fixture before reverting is **not** used: deleting rows is outside the revoke-only cleanup of 8.5 and is not needed.
+The revert therefore **keeps width-safe padding** in `submit_resolution` (`lpad(n::text, greatest(2, length(n::text)), '0')`, the same expression the helper uses) and restores everything else exactly. This is a deliberate, reviewed deviation from the previous body in that one expression; `apply_mutation` is restored exactly. The alternative of reconciling or deleting the synthetic boundary fixture before reverting is **not** used: deleting rows is outside the revoke-only cleanup of 8.6 and is not needed.
 
 Proposed content for `supabase/migrations/<timestamp>_revert_sequential_chair_numbering.sql`, to be reviewed, replayed from empty locally and then **kept unapplied**. It is the block that [`tests/sequential-chair-numbering-revert-db.test.ts`](../tests/sequential-chair-numbering-revert-db.test.ts) reads from this document and runs:
 
@@ -405,87 +405,112 @@ Only after sections 5 and 6 pass. The conference is new, labelled, small and has
 
 ### 8.1 Create the conference by hash-only credential insert (Proposed; the credential mechanism is Verified locally)
 
-Generate three codes locally. Each command writes the raw code to a private file and prints **only the digest**:
+Generate four codes locally (Executive, and one Chair per committee `TST`, `BND`, `BRW`). Each command writes the raw code to a private file and prints **only the digest**:
 
 ```
 node -e "const c=require('crypto'),fs=require('fs');const raw=c.randomBytes(12).toString('hex').toUpperCase();fs.writeFileSync(process.argv[1],raw+'\n',{mode:0o600});console.log(c.createHash('sha256').update(raw).digest('hex'))" /private/outside-repo/numbering-exec.code
 ```
 
-Repeat for `numbering-chair-tst.code` and `numbering-chair-bnd.code`. The raw value is 24 uppercase hexadecimal characters; `redeem_access_code` strips spaces and dashes and upper-cases, then hashes the 24 characters with SHA-256, so the digest above is what the database expects (**Verified locally**; this is the same format as [`scripts/bootstrap-first-executive.sql`](../scripts/bootstrap-first-executive.sql), which instead generates the code in the database and shows it once). Use that script only if the database should generate the Executive code and a person will read it from the result row.
+Repeat for `numbering-chair-tst.code`, `numbering-chair-bnd.code` and `numbering-chair-brw.code`. The raw value is 24 uppercase hexadecimal characters; `redeem_access_code` strips spaces and dashes and upper-cases, then hashes the 24 characters with SHA-256, so the digest above is what the database expects (**Verified locally**; this is the same format as [`scripts/bootstrap-first-executive.sql`](../scripts/bootstrap-first-executive.sql), which instead generates the code in the database and shows it once). Use that script only if the database should generate the Executive code and a person will read it from the result row.
 
-Run once, with the three digests substituted (**Proposed**; all names carry TEST markers so the rehearsal preflight and the cleanup recognise them):
+Run once, with the four digests substituted (**Proposed**; all names carry TEST markers so the rehearsal preflight and the cleanup recognise them):
 
 ```sql
 do $setup$
 declare
   conf uuid := gen_random_uuid();
-  tst uuid := gen_random_uuid(); bnd uuid := gen_random_uuid();
-  s_t uuid := gen_random_uuid(); s_b uuid := gen_random_uuid();
-  sess_t uuid := gen_random_uuid(); sess_b uuid := gen_random_uuid();
+  tst uuid := gen_random_uuid(); bnd uuid := gen_random_uuid(); brw uuid := gen_random_uuid();
+  sess_t uuid := gen_random_uuid(); sess_b uuid := gen_random_uuid(); sess_w uuid := gen_random_uuid();
   school uuid := gen_random_uuid();
 begin
   insert into public.conferences(id,name,venue,date) values (conf,'DCMUN Development Test (temporary numbering check)','TEST DATA - not a real conference - temporary',current_date);
   insert into public.schools(id,conference_id,name) values (school,conf,'TEST School (not real)');
-  insert into public.committees(id,conference_id,code,name,room) values (tst,conf,'TST','TEST Committee (not real)','TEST Room'),(bnd,conf,'BND','TEST Boundary Committee (not real)','TEST Room');
-  insert into public.sessions(id,conference_id,committee_id,name,"startsAt",state) values (sess_t,conf,tst,'TEST Session 1',now(),'scheduled'),(sess_b,conf,bnd,'TEST Session 1',now(),'scheduled');
+  insert into public.committees(id,conference_id,code,name,room) values (tst,conf,'TST','TEST Committee (not real)','TEST Room'),(bnd,conf,'BND','TEST Boundary Committee (not real)','TEST Room'),(brw,conf,'BRW','TEST Browser Committee (not real)','TEST Room');
+  insert into public.sessions(id,conference_id,committee_id,name,"startsAt",state) values (sess_t,conf,tst,'TEST Session 1',now(),'scheduled'),(sess_b,conf,bnd,'TEST Session 1',now(),'scheduled'),(sess_w,conf,brw,'TEST Session 1',now(),'scheduled');
   update public.committees set "currentSessionId" = sess_t where id = tst;
   update public.committees set "currentSessionId" = sess_b where id = bnd;
+  update public.committees set "currentSessionId" = sess_w where id = brw;
   insert into public.delegates(conference_id,committee_id,"schoolId",country,name,email) values
     (conf,tst,school,'France','TEST Delegate T1','numbering-t1@example.com'),(conf,tst,school,'Japan','TEST Delegate T2','numbering-t2@example.com'),
-    (conf,bnd,school,'Brazil','TEST Delegate B1','numbering-b1@example.com'),(conf,bnd,school,'Kenya','TEST Delegate B2','numbering-b2@example.com');
+    (conf,bnd,school,'Brazil','TEST Delegate B1','numbering-b1@example.com'),(conf,bnd,school,'Kenya','TEST Delegate B2','numbering-b2@example.com'),
+    (conf,brw,school,'Egypt','TEST Delegate W1','numbering-w1@example.com'),(conf,brw,school,'Chile','TEST Delegate W2','numbering-w2@example.com');
   insert into public.submission_links(conference_id,committee_id,token) values
-    (conf,tst,'NUMTST'||repeat('Z',34)),(conf,bnd,'NUMBND'||repeat('Z',34));
+    (conf,tst,'NUMTST'||repeat('Z',34)),(conf,bnd,'NUMBND'||repeat('Z',34)),(conf,brw,'NUMBRW'||repeat('Z',34));
   insert into private.access_credentials(conference_id,committee_id,role,credential_hash,expires_at,created_by) values
     (conf,null,'admin','<sha256 digest of the Executive code>', now()+interval '6 hours', null),
     (conf,tst,'chair','<sha256 digest of the TST Chair code>', now()+interval '6 hours', null),
-    (conf,bnd,'chair','<sha256 digest of the BND Chair code>', now()+interval '6 hours', null);
+    (conf,bnd,'chair','<sha256 digest of the BND Chair code>', now()+interval '6 hours', null),
+    (conf,brw,'chair','<sha256 digest of the BRW Chair code>', now()+interval '6 hours', null);
 end $setup$;
 select id as conference_id, name from public.conferences where name like 'DCMUN Development Test (temporary numbering check)%';
 ```
 
 Record the printed `conference_id` as the temporary conference (**the only conference id used below**; every later query filters on it). Short validity (6 hours) is deliberate. The submission link tokens above satisfy the `^[A-Za-z0-9_-]{22,64}$` check; they are placeholders for the temporary conference only.
 
-### 8.2 SQL-level numbering checks against the real, committed hosted function (Proposed)
+### 8.2 Run order and cumulative state (read this before running anything)
 
-Each as a separate `execute_sql`, filtered on the temporary conference. These repeat the dry run, now committed, and add what a rolled-back transaction cannot show.
+Every phase writes real rows, so the numbers each later phase must see are fixed by what came before. Three committees keep the checks independent: **`TST`** (Chair and public numbering, concurrency, retries), **`BND`** (the 99 to 100 boundary) and **`BRW`** (the browser checks of 8.5, kept fresh so its numbers start at 01 whatever happened elsewhere). The scripts derive each expected number from a **baseline** read at the start of the phase (the highest sequential suffix `M` in that committee), never from a hard-coded number; the table below is what the baseline gives when the phases run in this order.
 
-| # | Check | Expected |
-| --- | --- | --- |
-| S1 | Sequence 01..N: three Chair creates (section 8.3) then `select code from public.documents where committee_id = <TST> order by code` | `TST / 01`, `TST / 02`, `TST / 03` |
-| S2 | A public submission, called as the migration owner (the function is `SECURITY DEFINER`; its `service_role`-only grant is checked in section 6, the role switch was exercised in the dry run): `select public.submit_resolution('<NUMTST token>', <new uuid>, <TST delegate id>, 'Protecting civilians online', rpad('numbering',30,'x'), null,null,null,null);` | `status: created`, next number; calling again with the **same** submission id returns `status: replayed` and the **same** code, and the count of documents does not change |
-| S3 | Legacy hex code ignored: as owner insert `TST / ca7640bb` and `TST / 12345678` (documents need session, submitter, code, title) then create one more | The next number continues after the highest sequential code; the hex codes are untouched and not renumbered |
-| S4 | `/99` to `/100`: for committee `BND`, seed 01..98 as owner (`insert ... select ... from generate_series(1,98)`), then create three (Chair or public) | `BND / 99`, `BND / 100`, `BND / 101` (never `BND / 10`) |
-| S5 | Uniqueness backstop: `select count(*) = count(distinct code) from public.documents where conference_id = <temp conference>` | `true` |
+| Step | Section | Action | New codes | Highest sequential after |
+| --- | --- | --- | --- | --- |
+| T1 | 8.3 phase A | TST Chair creates 3 drafts, one after another | `TST / 01`, `02`, `03` | 03 |
+| T2 | 8.4 S2 | One public submission (owner call), then the same submission id again | `TST / 04`; the replay adds nothing and returns `replayed` with the same code | 04 |
+| T3 | 8.4 S3, then 8.3 phase A2 | Owner inserts legacy codes `TST / ca7640bb` and `TST / 12345678` (no number consumed), then the TST Chair creates 1 draft | `TST / 05`; the two hex codes are untouched | 05 |
+| T4 | 8.3 phase B | 8 concurrent TST Chair creates from 3 identities | `TST / 06` to `13`, distinct and consecutive | 13 |
+| T5 | 8.3 phase C | Only with the server key (A6): 4 Chair creates and 4 public submissions at the same time | `TST / 14` to `21`, distinct and consecutive across both paths. Skipped otherwise: **Untested (hosted)**, covered in CI only | 21 (or 13 if skipped) |
+| T6 | 8.3 phase D | One mutation id sent 5 times in a row, then a **second** mutation id sent 5 times concurrently | exactly **one** new code per id: `TST / 22` and `23` (or `14` and `15` if T5 was skipped) | 23 (or 15) |
+| T7 | 8.3 phase D | One fresh create | the next code: `TST / 24` (or `16`) | 24 (or 16) |
+| T8 | 8.3 phase E | A reused mutation id with a changed payload; the TST Chair creating in `BND` | refused; **no** new code | unchanged |
+| B1 | 8.4 S4 | Owner seeds `BND / 01` to `98` (`generate_series(1,98)`) | 98 seed rows | 98 |
+| B2 | 8.4 S4 | BND Chair create, then one public submission, then a BND Chair create | `BND / 99`, `BND / 100`, `BND / 101` (a truncated `BND / 10` would collide with the seeded `BND / 10`) | 101 |
+| W1 | 8.5 browser | BRW Chair, first device: 3 drafts | `BRW / 01`, `02`, `03` (shown `BRW/01` ...) | 03 |
+| W2 | 8.5 browser | BRW Chair, second device: 1 draft | `BRW / 04` | 04 |
+| W3 | 8.5 browser | One device offline and one online each create a draft, then reconnect | two more distinct codes, `BRW / 05` and `06` in either order | 06 |
+| W4 | 8.5 browser | Public submission through `/submit/<BRW token>` (needs the server key, A6) | `BRW / 07` (else skipped) | 07 (or 06) |
+
+After everything: `TST` holds the highest sequential number from T7 plus two hex codes, `BND` holds exactly `01` to `101`, `BRW` holds `01` to `06` or `07`. That `BND` state is the **post-test state** the revert procedure of section 7 must (and, in the local test, does) survive. Final uniqueness check (**Proposed**): `select count(*) = count(distinct code) from public.documents where conference_id = '<temp>'` returns `true`.
+
+**Local walk of this table (Verified locally, PGlite).** The setup SQL of 8.1 (taken from this document, with real digests, then redeemed by Chair devices) and the sequence T1 to T8, B1, B2 and W1 to W4 were replayed on a database holding migrations 1 to 27, with sequential stand-ins for the concurrent steps (the concurrent behaviour is the CI test). Both variants produced exactly the codes in the table: without T5 `TST` ends at 16, with T5 at 24, `BND` at 101 and `BRW` at 06 (or 07 with W4). The first draft of this table had T6 wrong (it expected one new code for two different mutation ids); the walk caught it. [`tests/numbering-verification-walk-db.test.ts`](../tests/numbering-verification-walk-db.test.ts) keeps this walk (the T5 variant) honest.
 
 ### 8.3 Chair numbering through the real API, concurrency and retries (Proposed script, hosted behaviour Untested)
 
 The app's own client code is the path under test: `redeemStaffCode` (device redeems the TST Chair code, creating an anonymous identity and grant) and `SupabaseTransport.send`, which calls `apply_conference_mutation` over PostgREST ([`lib/access-codes.ts`](../lib/access-codes.ts), [`lib/supabase/repository.ts`](../lib/supabase/repository.ts)). [`scripts/smoke-project.mts`](../scripts/smoke-project.mts) is the pattern to copy. **There is no committed script for this check**; a guarded `scripts/verify-numbering-hosted.mts` is a recommended follow-up (section 11) and needs owner approval. Until then the check is an ad hoc script kept **outside the repository** (a scratch directory) that must:
 
 1. Call `assertToolTarget(process.env.NEXT_PUBLIC_SUPABASE_URL)` first and exit if it throws; read `NEXT_PUBLIC_CONFERENCE_ID` and require it to equal the temporary conference id; require the conference name to carry `TEST`/`temporary` (the same marker the rehearsal preflight uses, [`scripts/rehearsal/offline-hosted.mts`](../scripts/rehearsal/offline-hosted.mts)).
-2. Read the Chair code from the 0600 file, never print it, redeem it on **several** separate clients (separate anonymous identities, one per simulated device).
-3. Run, each as its own phase, and print only ids, codes of the form `TST / NN`, and pass or fail:
-   * **Sequence:** one Chair, `newDocument` x 5 sequentially. Expect the five existing-plus-new numbers to be consecutive.
-   * **Concurrent Chair and Chair:** with `Promise.all`, send N (for example 8) `newDocument` commands from 3 identities at the same time. Expect N new, distinct, consecutive numbers and no gap. (Real PostgREST concurrency is **Untested (hosted)**; the PostgreSQL 17 version is the CI test above.)
-   * **Concurrent Chair and public:** only if the owner supplied `SUPABASE_SECRET_KEY` (A6): fire Chair creates and `submit_resolution` calls (through the server-role client, or the app's `/api/submissions` route on a local `next start`) together. Expect distinct consecutive numbers across both. Otherwise record this check as **Untested (hosted)**, covered only in CI.
-   * **Retries:** send the same mutation id 5 times sequentially and 5 times concurrently. Expect one new document and one number consumed; the next fresh create gets the next number, with no gap.
-   * **Idempotency replay with a changed payload:** reuse a mutation id with a different title or committee. Expect a refusal (`Idempotency key reused`, as in the smoke test), no new document, no number consumed.
-   * **Role boundary:** the TST Chair creating a draft in `BND` is refused (42501); the helper is not callable (section 6, item 2).
+2. Read the Chair code from the 0600 file, never print it, redeem it on **several** separate clients (separate anonymous identities, one per simulated device); redeem the BND Chair code on its own client.
+3. Run the phases below **in the order of the table in 8.2**, each starting by reading the committee's baseline `M` (highest sequential suffix; legacy hex ignored), and print only ids, codes of the form `TST / NN`, and pass or fail. Expected values are `M + 1 ...`, so a phase can be repeated and the table stays correct if an earlier phase was skipped:
+   * **A. Sequence:** one Chair, `newDocument` x 3 sequentially. Expect `M+1`, `M+2`, `M+3`. **A2:** after S3 inserted the legacy hex rows, one more create: expect `M+1` where `M` ignores the hex codes.
+   * **B. Concurrent Chair and Chair:** with `Promise.all`, send 8 `newDocument` commands from 3 identities at the same time. Expect 8 new, distinct, consecutive numbers `M+1 ... M+8` and no gap. (Real PostgREST concurrency is **Untested (hosted)**; the PostgreSQL 17 version is the CI test above.)
+   * **C. Concurrent Chair and public:** only if the owner supplied `SUPABASE_SECRET_KEY` (A6): fire 4 Chair creates and 4 `submit_resolution` calls (through the server-role client, or the app's `/api/submissions` route on a local `next start`) together. Expect 8 distinct consecutive numbers across both paths. Otherwise record this phase as skipped and **Untested (hosted)**.
+   * **D. Retries:** send one mutation id 5 times in a row: expect exactly one new document, `M+1`. Then send a **second** mutation id 5 times concurrently: expect exactly one more, `M+2`. Then one fresh create must be `M+3`, with no gap.
+   * **E. Refusals:** reuse a mutation id with a different payload: expect a refusal (`Idempotency key reused`, as in the smoke test) and no new document. The TST Chair creating a draft in `BND` is refused (42501); the helper is not callable (section 6, item 2).
 
-Counts are reported as deltas from a baseline read at the start of each phase, so a phase can be repeated.
+Counts are reported as deltas from the baseline, so a phase can be repeated.
 
-### 8.4 Signed-in browser and API checks (Proposed; the 21 October run is the precedent)
+### 8.4 SQL-level numbering checks against the real, committed hosted function (Proposed)
 
-Run a build of the exact commit against the temporary conference: `NEXT_PUBLIC_DATA_BACKEND=supabase`, the project URL and publishable key, `NEXT_PUBLIC_CONFERENCE_ID` set to the temporary conference id, and `STAGING_SUPABASE_REFS` set (see [DATABASE_BACKED_DEPLOYMENT.md](DATABASE_BACKED_DEPLOYMENT.md#4-how-the-app-is-built-in-supabase-mode)). A local `npm run build` then `npm start` is sufficient and needs no Vercel change; a protected deployment is the option described in that document. Check:
+Each as a separate `execute_sql`, filtered on the temporary conference, run at the points shown in 8.2. These repeat the dry run, now committed, and add what a rolled-back transaction cannot show.
 
-1. Chair signs in with the TST code (the staff access-code gate), creates three resolutions (**New resolution** has no title field): the identity shows `TST/01`, `TST/02`, `TST/03` (the display drops the spaces round the slash, [`lib/resolution-identity.ts`](../lib/resolution-identity.ts)), each with the Main Submitter's country, and the numbers survive a reload.
+| # | When | Check | Expected |
+| --- | --- | --- | --- |
+| S2 | T2 | A public submission, called as the migration owner (the function is `SECURITY DEFINER`; its `service_role`-only grant is checked in section 6, the role switch was exercised in the dry run): `select public.submit_resolution('<NUMTST token>', <new uuid>, <TST delegate id>, 'Protecting civilians online', rpad('numbering',30,'x'), null,null,null,null);` | `status: created`, `TST / 04`; calling again with the **same** submission id returns `status: replayed` and the **same** code, and the count of documents does not change |
+| S3 | T3 | Legacy hex code ignored: as owner insert `TST / ca7640bb` and `TST / 12345678` (documents need session, submitter, code, title); the next Chair create is then driven by 8.3 | `TST / 05`: the next number continues after the highest sequential code; the hex codes are untouched and not renumbered |
+| S4 | B1, B2 | `/99` to `/100`: for committee `BND`, seed 01..98 as owner (`insert ... select 'BND / '\|\|lpad(g::text,2,'0') ... from generate_series(1,98) g`, with the session, a delegate of `BND` and a title), then BND Chair, public, BND Chair | `BND / 99`, `BND / 100`, `BND / 101`; `BND / 10` still exists exactly once (the seed), so a truncated `/10` would have collided |
+| S5 | end | Uniqueness backstop: `select count(*) = count(distinct code) from public.documents where conference_id = <temp conference>` | `true` |
+
+### 8.5 Signed-in browser and API checks (Proposed; the 21 October run is the precedent)
+
+Use the **`BRW`** committee only, so its numbers start at 01 regardless of 8.3 and 8.4. Run a build of the exact commit against the temporary conference: `NEXT_PUBLIC_DATA_BACKEND=supabase`, the project URL and publishable key, `NEXT_PUBLIC_CONFERENCE_ID` set to the temporary conference id, and `STAGING_SUPABASE_REFS` set (see [DATABASE_BACKED_DEPLOYMENT.md](DATABASE_BACKED_DEPLOYMENT.md#4-how-the-app-is-built-in-supabase-mode)). A local `npm run build` then `npm start` is sufficient and needs no Vercel change; a protected deployment is the option described in that document. Check, in this order (W1 to W4 in 8.2):
+
+1. Chair signs in with the `BRW` code (the staff access-code gate), creates three resolutions (**New resolution** has no title field): the identity shows `BRW/01`, `BRW/02`, `BRW/03` (the display drops the spaces round the slash, [`lib/resolution-identity.ts`](../lib/resolution-identity.ts)), each with the Main Submitter's country, and the numbers survive a reload. If `BRW` already holds drafts (a repeated run), expect `M+1 ...` instead.
 2. After sync, the number each device shows equals `documents.code` on the server. The client computes an optimistic number first ([`lib/commands.ts`](../lib/commands.ts) `newDocument`) and the server decides; **observe and record** whether a draft created while another device or a public submission took the same number shows a different number after sync (not a data problem, but a visible change).
-3. A second Chair device on the same committee (a second identity redeeming the same code) creates a draft: the number continues the same sequence.
-4. Offline: take one device offline, create a draft, create another elsewhere, reconnect. One action, one document, no duplicate, numbers distinct (the offline outbox and `PT409`/idempotency contract, [AGENTS.md](../AGENTS.md) protected area 5). **Untested (hosted)** with sequential numbers.
-5. A public submission: if the server key is available, submit through `/submit/<token>` on the local build and confirm the next number; otherwise this stays **Untested (hosted)**.
+3. A second Chair device on the same committee (a second identity redeeming the same code) creates a draft: `BRW/04`, continuing the same sequence.
+4. Offline: take one device offline, create a draft, create another on the other device, reconnect (`BRW/05` and `BRW/06`, in whichever order the server receives them). One action, one document, no duplicate, numbers distinct (the offline outbox and `PT409`/idempotency contract, [AGENTS.md](../AGENTS.md) protected area 5). **Untested (hosted)** with sequential numbers.
+5. A public submission: if the server key is available, submit through `/submit/<BRW token>` on the local build and confirm `BRW/07`; otherwise this stays **Untested (hosted)**.
 6. Approval inbox shows the resolution with its country; Logistics print queue shows print copies (delegates + 3); the Executive overview lists the codes. (These screens were verified on 21 October for hex-coded drafts; the numbering change should not alter them.)
 7. No page errors in any session.
 
-### 8.5 Revoke-only cleanup
+### 8.6 Revoke-only cleanup
 
 **Only the credentials and grants of the temporary conference are revoked.** Nothing is deleted (deletion is the guarded cleanup of [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md), item 1.9.5 and cutover step 2.2). **Proposed**, `<temp>` is the temporary conference id, run last:
 
@@ -520,7 +545,7 @@ Record in a **new section appended to [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJE
 | Ledger after | Row count (27), 3.1 result (zero rows), statement MD5 and `parts` |
 | Reconciliation | Step 5.6: the three MD5 values equal the dry run |
 | Grants | Inventory diff (one new row), ACL of the helper, HTTP refusal of the helper, advisors |
-| Synthetic checks | Temporary conference id, S1 to S5, 8.3 phases (sequence, concurrency, retries, replay, boundary), 8.4 browser items, anything **Untested** and why |
+| Synthetic checks | Temporary conference id, S2 to S5, 8.3 phases A to E, 8.5 browser items, anything **Untested** and why |
 | Cleanup | The two zero counts, original conference untouched |
 | Decision | Left applied, or revert required (and the reason) |
 
