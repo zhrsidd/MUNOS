@@ -3,6 +3,7 @@ import {useState} from 'react';
 import {useConference} from '@/lib/context';
 import {vetoDelegates,votingOutcome} from '@/lib/repository';
 import {Chip,DelegateIdentity,Empty,Panel} from './ui';
+import {resolutionLabel} from '@/lib/resolution-identity';
 export function VotingConsole({committeeId,sessionId}:{committeeId:string;sessionId:string}){
  const {data,act}=useConference();const [confirm,setConfirm]=useState(false);
  const committee=data.committees.find(c=>c.id===committeeId)!;
@@ -17,7 +18,7 @@ export function VotingConsole({committeeId,sessionId}:{committeeId:string;sessio
  const sessionMismatch=r.sessionId!==sessionId;
  const chooseMode=(mode:'normal'|'divide',voteType:'substantive'|'procedural')=>{if(votes.length&&!window.confirm('Start a fresh ballot? Earlier choices remain in the audit history.'))return;void act({type:'voteMode',resolutionId:r.id,sessionId,mode,voteType},'chair');};
  return <>
- <Panel title={`${r.code} · Voting procedure`} subtitle="Choose the procedure. Starting a fresh ballot preserves earlier choices in the audit history. Each eligible delegation has one vote.">
+ <Panel title={`${resolutionLabel(r,data.delegates.filter(d=>d.committeeId===committeeId))} · Voting procedure`} subtitle="Choose the procedure. Starting a fresh ballot preserves earlier choices in the audit history. Each eligible delegation has one vote.">
  <div className="panel-body voting-setup">
  <div className="actions voting-mode"><button className={!divide?'selected':''} onClick={()=>chooseMode('normal',r.voteType??'substantive')}>Normal vote</button><button className={divide?'selected':''} onClick={()=>chooseMode('divide',r.voteType??'substantive')}>Divide the House</button><label>Vote type<select value={r.voteType??'substantive'} onChange={e=>chooseMode(r.voteMode??'normal',e.target.value as 'substantive'|'procedural')}><option value="substantive">Substantive</option><option value="procedural">Procedural · no veto</option></select></label></div>
  {sessionMismatch&&<div className="callout">This resolution’s ballot belongs to a different session. Select that session, or choose a voting mode here before recording any ballots.</div>}

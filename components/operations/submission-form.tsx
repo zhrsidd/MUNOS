@@ -2,11 +2,13 @@
 import { useState, useSyncExternalStore } from "react";
 import { googleDocMessages, parseGoogleDocLink } from "@/lib/submissions/google-doc";
 import { cleanTitle, submissionMessages, type LinkInfo, type SubmissionResponse } from "@/lib/submissions/rules";
+import { displayResolutionCode, resolutionIdentity } from "@/lib/resolution-identity";
+import { ResolutionName } from "../resolution-identity";
 
 type State =
   | { phase: "idle" }
   | { phase: "sending" }
-  | { phase: "done"; status: "created" | "duplicate" | "replayed"; code: string }
+  | { phase: "done"; status: "created" | "duplicate" | "replayed"; code: string; submitterId: string }
   | { phase: "error"; message: string };
 
 const subscribeNever = () => () => {};
@@ -51,7 +53,7 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
       return setState({ phase: "error", message: `Connection problem — we could not confirm your submission. Check your internet and tap Submit again; it is safe and will not create a duplicate.${help}` });
     }
     const body = (await response.json().catch(() => null)) as SubmissionResponse | null;
-    if (body?.ok) return setState({ phase: "done", status: body.status, code: body.code });
+    if (body?.ok) return setState({ phase: "done", status: body.status, code: body.code, submitterId });
     const message = body?.message ?? (response.status === 413 ? submissionMessages.too_large : submissionMessages.server_error);
     setState({ phase: "error", message: response.status >= 500 || response.status === 429 ? message + help : message });
   }
@@ -68,7 +70,11 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
       <section className="submit-card success" role="status">
         <div className="eyebrow">{link.committeeCode}</div>
         <h1>{state.status === "duplicate" ? "Already received" : "Resolution received"}</h1>
-        <p className="submit-code">{state.code}</p>
+        {/* The delegate chose this country, so a new submission reads GA1/01 — France from the list this page already holds.
+            A duplicate returns the earlier resolution, whose Main Submitter may differ from the country chosen now: code only. */}
+        <p className="submit-code">
+          {state.status === "duplicate" ? displayResolutionCode(state.code) : <ResolutionName identity={resolutionIdentity({ code: state.code, submitterId: state.submitterId }, link.submitters)} />}
+        </p>
         <p>
           {state.status === "duplicate"
             ? "This document was already submitted for this committee. Nothing new was created."

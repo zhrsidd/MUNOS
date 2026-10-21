@@ -8,6 +8,8 @@ import { googleDocMessages, googleDocUrl, parseGoogleDocLink } from "@/lib/submi
 import { browserClient } from "@/lib/supabase/client";
 import { formatTime } from "../chair";
 import { Chip, Panel } from "../ui";
+import { ResolutionName } from "../resolution-identity";
+import { useResolutionIdentities } from "@/lib/use-resolution-identity";
 import { useDemo } from "./submission-links";
 
 // Google Docs is the resolution editor. These controls only point at the documents (URLs are rebuilt
@@ -84,6 +86,7 @@ function SubmissionCard({ resolution, link, shareWith }: { resolution: Resolutio
   const { data, act } = useConference();
   const [copy, setCopy] = useState("");
   const delegate = data.delegates.find((d) => d.id === resolution.submitterId);
+  const identity = useResolutionIdentities()(resolution);
   const version = data.versions.find((v) => v.id === resolution.versionIds[0]);
   const parsedCopy = parseGoogleDocLink(copy);
   const access = (state: ResolutionLink["access"]) => act({ type: "resolutionLink", documentId: resolution.id, action: "access", access: state }, "chair");
@@ -97,10 +100,11 @@ function SubmissionCard({ resolution, link, shareWith }: { resolution: Resolutio
     <article className={`submission-card ${link.access}`}>
       <div className="submission-card-head">
         <div>
-          <small className="muted">{resolution.code}</small>
-          <strong>{resolution.title}</strong>
+          <strong>
+            <ResolutionName identity={identity} />
+          </strong>
           <p className="muted">
-            {delegate ? `${delegate.flag} ${delegate.country}` : "Unknown submitter"} · submitted {link.submittedAt ? formatTime(link.submittedAt) : "—"}
+            Submitted {link.submittedAt ? formatTime(link.submittedAt) : "—"}
             {!link.workingDocId && version?.storageKey && " · uploaded file"}
           </p>
         </div>
@@ -123,7 +127,7 @@ function SubmissionCard({ resolution, link, shareWith }: { resolution: Resolutio
       </div>
       <label className="approval-copy">
         Approval-folder copy (optional)
-        <input value={copy} placeholder="Paste the link to your copy in the Approval folder" onChange={(e) => setCopy(e.target.value)} aria-label={`Approval copy for ${resolution.code}`} />
+        <input value={copy} placeholder="Paste the link to your copy in the Approval folder" onChange={(e) => setCopy(e.target.value)} aria-label={`Approval copy for ${identity.text}`} />
         {copy.trim() && !parsedCopy.ok && <small className="field-error">{googleDocMessages[parsedCopy.problem]}</small>}
       </label>
       <div className="actions">

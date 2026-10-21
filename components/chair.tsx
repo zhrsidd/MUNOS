@@ -13,6 +13,7 @@ import { contributionCount, isContribution } from "@/lib/participation-view";
 import { AdjustmentHistory, DeductPoints } from "./point-adjustments";
 import { scoringLabel, scoringValues } from "@/lib/scoring";
 import { eventAmendmentId } from "@/lib/procedure/view";
+import { resolutionLabel } from "@/lib/resolution-identity";
 import {
   Chip,
   DelegateIdentity,
@@ -346,8 +347,7 @@ export function ChairScreen({
                         <Chip tone="blue">+{e.points}</Chip>
                       </td>
                       <td>
-                        {data.documents.find((d) => d.id === e.resolutionId)
-                          ?.code || "General debate"}
+                        {(() => { const r = data.documents.find((d) => d.id === e.resolutionId); return r ? resolutionLabel(r, delegates) : "General debate"; })()}
                         {(() => { const amendment = data.amendments?.find((a) => a.id === eventAmendmentId(data, e)); return amendment ? <> · <Chip tone="review">Amendment debate · {amendment.type} {amendment.clause}</Chip></> : null; })()}
                       </td>
                       <td>Head chair · Demo</td>

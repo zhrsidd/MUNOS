@@ -172,3 +172,21 @@ The panel uses existing tokens: hairline sections, 40 px controls, one primary S
 animates while typing": Felix's own composer may move his beak (a gentle 1.1 s cycle that settles 600 ms after the last key), as the owner requested; no other screen does.
 Expressions are decorative and never carry save, sync or error meaning. Reduced motion and the Animate Felix
 switch hold the face still.
+
+## Resolution identity · 21 October 2026
+
+A resolution is named by its number and Main Submitter, never by a title: **`GA1/01 — France`** (existing code, an
+em dash, the Main Submitter's country). The stored code is `GA1 / 01`; the spaces round the slash are dropped for
+display only and no code is ever rewritten. Never use a delegate's personal name, and never show the old title as the
+primary label (historical `title` data and Google Doc names are untouched; the title is not displayed or searched).
+
+- One module, `lib/resolution-identity.ts`, produces the string and its parts (code, country); every screen, notice,
+  Felix reminder and search uses it. Render with `ResolutionName` (`components/resolution-identity.tsx`): the code
+  stays on one line, the country wraps (`overflow-wrap: anywhere`), and an unavailable submitter is muted.
+- The country is read from the delegates already in the reader's snapshot, inside the resolution's own committee: no
+  per-row fetch, no new query. Fallback text is fixed: **`GA1/01 — Main submitter unavailable`** when the submitter is
+  missing, archived or not readable by that role (never a guess, never the title); **`Resolution number assigned on
+  submission`** in a pre-submission preview that has no code yet.
+- Search matches the code with or without the slash and spaces (`ga1/01`, `ga1 / 01`, `ga1 01`) and the country,
+  case- and accent-insensitively; resolution lists also match status and outcome.
+- The identity replaces the title text only: status chips, latest Approval feedback and the working Doc link stay.

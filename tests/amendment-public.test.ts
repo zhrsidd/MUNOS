@@ -56,7 +56,8 @@ test('invalid token, absent service configuration and unexpected failures fail c
 });
 test('public form shows only supplied committee/delegate fields, exact confirmation and all amendment types', () => {
   const html = renderToStaticMarkup(createElement(AmendmentForm, { token, link }));
-  for (const text of ['GA1/01', 'International cooperation', 'France', 'Add', 'Strike', 'Replace', 'I confirm this is the exact wording I want submitted.']) assert.ok(html.includes(text));
+  for (const text of ['GA1/01', 'France', 'Add', 'Strike', 'Replace', 'I confirm this is the exact wording I want submitted.']) assert.ok(html.includes(text));
+  assert.ok(!html.includes('International cooperation'), 'the resolution title is no longer shown; the identity is the code and Main Submitter (docs/BRAND.md)');
   assert.ok(!html.includes('SUPABASE_SECRET_KEY'));
   const closed = renderToStaticMarkup(createElement(AmendmentForm, { token, link: { ...link, resolution: null } }));
   assert.ok(closed.includes('Amendments are not currently open in this committee.')); assert.ok(!closed.includes('<form'));

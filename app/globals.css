@@ -3419,6 +3419,16 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
   .felix-face, .felix-face.is-petting { animation: none !important; transform: none !important; }
 }
 
+/* Resolution identity: GA1/01 — France (docs/BRAND.md). The code never splits; a long country name wraps. */
+.resolution-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.resolution-identity-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.resolution-identity-submitter.unavailable { color: var(--ink-3); font-weight: 500; }
+.document-card h3, .print-job h3 { font-size: 15px; line-height: 1.4; color: var(--ink); font-weight: 650; overflow-wrap: anywhere; }
+.document-card > div { flex-wrap: wrap; }
+.review-title > div, .summary-row > div { min-width: 0; }
+.review-title h2, .procedure-context h2, .history-resolution, .submit-code { overflow-wrap: anywhere; }
+.submit-code { font-size: clamp(20px, 6vw, 30px); line-height: 1.25; }
+
 /* ---- Committee voting rules (Executive → Workflow): one padded card per committee inside the panel ---- */
 .panel > form.panel {
   padding: var(--space-4) var(--space-5);
