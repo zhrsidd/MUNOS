@@ -1,6 +1,6 @@
 # New DCMUN Supabase project: setup record
 
-Status 2026-10-21: **all 26 migrations applied (21 on 20 October, 5 on 21 October); test conference; development role.** The 21 October rollout is recorded in "Migrations 22 to 26" below; the app-level smoke test and signed-in browser checks for it are still to run. Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
+Status 2026-10-21: **all 26 migrations applied (21 on 20 October, 5 on 21 October) and verified (smoke test 15/15 and signed-in browser checks on an isolated TEST conference); development role.** The 21 October rollout is recorded in "Migrations 22 to 26" below. Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
 
 ## Identity
 
@@ -62,7 +62,19 @@ After applying:
   * Voting: an observed close with a stale or missing `ballotRevision` is refused (PT409); with the right revision and nobody present it is refused (22023); with a present delegate it closes `Closed/Passed/observed` with the declaring Chair recorded.
   * Afterwards: the document was still `Draft`, revision 1, 24 copies; no SIM rows; ledger 26.
 
-Not yet done: `npm run smoke:project` against the test conference and signed-in browser checks of scoring, photos, voting, Approval and Logistics. They need an Executive access code (`SMOKE_EXECUTIVE_CODE`); the one active Executive credential on the project is unknown to the connector session and the smoke test rotates it, so the owner chooses when to run it. Production (demo mode) is not redeployed until those pass.
+**App-level verification (isolated temporary TEST conference, same project).** The owner asked for the smoke test and browser checks to run without touching the existing Executive code, so a second conference row named "DCMUN Development Test" (venue marked temporary) was created in this project with its own short-lived Executive credential (bootstrapped by hash, scoped to that conference only). Results, run against a build of `main` at `542e705` with `NEXT_PUBLIC_DATA_BACKEND=supabase`:
+
+* **`npm run smoke:project`: 15/15** through the app's own client code (Executive and Chair redemption, idempotent replay, stale-edit conflict, role boundaries, submission link, Executive rotation).
+* **Signed-in browser checks (Chromium, real sign-in with access codes):**
+  * Executive: added a Chair and set the Chair's Photo school (saved, survives reload); Scoring: "7, 8" refused with "Main Submitter credit is one whole number from 1 to 20", "7" saved and survives reload; added a photo slot (Executive Group photos shows "TST · 2 + Chair").
+  * Chair photos: the Chair sees "2 delegates and Chair TEST Chair Alex from this committee should attend" (the Chair cannot read the staff table; this comes from the `photoChairs` projection). After Acknowledge the reminder stays quiet after reload; after the Executive cleared and then restored the school it reminded again (the clear/restore acknowledgement bug is fixed on the hosted database).
+  * Resolution lifecycle: the Chair's New resolution form has no title field; the draft shows as `TST/<8 hex> — France`; Approval inbox shows the country (not "Main submitter unavailable"); Logistics print queue shows 5 copies (2 delegates + 3) and the country; Printed; Chair opened debate.
+  * Scoring: a Main Submitter speech scored +2 gave France 9 points (+2 and the configured Main Submitter credit +7), saved and reloaded.
+  * Voting: Clear majority For opened a confirmation; restarting the ballot (Divide the House) withdrew it with "The ballot was restarted or changed since Clear majority was opened. Choose Clear majority again. Nothing was closed."; after returning to a normal vote the declaration closed the resolution as "Passed · observed majority" and the Executive overview shows "(observed majority, no counts)".
+  * No page errors in any session.
+* **Not exercised here:** the public submission page's server path (`/submit/<token>`) needs the server-only service key; it is covered by the PGlite and PostgreSQL 17 tests and by `scripts/verify-submission-http.mts`.
+* **Cleanup.** Afterwards only the temporary conference's credentials (4) and device grants (36) were revoked. The original test conference was not touched: its two active credentials (Executive and Chair), 8 active grants and its Draft document are as before, and the ledger is still 26 rows. The temporary conference's TEST records remain, labelled and with no active access.
+* **Finding (existing behaviour, not from this release):** a Chair-created draft in hosted mode is numbered `<committee> / <first 8 characters of the id>` (for example `TST/ca7640bb`), because the `newDocument` SQL builds the code that way; public submissions get sequential numbers (`TST / 01`). The identity display (`TST/ca7640bb — France`) is therefore correct but not sequential for Chair-created drafts. A reviewed change would be needed to number them sequentially.
 
 ## Verification against the live project
 
