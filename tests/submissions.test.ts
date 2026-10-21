@@ -103,7 +103,7 @@ test('before hydration the resolution form cannot submit natively, accept unsync
  assert.match(form,/method="post"/,'a native submission is never a GET reload');
  assert.doesNotMatch(form,/action=/,'no native action target');
  assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, title, link and checkbox cannot be edited before React state exists');
- assert.match(html,/<button class="button primary submit-button" disabled="">Loading form…<\/button>/,'submit (and Enter-key implicit submission) is blocked');
+ assert.match(html,/<button disabled="" type="submit" class="pending-button button primary submit-button"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Loading form…<\/button>/,'submit (and Enter-key implicit submission) is blocked');
  assert.doesNotMatch(html,/type="file"|Upload a file/,'Google Docs only: no file input or upload toggle');
  assert.match(html,/<p class="muted" role="status">If this form does not load, ask your Chair how to submit your resolution\.<\/p>/,'stalled hydration (JS on, never loads) still tells the delegate what to do');
  assert.match(html,/<noscript>.*This form needs JavaScript to submit\. Ask your Chair how to submit your resolution\..*<\/noscript>/,'JavaScript disabled is never a silent dead form');
@@ -112,7 +112,7 @@ test('after hydration the resolution form is enabled and unchanged',t=>{
  t.mock.method(React,'useSyncExternalStore',((_subscribe:unknown,getSnapshot:()=>unknown)=>getSnapshot()) as typeof React.useSyncExternalStore);
  const html=renderToStaticMarkup(createElement(SubmissionForm,{token,link:formLink}));
  assert.doesNotMatch(html,/<fieldset disabled/);
- assert.match(html,/<button class="button primary submit-button">Submit resolution<\/button>/);
+ assert.match(html,/<button type="submit" class="pending-button button primary submit-button"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Submit resolution<\/button>/);
  assert.doesNotMatch(html,/type="file"|Upload a file/,'no file path after hydration either');
  assert.match(html,/Files \(PDF or Word\) are not accepted/,'the instructions say so before the delegate starts');
  assert.doesNotMatch(html,/Loading form…|If this form does not load/);
