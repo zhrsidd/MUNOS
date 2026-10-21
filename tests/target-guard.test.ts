@@ -57,13 +57,22 @@ test('tools: only an explicitly listed staging or development project; never pro
  assert.equal(assertToolTarget(url(STAGE),env),STAGE);
 });
 
-test('targetProblem: PHESMUN production is always refused; Vercel Production must match; other environments pass',()=>{
+test('targetProblem: PHESMUN production is always refused; Vercel Production must match; Preview must be allow-listed and never production',()=>{
  assert.equal(targetProblem(url(PHESMUN_PRODUCTION_REF),{}),'forbidden project');
  assert.equal(targetProblem(url(PHESMUN_PRODUCTION_REF),{VERCEL_ENV:'preview'}),'forbidden project');
  assert.equal(targetProblem(url(PROD),{VERCEL_ENV:'production',EXPECTED_SUPABASE_REF:PROD}),null);
  assert.ok(targetProblem(url(DEV),{VERCEL_ENV:'production',EXPECTED_SUPABASE_REF:PROD}));
  assert.ok(targetProblem(url(PROD),{VERCEL_ENV:'production'}),'production without an expectation fails closed');
- assert.equal(targetProblem(url(DEV),{VERCEL_ENV:'preview'}),null);
+ // Audit F1: a Preview pointing at the production project used to pass, even with EXPECTED_SUPABASE_REF set.
+ assert.match(targetProblem(url(PROD),{VERCEL_ENV:'preview',EXPECTED_SUPABASE_REF:PROD})!,/preview deployment refused: .*production project/);
+ assert.match(targetProblem(url(DEV),{VERCEL_ENV:'preview'})!,/not listed/,'no allow-list: refused');
+ assert.equal(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE}),null);
+ assert.equal(targetProblem(url(DEV),{VERCEL_ENV:'development',DEVELOPMENT_SUPABASE_REFS:DEV}),null);
+ assert.match(targetProblem(url('unlistedunlistedunli'),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE})!,/not listed/);
+ assert.match(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE,EXPECTED_SUPABASE_REF:STAGE})!,/one role/,'contradictory roles refused');
+ // After cutover the ref leaves every allow-list, so a new Preview against it cannot build or reach it.
+ assert.ok(targetProblem(url(PROD),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE}));
+ // A local build is not a cloud deployment.
  assert.equal(targetProblem(url(DEV),{}),null);
  assert.ok(NEVER_SUPABASE_REFS.includes(PHESMUN_PRODUCTION_REF));
 });
@@ -82,4 +91,16 @@ test('health probe: a refused target reports down and contacts nothing; an allow
  calls=0;
  const local=await probe({NEXT_PUBLIC_DATA_BACKEND:'local'},fetcher);
  assert.equal(local.status,'ok');assert.equal(calls,0);
+});
+
+test('public QR backends refuse a project the deployment may not use',async()=>{
+ const {submissionBackend}=await import('../lib/submissions/backend');
+ const {amendmentBackend}=await import('../lib/amendments/backend');
+ const base={NEXT_PUBLIC_DATA_BACKEND:'supabase',SUPABASE_SECRET_KEY:'server-only-test-value'};
+ for(const env of [{...base,NEXT_PUBLIC_SUPABASE_URL:url(PROD),VERCEL_ENV:'preview',EXPECTED_SUPABASE_REF:PROD},{...base,NEXT_PUBLIC_SUPABASE_URL:url(DEV),VERCEL_ENV:'preview'},{...base,NEXT_PUBLIC_SUPABASE_URL:url(DEV),VERCEL_ENV:'production',EXPECTED_SUPABASE_REF:PROD}]){
+  assert.equal(submissionBackend(env),null,JSON.stringify(env));
+  assert.equal(amendmentBackend(env),null,JSON.stringify(env));
+ }
+ const allowed={...base,NEXT_PUBLIC_SUPABASE_URL:url(STAGE),VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE};
+ assert.ok(submissionBackend(allowed));assert.ok(amendmentBackend(allowed));
 });

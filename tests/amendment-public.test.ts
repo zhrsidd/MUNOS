@@ -56,7 +56,8 @@ test('invalid token, absent service configuration and unexpected failures fail c
 });
 test('public form shows only supplied committee/delegate fields, exact confirmation and all amendment types', () => {
   const html = renderToStaticMarkup(createElement(AmendmentForm, { token, link }));
-  for (const text of ['GA1/01', 'International cooperation', 'France', 'Add', 'Strike', 'Replace', 'I confirm this is the exact wording I want submitted.']) assert.ok(html.includes(text));
+  for (const text of ['GA1/01', 'France', 'Add', 'Strike', 'Replace', 'I confirm this is the exact wording I want submitted.']) assert.ok(html.includes(text));
+  assert.ok(!html.includes('International cooperation'), 'the resolution title is no longer shown; the identity is the code and Main Submitter (docs/BRAND.md)');
   assert.ok(!html.includes('SUPABASE_SECRET_KEY'));
   const closed = renderToStaticMarkup(createElement(AmendmentForm, { token, link: { ...link, resolution: null } }));
   assert.ok(closed.includes('Amendments are not currently open in this committee.')); assert.ok(!closed.includes('<form'));
@@ -69,7 +70,7 @@ test('before hydration the public form cannot submit natively, expose wording in
   assert.match(form, /method="post"/, 'a native submission can never be a GET carrying the wording in the URL');
   assert.doesNotMatch(form, /action=/, 'no native action target');
   assert.match(html, /<fieldset disabled=""/, 'fields cannot be edited and then lost before hydration');
-  assert.match(html, /<button class="primary" type="submit" disabled="">Loading form…<\/button>/, 'submit (and Enter-key implicit submission) is blocked');
+  assert.match(html, /<button disabled="" type="submit" class="pending-button primary"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Loading form…<\/button>/, 'submit (and Enter-key implicit submission) is blocked');
   assert.equal((html.match(/type="submit"/g) ?? []).length, 1, 'no other enabled submitter');
   assert.match(html, /<p class="muted" role="status">If this form does not load, ask your Chair how to submit your amendment\.<\/p>/, 'stalled hydration (JS on, never loads) still tells the delegate what to do');
   assert.match(html, /<noscript>.*This form needs JavaScript to submit\. Ask your Chair how to submit your amendment\..*<\/noscript>/, 'never a silent dead form');
@@ -78,7 +79,7 @@ test('after hydration the public form is enabled and submits as before', t => {
   t.mock.method(React, 'useSyncExternalStore', ((_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot()) as typeof React.useSyncExternalStore);
   const html = renderToStaticMarkup(createElement(AmendmentForm, { token, link }));
   assert.doesNotMatch(html, /<fieldset disabled/);
-  assert.match(html, /<button class="primary" type="submit">Submit amendment<\/button>/);
+  assert.match(html, /<button type="submit" class="pending-button primary"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Submit amendment<\/button>/);
   assert.doesNotMatch(html, /Loading form…/);
   assert.doesNotMatch(html, /If this form does not load/, 'the loading fallback disappears once hydrated');
 });

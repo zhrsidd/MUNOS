@@ -1,5 +1,6 @@
 import type { ConferenceData } from "./domain";
 import type { DecisionKind } from "./operations/types";
+import { resolutionIdentities, type ResolutionIdentity } from "./resolution-identity";
 
 export type HistoryKind = DecisionKind | "comment";
 export const decisionLabel: Record<HistoryKind, string> = {
@@ -14,7 +15,12 @@ export interface HistoryEntry {
   id: string;
   documentId: string;
   code: string;
-  title: string;
+  /**
+   * The shared resolution identity (`GA1/01 — France`). The submitter is read from this reader's own documents and
+   * delegates when the resolution is in view; otherwise it is the code with "Main submitter unavailable".
+   * The server projection's title is deliberately not carried: it is no longer a label.
+   */
+  identity: ResolutionIdentity;
   kind: HistoryKind;
   label: string;
   /** 0 for a legacy comment with no recorded decision. */
@@ -27,17 +33,20 @@ export interface HistoryEntry {
 }
 /** Decisions newest first (ties by id), for one resolution or all of them. */
 export function approvalHistory(data: ConferenceData, documentId?: string): HistoryEntry[] {
+  const identify = resolutionIdentities(data.delegates);
   const entries = new Map<string, HistoryEntry>();
   for (const x of data.documentDecisions ?? []) {
     if (documentId && x.documentId !== documentId) continue;
     const doc = data.documents.find((r) => r.id === x.documentId);
-    // The server projection carries code and title, so history survives the resolution leaving this reader's view.
+    // The server projection carries the code (and committee), so history survives the resolution leaving this reader's view.
+    // It has no submitter: the country comes from the reader's own documents and delegates, or reads "Main submitter unavailable".
     if (!doc && !x.code) continue;
+    const code = x.code ?? doc?.code ?? "";
     entries.set(x.id, {
       id: x.id,
       documentId: x.documentId,
-      code: x.code ?? doc?.code ?? "",
-      title: x.title ?? doc?.title ?? "",
+      code,
+      identity: identify({ code, submitterId: doc?.submitterId, committeeId: doc?.committeeId ?? x.committeeId }),
       kind: x.decision,
       label: decisionLabel[x.decision],
       round: x.decision === "comment" ? 0 : x.round,
@@ -54,7 +63,7 @@ export function approvalHistory(data: ConferenceData, documentId?: string): Hist
     for (const c of doc.comments) {
       const id = `comment-${c.id}`;
       if (linked.has(c.id) || entries.has(id)) continue;
-      entries.set(id, { id, documentId: doc.id, code: doc.code, title: doc.title, kind: "comment", label: decisionLabel.comment, round: 0, version: null, reviewer: "Approval Panel", at: c.createdAt, comment: c.text });
+      entries.set(id, { id, documentId: doc.id, code: doc.code, identity: identify(doc), kind: "comment", label: decisionLabel.comment, round: 0, version: null, reviewer: "Approval Panel", at: c.createdAt, comment: c.text });
     }
   }
   return [...entries.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.id < b.id ? 1 : -1));

@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { AMENDMENT_TOKEN, type AmendmentError, type AmendmentLinkInfo } from './rules';
 import { AmendmentRejected, type AmendmentBackend } from './service';
+import { targetProblem } from '../platform/target-guard';
 // Server route/page imports only. No browser Auth session and no staff/private data in responses.
 export function amendmentBackend(env: Record<string, string | undefined> = process.env): AmendmentBackend | null {
-  if (env.NEXT_PUBLIC_DATA_BACKEND !== 'supabase' || !env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY) return null;
+  // A project this deployment may not use (target guard) is treated as not configured.
+  if (env.NEXT_PUBLIC_DATA_BACKEND !== 'supabase' || !env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY || targetProblem(env.NEXT_PUBLIC_SUPABASE_URL, env)) return null;
   const client = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   return {
     async linkInfo(token) {

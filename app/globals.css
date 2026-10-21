@@ -1168,6 +1168,34 @@ label > select,
 label > textarea {
   margin-top: 8px;
 }
+/* Checkboxes and radios keep their native size beside their label text. The field rules above (full width, 40px
+   minimum height, padding) are for text-like controls; applied to a checkbox they made it a wide, tall empty box
+   (Executive → Workflow veto lists, Slot active, the confirmation boxes on the public forms). */
+input[type="checkbox"],
+input[type="radio"] {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--blue);
+}
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+label > input[type="checkbox"],
+label > input[type="radio"] {
+  margin-top: 0;
+}
 textarea {
   resize: vertical;
   line-height: 1.7;
@@ -2573,6 +2601,8 @@ color: var(--ink-3);
 .resolution-detail {
   display: grid;
   gap: var(--space-3);
+  /* The Approval "Your decision" panel follows directly: same gap as between panels. */
+  margin-bottom: var(--space-5);
 }
 .resolution-row {
   background: var(--surface);
@@ -2691,6 +2721,11 @@ color: var(--ink-3);
 .history-entry:first-child {
   border-top: 0;
   padding-top: 0;
+}
+/* A history list placed straight in a Panel (Approval Panel → History) runs edge to edge like the panel heading,
+   so its rows carry the heading's side padding, and the first row clears the heading's rule. */
+.panel > .history .history-entry {
+  padding: var(--space-3) 23px;
 }
 .history-line {
   display: flex;
@@ -3382,4 +3417,125 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
 }
 @media (prefers-reduced-motion: reduce) {
   .felix-face, .felix-face.is-petting { animation: none !important; transform: none !important; }
+}
+
+/* Watermelon-derived feedback patterns (MIT, see docs/WATERMELON_LICENSE.txt; selection in docs/WATERMELON_UI_SELECTION.md).
+   Motion budget: 120-180 ms, opacity/transform only, all of it removed under prefers-reduced-motion. */
+
+/* Copy button: the three labels share one grid cell, so the button always has the width of the longest. */
+.copy-labels { display: inline-grid; }
+.copy-labels > span {
+  grid-area: 1 / 1;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(2px);
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 150ms;
+}
+.copy-labels > span[data-active="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+/* Spinner: a 16 px ring in a slot the button always reserves, so showing it never changes the button width.
+   Browsers do not run the animation in a hidden tab; reduced motion keeps a static ring. */
+.spinner {
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  opacity: 0;
+}
+.spinner[data-active="true"] {
+  opacity: 1;
+  border-color: color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  animation: spinner-turn 0.8s linear infinite;
+}
+.pending-button { gap: var(--space-1); padding-inline-start: var(--space-2); }
+@keyframes spinner-turn { to { transform: rotate(360deg); } }
+
+/* Skeleton: decorative row-shaped placeholders for a genuine first read; same box as the rows they stand in for. */
+.skeleton-rows { display: grid; gap: var(--skeleton-row-gap, 12px); }
+.skeleton-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  height: var(--skeleton-row-height, 72px);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+.skeleton-line { display: block; height: 12px; border-radius: var(--radius-control); background: var(--sunken); }
+.skeleton-line[data-last="true"] { width: 60%; }
+@keyframes skeleton-pulse { 50% { opacity: 0.55; } }
+
+/* Continuous tabs: one indicator moved by transform. Without data-indicator="on" the per-tab underline above still works. */
+.tabs-inner { position: relative; }
+.tab-indicator { display: none; }
+.tabs[data-indicator="on"] .tab-indicator {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 3px;
+  background: var(--brand);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.tabs[data-indicator="on"] .tab-indicator[data-animate="true"] { transition: transform 150ms ease-out; }
+.tabs[data-indicator="on"] .tab.active,
+.tabs[data-indicator="on"] a.tab.active,
+.tabs[data-indicator="on"] .tab.active:hover,
+.tabs[data-indicator="on"] a.tab.active:hover { border-bottom-color: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-labels > span,
+  .tabs[data-indicator="on"] .tab-indicator[data-animate="true"] { transition: none; }
+  .spinner[data-active="true"] { animation: none; }
+  .skeleton-row { animation: none; }
+}
+
+/* Resolution identity: GA1/01 — France (docs/BRAND.md). The code never splits; a long country name wraps. */
+.resolution-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.resolution-identity-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.resolution-identity-submitter.unavailable { color: var(--ink-3); font-weight: 500; }
+.document-card h3, .print-job h3 { font-size: 15px; line-height: 1.4; color: var(--ink); font-weight: 650; overflow-wrap: anywhere; }
+.document-card > div { flex-wrap: wrap; }
+.review-title > div, .summary-row > div { min-width: 0; }
+.review-title h2, .procedure-context h2, .history-resolution, .submit-code { overflow-wrap: anywhere; }
+.submit-code { font-size: clamp(20px, 6vw, 30px); line-height: 1.25; }
+
+/* ---- Committee voting rules (Executive → Workflow): one padded card per committee inside the panel ---- */
+.panel > form.panel {
+  padding: var(--space-4) var(--space-5);
+}
+.panel > form.panel > h3 {
+  margin-bottom: var(--space-3);
+}
+.panel > form.panel > .muted {
+  margin: 0 0 var(--space-3);
+}
+/* The panel's own side margins for direct labels and buttons do not apply inside a padded card. */
+.panel > form.panel > label {
+  margin: 0 0 var(--space-2);
+}
+.panel > form.panel > button {
+  margin: 0;
+}
+.veto-delegations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0 var(--space-4);
+  margin: var(--space-2) 0 var(--space-3);
 }

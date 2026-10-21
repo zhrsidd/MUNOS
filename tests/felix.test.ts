@@ -172,12 +172,13 @@ test("knowledge entries are well formed and reachable from their own examples", 
 
 test("retired and unimplemented features are not described", () => {
   const knowledge = readFileSync("lib/felix/knowledge.ts", "utf8");
-  for (const retired of [/Award discussion/i, /Resources & Drive/i, /Drive mirror/i, /projector/i, /server timer/i, /\+ ?3 spares|plus \d+ spares|PRINT_SPARES/i, /Debated Amendment/i, /Clear majority/i]) {
+  for (const retired of [/Award discussion/i, /Resources & Drive/i, /Drive mirror/i, /projector/i, /server timer/i, /Debated Amendment/i, /Clear majority/i]) {
     assert.doesNotMatch(knowledge, retired, String(retired));
   }
-  // The print answer reads the stored copies; it never invents a delegates-plus-spares formula.
+  // The print answer totals the stored copies and states the approval-time rule (lib/print.ts, PR #43).
   const print = ask("how many copies", ctxFor("logistics", { documents: [doc("a", "Approved", "A", { copies: 24 }), doc("b", "Approved", "B", { copies: 30 })] }));
   assert.match(print.text, /54 copies in total/);
+  assert.match(print.text, /one per committee delegate plus 3 spares, counted when the resolution is approved/);
   assert.match(print.text, /number of copies shown on the job/);
   // New submissions are Google Docs only, shared with Anyone with the link → Editor.
   const share = ask("how should delegates share their doc").text;
@@ -193,11 +194,13 @@ test("Chair guidance uses the current session, roll call and debate state", () =
   const notCalled = chairCtx({ marked: 0, present: 0 });
   assert.match(buildReminders(notCalled)[0].text, /Roll call hasn’t started for Committee Session 1/);
   assert.match(ask("how do I take roll call", chairCtx({ marked: 12, present: 10 })).text, /12 of 20 delegations marked, 10 present/);
-  const debating = chairCtx({ inDebate: "Water security", speaking: true, queued: 3 }, { documents: [doc("r1", "In Debate", "Water security"), doc("r2", "Approved", "Clean air")] });
-  assert.match(situation(debating), /a speaker has the floor; 3 queued to speak; “Water security” is in debate/);
+  const delegates = [{ id: "d1", committeeId: "ga1", country: "France" }];
+  const debating = chairCtx({ inDebate: "r1 — France", speaking: true, queued: 3 }, { delegates, documents: [doc("r1", "In Debate", "Water security"), doc("r2", "Approved", "Clean air")] });
+  assert.match(situation(debating), /a speaker has the floor; 3 queued to speak; r1 — France is in debate/);
   const why = ask("why can't I debate this resolution", debating);
-  assert.match(why.text, /“Water security” is in debate now/);
-  assert.match(why.text, /“Clean air” is Approved/);
+  assert.match(why.text, /r1 — France is in debate now/);
+  assert.match(why.text, /r2 — France is Approved/);
+  assert.ok(!/Water security|Clean air/.test(why.text), "resolutions are named by code and Main Submitter, never title");
 });
 
 test("reminders are role-scoped, prioritised, short enough for popups and summarise large backlogs", () => {
@@ -207,7 +210,8 @@ test("reminders are role-scoped, prioritised, short enough for popups and summar
   assert.deepEqual(approval.map(r => r.kind), ["approval:submitted", "approval:review", "approval:approved"]);
   const logistics = buildReminders(ctxFor("logistics", { documents: docs, amendments }));
   assert.deepEqual(logistics.map(r => r.priority), ["action"]);
-  assert.match(logistics[0].text, /Resolution c/);
+  assert.match(logistics[0].text, /c — Main submitter unavailable/, "this context holds no delegates, so the code reads honestly");
+  assert.ok(!/Resolution c/.test(logistics[0].text), "the title is not the label");
   const admin = buildReminders(ctxFor("admin", { documents: docs, amendments }));
   assert.ok(admin.every(r => r.href === "/admin/resolution-status" && r.priority === "info"));
   const chair = buildReminders(chairCtx({}, { documents: docs, amendments }));
@@ -272,9 +276,11 @@ test("delegate submissions, access problems and changes requested become Chair r
   const kinds = reminders.map(r => r.kind);
   for (const kind of ["chair:submissions", "chair:access", "chair:changes"]) assert.ok(kinds.includes(kind), kind);
   assert.match(reminders.find(r => r.kind === "chair:access")!.text, /Anyone with the link → Editor/);
-  assert.match(reminders.find(r => r.kind === "chair:changes")!.text, /“Food security”.*Resubmit after editing/);
-  assert.ok(!reminders.find(r => r.kind === "chair:submissions")!.text.includes("Food security"), "a sent-back draft is not a new submission");
-  assert.ok(!reminders.some(r => r.kind === "chair:draft" && /Ocean plastics|Food security/.test(r.text)));
+  const changes = reminders.find(r => r.kind === "chair:changes")!.text;
+  assert.match(changes, new RegExp(`back — ${data.delegates.find(d => d.id === "d1")!.country}.*Resubmit after editing`));
+  assert.ok(!/Food security/.test(changes), "named by code and Main Submitter, not title");
+  assert.ok(!reminders.find(r => r.kind === "chair:submissions")!.text.includes("back —"), "a sent-back draft is not a new submission");
+  assert.ok(!reminders.some(r => r.kind === "chair:draft" && /sub1|sub2|back/.test(r.text)));
 });
 
 test("reminders are deduplicated with stable keys", () => {

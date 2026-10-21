@@ -1,4 +1,5 @@
 import {applyBatch,materializeCommitteeSessions} from './batch/commands';
+import { printCopies } from "./print";
 import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
@@ -346,6 +347,8 @@ export function applyCommand(
         );
       const previous = r.status;
       r.revision = (r.revision ?? 0) + 1;
+      // Every approval (including re-approval after changes) recounts copies from the committee roster.
+      if (c.status === "Approved") r.copies = printCopies(d, r.committeeId);
       if(c.status==='Closed' && c.outcome!=='Withdrawn') {
         const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
         const ballots=d.votes.filter(v=>v.sessionId===r.sessionId && v.resolutionId===r.id);

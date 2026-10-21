@@ -13,7 +13,7 @@ not yet released.
 - **Read-only.** Felix reads only what the workspace already loaded (`lib/felix/context.ts`) plus the same
   repository health store the sync strip uses. It never changes conference data, retries or discards changes.
 - **Immediate.** Replies are computed and shown at once: there is no typewriter effect, "thinking" delay or
-  simulated streaming.
+  simulated streaming. See "Typing speed" below for the measured comparison with Leo.
 - **Links are real destinations.** `safeLink` accepts only `/role` + a slug from `destinationSlugs(role)`
   (`lib/navigation.ts`); anything else is dropped, including stored links. Tests check every answer, reminder and
   example against the navigation and the app's route list.
@@ -79,20 +79,80 @@ content), downscaled from the 1254 px originals with Pillow LANCZOS to transpare
 `<img srcset>` so they work offline; `public/sw.js` precaches all twelve (cache `conference-os-0.2.8`).
 
 `lib/felix/motion.ts` adapts the supplied `felix-motion.js` controller: one 260 ms blink every 5.2–8.4 s, no
-bobbing; typing in the Felix composer cycles the beak and stops after 950 ms of quiet; hover/pointer movement or
+bobbing; typing in the Felix composer plays the gentle typing cycle below; hover/pointer movement or
 keyboard focus (`:focus-visible`) on the launcher plays the 1.12 s happy sequence with at most 5° tilt and 1.05
 scale, 1.25 s cooldown; touch only opens/closes. Reduced motion, the Animate Felix switch, a hidden tab, an
 offscreen launcher or frames that failed to decode hold the static idle face and cancel timers. Frames are fetched
 only after the launcher mounts and only while motion is allowed. Expressions never represent saving, syncing,
 errors or delivery: the sync strip does that.
 
+## Typing speed (21 October 2026)
+
+Owner requirement: Felix's typing is faster than Leo's without being irritating, for reply text and for the small
+typing expression. Leo's timings below were read from the earlier conference's `components/leo-helper.tsx` and
+`app/globals.css` (commit 73e337e).
+
+| | Leo (baseline) | Felix |
+| --- | --- | --- |
+| "Thinking" delay before a reply | 500 ms fixed `setTimeout`, with a bouncing-dots bubble (0.7 s loop) | none (0 ms) |
+| Reply reveal | typewriter, one character every 19 ms (about 53 characters/s), no cap; a 420-character answer took about 8 s plus the 500 ms delay; the link showed from the first character, but a new question was refused until the reveal finished, and the whole message list was one polite live region that was rewritten on every character | whole reply at once (0 ms); the link is part of the same paint |
+| Beak while Leo "talks" | two-frame swap every 240 ms (0.48 s loop, about 4 swaps/s) for the whole reveal | none while replying |
+| Expression while the person types | none | gentle typing cycle (below) |
+| Typing stops | when the reveal finished | 600 ms after the last keystroke |
+
+**Reply text: decision.** The requested target was about 80 characters/s with a 900 ms cap and never slower than
+Leo. Felix already shows every reply in full on the frame it is sent (measured 3–5 ms from click to the complete
+text and link, a single DOM insertion, in Chromium), which is inside the cap and faster than Leo, so **no typewriter
+is added**. Consequences, all deliberate:
+
+- *Show all* is unnecessary: the whole answer is already shown, so there is nothing to skip.
+- The *Animate Felix* switch (and system reduced motion) still cover "let the user disable animation" for the face;
+  there is no text animation to disable. Reduced motion shows replies immediately, as it always does.
+- The question and the whole reply, link included, enter the conversation log in one state update. The log is the
+  one polite live region (`role="log"`), so a finished reply is announced once and never per letter.
+- Nothing delays, staggers or gates a link or action. `tests/felix-motion.test.ts` fails if a timer, animation frame
+  or typewriter is introduced into `components/felix-helper.tsx`.
+
+If a longer or streamed reply is ever added, the owner's targets apply: about 80 characters/s, 900 ms total cap,
+first content immediately, links and actions usable at once, Show all offered, and one announcement of the complete
+reply.
+
+**Typing expression.** Constants live in one place, `MOTION` in `lib/felix/motion.ts`:
+
+| Constant | Value | Was | Meaning |
+| --- | --- | --- | --- |
+| `typingCycleMs` | 1100 ms | 1400 ms | one cycle; requested range 1.0–1.2 s |
+| `typingQuietMs` | 600 ms | 950 ms | settle this long after the last keystroke |
+
+One cycle: still idle face at 0 ms, the beak closes at 260 ms and reopens at 440 ms (a single beak change), one
+230 ms blink from 640 ms (the same half-blink, blink, half-blink shape as the idle blink), then rests open until 1100 ms.
+The earlier cycle closed the beak twice in 1.4 s; this one closes it once in 1.1 s, so the face moves less often even
+though the cycle is shorter. Rules:
+
+- The first keystroke in the Felix composer starts the cycle. Later keystrokes only move the inactivity deadline; the
+  cycle is never restarted, so the rhythm is steady however fast someone types. Only the Felix composer calls it:
+  no other page input animates.
+- It stops 600 ms after the last keystroke (even part-way through a cycle), immediately on Send, on a suggestion
+  click, on blur, when the panel closes or switches to the Inbox, and when Animate Felix is off, reduced motion is on,
+  the tab is hidden, the launcher is offscreen or frames failed to decode. It does not loop after an answer and the
+  launcher never moves.
+- Petting is separate: the same 1.12 s response with a 1.25 s cooldown, on hover or keyboard focus; clicking and
+  keys are never delayed and focus is never moved.
+- Every timer is cancelled on stop and on unmount; no sound.
+
+Verification: fake-clock tests in `tests/felix-motion.test.ts` assert the exact frame timeline, cycle length, one beak
+change and one blink per cycle, the 600 ms stop, no restart under continuous keystrokes, all stop conditions and
+timer cleanup. Chromium check against the demo build (43 keystrokes at about 105 ms): beak closes every 1100 ms
+(1101, 1100, 1100, 1100), one blink per cycle (1100 ms apart), the face returned to idle 600–601 ms after the last
+key (five runs), no frame change at all with reduced motion or Animate Felix off, panel and launcher faces in step.
+Not yet measured on a representative Chair device.
+
 ## Knowledge review (20 October 2026)
 
 Reviewed against the MUNOS code, not the source app:
 
 - **Removed:** Award discussion (now: awards are Chair judgement; Participation for reference), Resources & Drive,
-  automatic Debated Amendment credit (no such code in MUNOS), the delegates + spares print formula (MUNOS stores
-  a copy count per resolution; Felix says "print the number of copies shown on the job"), PDF/file submission for
+  automatic Debated Amendment credit (no such code in MUNOS), PDF/file submission for
   new resolutions, the projector/server timer (the speaker timer is local to the device), schools/import column
   details that could not be confirmed, every reference to the previous mascot, conference and attribution.
 - **Added or rewritten:** Google Docs-only submissions with "Anyone with the link → Editor" or a direct share to a
