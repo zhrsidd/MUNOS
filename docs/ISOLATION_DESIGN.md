@@ -74,10 +74,10 @@ Consequence: today nothing outside process configuration separates a Preview, a 
 
 **Proposal.**
 
-1. A JSON **register** with fields: `schema`, `seq` (monotonic), `issued_at`, `expires_at`, `signing_key_id`, and `refs`, a map from project ref to `{ class: "never" | "production" | "preproduction" , since, note }`. Refs are public identifiers (they appear in the URL), so the document holds no secret. PHESMUN's ref is `never`.
+1. A JSON **register** with fields: `schema`, `seq` (monotonic), `issued_at`, `expires_at`, `signing_key_id`, and `refs`, a map from project ref to `{ class: "never" | "production" | "evidence" | "preproduction" , since, note }`. Refs are public identifiers (they appear in the URL), so the document holds no secret. PHESMUN's ref is `never`.
 2. It is signed with an **owner-held offline Ed25519 key**. The matching public key (and a spare, to allow rotation) is pinned in the repository. Verifying needs no network and no database. The private key is never in CI, Vercel, a developer machine or an agent environment.
 3. A copy is committed in the repository (changed only by an owner-approved, reviewed commit) so builds and CI can verify without network access. Operator tools additionally fetch the latest signed copy from a second owner-controlled location (for example a release asset or a static file served by the Production site; D2 decides) and use whichever valid copy has the higher `seq`.
-4. **Decision rule for every destructive, load, fixture, reset or verification tool (fail closed):** proceed only if all hold: the register verifies against a pinned key; it is not expired (`expires_at`, proposed maximum age 24 hours; owner decides the exact value); the target ref is present with class `preproduction`; the ref is also in exactly one nonproduction allow-list in the environment (the existing `targetConfig` rules stay: one role per ref, no override flag, exact `https://<20 chars>.supabase.co`). A ref that is absent, `production`, `never`, malformed, or any read, parse or signature failure refuses. The environment allow-list can narrow, never widen.
+4. **Decision rule for every destructive, load, fixture, reset or verification tool (fail closed):** proceed only if all hold: the register verifies against a pinned key; it is not expired (`expires_at`, proposed maximum age 24 hours; owner decides the exact value); the target ref is present with class `preproduction` (class `evidence`, the production-classified synthetic state of D3, is refused by every destructive, load, fixture and reset tool); the ref is also in exactly one nonproduction allow-list in the environment (the existing `targetConfig` rules stay: one role per ref, no override flag, exact `https://<20 chars>.supabase.co`). A ref that is absent, `production`, `never`, malformed, or any read, parse or signature failure refuses. The environment allow-list can narrow, never widen.
 5. Tools refuse a register whose `seq` is lower than the highest the machine has recorded locally (best-effort rollback protection; it does not stop a deliberately fresh checkout, which is why L2 and the removal of credentials exist).
 6. At promotion the owner signs a new register with the ref as `production` **before** the database transition (section 10). Refusal then begins immediately and in the safe direction.
 
@@ -174,7 +174,7 @@ From F4 (to be completed by T1): `apply_conference_mutation`, `apply_operations_
 
 1. The client sends the user's **access token in an `Authorization: Bearer` header** (from `auth.getSession()`), never relying on cookies as the credential. This is the main CSRF control: a cross-site page cannot make the victim's browser attach it.
 2. The route validates the token server-side against Supabase Auth (`getClaims`/`getUser`, as `lib/supabase/server.ts` already anticipates), requires the `sub` and `session_id` claims, and requires that the token's `iss` matches the expected project. Whether Auth rejects an access token whose session was revoked is assumption A2 and is **not relied on** (the database floor and grant checks are).
-3. The route refuses to run unless its own process passes the existing `targetProblem` check **and** the verified register lists the ref as `production` (an additional software check, not the control).
+3. The route refuses to run unless its own process passes the existing `targetProblem` check **and** its **runtime policy** (section 8.1: `production`, `evidence` or `preproduction`) agrees with the verified register's class for the ref and with the key class it holds. The Production policy needs register class `production`; the preproduction and evidence policies exist only so the gateway can be rehearsed and are separately approved (D15). This is an additional software check, **not the control**: the control is the key class the database accepts.
 
 **CSRF.** Bearer-header authentication; a custom header and `Content-Type: application/json` (forces a CORS preflight); no `Access-Control-Allow-*` response headers (cross-origin requests are blocked by the browser); reject requests with `Sec-Fetch-Site: cross-site` and an unexpected `Origin` as defence in depth. These stop cross-site browser attacks and are **not** the isolation control. Cookie-only requests are rejected.
 
@@ -237,11 +237,36 @@ What does not follow: revoking a **session** or deleting a **user** does not by 
 
 ### 7.3 Wait-out rule (fallback, binding)
 
-Real-data entry does not open until **either** hosted evidence proves, with a pre-issued access token from a revoked session, denial on all of: a read RPC, a table read, a gateway write, a direct write attempt and a Realtime subscription; **or** the operator waits `max(hosted jwt_expiry as read at the time, the 3600 s local default) + margin` after refresh-token revocation (proposed margin 10 minutes; the owner may set a larger value). The waiting period and the `jwt_expiry` value are recorded with the cutover evidence. The wait-out is the default and is **not** replaced by an untested claim.
+Real-data entry does not open until **either** hosted evidence proves, with a pre-issued access token from a revoked session, denial on all of: a read RPC, a table read, a gateway write, a direct write attempt and a Realtime subscription; **or** the operator waits until a **bound on the latest possible expiry of every access token issued before revocation** has passed, plus a margin. The current `jwt_expiry` setting is not that bound: tokens already issued keep the lifetime they were issued with, so a setting later reduced (for example from 3 hours to 1 hour) does not shorten them. The Supabase documentation says an unexpired JWT can remain valid after its session is revoked ([server-side advanced guide](https://supabase.com/docs/guides/auth/server-side/advanced-guide)).
+
+Procedure: (1) stop all issuance and refresh first (revoke refresh tokens and sessions, disable sign-in paths) and record the instant `T_stop`; (2) establish `L_max`, the longest lifetime any pre-revocation token could have been issued with, from **actual `exp` evidence** (for example the largest `exp` seen in Auth logs or sessions) or, failing that, a **conservative historical bound**: the maximum `jwt_expiry` the project has had since creation, which the owner must be able to document from the dashboard and change history; (3) the earliest opening time is `T_stop + L_max + margin` (proposed margin 10 minutes; the owner may set a larger one). **If `L_max` cannot be established, real-data entry stays closed**; the local 3600 s default is not an acceptable substitute. `T_stop`, `L_max`, the evidence for it and the opening time are recorded with the cutover evidence. The wait-out is the default and is **not** replaced by an untested claim.
 
 ## 8. Gate 5: Preview, build and runtime fail-closed; health
 
 **Build.** `next.config.ts` keeps its current checks and adds: after the existing process checks, the register is loaded and verified from the committed copy. The build **fails** if: the register is missing, unverifiable or expired; the configured ref is `never` or `production` and `VERCEL_ENV` is not `production`; or `VERCEL_ENV=production` and the register does not mark the ref `production` with the expected `EXPECTED_SUPABASE_REF`. An old allow-list can no longer re-authorise a promoted ref because the register, not the environment, has the last word.
+
+### 8.1 Runtime policies and the complete guard/key matrix
+
+The gateway cannot be rehearsed if only a production-classified deployment may run it, so three runtime policies exist. A policy is set by owner-approved deployment configuration and baked into the build identity; it is a **software fail-closed guard, never proof** (6.2). The database's key-class check (5.3) is the control. Deployment types: **PROD** (Vercel Production, public), **APPR** (an owner-approved, protected deployment of the exact candidate, or a local run, that holds the nonproduction key for its policy), **PREVIEW** (any other Preview, branch, old or immutable deployment: no hosted values, no key, no policy). Builds additionally fail if `VERCEL_ENV=production` and the policy is not `production`, and if `VERCEL_ENV` is not `production` and the policy is `production`.
+
+| # | Deployment | Policy | Register class of ref | Marker phase | Key class presented | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | PROD | production | production | production | production | **allowed** |
+| 2 | PROD | production | preproduction or evidence | any | any | denied (build and runtime) |
+| 3 | PROD | production | production | not production (marker and register disagree, 5.5) | production | denied |
+| 4 | PROD | preproduction or evidence | any | any | any | denied (strict Production denial; build fails) |
+| 5 | APPR | preproduction | preproduction | preproduction | test | **allowed** (rehearsal, load, capacity) |
+| 6 | APPR | preproduction | preproduction | synthetic_locked or production | test | denied by the database (key class not accepted) |
+| 7 | APPR | evidence | evidence | synthetic_locked | evidence | **allowed** (production-classified synthetic positive controls) |
+| 8 | APPR | evidence | evidence | preproduction | evidence | denied (phase/register mismatch) |
+| 9 | APPR | evidence | evidence | synthetic_locked | test | denied (**Preview- or test-minted proof**) |
+| 10 | APPR | any nonproduction | production | any | any | denied |
+| 11 | APPR | any | any | production | test or evidence | denied (keys revoked at promotion) |
+| 12 | PREVIEW | none | any | any | none (no key, no gateway) | denied by software; direct RPC denied by the database after the direct-execute revocation |
+| 13 | PREVIEW with a copied `test` key | n/a | any | synthetic_locked or production | test | denied by the database; in `preproduction` it is accepted, which is why the `test` key lives only in APPR environments and is revoked on entering `synthetic_locked` |
+| 14 | any | any | any | any | production key but marker not production | denied |
+
+Key custody follows the matrix: the `test` key exists only in APPR preproduction configuration; the `evidence` key only in the single APPR evidence deployment or a local evidence run, created on entering `synthetic_locked`; the `production` key is created by a human at promotion and never earlier. Table rows 5 and 7 are the only positive paths before promotion, and every synthetic positive-write check (including submission and amendment credentials, T21) happens there.
 
 **Server runtime.** Every server route that can reach the project (gateway, submissions, amendments, health) runs the same check at request time, not only at build time, so a deployment configured at build for one state and later reclassified refuses without a rebuild. A refused request contacts nothing.
 
@@ -266,12 +291,12 @@ Each numbered step is a **separate approval** (owner, plus independent review fo
 
 **Build and rehearse (preproduction, synthetic data; destructive and load tests complete before step 5):**
 
-1. Owner decisions D1 to D14 (section 12) recorded.
+1. Owner decisions D1 to D15 (section 12) recorded.
 2. Register and tooling change (L1) merged: signed register, pinned keys, tool and build checks. No database change. Tested locally (T3 to T5).
 3. **Additive migration** (marker, transitions, key ring, token floor, `assert_write_allowed`, wrapper functions; phase `preproduction`; direct execute still granted so nothing existing breaks): reviewed, replayed from empty locally, applied once to the hosted project.
-4. Gateway route and `SupabaseTransport` change; the load/rehearsal harness (`scripts/rehearsal/*`, `scripts/load-test.mts`, `scripts/remote-*.mts`, which call RPCs directly today) is moved onto the gateway with a `test` key, so rehearsals exercise the real path. Re-run capacity at Small through the gateway (checklist 1.8).
+4. Gateway route and `SupabaseTransport` change, with the **preproduction** runtime policy (8.1 row 5) deployed only to separately approved APPR deployments; the load/rehearsal harness (`scripts/rehearsal/*`, `scripts/load-test.mts`, `scripts/remote-*.mts`, which call RPCs directly today) is moved onto the gateway with a `test` key, so rehearsals exercise the real path. Re-run capacity at Small through the gateway (checklist 1.8).
 5. Verify on **protected preproduction deployments** that every device and Preview that matters runs the gateway-capable bundle. Then a **second small migration** revokes direct execute on the gated functions. It is separate so it can be sequenced after adoption and so a rollback does not require re-editing an applied migration (re-granting would be a new forward migration).
-6. Enter `synthetic_locked` (human, `lifecycle.transition`), install an `evidence` key. Run the full evidence suite of section 11 (production-classified synthetic state). Do the guarded synthetic cleanup (lifecycle cutover step 2). If evidence fails, demote to `preproduction` (allowed only here), fix, repeat.
+6. Owner signs a register with the ref as class `evidence`; then enter `synthetic_locked` (human, `lifecycle.transition`), which revokes the `test` key; install the `evidence` key and deploy the **evidence** runtime policy to the single APPR evidence deployment (8.1 rows 7 to 9, 11). All load, capacity and destructive runs must already be complete. Run the full evidence suite of section 11 (production-classified synthetic state). Do the guarded synthetic cleanup (lifecycle cutover step 2). If evidence fails, demote to `preproduction` (allowed only here), fix, repeat.
 
 **Cutover (the lifecycle's formal cutover; writes paused):**
 
@@ -317,7 +342,9 @@ Each numbered step is a **separate approval** (owner, plus independent review fo
 | T18 | Tamper detection: marker changed out of band; register digest mismatch | gateway refuses writes and reports | yes (simulated) | yes, once, in `synthetic_locked` |
 | T19 | Health on a refused target | zero network calls, status `down` | yes (existing style) | yes |
 | T20 | Capacity through the gateway at Small (110 devices, 19 committees), including cost of the wrapper and floor checks | within the acceptance used for checklist 1.8 | no | yes (needs owner approval and spending; **not authorised here**) |
-| T21 | Submission and amendment routes with the old secret key after promotion | refused by the lock; new key works | yes | yes (human) |
+| T21 | Submission and amendment routes in `synthetic_locked`: the pre-lock secret key and `test`-class proof | refused by the lock; the **new** evidence-class credential works (synthetic positive write, before promotion) | yes | yes (agent-runnable, before promotion). After promotion a human only confirms the old key is refused, non-destructively. |
+| T23 | Runtime-policy matrix (8.1): every row, including a PROD build with policy `evidence`, an APPR deployment against a `production` register, a Preview with a copied `test` key in each phase, and marker/register disagreement | each row gives exactly the stated result; no row other than 1, 5 and 7 allows a write | yes (unit and wrapper tests) | rows 5 to 9 and 11 to 13 live in `preproduction` and `synthetic_locked`; rows 1 to 4 on the built Production configuration without writing |
+| T24 | Older long-lived token after the Auth lifetime setting was reduced (7.3) | the entry bound uses the older token's later expiry; entry stays closed if the bound is unknown | claims-based simulation | yes (A11) |
 | T22 | Production-classified positive control: legitimate staff write through the `evidence` gateway | accepted | yes | yes |
 
 **Evidence recording.** Dated results in `docs/VERIFICATION.md` (checklist 1.4.6), each naming the commit, the phase, the epoch and whether it ran locally or hosted. **Local results are never presented as hosted evidence.**
@@ -344,6 +371,7 @@ Each option has a recommendation. These are recommendations to review, **not dec
 | D12 | Gateway capacity and cost | measure first at Small; or pre-approve a spending ceiling | Measure first (T20). This document approves no spending. |
 | D13 | Incident break-glass for writes | (a) human-only direct SQL as the operator, logged; (b) none | (a), added to [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md); never a client flag or header. |
 | D14 | Ordering of cleanup versus evidence | clean up while `synthetic_locked` (section 10 step 6); or clean up while `preproduction` and enter `synthetic_locked` only for evidence | The first; it avoids a second demotion. |
+| D15 | Runtime policies for gateway rehearsal (8.1) | (a) separately approved `preproduction` and `evidence` policies and key classes as in 8.1; (b) rehearse the gateway only locally and in Production at cutover; (c) allow the gateway in any non-Production deployment with a `test` key | (a). (b) leaves capacity and positive controls unproved on the hosted project; (c) weakens Preview denial. Each approved APPR deployment is an owner approval, recorded. |
 
 **Assumptions to prove (hosted, not established):**
 
@@ -359,6 +387,7 @@ Each option has a recommendation. These are recommendations to review, **not dec
 | A8 | A PostgREST pre-request function can be configured on the hosted project and its per-request cost is acceptable. |
 | A9 | Realtime stops delivering to a revoked or below-floor token (or the wait-out covers it). |
 | A10 | `pgcrypto` HMAC and Vault are available on the hosted project (or an asymmetric verification extension for D5). |
+| A11 | The longest lifetime of any token already issued can be established from Auth logs/sessions or the dashboard history of `jwt_expiry`. |
 
 ## 13. What is NOT decided
 
@@ -367,7 +396,8 @@ Each option has a recommendation. These are recommendations to review, **not dec
 - Register hosting location, expiry value, signing-key custody and rotation (D2, D11).
 - Whether `synthetic_locked` exists (D3), key classes and counts, key rotation schedule.
 - The proof lifetime (60 seconds proposed), clock-skew tolerance and the token-floor policy for incidents.
-- The revocation enforcement point beyond the grant check (D7), the wait-out margin and the hosted `jwt_expiry`.
+- The revocation enforcement point beyond the grant check (D7), the wait-out margin, the hosted `jwt_expiry` and the historical maximum lifetime `L_max` (7.3).
+- Which deployments are approved as APPR, and the `preproduction`/`evidence` runtime policies (D15).
 - Whether reads are gated (D8), whether Production-issued sessions are required (D9), and the break-glass procedure (D13).
 - Gateway capacity, Vercel and Supabase cost, and whether Small compute is enough with the gateway (D12, T20).
 - Any change to RLS, committee scoping, outbox, mutation UUID or idempotency semantics: **none is proposed**.
