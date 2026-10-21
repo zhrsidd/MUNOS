@@ -3717,7 +3717,13 @@
     "memberOf": ""
    }
   ],
-  "customRoles": [],
+  "customRoles": [
+   "gw_owner",
+   "lifecycle_operator",
+   "lifecycle_owner",
+   "proto_agent",
+   "proto_nobody"
+  ],
   "version": "PostgreSQL 17",
   "probe": {
    "lines": [
@@ -7055,7 +7061,13 @@
     "memberOf": ""
    }
   ],
-  "customRoles": [],
+  "customRoles": [
+   "gw_owner",
+   "lifecycle_operator",
+   "lifecycle_owner",
+   "proto_agent",
+   "proto_nobody"
+  ],
   "version": "PostgreSQL 17",
   "probe": {
    "lines": [

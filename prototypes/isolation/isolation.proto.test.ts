@@ -12,7 +12,7 @@ const AUD='proto-ref-0123456789ab';
 const q=(v:string|null)=>v===null?'null':literal(v);
 const notes:string[]=[];
 const note=(s:string)=>{notes.push(s);console.log(`# NOTE ${s}`);};
-const codeOf=(o:Outcome)=>o.ok?'ok':o.code;
+const codeOf=(o:Outcome):string=>o.ok?'ok':String(o.code);
 
 interface Family{wrapper:string;fn:string;names:string[];typ:'user'|'server';sub?:string;single?:boolean;returns:boolean}
 const FAM={
@@ -32,7 +32,7 @@ test('isolation feasibility prototype on PostgreSQL 17',{skip:!url,timeout:90000
  const exec=randomUUID(),chair=randomUUID(),device=randomUUID(),outsider=randomUUID(),otherChair=randomUUID();
  const sid=(u:string)=>`session-${u.slice(0,8)}`;
  const user=(u:string,extra:Partial<Identity>={}):Identity=>({role:'authenticated',sub:u,sid:sid(u),...extra});
- let key:Key=newKey('test');
+ const key:Key=newKey('test');
  const state=async()=>JSON.parse(await db.sql(`select to_json(s) from (select phase,epoch,token_floor,register_seq,real_data_attested from lifecycle.project_state) s`)) as {phase:string;epoch:number;token_floor:number;register_seq:number;real_data_attested:boolean};
  const op=(sql:string,rows=false)=>db.as({role:'lifecycle_operator'},sql,rows);
  const fingerprint=()=>db.sql(`select (select count(*) from private.mutation_receipts)||'/'||(select count(*) from private.resolution_submissions)||'/'||(select count(*) from private.amendment_submissions)||'/'||(select count(*) from private.access_credentials)||'/'||(select count(*) from public.user_access)||'/'||(select count(*) from private.access_redemption_attempts)||'/'||(select count(*) from lifecycle.proof_uses)||'/'||(select count(*) from public.attendance)`);

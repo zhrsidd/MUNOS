@@ -18,7 +18,7 @@ Scope: functions and relations in schemas `public` and `private` (the only schem
 | service_role | false | false | true | false | - |
 | supabase_admin | true | true | true | false | - |
 
-Custom roles created by the migrations or the bootstrap beyond the list above: none.
+Custom roles created by the migrations or the bootstrap beyond the list above: gw_owner, lifecycle_operator, lifecycle_owner, proto_agent, proto_nobody.
 
 | Schema | owner | USAGE: anon / authenticated / service_role / authenticator / postgres | CREATE: anon / authenticated / service_role / authenticator / postgres |
 | --- | --- | --- | --- |
@@ -193,7 +193,7 @@ Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t
 | `public.participation_adjustments` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
 | `public.participation_corrections` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
 | `public.participation_events` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.participation_history` | view | postgres | NO | no | security_invoker=true | - | r | rawdDxt | - | rawdDxt |
+| `public.participation_history` | view | postgres | n/a | n/a | security_invoker=true | - | r | rawdDxt | - | rawdDxt |
 | `public.photo_acknowledgements` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
 | `public.photo_list_epochs` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
 | `public.photo_slots` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |

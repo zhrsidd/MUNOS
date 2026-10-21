@@ -28,7 +28,7 @@ function psql(db:string,sql:string,file?:string):string{
  if(r.status!==0)throw new Error(`psql failed (${file??'inline'}): ${r.stderr}`);
  return r.stdout.trim();
 }
-const json=<T>(db:string,sql:string):T=>JSON.parse(psql(db,sql)) as T;
+const json=<T,>(db:string,sql:string):T=>JSON.parse(psql(db,sql)) as T;
 
 const ROLES=['anon','authenticated','service_role','authenticator','postgres'] as const;
 const DATA_API=['anon','authenticated','service_role'] as const;
