@@ -65,7 +65,24 @@ insert into public.user_access(conference_id,user_id,role,committee_id,expires_a
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};
 commit;
 `;
-  return { conference, mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
+  return { conference, cleanup: cleanupSql(conference), mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
+}
+/**
+ * Safe cleanup for ONE fixture conference: revokes every grant and link scoped to that conference id and nothing else.
+ * It deletes no rows (audit, receipts and procedure history are append-only), so the labelled TEST data stays for review and
+ * is removed later by the cutover step in docs/DEPLOYMENT.md. Every statement is filtered by the conference id.
+ */
+export function cleanupSql(conference: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(conference)) throw Error("cleanupSql needs a conference UUID");
+  return `-- Revoke all access to the LOAD TEST conference ${conference} (and only that conference). Deletes nothing.
+begin;
+update public.user_access set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
+update public.submission_links set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
+update public.amendment_links set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
+update private.access_credentials set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
+commit;
+-- Verify (expect 0): select count(*) from public.user_access where conference_id='${conference}' and revoked_at is null;
+`;
 }
 /** The harness/probe `--fixture` file: ids only (committees, sessions, delegates); no users, tokens or secrets. */
 export function fixtureJson(f: ReturnType<typeof buildFixture>) {

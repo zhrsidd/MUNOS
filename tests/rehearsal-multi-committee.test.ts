@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildFixture,fixtureJson} from '../scripts/rehearsal/fixture';
+import {capacityGateLabel} from '../scripts/rehearsal/readiness';
+import {buildFixture,cleanupSql,fixtureJson} from '../scripts/rehearsal/fixture';
+import {checkFixtureConference} from '../scripts/rehearsal/guard';
 import {resolveChairMapping,identityModeOf,type ChairIdentity,type MultiCommitteeFile,type LegacyScopedFile} from '../scripts/rehearsal/identities';
 import {assignChair,assessReadiness,readinessVerdict,checkSingleLinkSubmissions,plannedSubmissions,DOCUMENTED_SUBMIT_FRACTION,MAX_SINGLE_LINK_SUBMISSIONS,RESOLUTION_LINK_LIMIT_PER_10_MIN,type ChairTraffic} from '../scripts/rehearsal/readiness';
 import {evaluate,report} from '../scripts/rehearsal/metrics';
@@ -206,4 +208,44 @@ test('a deliberately high submission fraction is refused before any traffic; no 
  assert.equal(plannedSubmissions(c2(150,0)),0);
  // The verdict still fails on any rate-limit response; the preflight keeps the capacity run from causing one.
  assert.equal(evaluate(report([{action:'submit',ms:100,outcome:'rate_limited'}]),0,0).pass,false);
+});
+
+test('fixture guard: a fixture may never name the configured conference; cleanup SQL revokes only the fixture conference',async()=>{
+ const live='0331ceb6-3fa8-4731-92cb-2b4c0316d0cb';
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live}).ok,true);
+ assert.equal(checkFixtureConference(live,{NEXT_PUBLIC_CONFERENCE_ID:live.toUpperCase()}).ok,false,'case-insensitive match');
+ assert.equal(checkFixtureConference(live,{NEXT_PUBLIC_CONFERENCE_ID:` ${live} `}).ok,false);
+ for(const bad of [undefined,'',null,'not-a-uuid',"x'; select 1; --"])assert.equal(checkFixtureConference(bad,{NEXT_PUBLIC_CONFERENCE_ID:live}).ok,false,String(bad));
+ // Fail closed: a valid fixture is refused when the protected conference cannot be established.
+ for(const config of [{},{NEXT_PUBLIC_CONFERENCE_ID:''},{NEXT_PUBLIC_CONFERENCE_ID:'   '},{NEXT_PUBLIC_CONFERENCE_ID:'your-conference-uuid'}])assert.equal(checkFixtureConference(conference,config).ok,false,JSON.stringify(config));
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:`${conference}`}).ok,false,'explicit protected registry');
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:'nope'}).ok,false,'malformed registry entry refuses');
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:' ,'}).ok,true,'blank registry entries are ignored');
+ assert.throws(()=>cleanupSql("x'; select 1; --"),/conference UUID/);
+ const f=multi();assert.equal(f.cleanup,cleanupSql(conference));
+ assert.doesNotMatch(f.cleanup,/\bdelete\b|\btruncate\b|\bdrop\b/i,'cleanup revokes, it never removes rows');
+ const {db,query,asOwner}=await freshDatabase();
+ try{
+  await asOwner();
+  const original='33333333-3333-4333-8333-333333333333';
+  const other=user('b1',9);
+  for(const u of [...chairUsers,support.approval,support.admins,support.executive,other])await query('insert into auth.users(id) values($1)',[u]);
+  await db.exec(f.sql);
+  await query("insert into public.conferences(id,name,venue,date) values($1,'Original','Real venue',current_date)",[original]);
+  await query("insert into public.user_access(conference_id,user_id,role,expires_at) values($1,$2,'admin',now()+interval '1 day')",[original,other]);
+  await db.exec(f.cleanup);
+  assert.equal((await query<{n:number}>('select count(*)::int n from public.user_access where conference_id=$1 and revoked_at is null',[conference]))[0].n,0,'every fixture grant revoked');
+  assert.equal((await query<{n:number}>('select count(*)::int n from public.user_access where conference_id=$1',[conference]))[0].n,N+3,'fixture grants kept for audit, not removed');
+  assert.equal((await query<{n:number}>('select count(*)::int n from public.user_access where conference_id=$1 and revoked_at is null',[original]))[0].n,1,'another conference is untouched');
+  assert.equal((await query<{n:number}>('select count(*)::int n from public.delegates where conference_id=$1',[conference]))[0].n,N*30,'no rows removed');
+ }finally{await db.close();}
+});
+
+test('capacity gate label follows the current 110-device gate, not the historical 50-staff gate',()=>{
+ assert.match(capacityGateLabel(110),/CURRENT capacity gate size \(110 devices/);
+ assert.match(capacityGateLabel(110),/READINESS RUN/);
+ assert.match(capacityGateLabel(100),/OPTIONAL STRESS/);
+ assert.match(capacityGateLabel(80),/BELOW the current 110-device gate/);
+ assert.match(capacityGateLabel(50),/BELOW the current 110-device gate/);
+ assert.match(capacityGateLabel(25),/smoke \/ warm-up only/);
 });

@@ -112,3 +112,12 @@ export function checkSingleLinkSubmissions(users: SimUser[], singleLink: boolean
     return { ok: false as const, planned, pageLoads, reason: `Single-link readiness run plans ${planned} submissions; maximum is ${MAX_SINGLE_LINK_SUBMISSIONS} to stay below the designed ${RESOLUTION_LINK_LIMIT_PER_10_MIN}/10min link limit. Lower --submit-fraction or use a separate rate-limit test.` };
   return { ok: true as const, planned, pageLoads, reason: "" };
 }
+
+/** The release gate this run's peak stage corresponds to (root AGENTS.md: 110 devices across 19 real committees). A multi-stage run is labelled by its LARGEST stage only. */
+export const GATE_STAFF_DEVICES = 110;
+export function capacityGateLabel(peakStaff: number) {
+  if (peakStaff >= GATE_STAFF_DEVICES) return `CURRENT capacity gate size (${GATE_STAFF_DEVICES} devices; it counts only if the report is also a READINESS RUN across all 19 committees)`;
+  if (peakStaff >= 100) return "OPTIONAL STRESS / HEADROOM (100 staff) — not a release requirement";
+  if (peakStaff >= 50) return "BELOW the current 110-device gate (historical 50-staff C2 comparison / ramp step)";
+  return "BELOW the 50-staff comparison (smoke / warm-up only)";
+}
