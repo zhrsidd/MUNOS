@@ -127,6 +127,12 @@ export interface Resolution {
   submitterCountry?: string | null;
   status: DocumentStatus;
   outcome?: "Passed" | "Failed" | "Withdrawn";
+  /** "observed": the Chair declared a clear majority; no country choices or totals were recorded. */
+  outcomeMethod?: "counted" | "observed";
+  declaredBy?: ID | null;
+  /** The declaring Chair's staff name, when the server could resolve one. */
+  declaredByName?: string | null;
+  declaredAt?: string | null;
   versionIds: ID[];
   copies: number;
   comments: { id: ID; text: string; authorId: ID; createdAt: string }[];

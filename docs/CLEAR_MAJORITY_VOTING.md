@@ -1,7 +1,35 @@
 # Clear-majority For / Against — Claude implementation brief
 
-Retained owner request, 20 October 2026. **Pending implementation.** This is a general voting convenience;
-existing committee procedures and veto rules remain authoritative.
+Retained owner request, 20 October 2026. **Implemented in draft PR #37** with migration
+`20261021110000_clear_majority` (**not applied**; needs independent review and owner approval). This is a
+general voting convenience; existing committee procedures and veto rules remain authoritative.
+
+## Implemented behavior (PR #37)
+
+- Eligible: a normal vote (not Divide the House), simple majority, substantive or procedural, except a
+  substantive vote in a veto-enabled committee. Elsewhere the actions explain why counted ballots are needed.
+- An observed close skips **only** named-ballot completeness and the counted-rule comparison. It still needs:
+  the ballot's session context (the command names the session the Chair confirmed; client and
+  `private.apply_mutation` refuse it unless it is the resolution's ballot session) and **at least one
+  delegation present** in that session (no attendance rows, or everyone Absent, is refused in client and SQL).
+- The Clear majority actions keep the counted close's session safeguard: disabled when the console's session
+  is not the ballot session or nobody is present; the confirmation names the ballot session; a session switch
+  (from any Chair device) cancels an open confirmation instead of closing against the wrong session.
+- The declaration is bound to the exact ballot it was opened on. Opening Clear majority captures the resolution's
+  document `revision`; restarting the ballot (Normal vote, Divide the House or the vote type) bumps that revision,
+  from this Chair device or another. The confirmation is then withdrawn with "restarted or changed since Clear
+  majority was opened... Nothing was closed" (Dismiss, then choose Clear majority again for the new ballot). The
+  close command carries `ballotRevision`, and it is enforced below the UI: the sync layer sends it as the expected
+  revision (not the one current at confirm time), the local handler refuses a mismatch, and
+  `private.apply_mutation` raises PT409 (a stale-write conflict, kept visible in the outbox) when `ballotRevision`
+  is missing, malformed or not the document's current revision. Any other change to the document while it is in
+  debate also invalidates an open declaration; opening it again takes one click.
+- Stored: `outcomeMethod='observed'`, the declaring Chair (`declaredBy`, plus `declaredByName` from the staff
+  directory when the account is linked) and `declaredAt`. The `documents_observed_declared` CHECK requires a
+  non-NULL Passed/Failed outcome, Chair and time for every observed row (written so NULL is false, not unknown).
+- History: Documents and the Executive resolution overview show "Clear majority declared by <Chair> · <time>
+  Qatar time. No country votes or totals recorded", plus "N earlier ballots kept, not counted" where the
+  reader can see ballots. An unlinked Chair reads as "the committee Chair"; no name is invented.
 
 ## Required behavior
 

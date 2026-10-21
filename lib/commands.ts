@@ -44,6 +44,13 @@ export type Command =
       status: DocumentStatus;
       comment?: string;
       outcome?: "Passed" | "Failed" | "Withdrawn";
+      /** Close with a declared clear majority instead of counted ballots. */
+      method?: "observed";
+      /** Observed close only: the ballot session the Chair confirmed. It must still be the resolution's session. */
+      sessionId?: string;
+      /** Observed close only: the document revision the Chair saw when opening the declaration. A restarted ballot
+       *  (this Chair or another) bumps the revision, so a stale declaration is refused as a conflict. */
+      ballotRevision?: number;
     }
   | { type: "version"; id: string; fileName: string; text: string }
   | {
@@ -346,10 +353,19 @@ export function applyCommand(
           "Close the current debate before opening another resolution.",
         );
       const previous = r.status;
+      const openedRevision = r.revision ?? 0;
       r.revision = (r.revision ?? 0) + 1;
       // Every approval (including re-approval after changes) recounts copies from the committee roster.
       if (c.status === "Approved") r.copies = printCopies(d, r.committeeId);
-      if(c.status==='Closed' && c.outcome!=='Withdrawn') {
+      if(c.method!==undefined && c.method!=='observed')throw Error('Unknown voting method.');
+      if(c.status==='Closed' && c.outcome!=='Withdrawn' && c.method==='observed') {
+        // Same order as private.apply_mutation. Ballot completeness and the counted rule are skipped; the ballot's
+        // session context and a nonzero eligible attendance are not.
+        if(c.outcome!=='Passed'&&c.outcome!=='Failed')throw Error('Choose Passed or Failed.');
+        if(c.ballotRevision!==openedRevision)throw Error(OBSERVED_STALE);
+        const problem=observedMajorityProblem(d,r.id) ?? observedContextProblem(d,r.id,c.sessionId);
+        if(problem)throw Error(problem);
+      } else if(c.status==='Closed' && c.outcome!=='Withdrawn') {
         const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
         const ballots=d.votes.filter(v=>v.sessionId===r.sessionId && v.resolutionId===r.id);
         if(!eligible.length || ballots.length!==eligible.length)throw Error('Record every eligible ballot before closing.');
@@ -359,6 +375,11 @@ export function applyCommand(
       r.status = c.status;
       r.outcome = c.outcome;
       if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
+      if(c.status === "Closed" && c.method === "observed" && c.outcome !== "Withdrawn") {
+        const declaredBy=metadata?.actorId ?? `${role}-demo`;
+        // The server records the Chair's staff name; locally only a demo staff id resolves to one.
+        Object.assign(r,{outcomeMethod:"observed",declaredBy,declaredByName:d.staff.find(s=>s.id===declaredBy)?.name ?? null,declaredAt:now});
+      }
       let commentId: string | null = null;
       if (c.comment) {
         commentId = nextId();
@@ -618,6 +639,32 @@ export function votingOutcome(data: ConferenceData, resolutionId: string): "Pass
  const yes=votes.filter(v=>v.choice==='For').length, no=votes.filter(v=>v.choice==='Against').length;
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
  return yes+no>0 && (rule==='two_thirds'?yes*3>=(yes+no)*2:yes>no)?'Passed':'Failed';
+}
+/** Shown when the ballot changed (restarted here or on another Chair device) after a declaration was opened. */
+export const OBSERVED_STALE='The ballot was restarted or changed since Clear majority was opened. Choose Clear majority again.';
+/** Why a clear (observed) majority cannot close this vote, or null. Mirrors private.apply_mutation: an observation
+ *  can only establish a simple-majority result in a normal vote where no veto could apply. */
+export function observedMajorityProblem(data:ConferenceData,resolutionId:string):string|null{
+ const r=data.documents.find(r=>r.id===resolutionId);if(!r)return 'Resolution not found.';
+ const committee=data.committees.find(c=>c.id===r.committeeId);
+ if(r.voteMode==='divide')return 'Divide the House needs a counted roll call.';
+ if((committee?.votingRule ?? data.conference.votingRule ?? 'simple_majority')!=='simple_majority')return 'A two-thirds vote needs counted ballots.';
+ if((r.voteType ?? 'substantive')==='substantive' && committee?.vetoEnabled)return 'Only counted ballots can show that no veto was cast.';
+ return null;
+}
+/** Why an observed close cannot be declared from a console on `sessionId`, or null. Mirrors private.apply_mutation:
+ *  the console must be on the ballot's session, and at least one delegation must be present in it. */
+export function observedContextProblem(data:ConferenceData,resolutionId:string,sessionId:string|null|undefined):string|null{
+ const r=data.documents.find(r=>r.id===resolutionId);if(!r)return 'Resolution not found.';
+ if(!sessionId || !r.sessionId || sessionId!==r.sessionId)return 'This ballot belongs to a different session. Select that session first.';
+ if(!data.attendance.some(a=>a.sessionId===r.sessionId&&a.status!=='Absent'))return 'No delegation is present in this ballot’s session. Take roll call first.';
+ return null;
+}
+/** How a declared (observed) result reads in history, or null for a counted or open vote. */
+export function observedDeclaration(data:ConferenceData,resolutionId:string):{by:string;at:string;keptBallots:number}|null{
+ const r=data.documents.find(r=>r.id===resolutionId);
+ if(!r||r.outcomeMethod!=='observed'||!r.declaredAt)return null;
+ return {by:r.declaredByName?.trim()||'the committee Chair',at:r.declaredAt,keptBallots:data.votes.filter(v=>v.resolutionId===r.id).length};
 }
 export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
  const r=data.documents.find(r=>r.id===resolutionId); if(!r)return []; if(r.status==="Closed")return r.vetoedBy??[];
