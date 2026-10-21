@@ -3430,7 +3430,27 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
 .pending-button { gap: var(--space-1); padding-inline-start: var(--space-2); }
 @keyframes spinner-turn { to { transform: rotate(360deg); } }
 
+/* Skeleton: decorative row-shaped placeholders for a genuine first read; same box as the rows they stand in for. */
+.skeleton-rows { display: grid; gap: var(--space-3); }
+.skeleton-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  height: var(--skeleton-row-height, 72px);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+.skeleton-line { display: block; height: 12px; border-radius: var(--radius-control); background: var(--sunken); }
+.skeleton-line[data-last="true"] { width: 60%; }
+@keyframes skeleton-pulse { 50% { opacity: 0.55; } }
+
 @media (prefers-reduced-motion: reduce) {
   .copy-labels > span { transition: none; }
   .spinner[data-active="true"] { animation: none; }
+  .skeleton-row { animation: none; }
 }

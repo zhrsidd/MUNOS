@@ -9,6 +9,7 @@ import { Chip, Empty, Panel } from '@/components/ui';
 import { GoogleDocButton } from '@/components/operations/resolution-links';
 import { CopyButton } from '@/components/copy-button';
 import { PendingButton } from '@/components/pending';
+import { SkeletonRows } from '@/components/skeleton';
 
 const time = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -65,7 +66,12 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
   return <Panel title="Passed amendments" action={<Chip tone="green">{groups.reduce((n, g) => n + g.amendments.length, 0)}</Chip>}>
     {status === 'error' && <p className="callout" role="alert">Older passed amendments could not be loaded. Showing those already on this device. <button type="button" onClick={retry}>Retry</button></p>}
     <div className="panel-body" style={{ display: 'grid', gap: '1.25rem' }}>
-    {!groups.length ? <Empty title={status === 'loading' ? 'Loading passed amendments…' : 'No passed amendments yet'} text="Amendments that pass stay here, grouped by resolution, after debate ends." /> :
+    {!groups.length ? (
+      // No data yet: a first uncached read shows placeholders; a failed read shows only the error above, never "No ... yet".
+      status === 'loading' ? <SkeletonRows label="Loading passed amendments…" rows={3} height={150} lines={3} /> :
+      status === 'error' ? null :
+      <Empty title="No passed amendments yet" text="Amendments that pass stay here, grouped by resolution, after debate ends." />
+    ) :
       groups.map(g => {
         const workingDoc = links.find(l => l.documentId === g.resolutionId)?.workingDocId ?? offline.context.workingDocs[g.resolutionId];
         const known = g.resolution ?? offline.context.resolutions[g.resolutionId];
