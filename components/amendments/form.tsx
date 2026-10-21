@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState, useSyncExternalStore } from 'react';
+import { PendingButton } from '@/components/pending';
 import { AMENDMENT_TYPES, MAX_CLAUSE, MAX_WORDING, amendmentMessages, type AmendmentLinkInfo, type AmendmentResponse } from '@/lib/amendments/rules';
 import { resolutionIdentity } from '@/lib/resolution-identity';
 import { ResolutionName } from '@/components/resolution-identity';
@@ -43,7 +44,7 @@ export function AmendmentForm({ token, link }: { token: string; link: AmendmentL
     </fieldset>
     {result && !result.ok && <p className="error" role="alert">{result.message}</p>}
     {attempted && <p className="muted">Your details are held unchanged for safe retry. If debate has moved on or you need to change them, check this reference with your Chair first: {submissionId}</p>}
-    <button className="primary" type="submit" disabled={sending || !hydrated}>{!hydrated ? 'Loading form…' : sending ? 'Submitting…' : attempted ? 'Retry same amendment' : 'Submit amendment'}</button>
+    <PendingButton className="primary" type="submit" disabled={sending || !hydrated} pending={sending} pendingLabel="Submitting your amendment…">{!hydrated ? 'Loading form…' : attempted ? 'Retry same amendment' : 'Submit amendment'}</PendingButton>
     {!hydrated && <p className="muted" role="status">If this form does not load, ask your Chair how to submit your amendment.</p>}
     <noscript><p className="error" role="alert">This form needs JavaScript to submit. Ask your Chair how to submit your amendment.</p></noscript>
   </form><p className="muted">No account or Google Doc required. Only your committee and current resolution are shown here.</p></section>;
