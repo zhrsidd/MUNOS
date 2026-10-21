@@ -347,13 +347,18 @@ All **Proposed** (hosted); the local equivalents are **Verified** (PGlite).
 
 ## 7. Revert: forward-only
 
-**Verified** (read): migrations are never edited after apply ([AGENTS.md](../AGENTS.md) protected area 3). Migration 27 is `create or replace function` patches plus one new helper, so it leaves no schema to undo; reverting means a **new forward migration** (28) that restores the previous function bodies. Documents numbered by migration 27 (`TST / 03`) stay valid and unique after a revert; a later public submission then uses the old `count(*) + 1` plus skip loop, which still avoids any code in use.
+**Verified** (read): migrations are never edited after apply ([AGENTS.md](../AGENTS.md) protected area 3). Migration 27 is `create or replace function` patches plus one new helper, so it leaves no schema to undo; reverting means a **new forward migration** (28) that restores the previous behaviour. Documents numbered by migration 27 (`TST / 03`) stay valid and unique after a revert.
 
-**Where the previous bodies are.** There is **no single repository file** that holds them, because both functions are rebuilt by successive `pg_get_functiondef` plus anchor patches. The header of the migration points at the git history of `20261006073442` and `20261006023111`; that is **stale**: `private.apply_mutation` was patched afterwards by `20261007104501_staff_schedule_amendments`, `20261009120000_procedure_usability` and `20261021110000_clear_majority`, and `public.submit_resolution` by `20261007104501_staff_schedule_amendments` (archived-committee guard), so those two files alone would restore an older behaviour, not the previous one. The authoritative previous bodies are therefore, in order of preference:
+**Where the previous bodies are.** There is **no single repository file** that holds them, because both functions are rebuilt by successive `pg_get_functiondef` plus anchor patches. The header of the migration points at the git history of `20261006073442` and `20261006023111`; that is **stale**: `private.apply_mutation` was patched afterwards by `20261007104501_staff_schedule_amendments`, `20261009120000_procedure_usability` and `20261021110000_clear_majority`, and `public.submit_resolution` by `20261007104501_staff_schedule_amendments` (archived-committee guard), so those two files alone would restore an older behaviour, not the previous one. The previous bodies are what a replay of migrations 1 to 26 produces, and what the pre-apply capture (3.2 C1b) saved from the hosted project.
 
-1. **The inverse patch (preferred, Verified locally).** A migration that applies the same anchor technique in reverse. It restored both functions to byte-identical definitions (equal `md5(pg_get_functiondef)`) after migration 27 on PGlite. Proposed content for `supabase/migrations/<timestamp>_revert_sequential_chair_numbering.sql`, which must be reviewed, replayed from empty locally, tested (create, public submit, replay) and then **kept unapplied**:
+**A literal restore of the previous `submit_resolution` is unsafe after the verification fixture (reproduced locally).** The previous public path pads with `lpad(n::text, 2, '0')`, which truncates: `lpad('102', 2, '0')` is `'10'`. Section 8 deliberately leaves a committee numbered `BND / 01` to `BND / 101`. With that post-test state in place and the previous body restored literally, a public submission computes `count(*) + 1 = 102`, formats it as `BND / 10`, finds it taken, increments, formats `BND / 10`, `BND / 10`, ... and never exits: in a local PGlite replay the call did not return within 60 seconds, holding the committee lock the whole time. The Chair path is unaffected after a revert (it returns to the 8-character hex suffix), which hides the problem until a public submission arrives.
+
+The revert therefore **keeps width-safe padding** in `submit_resolution` (`lpad(n::text, greatest(2, length(n::text)), '0')`, the same expression the helper uses) and restores everything else exactly. This is a deliberate, reviewed deviation from the previous body in that one expression; `apply_mutation` is restored exactly. The alternative of reconciling or deleting the synthetic boundary fixture before reverting is **not** used: deleting rows is outside the revoke-only cleanup of 8.5 and is not needed.
+
+Proposed content for `supabase/migrations/<timestamp>_revert_sequential_chair_numbering.sql`, to be reviewed, replayed from empty locally and then **kept unapplied**. It is the block that [`tests/sequential-chair-numbering-revert-db.test.ts`](../tests/sequential-chair-numbering-revert-db.test.ts) reads from this document and runs:
 
 ```sql
+-- REVERT-SQL
 create function pg_temp.patch_back(definition text, anchor text, replacement text, label text) returns text language plpgsql as $$
 begin if (length(definition)-length(replace(definition,anchor,'')))<>length(anchor) then raise exception '% changed; review before reverting',label; end if; return replace(definition,anchor,replacement); end $$;
 do $revert$ declare d text; begin
@@ -365,21 +370,26 @@ do $revert$ declare d text; begin
  d := pg_temp.patch_back(d, $q$ doc_code := private.next_resolution_code(link.conference_id, link.committee_id);
 $q$, $q$ select count(*) + 1 into n from public.documents where committee_id = link.committee_id;
  loop
-   doc_code := committee_code || ' / ' || lpad(n::text, 2, '0');
+   doc_code := committee_code || ' / ' || lpad(n::text, greatest(2, length(n::text)), '0');
    exit when not exists(select 1 from public.documents where conference_id = link.conference_id and code = doc_code);
    n := n + 1;
  end loop;
 $q$, 'submit_resolution revert anchor');
  execute d;
 end $revert$;
-drop function private.next_resolution_code(uuid, uuid);
 ```
 
-   The `drop function` line is optional (leaving the unused helper is harmless: no grants) and is a review decision. Its dependants are gone once both bodies are reverted; a `plpgsql` body does not record a dependency, so the drop must come **after** the two `execute d` statements. (The inverse patch itself, without the `drop`, is what was verified.)
-2. **The saved pre-apply text** (3.2 C1b) is the cross-check: after the revert, `md5(pg_get_functiondef(...))` of both functions must equal the hosted pre-apply `def_md5` values.
-3. **A full replay.** Replay migrations 1 to 26 from empty on local PostgreSQL 17 and capture `pg_get_functiondef` of both functions; this is what the previous bodies are, independent of any comment. Use it to review the revert migration.
+Optionally, as a **separate statement after** the block, `drop function private.next_resolution_code(uuid, uuid);`. Leaving the unused helper is harmless (no grants) and is a review decision; a `plpgsql` body records no dependency, so the drop must come after both bodies are rewritten.
 
-If the owner decides an incident needs the previous bodies **before** a reviewed migration exists, the saved text from 3.2 C1b may be run once by a human with an explicit owner instruction, and a ledger-backed migration recording the same change must follow immediately. That is a deliberate exception to "apply schema changes only through committed migrations" and is the owner's to grant, never an agent's.
+**What was verified locally (PGlite, PostgreSQL 18.3).**
+
+* With the proposed block replaced by a literal restore (`lpad(n::text, 2, '0')`): after the post-test state, a Chair create succeeded and the next public submission hung (killed at 60 s). With the width-safe block above: the same sequence returned `BND / 103` in 6 ms (Chair path produced a hex code, so `count(*)` was 102).
+* [`tests/sequential-chair-numbering-revert-db.test.ts`](../tests/sequential-chair-numbering-revert-db.test.ts) builds the post-test state (`BND / 01` to `BND / 101` across the Chair and public paths, and a `TST` committee with sequential codes, a gap and a legacy hex code), runs the revert block from this document, and checks: `apply_mutation` no longer calls the helper; a Chair create gets the legacy hex suffix; two public submissions return distinct three-digit numbers without hanging; `TST` public submissions skip every code in use; no duplicate codes; both functions keep their ACLs.
+* Earlier, with the pre-27 padding, the inverse patch of `apply_mutation` restored a byte-identical `pg_get_functiondef` (equal MD5) to the state after migration 26. `submit_resolution` after the width-safe revert is that same body except the one `lpad` expression.
+
+**Hosted cross-check after a revert (Proposed).** `md5(pg_get_functiondef(...))` of `private.apply_mutation` must equal its hosted pre-apply `def_md5` (3.2 C1). For `public.submit_resolution` it will **not** equal the pre-apply value; compare instead with the saved pre-apply text (3.2 C1b) after replacing `lpad(n::text, 2, '0')` by `lpad(n::text, greatest(2, length(n::text)), '0')`.
+
+If the owner decides an incident needs the previous behaviour **before** a reviewed migration exists, the saved text from 3.2 C1b may be run once by a human with an explicit owner instruction, **with the same width-safe change in `submit_resolution`** if any committee holds a number of 100 or more, and a ledger-backed migration recording the same change must follow immediately. That is a deliberate exception to "apply schema changes only through committed migrations" and is the owner's to grant, never an agent's.
 
 **Optional hygiene (does not affect this procedure):** the stale pointer in the migration header could be corrected in a comment-only change **before** the apply; it would change the file MD5 (A3) and need re-review, so the recommendation is to leave the file as reviewed and rely on this section.
 
