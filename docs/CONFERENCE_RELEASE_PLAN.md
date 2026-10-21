@@ -15,7 +15,8 @@ Original gates this plan does **not** satisfy:
 | Gate | Status under this plan |
 | --- | --- |
 | Lifecycle safeguard 6: server/database write boundary so that a Preview with a valid production session cannot write; production-only gateway/capability | **Not met.** Writes stay browser -> PostgREST RPC with the user's token |
-| Safeguard 2/3: server-enforced lifecycle marker and signed owner register usable without database access | **Not met** (existing env-based target guard only), unless the optional HD6 below is built |
+| Safeguard 2/3, part A: a **server-enforced lifecycle marker** (production lock) inaccessible to test roles | **Not met.** Only the optional HD6 could satisfy part A (marker, log, raise-only token floor), and it is not built or tested inside `has_access` |
+| Safeguard 2/3, part B: an **owner-controlled signed registry** usable without database access, with freshness proof (head attestation, promotion barrier) | **Not met and stays unmet** under this plan. HD6 does not build it; implementing HD6 does not close part B. Only the deferred register/attestation work (feasibility PR 7) would. What exists is the env-based target guard (HD9), which is not a signed or fresh registry |
 | Safeguard 4 (partly): tools fail closed on stale lifecycle checks | Only the existing guard: no authority, no freshness proof |
 | Gate evidence: Preview/direct-RPC denial on production-classified synthetic state; old cached bundle denial | **Not applicable / not met**: direct RPC remains the supported path |
 
@@ -31,7 +32,7 @@ The alternative is to keep every original gate and move the delivery date (secti
 4. **Old or Preview deployments** built before the change retain whatever keys they were built with; the only control is retiring them (Section 4, item 6).
 5. **Two reads remain direct** (snapshots, Realtime) as in the design (D8).
 6. **The anon sign-in plus access-code path** (`redeem_access_code`) stays directly callable by any anonymous session holding a valid code.
-7. **No tamper-evident lifecycle record** inside the database unless HD6 is built; a database owner-level role (dashboard, Management API, agent connector) can change anything, which is why agent access is revoked at cutover.
+7. **No tamper-evident lifecycle record** inside the database unless HD6 is built (HD6 gives the database-side marker and log only; it supplies no owner-signed registry or freshness control, so the registry gate stays unmet either way); a database owner-level role (dashboard, Management API, agent connector) can change anything, which is why agent access is revoked at cutover.
 
 ## 3. What must be true to ship
 
@@ -66,7 +67,7 @@ Effort is engineer-days of implementation, excluding independent review (about 1
 | HD3 | Revoke direct EXECUTE on the four `private.apply_*` from `authenticated` | **Not possible on the direct path**: `public.apply_*` are SECURITY INVOKER routers and need the caller to hold EXECUTE on them. Making the public routers DEFINER would change protected existing functions; not recommended here | n/a |
 | HD4 | Inventory generator as a CI/review check (`--check`) so grants drift (new function, new table, default ACL) shows up in review | Verified locally (generator runs and `--check` passes); CI wiring Proposed | 0.5 |
 | HD5 | Hosted read-only privilege audit (A14) using the same queries | Untested | 0.5 plus human access |
-| HD6 | Optional: server-side lifecycle marker and raise-only token floor enforced in the existing `has_access` check (no gateway, no proof). Gives a recorded phase, key-independent revocation of pre-promotion tokens and tamper-evident log. Modifies a protected, widely used function, so it needs the most review | Marker, log and floor logic Verified locally in the prototype; enforcement inside `has_access` and its performance not built or tested | 3.0 (not recommended unless the wait-out cannot be evidenced) |
+| HD6 | Optional: server-side lifecycle marker and raise-only token floor enforced in the existing `has_access` check (no gateway, no proof). Gives a recorded phase, key-independent revocation of pre-promotion tokens and tamper-evident log. Could satisfy only safeguard 2/3 part A (marker); it does NOT provide the signed registry or freshness controls (part B stays unmet). Modifies a protected, widely used function, so it needs the most review | Marker, log and floor logic Verified locally in the prototype; enforcement inside `has_access` and its performance not built or tested | 3.0 (not recommended unless the wait-out cannot be evidenced) |
 | HD7 | Secret handling: secret key only in Production runtime, removed from Preview/Development/CI/agent environments, rotated at cutover, never logged; verify no bundle contains it | Proposed (existing server-only pattern); human steps | 0.5 |
 | HD8 | Revocation proofs on synthetic state (grant revoke, expiry, floor/wait-out) across RPC, table read and Realtime | grant revocation Verified locally; hosted token behaviour Untested | 1.0 |
 | HD9 | Existing target guard (`lib/platform/target-guard.ts`): confirm exact ref, registry and deny-list configuration at promotion; owner-controlled copy of the production ref outside the database | partly Verified locally; no freshness authority | 0.5 |
@@ -90,7 +91,7 @@ Recommended minimum: HD1, HD4, HD5, HD7, HD8, HD9, HD10 (about 5.5 days) and HD2
 
 **Very tight, no promise.** There is one fix day (a Sunday), the rehearsal runs on the first Small day, an H3 failure leaves exactly one day, and the cutover, wait-out and data-entry start all sit inside 2 to 4 November. Hosted surprises (A14 ACLs, default privileges, Realtime after revocation) or an unapproved spend on 30 October remove the slack. The 2 November cutover is a target that this plan cannot promise; if a gate is not met the honest options are a smaller, owner-approved documented capacity or not entering real data on this project yet.
 
-**Optional variant: earlier freeze and earlier Small upgrade.** Freeze the release candidate on Tue 27 Oct, upgrade to Small about 27 to 28 Oct and run the S0-R3/HD3 block and rehearsals on 28 to 30 Oct, leaving 31 Oct to 1 Nov as a two-day fix/rerun window. Tradeoff: it moves the rehearsal ahead of the weekend and gives more recovery time, but the Small window grows by about 4 days (about 12 days instead of 8, extra cost not approved), it needs its own written approval and cost decision, it shortens the time to finish reviews of HD1/HD2/HD10 and the hosted audit, and it contradicts the owner's proposed dates, so it should be chosen only deliberately. It also records the earlier placeholders the load plan marks as superseded (24 to 26 Oct upgrade, 27 to 29 Oct load).
+**Optional variant: earlier freeze and earlier Small upgrade.** Freeze the release candidate on Tue 27 Oct, upgrade to Small about 27 to 28 Oct and run the S0-R3/H3 block and rehearsals on 28 to 30 Oct, leaving 31 Oct to 1 Nov as a two-day fix/rerun window. Tradeoff: it moves the rehearsal ahead of the weekend and gives more recovery time, but the Small window grows by about 4 days (about 12 days instead of 8, extra cost not approved), it needs its own written approval and cost decision, it shortens the time to finish reviews of HD1/HD2/HD10 and the hosted audit, and it contradicts the owner's proposed dates, so it should be chosen only deliberately. It also records the earlier placeholders the load plan marks as superseded (24 to 26 Oct upgrade, 27 to 29 Oct load).
 
 ### What must be finished by when for a 2 November cutover to be possible
 
@@ -112,7 +113,7 @@ Recommended minimum: HD1, HD4, HD5, HD7, HD8, HD9, HD10 (about 5.5 days) and HD2
 1. The lifecycle scope change in section 1 (deferring the gateway and attestation gates), in writing, with the residual risk in section 2 accepted.
 2. Small compute and spending for the load and rehearsal window; the exact workload and stop authority.
 3. Which hosted human actions are performed, by whom (privilege audit, ledger reconciliation, migrations HD1/HD2, credential rotation, Preview retirement, agent disconnect).
-4. Whether HD2 and HD6 are wanted.
+4. Whether HD2 and HD6 are wanted (HD6 would address only the marker part of safeguard 2/3, not the registry/freshness part).
 5. John Paul Ribeiru's release approval for the exact SHA after the evidence is in.
 
 ## 7. What changes in documents
