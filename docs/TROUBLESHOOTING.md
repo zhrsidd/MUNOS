@@ -80,7 +80,7 @@ Conference OS stores only the Google Doc id and never calls Google; it cannot se
 
 ## Group-photo reminders
 
-Derived on each device from slot times and the **device clock** every 15 seconds; no server push. Wrong time on a laptop = wrong reminder timing (time zone doesn't matter, the clock does). A changed slot (time/place) re-alerts chairs who had acknowledged. Executive sees acknowledgements per committee (✓ warned, ✓✓ sent).
+Derived on each device from slot times and the **device clock** every 15 seconds; no server push. Wrong time on a laptop = wrong reminder timing (time zone doesn't matter, the clock does). A changed slot (time/place), or a change to which of the committee's Chairs are in the photo, re-alerts chairs who had acknowledged. Executive sees acknowledgements per committee (✓ warned, ✓✓ sent).
 
 ## Offline shell
 
