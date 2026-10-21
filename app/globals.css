@@ -2692,6 +2692,11 @@ color: var(--ink-3);
   border-top: 0;
   padding-top: 0;
 }
+/* A history list placed straight in a Panel (Approval Panel → History) runs edge to edge like the panel heading,
+   so its rows carry the heading's side padding, and the first row clears the heading's rule. */
+.panel > .history .history-entry {
+  padding: var(--space-3) 23px;
+}
 .history-line {
   display: flex;
   flex-wrap: wrap;
