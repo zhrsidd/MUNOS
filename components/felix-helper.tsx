@@ -13,6 +13,7 @@ import { InboxStore, isNewSince, markPopped, markRead, mergeInbox, nextPopup, un
 import { MAX_MESSAGES, MOTION_KEY, felixStorageKeys, parseMotionPreference, parseStoredChat, type StoredMessage } from "@/lib/felix/storage";
 import { FELIX_FRAMES, FelixMotion, felixFrameSrc, felixFrameSrcSet } from "@/lib/felix/motion";
 import { useClock } from "./operations/photo-reminders";
+import { FelixReveal } from "./felix-reveal";
 
 const roleNames: Record<Role, string> = { chair: "Chair", approval: "Approval Panel", logistics: "Admins", admin: "Executive" };
 const suggestions: Record<Role, string[]> = {
@@ -103,6 +104,8 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
   const [input, setInput] = useState("");
   // Felix mounts only after the conference data has loaded on the client, so browser storage is readable here.
   const [messages, setMessages] = useState<StoredMessage[]>(() => parseStoredChat(readStorage(keys.chat), role));
+  // The reply being typed out right now (this visit only; stored history is always shown whole).
+  const [typingId, setTypingId] = useState<number | null>(null);
   const [store] = useState(() => new InboxStore(keys.inbox, role, browserStorage()));
   const inbox = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   // When the Inbox view was opened in this visit: entries first shown since then are labelled New.
@@ -130,8 +133,10 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
     (view === "inbox" ? inboxHeadingRef.current : inputRef.current)?.focus();
   }, [open, view]);
 
+  const finishTyping = useCallback(() => setTypingId(null), []);
   const showInbox = useCallback(() => {
     motion.stopTyping();
+    setTypingId(null);
     const at = new Date().toISOString();
     setInboxOpenedAt(at);
     store.update(entries => markRead(entries, at));
@@ -144,6 +149,7 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
   }
   function close(returnFocus: boolean) {
     motion.stopTyping();
+    setTypingId(null);
     setOpen(false);
     setInboxOpenedAt(null);
     if (returnFocus) launcherRef.current?.focus();
@@ -161,8 +167,12 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
     const clean = text.trim();
     if (!clean) return;
     motion.stopTyping();
-    // Replies are computed locally and shown at once: no artificial delay, no simulated typing.
+    // Replies are computed locally with no delay, then typed out at REVEAL_CHARS_PER_SECOND. With animation off or
+    // reduced motion they appear whole. The link and the Show all button are usable from the first character.
     const reply = answerQuestion(clean, ctx, reminders);
+    const animate = motionOn && !systemReduced;
+    const nextId = messages.reduce((highest, message) => Math.max(highest, message.id + 1), 0) + 1;
+    setTypingId(animate ? nextId : null);
     setMessages(old => {
       const id = old.reduce((highest, message) => Math.max(highest, message.id + 1), 0);
       return [...old, { id, from: "you" as const, text: clean }, { id: id + 1, from: "felix" as const, text: reply.text, ...(reply.href ? { href: reply.href, linkLabel: reply.linkLabel ?? "Open" } : {}) }].slice(-MAX_MESSAGES);
@@ -219,7 +229,8 @@ export function FelixHelper({ role, committeeId, committeeCode, sessionName }: {
                 {messages.map(message => (
                   <div key={message.id} className={`felix-message ${message.from === "you" ? "felix-from-you" : "felix-from-felix"}`}>
                     <span className="sr-only">{message.from === "you" ? "You: " : "Felix: "}</span>
-                    {message.text}
+                    {message.id === typingId ? <FelixReveal text={message.text} onDone={finishTyping} /> : message.text}
+                    {message.id === typingId && <button type="button" className="felix-show-all" onClick={() => { finishTyping(); inputRef.current?.focus(); }}>Show all</button>}
                     {message.href && <Link href={message.href} onClick={() => close(false)}>{message.linkLabel} →</Link>}
                   </div>
                 ))}

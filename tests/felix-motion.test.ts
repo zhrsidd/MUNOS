@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { FELIX_ASSETS, FELIX_FRAMES, FelixMotion, MOTION, felixFrameSrcSet, type Clock } from "../lib/felix/motion";
+import { REVEAL_CHARS_PER_SECOND, revealDurationMs, revealedCount } from "../lib/felix/reveal";
 
 /** A manual clock: timers run only when the test advances time. */
 function fakeClock(random = 0.5) {
@@ -230,12 +231,27 @@ test("the launcher is a labelled 48 px face in a button, mounted for every works
   assert.doesNotMatch(workspace, /role === "chair" && <FelixHelper/, "not limited to one workspace");
 });
 
-test("replies are instant: no typewriter, thinking delay or staggering, and each reply is one live-region addition", () => {
+test("replies type out at 60 characters per second, announced once, with Show all and no delay before the first character", () => {
   const helper = readFileSync("components/felix-helper.tsx", "utf8");
-  assert.doesNotMatch(helper, /setTimeout|setInterval|requestAnimationFrame|typewriter|thinking/i, "nothing delays or paces reply text or links");
-  // The question and the whole reply (text and link together) enter the log in one state update, so the polite
-  // log announces the finished reply once, never per letter.
+  const reveal = readFileSync("components/felix-reveal.tsx", "utf8");
+  assert.equal(REVEAL_CHARS_PER_SECOND, 60);
+  assert.equal(revealedCount(0, 400), 0);
+  assert.equal(revealedCount(500, 400), 30);
+  assert.equal(revealedCount(1000, 400), 60);
+  assert.equal(revealedCount(100_000, 400), 400, "never past the end");
+  assert.equal(revealedCount(-5, 400), 0);
+  assert.equal(revealDurationMs(60), 1000);
+  // Pacing lives in the reveal component only; the helper has no timers of its own.
+  assert.doesNotMatch(helper, /setTimeout|setInterval|requestAnimationFrame|thinking/i);
+  assert.match(reveal, /revealedCount\(Date\.now\(\) - start/);
+  // Animation off or reduced motion shows the whole reply at once.
+  assert.match(helper, /const animate = motionOn && !systemReduced/);
+  assert.match(helper, /setTypingId\(animate \? nextId : null\)/);
+  // The question and the whole reply (text and link together) still enter the log in one state update, the typed copy is
+  // hidden from assistive technology and a hidden copy holds the full text, so the polite log announces it once.
   assert.match(helper, /setMessages\(old => \{[\s\S]*from: "you"[\s\S]*from: "felix" as const, text: reply\.text[\s\S]*href: reply\.href/);
+  assert.match(reveal, /<span className="sr-only">\{text\}<\/span>[\s\S]*aria-hidden="true"/);
+  assert.match(helper, /Show all/);
   assert.match(helper, /role="log" aria-live="polite"/);
   assert.equal((helper.match(/aria-live=/g) ?? []).length, 2, "the popup region and the conversation log are the only live regions");
 });
