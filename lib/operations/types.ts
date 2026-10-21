@@ -35,12 +35,32 @@ export interface PhotoSlot {
   /** Increments on every change; acknowledgements of an older revision no longer silence reminders. */
   revision: number;
 }
+/** A Chair with a school, one row per assigned committee: the only staff data a Chair device receives. */
+export interface PhotoChair {
+  staffId: string;
+  name: string;
+  committeeId: string;
+  schoolId: string;
+}
 export interface PhotoAck {
   slotId: string;
   committeeId: string;
   stage: "warning" | "due";
   revision: number;
+  /** The committee's Chairs in that photo when acknowledged (photoChairsVersion). Absent or "" means no Chairs. */
+  chairs?: string;
+  /** The committee's participant-list epoch (PhotoEpoch) when acknowledged. Absent means 0. */
+  epoch?: number;
   at: string;
+}
+/** Advances every time a Chair is added to, removed from or changed within the Chair list of one committee's
+ *  photo for one school (school, committee or role change). Absent means 0. An acknowledgement silences a
+ *  reminder only at the epoch it was given at, so a list that changes and later returns to an earlier state
+ *  can never reuse an earlier acknowledgement. */
+export interface PhotoEpoch {
+  committeeId: string;
+  schoolId: string;
+  epoch: number;
 }
 /** A Chair's traceable change to a delegate's total. Signed: a deduction is negative, a restore is positive. */
 export interface PointAdjustment {
@@ -64,6 +84,8 @@ export interface DocumentDecision {
   committeeId?: string;
   code?: string;
   title?: string;
+  /** The Main Submitter's country, published by private.decision_history so history still resolves `GA1/01 — France` after the resolution leaves this reader's view. */
+  submitterCountry?: string | null;
   /** The feedback text linked to this decision; null for a comment-free decision. */
   comment?: string | null;
   /** "comment" is a note written before decisions were recorded (no known decision). */
@@ -83,4 +105,6 @@ export interface OperationsData {
   resolutionLinks?: ResolutionLink[];
   photoSlots?: PhotoSlot[];
   photoAcks?: PhotoAck[];
+  photoChairs?: PhotoChair[];
+  photoEpochs?: PhotoEpoch[];
 }

@@ -5,9 +5,10 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {applyCommand,type Command} from '../lib/commands';
 import {createSeed} from '../lib/seed';
 import type {ConferenceData,Role} from '../lib/domain';
-import {conferenceScoring,effectiveScoring,isConfigurableScoring,REQUIRED_SCORING,scoringProblem,scoringValues} from '../lib/scoring';
+import {conferenceScoring,effectiveScoring,REQUIRED_SCORING,scoringProblem,scoringValues} from '../lib/scoring';
 import {countryCode,countryFlag,UNKNOWN_FLAG} from '../lib/countries';
 import {validateImport} from '../lib/import';
+import {speechScoreCommand} from '../lib/procedure/commands';
 import {activeAmendment,activePoi,amendmentFloorTaken,eventAmendmentId,nextPoi,nextSpeaker} from '../lib/procedure/view';
 import {committeePhotoReminders} from '../lib/operations/photo-reminders';
 import {PhotoAlert} from '../components/operations/photo-reminders';
@@ -19,11 +20,11 @@ const blank=()=>{const d=createSeed();d.scoring=[];d.events=[];return d;};
 // ---------------------------------------------------------------- 1. Scoring
 test('blank conference: required procedure scoring exists with defaults and can be established',()=>{
  const t=runner(blank());
- assert.deepEqual(conferenceScoring(t.d).map(s=>[s.id,s.values]),[['speech',[1,2,3]],['poi',[1,2]],['submitter',[5]]]);
+ assert.deepEqual(conferenceScoring(t.d).map(s=>[s.id,s.values]),[['speech',[1,2,3]],['poi',[1,2]],['submitter',[5]],['amendment',[3]]]);
  assert.deepEqual(scoringValues(t.d,'ga1','speech'),[1,2,3],'Chairs can score before an Executive saves anything');
- for(const r of REQUIRED_SCORING.filter(r=>isConfigurableScoring(r.id)))t.run({type:'scoring',id:r.id,values:[...r.values]},'admin');
- assert.deepEqual(t.d.scoring.map(s=>[s.id,s.label,s.values]),[['speech','Speech',[1,2,3]],['poi','POI',[1,2]]]);
- assert.throws(()=>t.run({type:'scoring',id:'submitter',values:[5]},'admin'),/fixed at \+5/,'Main Submitter is locked');
+ for(const r of REQUIRED_SCORING)t.run({type:'scoring',id:r.id,values:[...r.values]},'admin');
+ assert.deepEqual(t.d.scoring.map(s=>[s.id,s.label,s.values]),[['speech','Speech',[1,2,3]],['poi','POI',[1,2]],['submitter','Main Submitter',[5]],['amendment','Debated amendment',[3]]]);
+ assert.throws(()=>t.run({type:'scoring',id:'submitter',values:[5,7]},'admin'),/one whole number/,'Main Submitter takes one value');
  assert.throws(()=>t.run({type:'scoring',id:'made-up',values:[1]},'admin'),/Unknown scoring category/);
 });
 test('configured Speech values drive the Chair console and are enforced',()=>{
@@ -55,28 +56,39 @@ test('a committee override replaces only its own category; other committees keep
  assert.deepEqual(scoringValues(t.d,'ecosoc','speech'),[1,2],'conference default elsewhere');
  assert.deepEqual(scoringValues(t.d,'ga1','poi'),[1,2],'other categories still inherit');
  assert.deepEqual(t.d.committees.find(c=>c.id==='ga1')!.scoringOverrides!.map(s=>s.id),['speech']);
- assert.deepEqual(effectiveScoring(t.d,'ga1').map(s=>s.id),['speech','poi','submitter']);
+ assert.deepEqual(effectiveScoring(t.d,'ga1').map(s=>s.id),['speech','poi','submitter','amendment']);
 });
 test('invalid scoring values are rejected',()=>{
- for(const [id,values] of [['speech',[]],['speech',[21]],['speech',[-1]],['speech',[1.5]],['speech',[Number.NaN]],['poi',[1,1]],['speech',[0,1,2,3,4,5,6,7,8,9,10]],['submitter',[3,5]],['submitter',[5]],['submitter',[7]]] as [string,number[]][]){
+ for(const [id,values] of [['speech',[]],['speech',[21]],['speech',[-1]],['speech',[1.5]],['speech',[Number.NaN]],['poi',[1,1]],['speech',[0,1,2,3,4,5,6,7,8,9,10]],['submitter',[3,5]],['submitter',[]],['submitter',[0]],['submitter',[21]],['submitter',[2.5]]] as [string,number[]][]){
   assert.ok(scoringProblem(id,values),`${id} ${values}`);
   assert.throws(()=>applyCommand(blank(),{type:'scoring',id,values},'admin'));
  }
  assert.equal(scoringProblem('speech',[0,2,4]),null);
+ assert.equal(scoringProblem('submitter',[1]),null);assert.equal(scoringProblem('submitter',[20]),null);
 });
-test('Main Submitter credit stays a fixed +5, once per resolution, and cannot be configured or overridden',()=>{
+test('Main Submitter credit: configurable single value, once per resolution, earlier credits keep their points',()=>{
  const t=runner(blank());
- assert.throws(()=>t.run({type:'scoring',id:'submitter',values:[7]},'admin'),/fixed at \+5/);
- assert.throws(()=>t.run({type:'scoring',id:'submitter',values:[7],committeeId:'ga1'},'admin'),/fixed at \+5/);
- t.d.committees.find(c=>c.id==='ga1')!.scoringOverrides=[{id:'submitter',label:'Main Submitter',values:[9]}]; // even legacy stored data cannot change it
- assert.deepEqual(scoringValues(t.d,'ga1','submitter'),[5]);
- for(let i=0;i<2;i++){
-  t.run({type:'speechStart',sessionId:'s1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter'});
-  const s=t.d.speeches!.at(-1)!;t.run({type:'speechScore',sessionId:'s1',speechId:s.id,points:2});t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
- }
- const credits=t.d.events.filter(e=>e.categoryId==='submitter'&&e.resolutionId==='r1');
- assert.equal(credits.length,1);assert.equal(credits[0].points,5);assert.equal(credits[0].delegateId,'d0');
+ const mainSubmitterSpeech=(resolutionId:string,delegateId:string)=>{
+  t.run({type:'speechStart',sessionId:'s1',delegateId,resolutionId,classification:'Main Submitter'});
+  const s=t.d.speeches!.at(-1)!;t.run(speechScoreCommand(t.d,'ga1',s,2));t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+ };
+ const credits=(resolutionId:string)=>t.d.events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===resolutionId);
+ // Default +5 before any configuration; a second Main Submitter speech adds nothing.
+ mainSubmitterSpeech('r1','d0');mainSubmitterSpeech('r1','d0');
+ assert.deepEqual(credits('r1').map(e=>[e.delegateId,e.points]),[['d0',5]]);
  assert.throws(()=>t.run({type:'participation',delegateId:'d0',categoryId:'submitter',points:5,sessionId:'s1',resolutionId:'r1'}),/only be recorded once/);
+ // A committee override applies to that committee only; the stored +5 is unchanged.
+ t.run({type:'scoring',id:'submitter',values:[4]},'admin');
+ t.run({type:'scoring',id:'submitter',values:[8],committeeId:'ga1'},'admin');
+ assert.deepEqual(scoringValues(t.d,'ga1','submitter'),[8]);
+ assert.deepEqual(scoringValues(t.d,'ecosoc','submitter'),[4]);
+ const r2=t.d.documents.find(r=>r.id==='r2')!;r2.status='In Debate';r2.sessionId='s1';
+ // A manual credit must use the configured value.
+ assert.throws(()=>t.run({type:'participation',delegateId:r2.submitterId,categoryId:'submitter',points:5,sessionId:'s1',resolutionId:'r2'}),/configured point value/);
+ // The automatic credit uses the configured value, still once per resolution.
+ mainSubmitterSpeech('r2',r2.submitterId);mainSubmitterSpeech('r2',r2.submitterId);
+ assert.deepEqual(credits('r2').map(e=>e.points),[8]);
+ assert.deepEqual(credits('r1').map(e=>e.points),[5],'earlier credits keep their points');
 });
 
 // ---------------------------------------------------------------- 2. Country flags

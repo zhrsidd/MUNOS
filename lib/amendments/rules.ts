@@ -5,8 +5,8 @@ export const MAX_CLAUSE = 200;
 export const MAX_WORDING = 4000;
 export interface AmendmentLinkInfo {
   committee: { id: string; code: string; name: string };
-  /** `title` is the old label and is no longer displayed. `submitterId` is not published by amendment_link_info yet;
-   *  when it is, the public form shows the Main Submitter's country from `delegates` (see docs/UI_OVERHAUL.md). */
+  /** `title` is the old label and is no longer displayed. `submitterId` is published by amendment_link_info (migration
+   *  20261021130000); the public form shows the Main Submitter's country from `delegates`. Older servers omit it. */
   resolution: { id: string; code: string; title: string; submitterId?: string | null } | null;
   delegates: { id: string; country: string }[];
 }

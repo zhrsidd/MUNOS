@@ -1,35 +1,37 @@
 import type {ConferenceData,ScoringDefinition} from './domain';
 // Procedure categories the Chair console depends on. They always exist (conference defaults fill gaps),
 // so a blank conference is usable before an Executive saves anything. The server mirrors these defaults
-// in private.scoring_values(). Speech and POI values are configurable; Main Submitter is a fixed +5,
-// credited once per resolution, and cannot be configured or overridden.
+// in private.scoring_values(). Every category is configurable per conference and per committee.
+// Main Submitter is one value, credited once per resolution on the Main Submitter's first scored speech;
+// a stored credit keeps the points it was given.
 export const MAIN_SUBMITTER_POINTS=5;
-const MAIN_SUBMITTER:ScoringDefinition={id:'submitter',label:'Main Submitter',values:[MAIN_SUBMITTER_POINTS]};
+export const MAIN_SUBMITTER_ID='submitter';
 export const REQUIRED_SCORING:readonly ScoringDefinition[]=[
  {id:'speech',label:'Speech',values:[1,2,3]},
  {id:'poi',label:'POI',values:[1,2]},
- MAIN_SUBMITTER,
+ {id:MAIN_SUBMITTER_ID,label:'Main Submitter',values:[MAIN_SUBMITTER_POINTS]},
+ {id:'amendment',label:'Debated amendment',values:[3]},
 ];
 export const MAX_SCORING_VALUES=10;
 const required=(id:string)=>REQUIRED_SCORING.find(s=>s.id===id);
-/** Configurable categories an Executive may set (Main Submitter is locked). */
-export const isConfigurableScoring=(id:string)=>id!==MAIN_SUBMITTER.id;
 /** Conference defaults: configured definitions, with required procedure categories filled from the built-in defaults. */
 export function conferenceScoring(data:Pick<ConferenceData,'scoring'>):ScoringDefinition[]{
- return [...REQUIRED_SCORING.map(r=>isConfigurableScoring(r.id)?data.scoring.find(s=>s.id===r.id)??r:r),...data.scoring.filter(s=>!required(s.id))];
+ return [...REQUIRED_SCORING.map(r=>data.scoring.find(s=>s.id===r.id)??r),...data.scoring.filter(s=>!required(s.id))];
 }
 /** Effective definitions for one committee: a committee override replaces only its own category. */
 export function effectiveScoring(data:Pick<ConferenceData,'scoring'|'committees'>,committeeId:string):ScoringDefinition[]{
  const overrides=data.committees.find(c=>c.id===committeeId)?.scoringOverrides;
- return conferenceScoring(data).map(s=>isConfigurableScoring(s.id)?overrides?.find(o=>o.id===s.id)??s:s);
+ return conferenceScoring(data).map(s=>overrides?.find(o=>o.id===s.id)??s);
 }
 export function scoringValues(data:Pick<ConferenceData,'scoring'|'committees'>,committeeId:string,id:string):number[]{
  return effectiveScoring(data,committeeId).find(s=>s.id===id)?.values??[];
 }
 export const scoringLabel=(data:Pick<ConferenceData,'scoring'>,id:string)=>conferenceScoring(data).find(s=>s.id===id)?.label??id;
-/** Null when valid; otherwise the reason. Main Submitter is a fixed once-per-resolution credit. */
+/** Main Submitter credit for a committee: its single configured value. */
+export const mainSubmitterPoints=(data:Pick<ConferenceData,'scoring'|'committees'>,committeeId:string)=>scoringValues(data,committeeId,MAIN_SUBMITTER_ID)[0]??MAIN_SUBMITTER_POINTS;
+/** Null when valid; otherwise the reason. Main Submitter is a single credit, so it takes exactly one value. */
 export function scoringProblem(id:string,values:number[]):string|null{
- if(!isConfigurableScoring(id))return 'Main Submitter credit is fixed at +5 and cannot be changed.';
+ if(id===MAIN_SUBMITTER_ID)return values.length===1&&Number.isInteger(values[0])&&values[0]>=1&&values[0]<=20?null:'Main Submitter credit is one whole number from 1 to 20.';
  if(!values.length||values.length>MAX_SCORING_VALUES||values.some(n=>!Number.isInteger(n)||n<0||n>20))return `Use 1–${MAX_SCORING_VALUES} whole-number points from 0 to 20.`;
  if(new Set(values).size!==values.length)return 'Each point value may appear only once.';
  return null;

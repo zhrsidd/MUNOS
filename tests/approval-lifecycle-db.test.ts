@@ -60,7 +60,7 @@ test('history survives Draft, Printed, In Debate and Closed for the roles that w
   assert.deepEqual(closed.map(h=>h.decision),['review_started','changes_requested','approved']);
   assert.equal(closed[2].comment,null,'a comment-free approval stays comment-free');
   assert.equal(closed[2].reviewerName,'Priya Nair');
-  for(const h of closed)assert.deepEqual(Object.keys(h).sort(),['code','comment','commentId','committeeId','decidedAt','decision','documentId','id','reviewerId','reviewerName','round','title','versionId','versionNumber'],'only the safe projection fields');
+  for(const h of closed)assert.deepEqual(Object.keys(h).sort(),['code','comment','commentId','committeeId','decidedAt','decision','documentId','id','reviewerId','reviewerName','round','submitterCountry','title','versionId','versionNumber'],'only the safe projection fields (the country is the one addition: no name, email or school)');
   // Scope: owning committee's Chair and the Executive read it; another committee's Chair and Printing do not.
   assert.equal((await history(chair,doc)).length,3);assert.equal((await history(admin,doc)).length,3);
   assert.equal((await history(whoChair,doc)).length,0);assert.equal((await history(print,doc)).length,0);

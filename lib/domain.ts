@@ -58,6 +58,8 @@ export interface Staff {
   /** Directory contact, not an authentication identity. Published only for assigned Chairs. */
   email?: string | null;
   contactRevision?: number;
+  /** A Chair's school, so they are included in that school's group photo. Executive-only data. */
+  schoolId?: ID | null;
   id: ID;
   name: string;
   role: Role;
@@ -117,6 +119,12 @@ export interface Resolution {
   code: string;
   title: string;
   submitterId: ID;
+  /**
+   * The Main Submitter's country, published by the server (private.document_submitter_countries) to readers whose
+   * snapshot carries no delegates (Approval, Logistics). Country only; null/absent when not published or unreadable.
+   * The identity formatter uses it only when the submitter's delegate cannot be found.
+   */
+  submitterCountry?: string | null;
   status: DocumentStatus;
   outcome?: "Passed" | "Failed" | "Withdrawn";
   /** "observed": the Chair declared a clear majority; no country choices or totals were recorded. */
