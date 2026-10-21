@@ -7,6 +7,7 @@ This page used to hold the conference-day notes. They now live in:
 - [CONFERENCE_RUNBOOK.md](../CONFERENCE_RUNBOOK.md) — organizer checklists and procedures (print this).
 - [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) — one-page emergency sheet.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — gates from development to Production and the T-48h freeze.
+- [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md) — current v1 status per gate: verified, outstanding, release blockers and owner approvals.
 - [STAFF_REHEARSAL.md](STAFF_REHEARSAL.md) — 30–45 minute staff familiarisation rehearsal (no load).
 - [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md) — one-time first-Executive access code for a brand-new project.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — technical contact: health details, access codes, unsynced/conflict recovery, Supabase/Vercel checks, end-of-conference clean-up.
