@@ -210,3 +210,22 @@ Source documents, kept verbatim: [UI/QoL brief](briefs/UI_QOL_BRIEF_2026-10-19.m
 | Audit F1 cutover isolation | Pending: cutover packet. |
 | Audit F4 bounded bodies | Draft PR #39. |
 | Audit F5 touch targets | PR #32 gives 40 × 44 px on touch; raise to 44 × 44 with 8 px gaps as the audit proposes. |
+
+## Resolution identity (handoff 21 October, section 2): display and search · 21 October 2026
+
+Rule, fallbacks and styling: [BRAND.md](BRAND.md#resolution-identity--21-october-2026). Done on `claude/resolution-identity`
+(display and search only; no schema, RLS, command-contract or submission-form change): Chair Resolutions, Debate, Voting,
+Amendments and Participation, Approval queue/detail/history, Executive resolution status and its search (code, country,
+status, outcome), Logistics print queue and Completed, delegate submission cards, Felix reminders and answers, the public
+amendment page, the device amendment-history cache and the submission confirmation.
+
+Open, for independent review (none are made here):
+- **Approval and Logistics cannot read delegates** (`delegates` RLS is admin/chair/observer; their snapshots carry none), so
+  in hosted mode their screens and Approval history read `GA1/01 — Main submitter unavailable`. Recommended: add the Main
+  Submitter's country (a `submitterCountry` string only) to the `documents` projection in `conference_snapshot` for the
+  approval and logistics roles, and to `private.decision_history`. `resolutionIdentity` already prefers the reader's delegate
+  and falls back to a published `submitterCountry`, so the UI needs no further change.
+- The public amendment page shows `GA1/01 — Main submitter unavailable` until `amendment_link_info` publishes the resolution's
+  `submitterId` (its `delegates` list is already public; `AmendmentLinkInfo.resolution.submitterId` is read when present).
+- Title is still required by the new-resolution form, the submission form and the `document` create command; removing it
+  is the separate contract task.

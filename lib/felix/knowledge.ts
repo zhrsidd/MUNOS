@@ -9,7 +9,7 @@ import { STAFF_ROLE_LABELS } from "../access";
 import { MAIN_SUBMITTER_POINTS } from "../scoring";
 import { TIMER_DURATIONS, DEFAULT_DURATION } from "../timer/local-timer";
 import type { Matchable } from "./match";
-import type { FelixContext } from "./context";
+import { felixResolutionLabel, type FelixContext } from "./context";
 
 export type Answer = { text: string; steps?: string[]; mistakes?: string; href?: string; linkLabel?: string };
 type AnswerFor = Answer | ((ctx: FelixContext) => Answer);
@@ -191,9 +191,9 @@ export const KNOWLEDGE: Entry[] = [
     examples: ["why can't I debate this resolution", "open debate is greyed out"],
     answers: {
       chair: ctx => {
-        const notReady = ctx.documents.filter(d => ["Draft", "Submitted", "Review", "Approved"].includes(d.status)).slice(0, 3).map(d => `“${d.title}” is ${d.status}`);
+        const notReady = ctx.documents.filter(d => ["Draft", "Submitted", "Review", "Approved"].includes(d.status)).slice(0, 3).map(d => `${felixResolutionLabel(ctx, d)} is ${d.status}`);
         return {
-          text: `A resolution can be opened for debate only once it is Printed, and only one resolution per committee can be In Debate at a time.${ctx.chair?.inDebate ? ` “${ctx.chair.inDebate}” is in debate now: close its vote first.` : ""}${notReady.length ? ` In your committee: ${notReady.join("; ")}.` : ""}`,
+          text: `A resolution can be opened for debate only once it is Printed, and only one resolution per committee can be In Debate at a time.${ctx.chair?.inDebate ? ` ${ctx.chair.inDebate} is in debate now: close its vote first.` : ""}${notReady.length ? ` In your committee: ${notReady.join("; ")}.` : ""}`,
           steps: ["Draft → “Submit for review” (or “Submit to Approval” for a delegate submission).", "The Approval Panel approves it; Admins print it and mark it printed.", "On Resolutions, the Printed resolution shows “Open debate”."],
           mistakes: "“Close the current debate before opening another resolution.” means another resolution is still In Debate: finish its vote in Voting first.",
           href: "/chair/documents", linkLabel: "Open Resolutions",

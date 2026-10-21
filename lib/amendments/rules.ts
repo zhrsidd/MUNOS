@@ -5,7 +5,9 @@ export const MAX_CLAUSE = 200;
 export const MAX_WORDING = 4000;
 export interface AmendmentLinkInfo {
   committee: { id: string; code: string; name: string };
-  resolution: { id: string; code: string; title: string } | null;
+  /** `title` is the old label and is no longer displayed. `submitterId` is not published by amendment_link_info yet;
+   *  when it is, the public form shows the Main Submitter's country from `delegates` (see docs/UI_OVERHAUL.md). */
+  resolution: { id: string; code: string; title: string; submitterId?: string | null } | null;
   delegates: { id: string; country: string }[];
 }
 export type AmendmentError = 'invalid_link' | 'invalid_submitter' | 'not_open' | 'invalid_amendment' | 'rate_limited' | 'idempotency_conflict' | 'not_configured' | 'server_error';

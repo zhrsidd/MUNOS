@@ -1,6 +1,8 @@
 'use client';
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { AMENDMENT_TYPES, MAX_CLAUSE, MAX_WORDING, amendmentMessages, type AmendmentLinkInfo, type AmendmentResponse } from '@/lib/amendments/rules';
+import { resolutionIdentity } from '@/lib/resolution-identity';
+import { ResolutionName } from '@/components/resolution-identity';
 const subscribeNever = () => () => {};
 /** False in server HTML and until React hydrates; true once submit() is attached. */
 const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
@@ -12,7 +14,7 @@ export function AmendmentForm({ token, link }: { token: string; link: AmendmentL
   const [attempted, setAttempted] = useState(false);
   const [result, setResult] = useState<AmendmentResponse | null>(null);
   if (!link.resolution) return <section className="submit-card"><h1>Amendments are not currently open in this committee.</h1><p>{link.committee.code} · {link.committee.name}</p><p>Wait for your Chair to open a resolution for debate, then reload this page.</p><button onClick={() => window.location.reload()}>Check again</button></section>;
-  if (result?.ok) return <section className="submit-card success" role="status"><div className="eyebrow">{link.committee.code}</div><h1>Amendment received</h1><p>Your Chair will review it for {link.resolution.code}.</p><p>Reference: <strong>{result.id}</strong></p><p>Keep this reference. Your amendment does not change the working Google Doc automatically.</p><button onClick={() => window.location.reload()}>Submit another amendment</button></section>;
+  if (result?.ok) return <section className="submit-card success" role="status"><div className="eyebrow">{link.committee.code}</div><h1>Amendment received</h1><p>Your Chair will review it for {resolutionIdentity(link.resolution, link.delegates).code}.</p><p>Reference: <strong>{result.id}</strong></p><p>Keep this reference. Your amendment does not change the working Google Doc automatically.</p><button onClick={() => window.location.reload()}>Submit another amendment</button></section>;
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -30,7 +32,7 @@ export function AmendmentForm({ token, link }: { token: string; link: AmendmentL
     } catch { setResult({ ok: false, error: 'server_error', message: amendmentMessages.server_error }); }
     finally { setSending(false); }
   }
-  return <section className="submit-card"><div className="eyebrow">{link.committee.code} · Submit an amendment</div><h1>{link.resolution.code}</h1><p>{link.resolution.title}</p><form method="post" onSubmit={submit}>
+  return <section className="submit-card"><div className="eyebrow">{link.committee.code} · Submit an amendment</div><h1><ResolutionName identity={resolutionIdentity({ ...link.resolution, committeeId: link.committee.id }, link.delegates)} /></h1><form method="post" onSubmit={submit}>
     {/* Until hydration a native submit would reload the page and (as GET) put the wording in the URL; method="post" is a backstop. */}
     <fieldset disabled={attempted || !hydrated} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '1rem' }}>
       <label>Delegation / country<select name="submitterId" required defaultValue=""><option value="" disabled>Choose your delegation</option>{link.delegates.map(d => <option key={d.id} value={d.id}>{d.country}</option>)}</select></label>

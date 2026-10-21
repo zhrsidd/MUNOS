@@ -2,15 +2,19 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Amendment } from '../batch/types';
 import type { Delegate, Resolution } from '../domain';
 import { GOOGLE_DOC_ID } from '../submissions/google-doc';
+import { submitterCountry } from '../resolution-identity';
 import { mergePassed } from './history';
 // Read-only device cache of passed amendment history (audit F2), so wording fetched online stays readable offline
 // after its resolution leaves the snapshot. Kept apart from the mutation outbox: its own database, no writes to the
 // server, keyed by actor + conference + committee so another staff identity on the same device never reads it.
 export const HISTORY_CACHE_LIMIT = 500;
 export const HISTORY_CACHE_MAX_AGE_MS = 14 * 86_400_000;
+/** One cached resolution. `title` is kept as history only and is no longer displayed; `country` (the Main Submitter's,
+ *  read from this committee's delegates when cached) is optional so entries written before it existed stay valid. */
+export interface CachedResolution { code: string; title: string; country?: string }
 /** Enough to show a row offline: resolution identity, the submitting delegation and the working Doc id. */
 export interface HistoryContext {
-  resolutions: Record<string, { code: string; title: string }>;
+  resolutions: Record<string, CachedResolution>;
   delegations: Record<string, { flag: string; country: string }>;
   workingDocs: Record<string, string>;
 }
@@ -24,7 +28,10 @@ export function historyContext(rows: Amendment[], documents: Resolution[], deleg
   const context = emptyContext();
   for (const a of rows) {
     const r = documents.find(d => d.id === a.resolutionId);
-    if (r) context.resolutions[r.id] = { code: r.code, title: r.title };
+    if (r) {
+      const country = submitterCountry(r, delegates);
+      context.resolutions[r.id] = country ? { code: r.code, title: r.title, country } : { code: r.code, title: r.title };
+    }
     const d = delegates.find(x => x.id === a.submitterId);
     if (d) context.delegations[d.id] = { flag: d.flag, country: d.country };
     const doc = links.find(l => l.documentId === a.resolutionId)?.workingDocId;
@@ -38,7 +45,10 @@ export function historyContext(rows: Amendment[], documents: Resolution[], deleg
 export function mergeCache(prior: CachedHistory | undefined, key: string, committeeId: string, rows: Amendment[], context: HistoryContext, now = new Date()): CachedHistory {
   const fresh = prior && Date.parse(prior.savedAt) > now.getTime() - HISTORY_CACHE_MAX_AGE_MS ? prior : undefined;
   const kept = mergePassed(committeeId, fresh?.rows ?? [], rows).slice(0, HISTORY_CACHE_LIMIT);
-  const all = { resolutions: { ...fresh?.context.resolutions, ...context.resolutions }, delegations: { ...fresh?.context.delegations, ...context.delegations }, workingDocs: { ...fresh?.context.workingDocs, ...context.workingDocs } };
+  // A newer entry replaces an older one, but never drops a country the older one knew.
+  const resolutions = { ...fresh?.context.resolutions, ...context.resolutions };
+  for (const [id, entry] of Object.entries(resolutions)) { const country = entry.country ?? fresh?.context.resolutions[id]?.country; if (country && !entry.country) resolutions[id] = { ...entry, country }; }
+  const all = { resolutions, delegations: { ...fresh?.context.delegations, ...context.delegations }, workingDocs: { ...fresh?.context.workingDocs, ...context.workingDocs } };
   const pick = <T,>(record: Record<string, T>, ids: Set<string>) => Object.fromEntries(Object.entries(record).filter(([id]) => ids.has(id)));
   const resolutionIds = new Set(kept.map(a => a.resolutionId)), submitterIds = new Set(kept.map(a => a.submitterId));
   return { key, rows: kept, context: { resolutions: pick(all.resolutions, resolutionIds), delegations: pick(all.delegations, submitterIds), workingDocs: pick(all.workingDocs, resolutionIds) }, savedAt: now.toISOString() };
