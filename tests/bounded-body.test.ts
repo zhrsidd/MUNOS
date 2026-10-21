@@ -40,10 +40,10 @@ test('public submission endpoint rejects an oversized multipart body without Con
  try{
   const boundary='----munos';
   const part=(name:string,value:string)=>`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`;
-  const multipart=(title:string)=>`${part('title',title)}--${boundary}--\r\n`;
+  const multipart=(title:string)=>`${part('padding',title)}--${boundary}--\r\n`;
   const type={'content-type':`multipart/form-data; boundary=${boundary}`};
   const encode=(text:string)=>new ReadableStream<Uint8Array>({start(c){c.enqueue(new TextEncoder().encode(text));c.close();}});
-  // The audit's reproduction: ~70 KB, no Content-Length. Before the fix this reached validation (400 invalid_title).
+  // The audit's reproduction: ~70 KB, no Content-Length. Before the fix this reached validation.
   const big=multipart('x'.repeat(70_000));
   const tooLarge=await submit(streamed(encode(big),type));
   assert.equal(tooLarge.status,413);

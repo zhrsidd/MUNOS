@@ -251,7 +251,7 @@ export const KNOWLEDGE: Entry[] = [
     answers: {
       chair: {
         text: "Submitting sends a resolution to the Approval Panel’s Review inbox.",
-        steps: ["Delegate submissions appear at the top of Resolutions: “Open Google Doc”, review and edit it there, optionally paste your Approval-folder copy, then press “Submit to Approval”.", "For a draft you created with “+ New resolution”, press “Submit for review”."],
+        steps: ["Delegate submissions appear at the top of Resolutions: “Open Google Doc”, review and edit it there, optionally paste your Approval-folder copy, then press “Submit to Approval”.", "For a draft you created with “+ New resolution” (choose the Main Submitter; the resolution number is assigned automatically), press “Submit for review”."],
         mistakes: "“Submit to Approval” stays disabled while the card is marked “Can’t access”: get the sharing fixed, then press “Access fixed”.",
         href: "/chair/documents", linkLabel: "Open Resolutions",
       },

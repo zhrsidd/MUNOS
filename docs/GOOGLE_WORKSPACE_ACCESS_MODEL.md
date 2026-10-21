@@ -13,14 +13,14 @@ Verified in the current code (`main`), and re-verified over real HTTP against th
 - `/submit/*` renders **without** the staff workspace provider, device storage (IndexedDB) or the service worker (`components/conference-shell.tsx`, `components/offline-shell.tsx`).
 - The page and `POST /api/submissions` are **server-mediated**. The browser never talks to Supabase. The server uses `SUPABASE_SECRET_KEY` with `persistSession: false` to call two `service_role`-only functions.
 - **No Supabase Auth session, anonymous sign-in or cookie is created for a delegate.** A burst of delegate submissions therefore does not consume Supabase Auth's per-IP anonymous sign-in limit.
-- The form shows only: committee code and name, conference name, the sharing text, a country/delegation selector (country and flag only — no names or emails), title, Google Doc link and a confirmation checkbox. **Google Docs only**: since 20 October 2026 the form and `POST /api/submissions` refuse files (§7). No attendance, roster, participation, votes, notes, workflow history or staff data.
+- The form shows only: committee code and name, conference name, the sharing text, a country/delegation selector (country and flag only — no names or emails), Google Doc link and a confirmation checkbox (no resolution title since 21 October 2026: a posted `title` is ignored and the server stores the fixed compatibility title, [UI_OVERHAUL.md](UI_OVERHAUL.md#title-free-resolutions-handoff-21-october-section-2-contract-change--21-october-2026)). **Google Docs only**: since 20 October 2026 the form and `POST /api/submissions` refuse files (§7). No attendance, roster, participation, votes, notes, workflow history or staff data.
 
 ## 2. Delegate submission flow (target)
 
 ```
 Write resolution in Google Docs
 → Share → General access: "Anyone with the link" → role "Editor" → Copy link
-→ scan committee QR → choose delegation → enter title → paste link
+→ scan committee QR → choose delegation → paste link
 → tick "I have made sure the Chairs can edit this document." → Submit → done
 ```
 

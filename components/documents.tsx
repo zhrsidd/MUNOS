@@ -8,6 +8,7 @@ import { approvalHistory, decisionTone, type HistoryEntry } from "@/lib/approval
 import { observedDeclaration } from "@/lib/repository";
 import { resolutionNextAction, resolutionOrder, sentBack } from "@/lib/resolution-view";
 import { previewIdentity } from "@/lib/resolution-identity";
+import { compatResolutionTitle } from "@/lib/resolution-title";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { ResolutionName } from "./resolution-identity";
 import { useResolutionIdentities } from "@/lib/use-resolution-identity";
@@ -142,11 +143,52 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
     </article>
   );
 }
-export function Documents({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
+/** The Chair's "New resolution" form. No title: only the Main Submitter, and the number is assigned on creation. */
+export function NewResolutionForm({ committeeId, sessionId, onDone }: { committeeId: string; sessionId: string; onDone: () => void }) {
   const { data, act } = useConference();
-  const [modal, setModal] = useState<"new" | null>(null);
-  const [title, setTitle] = useState("");
   const [submitterId, setSubmitterId] = useState(data.delegates.find((d) => d.committeeId === committeeId)?.id || "");
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (
+          await act(
+            {
+              type: "newDocument",
+              committeeId,
+              sessionId,
+              // Not asked for or shown: only fills the legacy not-null column (lib/resolution-title.ts).
+              title: compatResolutionTitle(),
+              submitterId,
+            },
+            "chair",
+          )
+        )
+          onDone();
+      }}
+    >
+      <label>
+        Main submitter
+        <select value={submitterId} onChange={(e) => setSubmitterId(e.target.value)}>
+          {data.delegates
+            .filter((d) => d.committeeId === committeeId)
+            .map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.country} · {d.name}
+              </option>
+            ))}
+        </select>
+      </label>
+      <p className="muted" aria-live="polite">
+        <ResolutionName identity={previewIdentity(submitterId, data.delegates, committeeId)} />
+      </p>
+      <button className="primary">Create draft</button>
+    </form>
+  );
+}
+export function Documents({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
+  const { data } = useConference();
+  const [modal, setModal] = useState<"new" | null>(null);
   const documents = data.documents.filter((r) => r.committeeId === committeeId).sort(resolutionOrder);
   return (
     <>
@@ -171,54 +213,7 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
       )}
       {modal === "new" && (
         <Modal title="New resolution" onClose={() => setModal(null)}>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (
-                await act(
-                  {
-                    type: "newDocument",
-                    committeeId,
-                    sessionId,
-                    title,
-                    submitterId,
-                  },
-                  "chair",
-                )
-              ) {
-                setModal(null);
-                setTitle("");
-              }
-            }}
-          >
-            <label>
-              Resolution title
-              <input
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </label>
-            <label>
-              Main submitter
-              <select
-                value={submitterId}
-                onChange={(e) => setSubmitterId(e.target.value)}
-              >
-                {data.delegates
-                  .filter((d) => d.committeeId === committeeId)
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.country} · {d.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <p className="muted" aria-live="polite">
-              <ResolutionName identity={previewIdentity(submitterId, data.delegates, committeeId)} />
-            </p>
-            <button className="primary">Create draft</button>
-          </form>
+          <NewResolutionForm committeeId={committeeId} sessionId={sessionId} onDone={() => setModal(null)} />
         </Modal>
       )}
     </>

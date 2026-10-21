@@ -110,7 +110,7 @@ For each: set **New code expires** to the end of the conference (Qatar time) →
 - [ ] Every device uses a **normal** browser window (not private/incognito) and a browser profile nobody else uses. Note on each laptop: *"Conference device — do not clear browser data."*
 - [ ] **Do not clear browser storage** on any prepared device from now until the end of the conference.
 - [ ] **Recovery practised:** on one prepared Chair laptop and the Executive laptop, sidebar → **System health** → **Export device recovery file** downloads a file. Delete the test files.
-- [ ] **Paper fallback per committee** (in a labelled envelope, for emergencies only): delegate list, blank attendance sheet, blank speakers list, **blank amendment slips** (delegation, resolution, Add/Strike/Replace, clause, exact wording), **vote-tally sheets** (for / against / abstain per vote), a **resolution intake log** (time, delegation, title, how received), both QR sheets, and this runbook's *During the conference* page.
+- [ ] **Paper fallback per committee** (in a labelled envelope, for emergencies only): delegate list, blank attendance sheet, blank speakers list, **blank amendment slips** (delegation, resolution, Add/Strike/Replace, clause, exact wording), **vote-tally sheets** (for / against / abstain per vote), a **resolution intake log** (time, delegation, how received), both QR sheets, and this runbook's *During the conference* page.
 - [ ] Wi-Fi tested in every committee room (System health GREEN). Note weak rooms.
 
 ---

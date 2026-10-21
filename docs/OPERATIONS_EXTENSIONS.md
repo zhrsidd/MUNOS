@@ -32,7 +32,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 **Flow.**
 
 1. Delegate writes the resolution in Google Docs and preferably chooses **Anyone with the link → Editor**. If school sharing rules prevent this, the form shows actual assigned Chair names and configured contact emails so the delegate can share directly. Do not invent committee mailboxes.
-2. Delegate scans the committee QR → `/submit/{token}` (public, mobile, no account) → country (main submitter), title, **Google Doc link**, ticks “I have made sure the Chairs can edit this document.” → Submit.
+2. Delegate scans the committee QR → `/submit/{token}` (public, mobile, no account) → country (main submitter), **Google Doc link**, ticks “I have made sure the Chairs can edit this document.” → Submit.
 3. The server validates the link and calls `public.submit_resolution`, which creates the resolution in the existing **Draft** state (with the Chair) plus a `resolution_links` record (working Google Doc id, submitted time) and notifies the committee's Chair.
 4. Chair Console → Documents → **Delegate submissions**: *Open Google Doc* · *Can't access* / *Access fixed* · optional *Approval-folder copy* link · **Submit to Approval** (the existing core `Draft → Submitted` transition).
 5. Approval Panel sees it in its inbox with *Open approval copy* (if recorded) and *Open working Google Doc*; the existing workflow continues (Review/Approved → Printed → In Debate → Closed).
@@ -47,7 +47,7 @@ Google Doc = working document. MUNOS = workflow truth. PDF = snapshot/output/arc
 
 - One active link per committee (`public.submission_links`); the token is 128 bits of randomness. Possessing it lets someone register a resolution **for that committee only**; it grants no staff-table access. The server deliberately returns only the committee context, country choices and assigned Chair contact details needed for submission (no delegate names or emails).
 - The browser never talks to the database for submission. The server route uses `SUPABASE_SECRET_KEY` (server-only) to call two functions executable **only by `service_role`**: `submission_link_info` and `submit_resolution`. No `anon` grants or policies; core RLS unchanged.
-- Validation: Google Doc link as above **or** a PDF/DOCX/DOC file (never both), title 3–200 characters, submitter must be a delegate of that committee, a stored file must be inside that committee's folder.
+- Validation: Google Doc link as above **or** a PDF/DOCX/DOC file (never both), no title (since 21 October 2026 the route ignores any posted `title`; `submit_resolution` still checks 3–200 characters and receives the fixed compatibility title, `lib/resolution-title.ts`), submitter must be a delegate of that committee, a stored file must be inside that committee's folder.
 - Abuse limits: 20 accepted submissions per link per 10 minutes; the same Google Doc (or the same file, SHA-256) to the same committee returns the original reference.
 - Executive manages actual Chair contact emails in staff records and committee assignments; changing contact metadata does not grant authentication or database access. Legacy `share_with` is temporary compatibility data, not the source of sharing instructions. Executive can **Replace** a leaked link (old QR stops working immediately) or **Turn off** online submission for a committee.
 - Pages under `/submit/` send `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`, `Cache-Control: private, no-store`, and do not open the staff workspace, device storage, a staff session or the service worker.

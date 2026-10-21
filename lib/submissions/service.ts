@@ -1,7 +1,14 @@
+import { legacySubmissionTitle } from "../resolution-title";
 import { googleDocMessages, parseGoogleDocLink } from "./google-doc";
-import { SUBMISSION_TOKEN, cleanTitle, submissionMessages, type LinkInfo, type SubmissionError, type SubmissionResponse } from "./rules";
+import { SUBMISSION_TOKEN, submissionMessages, type LinkInfo, type SubmissionError, type SubmissionResponse } from "./rules";
 export interface SubmitArgs {
-  token: string; submissionId: string; submitterId: string; title: string;
+  token: string; submissionId: string; submitterId: string;
+  /**
+   * Only set when an OLD cached form posted a valid title (already reduced and bounded, lib/resolution-title.ts). It is
+   * forwarded unchanged so a retry of a submission accepted before the deploy matches its stored receipt. Absent means
+   * "use the compatibility title". The new form never sends one.
+   */
+  title?: string;
   /** The working Google Doc (id only). */
   googleDocId: string;
 }
@@ -24,6 +31,10 @@ const rejected = (error: unknown) => {
 };
 /**
  * Registers a delegate's resolution with the committee Chair (the workflow's Draft state).
+ * Resolutions are not named: the form has no title and none is ever required. A `title` posted by an OLDER cached form is
+ * reduced and bounded exactly as before (legacySubmissionTitle) and, when valid, forwarded unchanged so a retry of a
+ * submission accepted before the deploy stays idempotent; an absent or invalid one is not an error, and the backend uses
+ * the compatibility title (lib/resolution-title.ts).
  * Google Docs links only: validated, reduced to the document id, never fetched. A request carrying a file is refused
  * before anything is stored or created; historical uploads remain readable by staff through Storage RLS.
  * Retries with the same submissionId are safe (idempotent database call).
@@ -32,13 +43,12 @@ export async function handleSubmission(form: FormData, backend: SubmissionBacken
   const token = String(form.get("token") ?? "");
   const submissionId = String(form.get("submissionId") ?? "");
   const submitterId = String(form.get("submitterId") ?? "");
-  const title = cleanTitle(String(form.get("title") ?? ""));
   const docLink = String(form.get("googleDoc") ?? "").trim();
+  const title = legacySubmissionTitle(form.get("title"));
   if (!SUBMISSION_TOKEN.test(token)) return fail(404, "invalid_link");
   if (form.has("file")) return fail(400, "docs_only");
   if (!backend) return fail(503, "not_configured");
   if (!UUID.test(submissionId)) return fail(400, "server_error");
-  if (title.length < 3 || title.length > 200) return fail(400, "invalid_title");
   if (!UUID.test(submitterId) && !/^[A-Za-z0-9_-]{1,64}$/.test(submitterId)) return fail(400, "invalid_submitter");
   if (!docLink) return fail(400, "missing_source");
   const doc = parseGoogleDocLink(docLink);
@@ -48,7 +58,7 @@ export async function handleSubmission(form: FormData, backend: SubmissionBacken
   if (!link) return fail(404, "invalid_link");
   if (!link.submitters.some((s) => s.id === submitterId)) return fail(400, "invalid_submitter");
   try {
-    const result = await backend.submit({ token, submissionId, submitterId, title, googleDocId: doc.id });
+    const result = await backend.submit({ token, submissionId, submitterId, googleDocId: doc.id, ...(title === undefined ? {} : { title }) });
     return { status: result.status === "created" ? 201 : 200, body: { ok: true, status: result.status, code: result.code } };
   } catch (error) { return rejected(error); }
 }

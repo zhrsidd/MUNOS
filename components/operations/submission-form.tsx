@@ -2,7 +2,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { googleDocMessages, parseGoogleDocLink } from "@/lib/submissions/google-doc";
 import { PendingButton } from "../pending";
-import { cleanTitle, submissionMessages, type LinkInfo, type SubmissionResponse } from "@/lib/submissions/rules";
+import { submissionMessages, type LinkInfo, type SubmissionResponse } from "@/lib/submissions/rules";
 import { displayResolutionCode, resolutionIdentity } from "@/lib/resolution-identity";
 import { ResolutionName } from "../resolution-identity";
 
@@ -20,7 +20,6 @@ const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () =>
 export function SubmissionForm({ token, link }: { token: string; link: LinkInfo }) {
   const hydrated = useHydrated();
   const [submitterId, setSubmitterId] = useState("");
-  const [title, setTitle] = useState("");
   const [docLink, setDocLink] = useState("");
   const [shared, setShared] = useState(false);
   // One id per intended submission: a retry after a lost response reuses it, so the server
@@ -36,8 +35,6 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!submitterId) return setState({ phase: "error", message: submissionMessages.invalid_submitter });
-    const clean = cleanTitle(title);
-    if (clean.length < 3 || clean.length > 200) return setState({ phase: "error", message: submissionMessages.invalid_title });
     if (!parsedDoc.ok) return setState({ phase: "error", message: googleDocMessages[parsedDoc.problem] });
     if (!shared) return setState({ phase: "error", message: "Make sure the Chairs can edit this document, then tick the box." });
     const form = new FormData();
@@ -45,7 +42,6 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
     form.set("token", token);
     form.set("submissionId", submissionId);
     form.set("submitterId", submitterId);
-    form.set("title", clean);
     setState({ phase: "sending" });
     let response: Response;
     try {
@@ -59,7 +55,6 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
     setState({ phase: "error", message: response.status >= 500 || response.status === 429 ? message + help : message });
   }
   function reset() {
-    setTitle("");
     setDocLink("");
     setShared(false);
     fresh();
@@ -113,10 +108,6 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
               </option>
             ))}
           </select>
-        </li>
-        <li>
-          <label htmlFor="title">Resolution title</label>
-          <input id="title" value={title} maxLength={200} autoComplete="off" placeholder="e.g. Protecting civilians in cyberspace" onChange={(e) => setTitle(e.target.value)} required />
         </li>
         <li>
           <label htmlFor="doc">Google Doc link</label>

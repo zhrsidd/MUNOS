@@ -20,7 +20,7 @@ class FakeBackend implements SubmissionBackend{
   this.submissions.set(a.submissionId,a);if(this.loseResponse){this.loseResponse=false;throw Error('response lost after commit');}return {status:'created' as const,code:'GA1 / 01'};
  }
 }
-const form=(fields:Record<string,string|File>,base:Record<string,string|File>={googleDoc:docLink})=>{const f=new FormData();for(const [k,v] of Object.entries({token,submissionId:crypto.randomUUID(),submitterId:submitter,title:'Protecting civilians',...base,...fields}))f.set(k,v);return f;};
+const form=(fields:Record<string,string|File>,base:Record<string,string|File>={googleDoc:docLink})=>{const f=new FormData();for(const [k,v] of Object.entries({token,submissionId:crypto.randomUUID(),submitterId:submitter,...base,...fields}))f.set(k,v);return f;};
 test('Google Doc link (normal path): stores only the canonical document id, never uploads, never fetches the document',async()=>{
  const backend=new FakeBackend();const id=crypto.randomUUID();
  const realFetch=globalThis.fetch;let fetched=false;globalThis.fetch=(async()=>{fetched=true;throw Error('no network');}) as typeof fetch;
@@ -62,9 +62,9 @@ test('Google Docs only: any file is refused before anything is created, even alo
  assert.equal(backend.submissions.size,0,'nothing created');
  const noBackend=await handleSubmission(form({file:pdf()},{}),null);assert.equal(!noBackend.body.ok&&noBackend.body.error,'docs_only','refused even before configuration is checked');
 });
-test('valid and invalid committee tokens; wrong submitter; title',async()=>{
+test('valid and invalid committee tokens; wrong submitter',async()=>{
  const backend=new FakeBackend();
- for(const [fields,error,status] of [[{token:'x'.repeat(22)},'invalid_link',404],[{token:'../../etc'},'invalid_link',404],[{submitterId:'22222222-2222-4222-8222-222222222222'},'invalid_submitter',400],[{title:'  '},'invalid_title',400]] as const){
+ for(const [fields,error,status] of [[{token:'x'.repeat(22)},'invalid_link',404],[{token:'../../etc'},'invalid_link',404],[{submitterId:'22222222-2222-4222-8222-222222222222'},'invalid_submitter',400]] as const){
   const r=await handleSubmission(form(fields),backend);assert.equal(r.status,status,error);assert.equal(!r.body.ok&&r.body.error,error);
  }
  assert.equal((await handleSubmission(form({}),backend)).status,201,'valid token accepted');
@@ -91,7 +91,7 @@ test('local demo backend resolves seed committees only, does not invent Chair ma
  assert.equal(await demo.linkInfo('demo_nope_0123456789abcdef0123'),null);
  const info=await demo.linkInfo('demo_ga1_0123456789abcdef0123');assert.equal(info?.committeeCode,'GA1');assert.equal(info?.shareWith,'');assert.deepEqual(info?.chairs,[]);
  assert.ok(info!.submitters.every(s=>Object.keys(s).join()==='id,country,flag'),'countries only, no names or emails');
- const args={token:'demo_ga1_0123456789abcdef0123',submitterId:'d0',title:'T',googleDocId:docId};
+ const args={token:'demo_ga1_0123456789abcdef0123',submitterId:'d0',googleDocId:docId};
  assert.equal((await demo.submit({...args,submissionId:crypto.randomUUID()})).status,'created');
  assert.equal((await demo.submit({...args,submissionId:crypto.randomUUID()})).status,'duplicate');
 });
@@ -102,7 +102,7 @@ test('before hydration the resolution form cannot submit natively, accept unsync
  const form=html.match(/<form[^>]*>/)![0];
  assert.match(form,/method="post"/,'a native submission is never a GET reload');
  assert.doesNotMatch(form,/action=/,'no native action target');
- assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, title, link and checkbox cannot be edited before React state exists');
+ assert.match(html,/<fieldset disabled=""[^>]*><ol class="submit-steps">/,'country, link and checkbox cannot be edited before React state exists');
  assert.match(html,/<button disabled="" type="submit" class="pending-button button primary submit-button"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Loading form…<\/button>/,'submit (and Enter-key implicit submission) is blocked');
  assert.doesNotMatch(html,/type="file"|Upload a file/,'Google Docs only: no file input or upload toggle');
  assert.match(html,/<p class="muted" role="status">If this form does not load, ask your Chair how to submit your resolution\.<\/p>/,'stalled hydration (JS on, never loads) still tells the delegate what to do');

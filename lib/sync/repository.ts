@@ -3,7 +3,7 @@ import {isBatchCommand} from '../batch/types';
 import {operationsFingerprint} from "../operations/fingerprint";
 import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
-import { applyCommand, type Command, type ConferenceRepository } from "../commands";
+import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
 import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
@@ -109,8 +109,11 @@ export class DurableRepository implements ConferenceRepository {
     if (this.transport) void this.flush();
   }
   private async reload() { const latest=await this.store.read(this.key); if(latest) this.publish(latest); }
-  execute = async (command: Command, role: Role) => {
+  execute = async (raw: Command, role: Role) => {
     if (!this.data) throw Error("Workspace is still loading.");
+    // The single queue/apply boundary: normalise BEFORE the fingerprint, the local apply and the persisted outbox entry,
+    // so the queued JSON, its replay and the server's idempotent retry are identical (a title-less create never reaches SQL).
+    const command = normalizeCommand(raw);
     // A transaction commits before any optimistic state or successful-save message is visible.
     const mutation: Mutation={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:this.transport?.actorId ?? `${role}-demo`,role,command,expected:fingerprint(this.data,command),state:"pending"};
     this.publish(await this.store.update(this.key, old=>{
