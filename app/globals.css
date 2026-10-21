@@ -1168,6 +1168,34 @@ label > select,
 label > textarea {
   margin-top: 8px;
 }
+/* Checkboxes and radios keep their native size beside their label text. The field rules above (full width, 40px
+   minimum height, padding) are for text-like controls; applied to a checkbox they made it a wide, tall empty box
+   (Executive → Workflow veto lists, Slot active, the confirmation boxes on the public forms). */
+input[type="checkbox"],
+input[type="radio"] {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--blue);
+}
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+label > input[type="checkbox"],
+label > input[type="radio"] {
+  margin-top: 0;
+}
 textarea {
   resize: vertical;
   line-height: 1.7;
@@ -2573,6 +2601,8 @@ color: var(--ink-3);
 .resolution-detail {
   display: grid;
   gap: var(--space-3);
+  /* The Approval "Your decision" panel follows directly: same gap as between panels. */
+  margin-bottom: var(--space-5);
 }
 .resolution-row {
   background: var(--surface);
@@ -3474,4 +3504,28 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
   .tabs[data-indicator="on"] .tab-indicator[data-animate="true"] { transition: none; }
   .spinner[data-active="true"] { animation: none; }
   .skeleton-row { animation: none; }
+}
+
+/* ---- Committee voting rules (Executive → Workflow): one padded card per committee inside the panel ---- */
+.panel > form.panel {
+  padding: var(--space-4) var(--space-5);
+}
+.panel > form.panel > h3 {
+  margin-bottom: var(--space-3);
+}
+.panel > form.panel > .muted {
+  margin: 0 0 var(--space-3);
+}
+/* The panel's own side margins for direct labels and buttons do not apply inside a padded card. */
+.panel > form.panel > label {
+  margin: 0 0 var(--space-2);
+}
+.panel > form.panel > button {
+  margin: 0;
+}
+.veto-delegations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0 var(--space-4);
+  margin: var(--space-2) 0 var(--space-3);
 }
