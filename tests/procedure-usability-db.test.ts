@@ -31,8 +31,7 @@ test('real PostgreSQL: blank-conference scoring, flags, top-of-queue, two-stage 
   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
   for(const [id,values] of [['speech',[1,1]],['speech',[21]],['speech',[]],['poi',[0,1,2,3,4,5,6,7,8,9,10]]] as [string,number[]][])
    await assert.rejects(()=>send({type:'scoring',id,values},'admin'),/whole-number|only once|scoring_definitions/,`${id} ${values}`);
-  for(const values of [[7],[5],[3,5]])await assert.rejects(()=>send({type:'scoring',id:'submitter',values},'admin'),/fixed at \+5/,`submitter ${values}`);
-  await assert.rejects(()=>send({type:'scoring',id:'submitter',values:[7],committeeId:ids.ga1},'admin'),/fixed at \+5/,'no committee override either');
+  for(const values of [[0],[21],[3,5]])await assert.rejects(()=>send({type:'scoring',id:'submitter',values},'admin'),/one whole number from 1 to 20/,`submitter ${values}`);
   await assert.rejects(()=>send({type:'scoring',id:'made-up',values:[1]},'admin'),/Unknown scoring category/);
   await send({type:'scoring',id:'speech',values:[2,4]},'admin');
   await send({type:'scoring',id:'speech',values:[9],committeeId:ids.ga1},'admin');
@@ -47,7 +46,7 @@ test('real PostgreSQL: blank-conference scoring, flags, top-of-queue, two-stage 
   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
   await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
   s=await active();await send({type:'speechScore',sessionId:ids.session,speechId:s.id,points:9});await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
-  assert.deepEqual((await snap()).events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===ids.resolution).map(e=>e.points),[5],'Main Submitter credit: fixed +5, once per resolution');
+  assert.deepEqual((await snap()).events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===ids.resolution).map(e=>e.points),[5],'Main Submitter credit: default +5 when not configured, once per resolution');
 
   // 2) Derived flags are stored on delegate edit and import; arbitrary text is refused.
   await send({type:'delegate',id:ids.japan,name:'Hana Tanaka',email:'delegate2@example.com',country:'Ivory Coast',flag:'🇨🇮'},'admin');

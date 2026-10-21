@@ -13,7 +13,10 @@ export type ProcedureCommand =
  | {type:'queueRemove'; sessionId:string; entryId:string}
  | {type:'speechStart'; sessionId:string; delegateId:string; resolutionId:string|null; classification:Exclude<SpeechKind,'Co-Submitter'>; entryId?:string; amendmentId?:string|null}
  | {type:'speechYield'; sessionId:string; speechId:string; delegateId:string}
- | {type:'speechScore'; sessionId:string; speechId:string; points:number}
+ /** submitterPoints: the Main Submitter credit this device awarded with a Main Submitter speech score (its effective
+  *  setting when the action was saved). If the credit is due but the setting has changed since, the action is refused
+  *  as a retained conflict, never repriced. Absent on actions saved before the credit was configurable: they awarded +5. */
+ | {type:'speechScore'; sessionId:string; speechId:string; points:number; submitterPoints?:number}
  | {type:'speechFinish'; sessionId:string; speechId:string}
  | {type:'poiAllowance'; sessionId:string; speechId:string; limit:number|null}
  | {type:'poiAdd'; sessionId:string; speechId:string; delegateId:string}
