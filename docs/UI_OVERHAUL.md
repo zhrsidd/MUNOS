@@ -169,6 +169,49 @@ workspace redirects. Cached refreshes retain the workspace and use the sync stri
 recovery controls replace the loader when data is unavailable. See [LOADING_MOTION_PROPOSAL.md](LOADING_MOTION_PROPOSAL.md)
 for the implementation and verification; other skeleton/loading primitives and wider transitions remain open.
 
+## Watermelon patterns · 21 October 2026
+
+Selected from [WATERMELON_UI_SELECTION.md](WATERMELON_UI_SELECTION.md) and re-implemented in plain React and CSS with the
+existing tokens: no dependency was added and no upstream component was copied (each file names the idea and points at
+[the MIT notice](WATERMELON_LICENSE.txt)). Design rules and constants are in [BRAND.md](BRAND.md) "Feedback and motion patterns".
+
+| Pattern | Where it is used | Why there and not elsewhere |
+| --- | --- | --- |
+| **CopyButton** (`components/copy-button.tsx`, logic in `lib/ui/copy.ts`) | Access-code reveal dialog, Executive and Chair submission links, amendment links, Passed amendments "Copy wording" | Replaces four ad-hoc copies. "Copied" only after the clipboard write resolves; a refusal or missing Clipboard API shows "Select and copy" and selects the read-only field. One polite announcement; fixed width; reverts after 2 s. The submission-link copy used to reset silently on failure. |
+| **Spinner / `PendingButton`** (`components/pending.tsx`, `lib/ui/pending.ts`) | Public resolution and amendment submit buttons; staff access "Open staff workspace" and "Retry access"; access-code Create/Rotate/Revoke/Refresh; "Load older passed amendments" | Only controls that wait on the network. `act()` (the durable local write behind every Chair action) is deliberately not decorated: it resolves in IndexedDB time, and the debate-critical paths gain no code, state or latency. The ring never says saved or synced. |
+| **SkeletonRows** (`components/skeleton.tsx`) | Passed amendment history first page when no device cache exists; access-code status table | The only two screens that read from the server after the workspace snapshot is already loaded. Every other screen renders from the snapshot, so no skeleton is needed or shown. System health already says "checking" in words for its probe. |
+| **Continuous tab indicator** (`components/shell.tsx`, `lib/ui/tab-indicator.ts`) | Workspace navigation in all four workspaces | One 3 px underline slides to the active tab. Routes, `aria-current`, menus and keyboard behaviour are unchanged; the per-tab underline remains the fallback. Other segmented selectors were not changed: none is a clear, trivial fit. |
+
+Behaviour that matters:
+
+- Skeletons appear only while there is nothing to show; cached or merged data is never replaced by placeholders during a
+  refresh. A failed first read shows its error, not "No passed amendments yet" or "Not created" for every access code.
+- Skeleton row heights are the typical final height (150 px for an amendment, 69 px for a table row). Amendment wording
+  varies in length, so a replacement row can be shorter or longer; nothing above the placeholder moves.
+- The pending ring is reserved (16 px slot, 8 px left padding, 4 px gap) so a button never changes width; labels no longer
+  swap to "Submitting…" or "Loading…".
+- The indicator does not animate on first mount. It remembers its position for 1.5 s because the route remounts the nav
+  on every navigation, so it still slides. On narrow screens, where tabs wrap onto rows, it slides along a row and jumps
+  between rows.
+
+Client bundle, `next build --webpack`, demo build, summed `<script>` chunks of the prerendered route (raw / gzip), same base
+commit before and after: `/chair` 1,193,458 / 352,295 B to 1,198,187 / 354,077 B (+4.7 kB raw, +1.8 kB gzip); `/about`
+931,270 / 277,709 B to 932,362 / 278,176 B (+1.1 kB, +0.5 kB; shared chunk only); global CSS 73,019 / 15,049 B to
+75,056 / 15,452 B (+2.0 kB, +0.4 kB). No dependency added. Next 16's route table no longer prints First Load JS, hence
+the manual sum.
+
+Verified: unit tests (`copy-button`, `pending`, `skeleton`, `tab-indicator`), typecheck, lint of changed files, production
+demo build and Playwright runs against it (indicator timing, resize, 640 px at 2x, phone, reduced motion, keyboard,
+clipboard success, refusal and missing API, widths). Not verified: real screen-reader output, the spinner and
+skeletons against a live Supabase read or a throttled network, and authenticated staging.
+
+Not adopted (per the selection brief): **Run Action Button** (fake staged progress, width changes), **Labeled Progress
+Indicator** (timer-driven fake percentage), **Command Search** (palette, global shortcut, substring match; the compact
+country combobox is the chosen control), **Inline Toast** (the persistent sync strip and in-dialog save errors stay) and
+**Expand Details** (measured-height animation; older feedback keeps the existing disclosure). Also left out: any
+animation or measuring dependency (`framer-motion`, `react-use-measure`, `cmdk`, Base UI, Hugeicons) and every page
+template or dashboard. Per-screen skeletons for the initial workspace read, and spinners on `act()`, were not added.
+
 ## Owner follow-up: button and spacing overhaul
 
 Claude owns the global button, alignment, panel-width and spacing cleanup requested on 19 October 2026.
@@ -255,10 +298,21 @@ What changed (this is a contract change, hence the review):
   `submit_resolution` RPC. `invalid_title` is removed from `SubmissionError`, `submissionMessages` and the known-error list
   (the RPC can only raise it for a title outside 3 to 200 characters, which the constant never is; an unexpected raise would
   surface as the generic "could not confirm" error). The bounded-body (64 KB), rate-limit, Docs-only and token checks are untouched.
-- **Chair create.** `newDocument.title` is optional in `lib/commands.ts`. The Chair form always sends the compatibility
-  value, so the existing SQL (`command->>'title'` into `documents.title text not null`, and into the draft version text) keeps
-  working unchanged; the local reducer falls back to the same value if a caller omits it. A command with NO title would be
-  rejected by PostgreSQL (not-null); that is deliberate and tested, which is why the client, not the server, supplies the value.
+- **Chair create.** `newDocument.title` is REQUIRED again in the `Command` type (`lib/commands.ts`), so the typed contract
+  guarantees it (a `@ts-expect-error` in `tests/title-free-resolutions.test.ts` fails typecheck if it ever turns optional). The
+  Chair form always sends the compatibility value, so the existing SQL (`command->>'title'` into `documents.title text not null`,
+  and into the draft version text) keeps working unchanged.
+- **Boundary normalisation (Codex finding: a title-less command must never reach PostgreSQL).** `normalizeCommand()` in
+  `lib/commands.ts` is a pure step run first in `DurableRepository.execute` (`lib/sync/repository.ts`), the one place every
+  command passes before the optimistic fingerprint, the local apply and the persisted outbox entry. For a `newDocument` whose
+  title is missing, null, blank or not a string (JS callers, tests, older code paths) it returns a copy with
+  `compatResolutionTitle()`; every other command, and any `newDocument` that already has a real title (including one queued
+  before titles were removed), is returned as the same object, so legacy queued commands persist and replay byte-identically.
+  Because it runs before persistence, the IndexedDB entry, the `apply_conference_mutation` payload and every idempotent retry
+  carry identical JSON. The local reducer's own fallback stays as a last resort.
+- **The server stays strict.** Nothing in SQL changed: a `newDocument` with no or null title is still rejected by PostgreSQL
+  (not-null), asserted by a direct RPC in `tests/title-free-resolutions-db.test.ts`. The fix is that the client can no longer send
+  one. Before the fix, a title-less create queued without a title, was refused with 23502 and was retained as a conflict.
 - **Fingerprints and the outbox.** `newDocument` has no optimistic fingerprint (it returns null with or without a title), so
   commands queued before this change (with a real title) replay exactly as before and are stored with that title.
 - Draft version text for a Chair-created draft is `Untitled resolution` followed (locally) by the draft notice, as before with the
@@ -266,7 +320,7 @@ What changed (this is a contract change, hence the review):
 
 What did not change: no migration, no RLS or grant change, no change to `submit_resolution`, `apply_mutation`, the snapshot
 projections or the `Resolution`/`Delegate` types. Existing stored titles, Google Doc names, version text and audit records
-are untouched, and nothing rewrites a code. `lib/supabase/*`, `lib/sync/*` and migrations are not edited here.
+are untouched, and nothing rewrites a code. `lib/supabase/*` and migrations are not edited here; `lib/sync/repository.ts` gains only the one `normalizeCommand` call.
 
 Why no migration: both server checks already accept the compatibility value (`title text not null`, 3 to 200 characters), so
 loosening them would only widen a protected contract for no benefit. A later migration could make `documents.title` nullable
@@ -282,5 +336,7 @@ Risks to check:
   approval-history projection reads `title`; none displays or matches it.
 
 Tests: `tests/title-free-resolutions.test.ts` (public route in demo and Supabase-backend paths, legacy title ignored, static
-forms, local create, fingerprint, outbox replay, identity on every screen) and `tests/title-free-resolutions-db.test.ts`
-(route to the real `submit_resolution` on the migrated schema, Chair create, history through Draft, Printed, In Debate and Closed).
+forms, local create, type contract, `normalizeCommand`, persisted outbox payload and replay, fingerprint, identity on every screen) and
+`tests/title-free-resolutions-db.test.ts` (route to the real `submit_resolution` on the migrated schema, Chair create, strict
+server, a title-less create through the real `DurableRepository` and `SupabaseTransport` into `apply_conference_mutation` in
+PGlite, history through Draft, Printed, In Debate and Closed).

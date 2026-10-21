@@ -76,11 +76,11 @@ task are never hidden behind a click; settings and history are.
 
 - Navigation: a user with one workspace is taken straight into it; there is no workspace picker. Within a
   workspace use at most five tabs, named for the job (Roll call, Debate, Resolutions, Participation, Sessions)
-  not the data model. The active tab has a 3 px `--brand` underline and `--ink` text.
+  not the data model. The active tab has a 3 px `--brand` underline (one indicator that moves, see Feedback and motion patterns) and `--ink` text.
 - Frequently used actions are always visible. Rare actions (rename, rebind, export) live under one "More"
   menu per region.
-- Empty states say what the screen is for and the single next step. Loading shows the final layout, greyed;
-  never a spinner on its own for more than a second.
+- Empty states say what the screen is for and the single next step. Loading shows the final layout, greyed
+  (skeleton rows); never a spinner on its own for more than a second.
 - Errors use plain language, say what happened to the user's data first ("Saved on this device, will send when
   online"), then what to do.
 
@@ -101,7 +101,8 @@ task are never hidden behind a click; settings and history are.
 - **Table.** Hairline rows, sticky header, tabular numerals, no zebra, ink-3 headers.
 - **Focus.** 3 px `--focus` ring with 2 px offset on every interactive element, never removed.
 - **Motion.** Colour and opacity transitions 120 ms; panels slide at most 8 px in 180 ms. Nothing animates
-  while a delegate or chair is typing. `prefers-reduced-motion` removes all movement.
+  while a delegate or chair is typing. `prefers-reduced-motion` removes all movement. Feedback patterns below
+  stay inside 120-180 ms, opacity and transform only.
 
 ## 7. Workspaces
 
@@ -114,6 +115,31 @@ the seal as a background.
 
 AA contrast; full keyboard operation; visible focus; status never by colour alone; labelled controls; live
 regions for save and sync status; `lang="en"`; touch targets as above; works at 200% zoom and 320 px width.
+
+## Feedback and motion patterns · 21 October 2026
+
+Ideas from Watermelon (MIT, [notice](WATERMELON_LICENSE.txt)) re-implemented in CSS and plain React; see
+[UI_OVERHAUL.md](UI_OVERHAUL.md) for where each is used and what was rejected. Constants:
+
+| Constant | Value | Where |
+| --- | --- | --- |
+| Pending threshold | 300 ms (`PENDING_INDICATOR_DELAY_MS`) | The ring appears only after this; it vanishes the moment the work ends. No minimum visible time, no added wait. |
+| Copied feedback | 2 s (`COPIED_RESET_MS`); failure prompt 4 s | Then the label returns to normal. Timers are cleared on unmount and on a new click. |
+| Transitions | 120-180 ms: label crossfade 150 ms, tab indicator 150 ms | Opacity/transform only. Skeleton pulse 1.6 s and ring 0.8 s are the only repeating motion. |
+
+- **Copy button** (`CopyButton`). Native `<button>` with a visible focus ring. The three labels (Copy, Copied, Select
+  and copy) share one grid cell, so the button keeps the width of the longest. "Copied" only after the clipboard write
+  resolves; refusal or no Clipboard API shows "Select and copy" and the caller selects the field. One polite
+  `role="status"` announcement, silent on revert. Replaces every ad-hoc copy; do not add another.
+- **Spinner** (`PendingButton`). 16 px ring in a slot the button always reserves, beside a label that never changes.
+  `aria-busy` on the button and one status text spoken when the ring appears. Only for controls waiting on the network,
+  never for local durable writes; it is a busy indicator, never proof of "saved" or "synced". Reduced motion: static ring.
+- **Skeleton** (`SkeletonRows`). Decorative row shapes (hidden from assistive technology) with one `role="status"`
+  "Loading …" and `aria-busy`. Only for a genuine first read with nothing cached; never over visible data, never before
+  an empty state. Opacity pulse; static under reduced motion. Give it the final row height.
+- **Tab indicator.** One 3 px `--brand` underline, placed by measuring the active tab and moved by transform. No
+  animation on first mount, no label movement, focus outlines untouched. It is an enhancement: when it cannot measure
+  (or before hydration) each tab draws its own underline. Reduced motion: it sits in place with no transition.
 
 ## Chair interaction additions · 19 October 2026
 

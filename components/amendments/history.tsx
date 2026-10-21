@@ -7,17 +7,13 @@ import { historyCache, historyCacheKey, historyContext, usableCache, type Histor
 import type { Amendment } from '@/lib/batch/types';
 import { Chip, Empty, Panel } from '@/components/ui';
 import { GoogleDocButton } from '@/components/operations/resolution-links';
+import { CopyButton } from '@/components/copy-button';
+import { PendingButton } from '@/components/pending';
+import { SkeletonRows } from '@/components/skeleton';
 import { ResolutionName } from '@/components/resolution-identity';
 import { resolutionIdentity } from '@/lib/resolution-identity';
 
 const time = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-
-/** Copy feedback is shown only after the clipboard write resolves; a refusal says so instead of pretending. */
-function CopyWording({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const copy = () => { navigator.clipboard.writeText(text).then(() => setState('copied'), () => setState('failed')); };
-  return <><button type="button" onClick={copy}>{state === 'copied' ? 'Copied' : 'Copy wording'}</button>{state === 'failed' && <span className="field-error" role="alert">Copy failed. Select the wording and copy it manually.</span>}</>;
-}
 
 /** Every passed amendment for the committee, grouped by its original resolution, kept after closure and session changes.
  *  Pages fetched online are also kept in a read-only device cache (lib/amendments/history-cache.ts) for offline reloads. */
@@ -72,7 +68,12 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
   return <Panel title="Passed amendments" action={<Chip tone="green">{groups.reduce((n, g) => n + g.amendments.length, 0)}</Chip>}>
     {status === 'error' && <p className="callout" role="alert">Older passed amendments could not be loaded. Showing those already on this device. <button type="button" onClick={retry}>Retry</button></p>}
     <div className="panel-body" style={{ display: 'grid', gap: '1.25rem' }}>
-    {!groups.length ? <Empty title={status === 'loading' ? 'Loading passed amendments…' : 'No passed amendments yet'} text="Amendments that pass stay here, grouped by resolution, after debate ends." /> :
+    {!groups.length ? (
+      // No data yet: a first uncached read shows placeholders; a failed read shows only the error above, never "No ... yet".
+      status === 'loading' ? <SkeletonRows label="Loading passed amendments…" rows={3} height={150} lines={3} /> :
+      status === 'error' ? null :
+      <Empty title="No passed amendments yet" text="Amendments that pass stay here, grouped by resolution, after debate ends." />
+    ) :
       groups.map(g => {
         const workingDoc = links.find(l => l.documentId === g.resolutionId)?.workingDocId ?? offline.context.workingDocs[g.resolutionId];
         // The live resolution reads its Main Submitter from this committee's delegates; a resolution known only from the
@@ -88,13 +89,13 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
             return <article key={a.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '1rem' }}>
               <div className="actions"><Chip tone="green">Passed</Chip><strong>{a.type}</strong><span>{a.clause}</span><span className="muted">{submitter ? `${submitter.flag} ${submitter.country}` : 'Delegation not on this device'} · submitted {time(a.createdAt)}</span></div>
               <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{a.wording}</p>
-              <div className="actions"><CopyWording text={amendmentCopyText(a, submitter)} /></div>
+              <div className="actions"><CopyButton text={amendmentCopyText(a, submitter)} label="Copy wording" failedAnnouncement="Copy failed. Select the wording and copy it manually." /></div>
             </article>;
           })}
         </section>;
       })}
     </div>
-    {cloud && next && <div className="actions"><button type="button" disabled={status === 'loading'} onClick={() => void older(next)}>{status === 'loading' ? 'Loading…' : 'Load older passed amendments'}</button></div>}
+    {cloud && next && <div className="actions"><PendingButton disabled={status === 'loading'} pending={status === 'loading'} pendingLabel="Loading older passed amendments…" onClick={() => void older(next)}>Load older passed amendments</PendingButton></div>}
     <p className="footnote">{cloud ? `Older history loads ${PASSED_HISTORY_PAGE} at a time.` : 'Showing amendments held on this device.'} The time shown is when the amendment was submitted; Conference OS does not record the time it passed.</p>
   </Panel>;
 }

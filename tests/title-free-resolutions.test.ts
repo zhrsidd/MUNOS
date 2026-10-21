@@ -12,7 +12,7 @@ import { ConferenceProvider } from "../lib/context";
 import { repository } from "../lib/repository";
 import { grantAccess } from "../lib/access";
 import { createSeed } from "../lib/seed";
-import { applyCommand, type Command } from "../lib/commands";
+import { applyCommand, normalizeCommand, type Command } from "../lib/commands";
 import { DurableRepository, fingerprint, type Transport } from "../lib/sync/repository";
 import { DurableStore, type Mutation } from "../lib/sync/store";
 import { COMPAT_RESOLUTION_TITLE, compatResolutionTitle } from "../lib/resolution-title";
@@ -137,7 +137,7 @@ test("the public form has no title input or label, and keeps the country, link a
   assert.match(html, /I have made sure the Chairs can edit this document\./);
   assert.match(html, /Files \(PDF or Word\) are not accepted/);
   assert.doesNotMatch(html, /type="file"/);
-  assert.match(html, /<button class="button primary submit-button">Submit resolution<\/button>/);
+  assert.match(html, /<button type="submit" class="pending-button button primary submit-button"><span class="spinner" data-active="false" aria-hidden="true"><\/span>Submit resolution<\/button>/);
 });
 
 test("the room sheet no longer tells delegates to enter a title", async () => {
@@ -174,8 +174,9 @@ test("the Chair's New resolution form asks only for the Main Submitter and keeps
 
 test("a Chair draft created without any title is stored with the compatibility title, a draft text to match, and the next code", () => {
   const before = seed();
-  const command: Command = { type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
-  const after = applyCommand(before, command, "chair", { id: "m1", actorId: "chair-demo" } as Mutation);
+  const command = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  // The type requires a title (see the contract test below); this is what an untyped JS caller or an old path could pass.
+  const after = applyCommand(before, command as unknown as Command, "chair", { id: "m1", actorId: "chair-demo" } as Mutation);
   const created = after.documents.find(d => !before.documents.some(b => b.id === d.id))!;
   assert.equal(created.title, COMPAT_RESOLUTION_TITLE);
   assert.equal(created.status, "Draft");
@@ -194,10 +195,39 @@ test("a Chair draft created without any title is stored with the compatibility t
   assert.equal(applyCommand(before, { ...command, title: "   " }, "chair", { id: "m4", actorId: "chair-demo" } as Mutation).documents.at(-1)!.title, COMPAT_RESOLUTION_TITLE);
 });
 
+test("contract: the typed newDocument command requires a title", () => {
+  // tsc checks this file: if `title` ever becomes optional again the directive below is unused and typecheck fails.
+  // @ts-expect-error `title` is required on newDocument (documents.title is not null; the SQL rejects a command without it)
+  const missing: Command = { type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const typed: Command = { type: "newDocument", committeeId: "ga1", sessionId: "s1", title: compatResolutionTitle(), submitterId: "d1" };
+  assert.equal(normalizeCommand(typed), typed, "a typed command is already complete");
+  assert.equal(normalizeCommand(missing).type, "newDocument");
+});
+
+test("normalizeCommand fills the compatibility title for a missing, null, blank or non-string title and nothing else", () => {
+  const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const compat = { ...base, title: COMPAT_RESOLUTION_TITLE };
+  for (const title of [undefined, null, "", "   ", "\n\t", 42, {}, ["x"], false]) {
+    const input = (title === undefined ? base : { ...base, title }) as unknown as Command;
+    const before = JSON.stringify(input);
+    assert.deepEqual(normalizeCommand(input), compat, `title ${JSON.stringify(title)}`);
+    assert.equal(JSON.stringify(input), before, "the input is never mutated");
+  }
+  // A command that already carries a real title (including one queued before titles were removed) is the same object.
+  for (const title of ["Queued before the change", compatResolutionTitle(), "  padded real title  ", "ab"]) {
+    const legacy: Command = { ...base, title };
+    assert.equal(normalizeCommand(legacy), legacy, `real title ${JSON.stringify(title)} is left untouched`);
+  }
+  // Every other command is returned as it came.
+  const other: Command = { type: "queue", sessionId: "s1", advance: true };
+  assert.equal(normalizeCommand(other), other);
+  assert.equal(JSON.stringify(normalizeCommand(base as unknown as Command)), JSON.stringify(compat), "deterministic bytes: identical on every retry");
+});
+
 test("the create command has no title in its optimistic fingerprint, with or without one", () => {
   const data = seed();
   const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
-  assert.equal(fingerprint(data, base), null);
+  assert.equal(fingerprint(data, base as unknown as Command), null);
   assert.equal(fingerprint(data, { ...base, title: "Legacy" }), null, "a command queued with a title fingerprints exactly as before");
   assert.equal(fingerprint(data, { ...base, title: compatResolutionTitle() }), null);
 });
@@ -221,7 +251,7 @@ test("outbox: a create command queued before the change (with a title) and one a
   const initial = repo.getSnapshot()!.documents.length;
   await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", title: "Queued before the change", submitterId: "d1" }, "chair");
   await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", title: compatResolutionTitle(), submitterId: "d2" }, "chair");
-  await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d3" }, "chair");
+  await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d3" } as unknown as Command, "chair");
   await tick();
   assert.equal(repo.getHealth().pending, 3);
   repo.dispose(); await store.close();
@@ -239,6 +269,43 @@ test("outbox: a create command queued before the change (with a title) and one a
   await repo.flush();
   assert.equal(server.data.documents.length, initial + 3, "a further flush creates nothing twice");
   repo.dispose(); await reopened.close();
+});
+
+test("outbox: a title-less create is normalised BEFORE it is queued; the persisted entry, the wire payload and the replay all carry the compatibility title", async () => {
+  const name = "title-free-payload-" + crypto.randomUUID();
+  const store = new DurableStore(name), server = new Server(), sent: unknown[] = [];
+  const send = server.send.bind(server);
+  server.send = async (m: Mutation) => { await send(m); sent.push(JSON.parse(JSON.stringify(m.command))); }; // only requests that reached the server
+  const repo = new DurableRepository("ga1", createSeed, store, server);
+  await repo.ready(); await tick();
+  try {
+  const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const variants = [base, { ...base, title: null }, { ...base, title: "" }, { ...base, title: "   " }, { ...base, title: 7 }];
+  for (const v of variants) await repo.execute(v as unknown as Command, "chair");
+  const real: Command = { ...base, title: "Queued before the change" };
+  await repo.execute(real, "chair");
+  await tick();
+  const queued = (await store.read("ga1"))!.pending;
+  assert.equal(queued.length, 6);
+  for (const m of queued.slice(0, 5)) {
+    assert.deepEqual(m.command, { ...base, title: COMPAT_RESOLUTION_TITLE }, "the stored outbox JSON already has the title");
+    assert.equal(m.expected, null);
+  }
+  assert.deepEqual(queued[5].command, real, "a legacy command with a real title is persisted byte-identically");
+  assert.equal(JSON.stringify(queued[5].command), JSON.stringify(real));
+  assert.equal(repo.getSnapshot()!.documents.filter(d => d.title === COMPAT_RESOLUTION_TITLE).length >= 5, true, "applied locally with the same title");
+  server.online = true;
+  await repo.flush(); await repo.flush();
+  assert.equal(repo.getHealth().pending, 0);
+  assert.equal(sent.length, 6);
+  for (const c of sent.slice(0, 5)) assert.equal((c as { title?: unknown }).title, COMPAT_RESOLUTION_TITLE, "nothing without a title is ever sent");
+  assert.deepEqual(sent[5], real);
+  // Replaying every queued mutation (a lost response) is idempotent and identical.
+  const count = server.data.documents.length;
+  for (const m of queued) await server.send(m);
+  assert.equal(server.data.documents.length, count);
+  assert.deepEqual(sent.slice(6).map(c => JSON.stringify(c)), queued.map(m => JSON.stringify(m.command)), "replay payloads equal the queued JSON");
+  } finally { repo.dispose(); await store.close(); }
 });
 
 test("every screen still names a title-free resolution GA1/xx — Country; the compatibility title is shown nowhere and never searched", async t => {

@@ -1,13 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useRef } from 'react';
 import { useConference } from '@/lib/context';
 import { QrCode } from '@/components/operations/submission-links';
 import { Chip, PageHeading, Panel } from '@/components/ui';
+import { CopyButton } from '@/components/copy-button';
 const url = (token: string) => `${typeof window === 'undefined' ? '' : window.location.origin}/amend/${token}`;
 function newToken() { const bytes = crypto.getRandomValues(new Uint8Array(24)); return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(''); }
 function Copy({ token }: { token: string }) {
-  const [message, setMessage] = useState('Copy link');
-  return <div className="link-field"><input aria-label="Amendment submission link" readOnly value={url(token)} onFocus={event => event.target.select()} /><button onClick={() => void navigator.clipboard.writeText(url(token)).then(() => setMessage('Copied'), () => setMessage('Select and copy the link'))}>{message}</button></div>;
+  const field = useRef<HTMLInputElement>(null);
+  return <div className="link-field"><input ref={field} aria-label="Amendment submission link" readOnly value={url(token)} onFocus={event => event.target.select()} /><CopyButton text={url(token)} label="Copy link" onFailure={() => field.current?.select()} /></div>;
 }
 export function AmendmentQrPanel({ committeeId }: { committeeId: string }) {
   const { data } = useConference(); const committee = data.committees.find(c => c.id === committeeId); const link = data.amendmentLinks?.find(l => l.committeeId === committeeId);

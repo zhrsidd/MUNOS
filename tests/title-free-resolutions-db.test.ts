@@ -1,8 +1,14 @@
+import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshDatabase} from './helpers/database';
 import {POST as submit} from '../app/api/submissions/route';
 import {COMPAT_RESOLUTION_TITLE,compatResolutionTitle} from '../lib/resolution-title';
+import type {SupabaseClient} from '@supabase/supabase-js';
+import type {Command} from '../lib/commands';
+import {SupabaseTransport} from '../lib/supabase/repository';
+import {DurableRepository} from '../lib/sync/repository';
+import {DurableStore} from '../lib/sync/store';
 
 // Title-free resolutions against the real migrations (PGlite replays every one): the existing SQL is unchanged and still
 // receives a valid title, from the public route and from the Chair command.
@@ -127,6 +133,8 @@ test('Chair create: the compatibility title satisfies the unchanged SQL; a title
   await asOwner();assert.equal((await query<{title:string}>('select title from public.documents where id=$1',[old.slice(0,24)+'000000000001']))[0].title,'Queued before the change');
   // The SQL itself has no title rule beyond not-null: this is why the client always sends the value.
   await assert.rejects(()=>send(chair,{type:'newDocument',committeeId:ids.ga1,sessionId:ids.session,submitterId:ids.france},'chair'),/null value/i);
+  await assert.rejects(()=>send(chair,{type:'newDocument',committeeId:ids.ga1,sessionId:ids.session,title:null,submitterId:ids.france},'chair'),/null value/i,'the server stays strict: a null title is refused too');
+  await asOwner();assert.equal((await query('select 1 from public.documents where title is null')).length,0);
  }finally{await db.close();}
 });
 
@@ -157,4 +165,68 @@ test('feedback and history stay visible for a title-free resolution through Draf
   assert.deepEqual(closed.map(h=>h.decision),['review_started','changes_requested','approved'],'Closed');
   assert.equal(closed.find(h=>h.decision==='changes_requested')!.comment,'Cite sources.');
  }finally{await db.close();}
+});
+
+// The same Chair create, but through the real client path: DurableRepository (queue + outbox) -> SupabaseTransport ->
+// public.apply_conference_mutation, with PGlite standing in for PostgREST. The SQL above stays strict; the client never
+// lets a title-less create reach it.
+async function durableChair(){
+ const f=await setup();const {ids,query,as,asOwner,db}=f;
+ const wire:{name:string;mutation:string;command:Record<string,unknown>}[]=[];
+ const failures:{code?:string;message:string}[]=[];
+ let online=false;
+ const client={rpc:async(name:string,args:Record<string,unknown>)=>{
+  if(!online)return {data:null,error:{message:'Failed to fetch'},status:0};
+  await as(chair);
+  try{
+   if(name.startsWith('apply_')){
+    wire.push({name,mutation:String(args.mutation),command:JSON.parse(JSON.stringify(args.command))});
+    await db.query(`select public.${name}($1,$2,$3,$4,$5,$6)`,[args.conf,args.mutation,JSON.stringify(args.command),args.requested_role,args.expected,args.client_time]);
+    return {data:null,error:null,status:200};
+   }
+   return {data:(await query<{r:unknown}>(`select public.${name}($1) r`,[args.conf]))[0].r,error:null,status:200};
+  }catch(e){const x=e as {code?:string;message:string};failures.push({code:x.code,message:x.message});return {data:null,error:{code:x.code,message:x.message},status:400};}
+ }} as unknown as SupabaseClient;
+ const transport=new SupabaseTransport(client,ids.conference,chair);
+ online=true;const seedData=await transport.read();online=false;
+ const name='title-free-db-'+crypto.randomUUID(),store=new DurableStore(name);
+ const repo=new DurableRepository(name,()=>structuredClone(seedData),store,transport);
+ await repo.ready();
+ // Back online: keep asking for a sync (a flush already in flight is skipped) until the outbox drains or a conflict stops it.
+ const sync=async()=>{online=true;for(let n=0;n<500;n++){await repo.flush();if(repo.getHealth().pending===0||repo.getHealth().conflicts>0)return;await new Promise(r=>setTimeout(r,10));}assert.fail('outbox did not drain');};
+ const docs=async(ids2:string[])=>{await asOwner();return query<{id:string;title:string;status:string;submitterId:string}>('select id,title,status,"submitterId" from public.documents where id=any($1::uuid[]) order by id',[ids2]);};
+ const close=async()=>{repo.dispose();await store.close();await db.close();};
+ return {...f,wire,failures,repo,store,name,transport,sync,docs,close};
+}
+const create=(extra:Record<string,unknown>,ids:Record<string,string>)=>({type:'newDocument',committeeId:ids.ga1,sessionId:ids.session,submitterId:ids.france,...extra}) as unknown as Command;
+
+test('a title-less create through the real DurableRepository + SupabaseTransport reaches apply_conference_mutation with the compatibility title and SUCCEEDS',async()=>{
+ const t=await durableChair();const {ids,repo,store,name,wire,failures,transport,sync,docs,query,asOwner}=t;
+ try{
+  // Missing, null, blank and non-string titles (JS callers, tests, older code paths), plus the typed command the form sends.
+  const variants=[{},{title:null},{title:''},{title:'   '},{title:7},{title:compatResolutionTitle()}];
+  for(const v of variants)await repo.execute(create(v,ids),'chair');
+  await repo.execute(create({title:'Queued before the change'},ids),'chair');
+  const queued=(await store.read(name))!.pending;
+  assert.equal(queued.length,7,'everything is queued durably while offline');
+  for(const m of queued.slice(0,6))assert.deepEqual(m.command,create({title:COMPAT_RESOLUTION_TITLE},ids),'the persisted outbox JSON already carries the compatibility title');
+  assert.equal(JSON.stringify(queued[6].command),JSON.stringify(create({title:'Queued before the change'},ids)),'a legacy command with a real title is persisted byte-identically');
+  await sync();
+  assert.deepEqual(failures,[],'PostgreSQL rejected nothing');
+  assert.equal(repo.getHealth().conflicts,0);assert.equal(repo.getHealth().pending,0);
+  assert.equal(wire.length,7);
+  for(const w of wire){assert.equal(w.name,'apply_conference_mutation');assert.equal(typeof w.command.title,'string');}
+  assert.deepEqual(wire.map(w=>w.command.title),[...Array(6).fill(COMPAT_RESOLUTION_TITLE),'Queued before the change']);
+  const rows=await docs(queued.map(m=>m.id.slice(0,24)+'000000000001'));
+  assert.equal(rows.length,7,'every create landed exactly once');
+  assert.deepEqual(rows.map(r=>r.status),Array(7).fill('Draft'));
+  assert.equal(rows.filter(r=>r.title===COMPAT_RESOLUTION_TITLE).length,6);
+  assert.equal(rows.find(r=>r.id===queued[6].id.slice(0,24)+'000000000001')!.title,'Queued before the change');
+  // Replay (a lost response resends the same mutation id with the same JSON) is idempotent: no second document, same bytes.
+  const sentBefore=wire.length;
+  for(const m of queued)await transport.send(m);
+  assert.deepEqual(wire.slice(sentBefore).map(w=>JSON.stringify(w.command)),wire.slice(0,sentBefore).map(w=>JSON.stringify(w.command)),'replay is byte-identical to the first send');
+  assert.deepEqual(failures,[]);
+  await asOwner();assert.equal((await query<{n:number}>('select count(*)::int n from public.documents where id=any($1::uuid[])',[queued.map(m=>m.id.slice(0,24)+'000000000001')]))[0].n,7);
+ }finally{await t.close();}
 });

@@ -52,11 +52,12 @@ export type Command =
       committeeId: string;
       sessionId: string;
       /**
-       * Legacy compatibility value only (`documents.title` is not null). New resolutions are not named: the client sends
-       * `compatResolutionTitle()` and nothing displays it. Optional so a caller may omit it; commands queued before the
-       * title was removed still carry a real one, which is kept as history.
+       * Legacy compatibility value only (`documents.title` is not null and the SQL rejects a command without it). New
+       * resolutions are not named: the client sends `compatResolutionTitle()` and nothing displays it. REQUIRED, so
+       * the type guarantees it; `normalizeCommand` fills it for untyped callers before anything is queued or sent.
+       * Commands queued before the title was removed still carry a real one, which is kept as history.
        */
-      title?: string;
+      title: string;
       submitterId: string;
     }
   | { type: "queue"; delegateId?: string; sessionId: string; advance?: boolean }
@@ -115,6 +116,20 @@ export type Command =
   | { type: "school"; name: string }
   | { type: "staff"; name: string; role: Role; committeeIds: string[]; email?: string }
   | { type: "staffContact"; id: string; email: string };
+/**
+ * The ONE normalisation every command passes through before it is applied locally or queued in the durable outbox
+ * (DurableRepository.execute): a `newDocument` whose title is missing, null, blank or not a string gets the
+ * compatibility title, because `documents.title` is not null and PostgreSQL rejects a command without it. The type
+ * already requires a title; this covers JS callers, tests and older code paths. It runs before the optimistic
+ * fingerprint and before anything is persisted, so the queued JSON, its replay and the idempotent server retry are
+ * identical. A command that already carries a real title (including one queued before titles were removed) is
+ * returned untouched, as the same object. Pure: never mutates its input.
+ */
+export function normalizeCommand(c: Command): Command {
+  if (c.type === "newDocument" && (typeof c.title !== "string" || !c.title.trim()))
+    return { ...c, title: compatResolutionTitle() };
+  return c;
+}
 export interface ConferenceRepository {
   getSnapshot(): ConferenceData | null;
   subscribe(listener: () => void): () => void;
