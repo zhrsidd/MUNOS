@@ -90,7 +90,7 @@ export const KNOWLEDGE: Entry[] = [
       chair: {
         text: "Speech points are recorded on the Debate page while the speech has the floor.",
         steps: ["Recognize the speaker with “Next speaker · <country>” (or “Invite Main Submitter”).", "Under “Record this speech”, press the configured value (+1, +2 or +3 unless the Executive changed them).", "Press “Finish · return floor to Chair” when the speech ends."],
-        mistakes: `Scoring the Main Submitter’s speech also credits Main Submitter +${MAIN_SUBMITTER_POINTS}, once per resolution. To fix a score afterwards, use Participation → Event history → Edit.`,
+        mistakes: `Scoring the Main Submitter’s speech also credits the Main Submitter points (+${MAIN_SUBMITTER_POINTS} unless the Executive changed them), once per resolution. To fix a score afterwards, use Participation → Event history → Edit.`,
         href: "/chair", linkLabel: "Open Debate",
       },
     },
@@ -106,7 +106,7 @@ export const KNOWLEDGE: Entry[] = [
         mistakes: "Speech and POI points are normally recorded from the Debate page during the speech.",
         href: "/chair/participation", linkLabel: "Open Participation",
       },
-      admin: { text: `Point values are set in Operations → Scoring: Speech and POI values, with optional per-committee overrides. Main Submitter is fixed at +${MAIN_SUBMITTER_POINTS}.`, href: "/admin/scoring", linkLabel: "Open Scoring" },
+      admin: { text: `Point values for every category, including Main Submitter, are set in Operations → Scoring, with optional per-committee overrides.`, href: "/admin/scoring", linkLabel: "Open Scoring" },
     },
   },
   {
@@ -114,7 +114,7 @@ export const KNOWLEDGE: Entry[] = [
     all: ["scoringConfig"], any: ["how", "participation", "speech", "poi"],
     examples: ["change speech values", "configure scoring"],
     answers: {
-      admin: { text: `Operations → Scoring sets the conference defaults, with optional per-committee overrides. Each category takes 1–10 whole-number values from 0 to 20; Main Submitter is fixed at +${MAIN_SUBMITTER_POINTS}. Past events keep their original points.`, href: "/admin/scoring", linkLabel: "Open Scoring" },
+      admin: { text: `Operations → Scoring sets the conference defaults, with optional per-committee overrides. Each category takes 1–10 whole-number values from 0 to 20; Main Submitter takes one value from 1 to 20 (default +${MAIN_SUBMITTER_POINTS}). Past events keep their original points.`, href: "/admin/scoring", linkLabel: "Open Scoring" },
     },
   },
   {
@@ -160,7 +160,7 @@ export const KNOWLEDGE: Entry[] = [
     answers: {
       chair: {
         text: "With a resolution in debate (and no amendment debate open), press “Invite Main Submitter · <country>” on Debate. During that speech, choose a delegate under “Yield to a Co-Submitter” and press “Yield floor”; the Co-Submitter then returns the floor to the Chair.",
-        mistakes: `Scoring the Main Submitter’s speech also credits Main Submitter +${MAIN_SUBMITTER_POINTS}, once per resolution. The button reads “(mark present first)” until the Main Submitter is marked present in Roll call. Main Submitter and Co-Submitter speeches are not available during an amendment debate.`,
+        mistakes: `Scoring the Main Submitter’s speech also credits the Main Submitter points (+${MAIN_SUBMITTER_POINTS} unless the Executive changed them), once per resolution. The button reads “(mark present first)” until the Main Submitter is marked present in Roll call. Main Submitter and Co-Submitter speeches are not available during an amendment debate.`,
         href: "/chair", linkLabel: "Open Debate",
       },
     },

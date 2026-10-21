@@ -32,7 +32,7 @@ export interface IdentityResolution {
   committeeId?: string | null;
   /**
    * Country published by the server for readers whose snapshot excludes delegates (Approval, Logistics). Used only
-   * when the delegate itself cannot be found. Nothing publishes it yet; see docs/UI_OVERHAUL.md.
+   * when the delegate itself cannot be found. Published by migration 20261021130000 (documents and decision history).
    */
   submitterCountry?: string | null;
 }

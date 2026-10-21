@@ -10,7 +10,7 @@ import { Command, repository } from "@/lib/repository";
 import { Role } from "@/lib/domain";
 import { parseCSV, validateImport } from "@/lib/import";
 import { countryFlag } from "@/lib/countries";
-import { conferenceScoring, effectiveScoring, isConfigurableScoring, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
+import { conferenceScoring, effectiveScoring, MAIN_SUBMITTER_ID, parseScoringValues, REQUIRED_SCORING, scoringProblem } from "@/lib/scoring";
 import { Metric, Search } from "./chair";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { useDemo } from "./operations/submission-links";
@@ -346,7 +346,7 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "staff" && (
         <Panel
           title="Staff assignments"
-          subtitle="Assigned Chair contact emails are shown on the committee submission form. Directory contacts do not grant app access."
+          subtitle="Assigned Chair contact emails are shown on the committee submission form. A Chair's school includes them in that school's group photo. Directory contacts do not grant app access."
         >
           <div className="table-scroll">
             <table>
@@ -356,6 +356,7 @@ export function AdminScreen({ section }: { section: string }) {
                   <th>Role</th>
                   <th>Committee scope</th>
                   <th>Contact email</th>
+                  <th>Photo school</th>
                 </tr>
               </thead>
               <tbody>
@@ -374,6 +375,7 @@ export function AdminScreen({ section }: { section: string }) {
                         .join(", ") || "Conference-wide"}
                     </td>
                     <td><StaffContact key={`${s.id}-${s.contactRevision}`} id={s.id} email={s.email ?? ""} name={s.name} /></td>
+                    <td>{s.role === "chair" ? <StaffSchool id={s.id} schoolId={s.schoolId ?? null} name={s.name} /> : <span className="muted">Chairs only</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -841,6 +843,28 @@ function StaffContact({id,email,name}:{id:string;email:string;name:string}) {
   </form>;
 }
 
+function StaffSchool({ id, schoolId, name }: { id: string; schoolId: string | null; name: string }) {
+  const { data, act } = useConference();
+  return (
+    <select aria-label={`${name} photo school`} value={schoolId ?? ""} onChange={(e) => void act({ type: "staffSchool", staffId: id, schoolId: e.target.value || null }, "admin")}>
+      <option value="">No school</option>
+      {data.schools.map((school) => (
+        <option key={school.id} value={school.id}>{school.name}</option>
+      ))}
+    </select>
+  );
+}
+
+function scoringDescription(id: string) {
+  switch (id) {
+    case "speech": return "Chair-judged value for each delivered speech";
+    case "poi": return "Chair-judged value after a recognized POI is asked";
+    case MAIN_SUBMITTER_ID: return "One value, credited once per resolution on the Main Submitter’s first scored speech";
+    case "amendment": return "Chair-awarded points for a debated amendment";
+    default: return "Chair-awarded points";
+  }
+}
+
 /** Executive → Scoring. Works on a blank conference: required procedure categories always show, with
  *  built-in defaults until an Executive establishes them. Categories cannot be deleted. */
 function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope: string) => void }) {
@@ -849,7 +873,7 @@ function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope:
   const [busy, setBusy] = useState(false);
   const committee = data.committees.find((c) => c.id === scope);
   const definitions = committee ? effectiveScoring(data, committee.id) : conferenceScoring(data);
-  const unsaved = REQUIRED_SCORING.filter((r) => isConfigurableScoring(r.id) && !data.scoring.some((s) => s.id === r.id));
+  const unsaved = REQUIRED_SCORING.filter((r) => !data.scoring.some((s) => s.id === r.id));
   async function save(id: string, text: string) {
     const values = parseScoringValues(text);
     const problem = scoringProblem(id, values);
@@ -886,38 +910,25 @@ function ScoringSettings({ scope, setScope }: { scope: string; setScope: (scope:
       <Panel title="Point definitions" subtitle="Chairs choose from these values on the Debate Console. One event equals one opportunity, regardless of its quality points.">
         {error && <p className="form-error" role="alert">{error}</p>}
         {definitions.map((s) => {
-          if (!isConfigurableScoring(s.id))
-            return (
-              <div className="definition-row" key={`${scope}-${s.id}`}>
-                <div>
-                  <strong>{s.label}</strong>
-                  <p>Fixed, once per resolution, on the Main Submitter’s first scored speech</p>
-                </div>
-                <label>
-                  Points
-                  <input readOnly value={`+${s.values[0]}`} aria-label={`${s.label} points, fixed`} />
-                </label>
-                <span className="definition-lock">Not configurable</span>
-              </div>
-            );
           const builtIn = !data.scoring.some((x) => x.id === s.id);
           const overridden = !!committee?.scoringOverrides?.some((x) => x.id === s.id);
+          const submitter = s.id === MAIN_SUBMITTER_ID;
           return (
             <form className="definition-row" key={`${scope}-${s.id}-${s.values}`} onSubmit={(e) => { e.preventDefault(); void save(s.id, String(new FormData(e.currentTarget).get("values"))); }}>
               <div>
                 <strong>{s.label}</strong>
-                <p>{s.id === "speech" ? "Chair-judged value for each delivered speech" : s.id === "poi" ? "Chair-judged value after a recognized POI is asked" : "Chair-awarded points"}{committee ? (overridden ? " · committee override" : " · conference default") : builtIn ? " · built-in default" : ""}</p>
+                <p>{scoringDescription(s.id)}{committee ? (overridden ? " · committee override" : " · conference default") : builtIn ? " · built-in default" : ""}</p>
               </div>
               <label>
-                Allowed values
-                <input name="values" required defaultValue={s.values.join(", ")} aria-label={`${s.label} allowed values`} />
+                {submitter ? "Points" : "Allowed values"}
+                <input name="values" required inputMode={submitter ? "numeric" : undefined} defaultValue={s.values.join(", ")} aria-label={submitter ? `${s.label} points` : `${s.label} allowed values`} />
               </label>
               <button disabled={busy}>Save definition</button>
             </form>
           );
         })}
       </Panel>
-      <p className="footnote">Historical events retain their original points when definitions change. Speaker suggestions use opportunity counts. Awards remain Chair judgement; there is no automatic ranking.</p>
+      <p className="footnote">Historical events, including earlier Main Submitter credits, keep their original points when definitions change. Speaker suggestions use opportunity counts. Awards remain Chair judgement; there is no automatic ranking.</p>
     </>
   );
 }

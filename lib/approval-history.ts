@@ -39,14 +39,14 @@ export function approvalHistory(data: ConferenceData, documentId?: string): Hist
     if (documentId && x.documentId !== documentId) continue;
     const doc = data.documents.find((r) => r.id === x.documentId);
     // The server projection carries the code (and committee), so history survives the resolution leaving this reader's view.
-    // It has no submitter: the country comes from the reader's own documents and delegates, or reads "Main submitter unavailable".
+    // It also carries the Main Submitter's country, so the identity resolves even when the document and delegates are out of view.
     if (!doc && !x.code) continue;
     const code = x.code ?? doc?.code ?? "";
     entries.set(x.id, {
       id: x.id,
       documentId: x.documentId,
       code,
-      identity: identify({ code, submitterId: doc?.submitterId, committeeId: doc?.committeeId ?? x.committeeId }),
+      identity: identify({ code, submitterId: doc?.submitterId, committeeId: doc?.committeeId ?? x.committeeId, submitterCountry: x.submitterCountry ?? doc?.submitterCountry }),
       kind: x.decision,
       label: decisionLabel[x.decision],
       round: x.decision === "comment" ? 0 : x.round,
