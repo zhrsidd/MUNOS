@@ -30,13 +30,21 @@ begin
  return replace(definition,anchor,replacement);
 end $$;
 
--- 2) private.apply_procedure: the automatic Main Submitter credit uses the committee's configured value.
+-- 2) private.apply_procedure: the automatic Main Submitter credit uses the committee's configured value. A speech
+--    score carries the credit the saving device awarded ("submitterPoints"; absent on actions saved before this
+--    migration, which always awarded +5). When the credit is due and that value is not the current setting, the
+--    action is refused as a stale write (PT409, a retained conflict on the device), never repriced. Mirrors
+--    lib/procedure/commands.ts. When no credit is due (already recorded), the carried value is not consulted.
 do $patch$
 declare definition text;
 begin
  definition:=pg_get_functiondef('private.apply_procedure(uuid,uuid,jsonb,public.conference_role,text,timestamptz)'::regprocedure);
  definition:=pg_temp.patch_once(definition,
-  $q$sp."resolutionId",'submitter',5,actor,client_time,sp.id,sp.classification);$q$,
-  $q$sp."resolutionId",'submitter',(private.scoring_values(conf,cid,'submitter'))[1],actor,client_time,sp.id,sp.classification);$q$,'apply_procedure submitter credit');
+  $q$  if sp.classification='Main Submitter' and not exists(select 1 from public.participation_events where "resolutionId"=sp."resolutionId" and "categoryId"='submitter') then
+   insert into public.participation_events(id,conference_id,committee_id,"delegateId","sessionId","resolutionId","categoryId",points,"chairId","createdAt","speechId",classification) values(second_id,conf,cid,sp."delegateId",sid,sp."resolutionId",'submitter',5,actor,client_time,sp.id,sp.classification);$q$,
+  $q$  if sp.classification='Main Submitter' and not exists(select 1 from public.participation_events where "resolutionId"=sp."resolutionId" and "categoryId"='submitter') then
+   vals:=private.scoring_values(conf,cid,'submitter');
+   if coalesce(command->'submitterPoints','5'::jsonb) is distinct from to_jsonb(vals[1]) then raise sqlstate 'PT409' using message='The Main Submitter points changed. Review the Debate Console.'; end if;
+   insert into public.participation_events(id,conference_id,committee_id,"delegateId","sessionId","resolutionId","categoryId",points,"chairId","createdAt","speechId",classification) values(second_id,conf,cid,sp."delegateId",sid,sp."resolutionId",'submitter',vals[1],actor,client_time,sp.id,sp.classification);$q$,'apply_procedure submitter credit');
  execute definition;
 end $patch$;

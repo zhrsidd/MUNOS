@@ -8,6 +8,7 @@ import type {ConferenceData,Role} from '../lib/domain';
 import {conferenceScoring,effectiveScoring,REQUIRED_SCORING,scoringProblem,scoringValues} from '../lib/scoring';
 import {countryCode,countryFlag,UNKNOWN_FLAG} from '../lib/countries';
 import {validateImport} from '../lib/import';
+import {speechScoreCommand} from '../lib/procedure/commands';
 import {activeAmendment,activePoi,amendmentFloorTaken,eventAmendmentId,nextPoi,nextSpeaker} from '../lib/procedure/view';
 import {committeePhotoReminders} from '../lib/operations/photo-reminders';
 import {PhotoAlert} from '../components/operations/photo-reminders';
@@ -69,7 +70,7 @@ test('Main Submitter credit: configurable single value, once per resolution, ear
  const t=runner(blank());
  const mainSubmitterSpeech=(resolutionId:string,delegateId:string)=>{
   t.run({type:'speechStart',sessionId:'s1',delegateId,resolutionId,classification:'Main Submitter'});
-  const s=t.d.speeches!.at(-1)!;t.run({type:'speechScore',sessionId:'s1',speechId:s.id,points:2});t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+  const s=t.d.speeches!.at(-1)!;t.run(speechScoreCommand(t.d,'ga1',s,2));t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
  };
  const credits=(resolutionId:string)=>t.d.events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===resolutionId);
  // Default +5 before any configuration; a second Main Submitter speech adds nothing.

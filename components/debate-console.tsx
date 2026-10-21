@@ -8,6 +8,7 @@ import type { Command } from "@/lib/commands";
 import type { Delegate } from "@/lib/domain";
 import type { Lane, SpeechKind } from "@/lib/procedure/types";
 import { activeAmendment, activeLane, activePoi, FLOOR_NOT_WITH_CHAIR, laneEntries, nextPoi, nextSpeaker, poiEntries } from "@/lib/procedure/view";
+import { speechScoreCommand } from "@/lib/procedure/commands";
 import { scoringValues } from "@/lib/scoring";
 import { Chip, DelegateIdentity, Panel, Timer } from "./ui";
 import { CountryPicker } from "./country-picker";
@@ -154,7 +155,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
             {active.classification === "Co-Submitter" && <p className="footnote">Yielded by the Main Submitter. This speaker returns the floor to the Chair.</p>}
             <div className="procedure-score">
               <div><strong>{speechRecorded ? "Speech recorded" : "Record this speech"}</strong><p>{speechRecorded ? "Corrections are available in Participation." : "Choose the configured speech value when delivered."}</p></div>
-              <div className="procedure-buttons">{speechValues.map(points => <button key={points} disabled={busy || !!speechRecorded} aria-label={`Record ${speaker.country} speech for ${points} points`} onClick={() => void send({ type: "speechScore", sessionId, speechId: active.id, points })}>+{points}</button>)}</div>
+              <div className="procedure-buttons">{speechValues.map(points => <button key={points} disabled={busy || !!speechRecorded} aria-label={`Record ${speaker.country} speech for ${points} points`} onClick={() => void send(speechScoreCommand(data, committeeId, active, points))}>+{points}</button>)}</div>
             </div>
             {active.classification === "Main Submitter" && <form className="procedure-inline-form" onSubmit={e => { e.preventDefault(); if (selectedYield) void send({ type: "speechYield", sessionId, speechId: active.id, delegateId: selectedYield }); }}>
               <CountryPicker label="Yield to a Co-Submitter" delegates={yieldDelegates} value={selectedYield} onChange={setYieldSelection} counts={counts} kind="speeches" disabled={busy} />

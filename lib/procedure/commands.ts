@@ -1,7 +1,12 @@
 import type {ConferenceData, ParticipationEvent} from '../domain';
 import type {ProcedureCommand, Speech} from './types';
 import {activeAmendment,activeLane,laneEntries,poiEntries} from './view';
-import {mainSubmitterPoints,scoringValues} from '../scoring';
+import {MAIN_SUBMITTER_POINTS,mainSubmitterPoints,scoringValues} from '../scoring';
+export const SUBMITTER_POINTS_CHANGED='The Main Submitter points changed. Review the Debate Console.';
+/** A speech score as the Debate Console saves it: a Main Submitter speech carries the credit this device awards. */
+export function speechScoreCommand(d:ConferenceData,committeeId:string,speech:Speech,points:number):ProcedureCommand{
+ return {type:'speechScore',sessionId:speech.sessionId,speechId:speech.id,points,...(speech.classification==='Main Submitter'?{submitterPoints:mainSubmitterPoints(d,committeeId)}:{})};
+}
 export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>string,now:string,actor:string){
  const committee=d.committees.find(x=>x.id===('committeeId' in c?c.committeeId:d.sessions.find(s=>s.id===c.sessionId)?.committeeId));
  if(!committee)throw Error('Committee unavailable.');
@@ -61,7 +66,11 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
   const s=active();if(!scoringValues(d,committee.id,'speech').includes(c.points))throw Error('Choose a configured speech value.');
   if(d.events.some(e=>e.speechId===s.id&&e.categoryId==='speech'))throw Error('Speech already recorded. Edit its event in Participation.');
   event(s,s.delegateId,'speech',c.points);
-  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter'))event(s,s.delegateId,'submitter',mainSubmitterPoints(d,committee.id));
+  if(s.classification==='Main Submitter'&&!d.events.some(e=>e.resolutionId===s.resolutionId&&e.categoryId==='submitter')){
+   const points=mainSubmitterPoints(d,committee.id);
+   if((c.submitterPoints===undefined?MAIN_SUBMITTER_POINTS:c.submitterPoints)!==points)throw Error(SUBMITTER_POINTS_CHANGED);
+   event(s,s.delegateId,'submitter',points);
+  }
   break;
  }
  case 'speechFinish': {const s=active();s.state='finished';s.revision++;d.poiQueue=pois.filter(p=>p.speechId!==s.id);break;}
