@@ -11,7 +11,10 @@
 -- REVIEW NOTE FOR CODEX
 -- Mechanism
 --   private.next_resolution_code(conf, committee) returns `<committee code> / <NN>`:
---     NN = (highest existing sequential number in that committee) + 1, left-padded to two digits (`01`..`99`, then `100`).
+--     NN = (highest existing sequential number in that committee) + 1, left-padded to at least two digits and never truncated (`01`..`99`, then `100`, `101`; the width is
+--     greatest(2, length(n)) because lpad('100',2,'0') returns '10'). Supported range is 01..999999 (generate and parse the
+--     same 2-6 digit widths; 99999 -> 100000 works). Past 999999 the helper raises 'No free resolution number in committee X'
+--     (errcode 22023) instead of emitting a code it could not read back or looping until a statement timeout.
 --     "Sequential" means the code ends in ` / ` followed by 2-6 decimal digits. Legacy hex suffixes are exactly 8
 --     characters, so they never match and the counter ignores them. The suffix is read, not the committee prefix, so a
 --     committee renamed after its first resolution keeps counting.
@@ -54,7 +57,12 @@ begin
  select coalesce(max((substring(d.code from ' / ([0-9]{2,6})$'))::integer),0)+1 into n
  from public.documents d where d.conference_id=conf and d.committee_id=committee and d.code ~ ' / [0-9]{2,6}$';
  loop
-  candidate:=committee_code||' / '||lpad(n::text,2,'0');
+  -- Upper bound, decided explicitly: the counter only reads 2-6 digit suffixes, so it never generates a number it could
+  -- not read back. Past 999999 raise a clear error (before formatting, and also ends the skip loop) rather than emit a
+  -- 7-digit code the counter would ignore, or loop until a statement timeout.
+  if n>999999 then raise exception 'No free resolution number in committee %',committee_code using errcode='22023'; end if;
+  -- Width is at least the digits of n: lpad('100',2,'0') would TRUNCATE to '10', so never pad to a fixed 2.
+  candidate:=committee_code||' / '||lpad(n::text,greatest(2,length(n::text)),'0');
   exit when not exists(select 1 from public.documents d where d.conference_id=conf and d.code=candidate);
   n:=n+1;
  end loop;

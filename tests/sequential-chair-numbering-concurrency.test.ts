@@ -96,5 +96,31 @@ test('PostgreSQL 17 sequential Chair numbering',{skip:!localUrl,timeout:120000},
    await c.query(create(legacy));
    assert.deepEqual(await codes(legacy),['LEG / 01','LEG / 12345678','LEG / ca7640bb']);
   });
+  await t.test('concurrent Chair creates and submissions across the 99 -> 100 boundary give distinct consecutive numbers',async()=>{
+   const edge=committeeSql(ids.conference,'EDG');
+   await owner.query(`${edge.sql}insert into public.user_access(conference_id,user_id,role,committee_id,expires_at) values(${conf},${literal(chair)},'chair',${literal(edge.committee)},now()+interval '1 day');
+    insert into public.documents(id,conference_id,committee_id,"sessionId","submitterId",code,title)
+     select gen_random_uuid(),${conf},${literal(edge.committee)},${literal(edge.session)},${literal(edge.delegates[0])},'EDG / '||lpad(g::text,2,'0'),'Seed' from generate_series(1,98) g;`);
+   const chairs=await Promise.all(Array.from({length:3},(_,i)=>chairConnection(`edge_c${i}`)));
+   const servers=await Promise.all(Array.from({length:3},(_,i)=>serverConnection(`edge_s${i}`)));
+   await Promise.all([...chairs.map(c=>c.query(create(edge))),...servers.map(c=>c.query(submit(edge)))]);
+   assert.deepEqual(await owner.query(`select string_agg(code,',' order by substring(code from ' / ([0-9]+)$')::int) from public.documents where committee_id=${literal(edge.committee)} and substring(code from ' / ([0-9]+)$')::int>=97;`),
+    'EDG / 97,EDG / 98,EDG / 99,EDG / 100,EDG / 101,EDG / 102,EDG / 103,EDG / 104');
+   assert.equal(await owner.query(`select count(distinct code)=count(*) from public.documents where committee_id=${literal(edge.committee)};`),'t');
+  });
+  await t.test('concurrent Chair creates and submissions across the five to six digit boundary, and the explicit upper bound',async()=>{
+   const big=committeeSql(ids.conference,'BIG'),top=committeeSql(ids.conference,'TOP');
+   const seedAt=(c:typeof tst,n:number)=>`insert into public.documents(id,conference_id,committee_id,"sessionId","submitterId",code,title) values(gen_random_uuid(),${conf},${literal(c.committee)},${literal(c.session)},${literal(c.delegates[0])},${literal(`${c===big?'BIG':'TOP'} / ${n}`)},'Seed');`;
+   const grantChair=(c:typeof tst)=>`insert into public.user_access(conference_id,user_id,role,committee_id,expires_at) values(${conf},${literal(chair)},'chair',${literal(c.committee)},now()+interval '1 day');`;
+   await owner.query(`${big.sql}${top.sql}${grantChair(big)}${grantChair(top)}${seedAt(big,99997)}${seedAt(top,999999)}`);
+   const chairs=await Promise.all(Array.from({length:3},(_,i)=>chairConnection(`big_c${i}`)));
+   const servers=await Promise.all(Array.from({length:3},(_,i)=>serverConnection(`big_s${i}`)));
+   await Promise.all([...chairs.map(c=>c.query(create(big))),...servers.map(c=>c.query(submit(big)))]);
+   assert.deepEqual(await codes(big),['BIG / 100000','BIG / 100001','BIG / 100002','BIG / 100003','BIG / 99997','BIG / 99998','BIG / 99999']);
+   const c=await chairConnection('top_c'),s=await serverConnection('top_s');
+   await assert.rejects(()=>c.query(create(top)),/No free resolution number/);
+   await assert.rejects(()=>s.query(submit(top)),/No free resolution number/);
+   assert.deepEqual(await codes(top),['TOP / 999999']);
+  });
  }finally{await db.close();}
 });

@@ -15,6 +15,19 @@ test('numbers continue after the highest sequential code and ignore legacy hex c
  assert.equal(nextResolutionCode('TST',[{code:'TST / 01'}],new Set(['TST / 02'])),'TST / 03');
 });
 
+test('numbers of 100 and above are never truncated, matching the SQL helper',()=>{
+ assert.equal(nextResolutionCode('TST',[{code:'TST / 99'}]),'TST / 100');
+ assert.equal(nextResolutionCode('TST',[{code:'TST / 100'},{code:'TST / ca7640bb'}]),'TST / 101');
+ const dense=Array.from({length:99},(_,i)=>({code:`TST / ${String(i+1).padStart(2,'0')}`}));
+ assert.equal(nextResolutionCode('TST',dense),'TST / 100');
+});
+
+test('six-digit boundary and the explicit upper bound match the SQL helper',()=>{
+ assert.equal(nextResolutionCode('TST',[{code:'TST / 99999'}]),'TST / 100000');
+ assert.equal(nextResolutionCode('TST',[{code:'TST / 999998'}]),'TST / 999999');
+ assert.throws(()=>nextResolutionCode('TST',[{code:'TST / 999999'}]),/No free resolution number/);
+});
+
 test('legacy and sequential codes display the same way',()=>{
  assert.equal(displayResolutionCode('TST / 03'),'TST/03');
  assert.equal(displayResolutionCode('TST / ca7640bb'),'TST/ca7640bb');

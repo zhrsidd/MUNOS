@@ -393,7 +393,8 @@ Problem: in hosted mode a Chair-created draft (`newDocument` in `private.apply_m
 Mechanism:
 - New `private.next_resolution_code(conf, committee)` (SECURITY DEFINER, `search_path=''`, EXECUTE revoked from
   public/anon/authenticated; not an RPC). Result `<committee code> / NN`: NN is the highest existing sequential number in that
-  committee plus one, left-padded to two digits (`99` is followed by `100`). "Sequential" = the code ends in ` / ` plus 2 to 6
+  committee plus one, left-padded to at least two digits and never truncated (`99` is followed by `100`; the width is `greatest(2, length(n::text))`
+  because PostgreSQL `lpad('100',2,'0')` returns `'10'`, unlike JavaScript `padStart`; Codex P2 on the first push). "Sequential" = the code ends in ` / ` plus 2 to 6
   digits; the suffix is read, not the prefix, so a renamed committee keeps counting. It then skips forward while any document
   in the conference already has that code (the loop `submit_resolution` always had), so the existing
   `unique(conference_id, code)` on `public.documents` is never the thing that stops a create.
@@ -447,5 +448,10 @@ What Codex should check:
 2. That the helper's own `for update` on the committee row cannot invert lock order with any other path: it is only called
    after the caller took the same lock, and no path takes a committee lock then a mutation/submission advisory lock.
 3. The `count(*)+1` to `max+1` change for public submissions is acceptable (gaps from legacy drafts stop appearing).
-4. A 7-digit number (over a million drafts in one committee) would no longer match the pattern; not a realistic bound.
+4. Upper bound, decided explicitly: the counter reads and generates the same 2 to 6 digit widths (`01`..`999999`, so `99999` -> `100000`
+   works). Past `999999` the helper raises `No free resolution number in committee X` (errcode 22023) before formatting, which also
+   bounds the skip loop (a dense `01`..`99` committee continues at `100` immediately; it can no longer spin until a statement
+   timeout). The client helper throws the same message. Tests: `tests/sequential-chair-numbering-boundary-db.test.ts` (PGlite:
+   only `99` -> `100` for Chair and public, dense 01..99, `100` -> `101`, hex ignored, `99999` -> `100000`, error at `999999`) and the
+   PostgreSQL 17 concurrency test (Chair and public racing across 99 -> 100 and 99997 -> 100003, error at `999999`).
 5. Any code outside `<prefix> / <digits>` (for example custom edited codes) is ignored by the counter, never rewritten.

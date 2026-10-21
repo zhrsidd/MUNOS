@@ -17,5 +17,6 @@ export function nextResolutionCode(
     if (match) n = Math.max(n, Number(match[1]) + 1);
   }
   while (conferenceCodes.has(`${committeeCode} / ${String(n).padStart(2, "0")}`)) n += 1;
+  if (n > 999999) throw new Error(`No free resolution number in committee ${committeeCode}`);
   return `${committeeCode} / ${String(n).padStart(2, "0")}`;
 }
