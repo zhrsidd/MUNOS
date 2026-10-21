@@ -34,8 +34,10 @@ reviewed, tested change.
 2. **Secrets.** Never commit secrets, session tokens, service keys or generated build output. Never print
    credentials in logs, tests, docs or chat. Keep server-only keys out of client bundles.
 3. **Migrations and schema.** Apply schema changes only through committed migrations in `supabase/migrations`,
-   replayed from empty on local disposable Postgres and verified in the preproduction phase of the single hosted
-   project before release. Never edit an applied migration. One person substantially
+   replayed from empty on local disposable Postgres; the initial promotion also requires verification in the
+   preproduction phase of the single hosted project. After promotion, later migrations are independently
+   reviewed, replayed from empty locally, checked for backward compatibility and applied through an authorised
+   human-controlled release, without re-enabling cloud-agent hosted testing. Never edit an applied migration. One person substantially
    changes schema, RLS, auth, shared domain types or repository contracts at a time; announce it and have it
    reviewed.
 4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation takes
