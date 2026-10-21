@@ -1,6 +1,6 @@
 # New DCMUN Supabase project: setup record
 
-Status 2026-10-20: **all 21 migrations applied and verified; test conference created; development role.** Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
+Status 2026-10-21: **all 26 migrations applied (21 on 20 October, 5 on 21 October) and verified (smoke test 15/15 and signed-in browser checks on an isolated TEST conference); development role.** The 21 October rollout is recorded in "Migrations 22 to 26" below. Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
 
 ## Identity
 
@@ -30,6 +30,51 @@ PR #22 merged to `main` (`852642c`) before the apply. The 21 files on `main` wer
 | 21 | `20261019100200_retire_archive_jobs` (dropped `public.archive_jobs`) |
 
 The ledger (`supabase_migrations.schema_migrations`) has exactly these 21 rows, with versions and names equal to the filenames.
+
+## Migrations 22 to 26 (21 October 2026, owner-approved)
+
+The owner approved applying the five pending migrations to this project (DCMUN Staging, the single preproduction project) after Codex's independent review and replay on PostgreSQL 17. Applied in timestamp order, through the Supabase connector (`apply_migration`, one migration per call) rather than the CLI, from the exact files on `main` at `542e705` (CI green on that commit).
+
+| # | File | Feature |
+| --- | --- | --- |
+| 22 | `20261021090000_configurable_points` | Main Submitter and Debated amendment points configurable (PR #35) |
+| 23 | `20261021100000_photo_chairs` | Chairs in school group photos, participant-list epochs (PR #36) |
+| 24 | `20261021110000_clear_majority` | Clear majority For / Against, bound to the ballot revision (PR #37) |
+| 25 | `20261021120000_print_copies` | Print copies = committee delegates + 3 (audit F3) |
+| 26 | `20261021130000_identity_projection` | Main Submitter's country for Approval, Logistics and the public amendment page (PR #53) |
+
+Before applying:
+
+* **Preproduction confirmed.** One conference, "DCMUN Development Test"; one TEST document, two TEST delegates, no staff. Ledger: exactly the original 21 rows, with versions and names equal to the repository files, so `--include-all` was not needed.
+* **Dry run on the live database.** All five migrations were run in order in one transaction on this project and the transaction was then aborted on purpose (a final `RAISE EXCEPTION` after a check that every object existed). Every `patch_once` anchor matched the hosted function definitions. Afterwards the ledger still had 21 rows and none of the new objects existed.
+
+After applying:
+
+* **Ledger.** The connector records its own apply-time version, so the five versions were updated to the filename versions. The ledger now has 26 rows with versions and names equal to the filenames. The stored statements were compared with the files by MD5 (trimmed): all five identical.
+* **Grants (live).** `private.photo_chairs` and `private.document_submitter_countries` are executable by `authenticated` only (as designed); every other new `private` function, including `private.submitter_country`, `private.ops_staff_school`, `private.advance_photo_epoch`, `private.print_copies` and the trigger functions, is executable by no client role; `public.amendment_link_info` stays `service_role` only; the three snapshot functions are executable by `authenticated`. `public.photo_list_epochs` has RLS on, SELECT for `authenticated` through `read_authorized`, no INSERT, nothing for `anon`.
+* **Security advisors.** Unchanged in kind: the same four access-code SECURITY DEFINER warnings, the generic anonymous-policy notices and leaked-password protection. Nothing new from these migrations.
+* **Signed-in role simulation on the hosted database (rolled back; no data left).** Using real `auth.users` rows and temporary `user_access` grants for each role inside a transaction that was aborted at the end:
+  * Executive: conference and executive snapshots carry `submitterCountry` (France); `operations_snapshot` carries `photoChairs` and `photoEpochs`; `staffSchool` is dispatched (an unknown Chair is refused with 22023).
+  * Approval: sees no Draft; after Review sees the document with the country, no delegates in the snapshot and 0 rows from `public.delegates`; cannot call `private.submitter_country` (42501).
+  * Logistics: after Approved the print copies were 5 (2 delegates + 3); sees the country and no delegates.
+  * Photos: setting a Chair's school created `photoChairs` and epoch 1; clearing and restoring the school gave epoch 3; the Chair sees the projection but still reads 0 rows from `public.staff`.
+  * Scoring: default Main Submitter `{5}`, Debated amendment `{3}`; one value from 1 to 20 accepted, two values or 0 refused; `apply_procedure` carries the `submitterPoints` check.
+  * Voting: an observed close with a stale or missing `ballotRevision` is refused (PT409); with the right revision and nobody present it is refused (22023); with a present delegate it closes `Closed/Passed/observed` with the declaring Chair recorded.
+  * Afterwards: the document was still `Draft`, revision 1, 24 copies; no SIM rows; ledger 26.
+
+**App-level verification (isolated temporary TEST conference, same project).** The owner asked for the smoke test and browser checks to run without touching the existing Executive code, so a second conference row named "DCMUN Development Test" (venue marked temporary) was created in this project with its own short-lived Executive credential (bootstrapped by hash, scoped to that conference only). Results, run against a build of `main` at `542e705` with `NEXT_PUBLIC_DATA_BACKEND=supabase`:
+
+* **`npm run smoke:project`: 15/15** through the app's own client code (Executive and Chair redemption, idempotent replay, stale-edit conflict, role boundaries, submission link, Executive rotation).
+* **Signed-in browser checks (Chromium, real sign-in with access codes):**
+  * Executive: added a Chair and set the Chair's Photo school (saved, survives reload); Scoring: "7, 8" refused with "Main Submitter credit is one whole number from 1 to 20", "7" saved and survives reload; added a photo slot (Executive Group photos shows "TST · 2 + Chair").
+  * Chair photos: the Chair sees "2 delegates and Chair TEST Chair Alex from this committee should attend" (the Chair cannot read the staff table; this comes from the `photoChairs` projection). After Acknowledge the reminder stays quiet after reload; after the Executive cleared and then restored the school it reminded again (the clear/restore acknowledgement bug is fixed on the hosted database).
+  * Resolution lifecycle: the Chair's New resolution form has no title field; the draft shows as `TST/<8 hex> — France`; Approval inbox shows the country (not "Main submitter unavailable"); Logistics print queue shows 5 copies (2 delegates + 3) and the country; Printed; Chair opened debate.
+  * Scoring: a Main Submitter speech scored +2 gave France 9 points (+2 and the configured Main Submitter credit +7), saved and reloaded.
+  * Voting: Clear majority For opened a confirmation; restarting the ballot (Divide the House) withdrew it with "The ballot was restarted or changed since Clear majority was opened. Choose Clear majority again. Nothing was closed."; after returning to a normal vote the declaration closed the resolution as "Passed · observed majority" and the Executive overview shows "(observed majority, no counts)".
+  * No page errors in any session.
+* **Not exercised here:** the public submission page's server path (`/submit/<token>`) needs the server-only service key; it is covered by the PGlite and PostgreSQL 17 tests and by `scripts/verify-submission-http.mts`.
+* **Cleanup.** Afterwards only the temporary conference's credentials (4) and device grants (36) were revoked. The original test conference was not touched: its two active credentials (Executive and Chair), 8 active grants and its Draft document are as before, and the ledger is still 26 rows. The temporary conference's TEST records remain, labelled and with no active access.
+* **Finding (existing behaviour, not from this release):** a Chair-created draft in hosted mode is numbered `<committee> / <first 8 characters of the id>` (for example `TST/ca7640bb`), because the `newDocument` SQL builds the code that way; public submissions get sequential numbers (`TST / 01`). The identity display (`TST/ca7640bb — France`) is therefore correct but not sequential for Chair-created drafts. A reviewed change would be needed to number them sequentially.
 
 ## Verification against the live project
 
