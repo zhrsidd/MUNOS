@@ -89,6 +89,8 @@ Environment (values are read, never printed):
 ```
 REHEARSAL_MODE=hosted
 REHEARSAL_BASE_URL=https://<deployment built for the staging project>
+REHEARSAL_EXPECTED_ORIGIN=https://<same origin, supplied independently of the URL>
+REHEARSAL_EXPECTED_COMMIT=<optional: build commit /api/health must report>
 NEXT_PUBLIC_SUPABASE_URL  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY  NEXT_PUBLIC_CONFERENCE_ID   (the target the deployment was built for)
 STAGING_SUPABASE_REFS=<ref>
 REHEARSAL_CONFIRM_TEMP_CONFERENCE_ID=<same conference id>
@@ -108,6 +110,35 @@ Both Chair devices redeem the same Chair code (separate anonymous identities). A
 read-only Chair identity through `SupabaseTransport`: the Executive snapshot does not carry events, speeches or votes. The
 Executive session is used for the preflight and for minting codes. Assertions are deltas from a baseline read at the start of the
 scenario, so the run can be repeated on the same fixture. Set `REHEARSAL_PROBE_SEND_LATENCY=1` to add the informational S10 probe.
+
+### Deployment binding (checked before any code is typed)
+
+1. Offline, nothing contacted: `REHEARSAL_BASE_URL` must be https (or a localhost build), carry no credentials, and its origin must
+   equal `REHEARSAL_EXPECTED_ORIGIN`.
+2. A browser opens the deployment with no code and reads its client bundles. They must embed the validated
+   `NEXT_PUBLIC_SUPABASE_URL` and conference id and reference no other `*.supabase.co` project. If `REHEARSAL_EXPECTED_COMMIT`
+   is set, `/api/health` must report that commit.
+3. Only then is the Executive code used (preflight) and are devices opened. Every browser context denies by default: requests to
+   any origin other than the app and the validated Supabase project are aborted. Fault-injection rules are bound to the validated
+   Supabase origin.
+
+Self-tests (no browser, no hosted calls, part of `npm test`): `tests/rehearsal-delivery-audit.test.ts`, including a run that
+proves a mismatched origin aborts with no network and without printing codes.
+
+### Evidence rules (pure helpers in `scripts/rehearsal/delivery-audit.mjs`)
+
+- S6 captures the upstream status and body of both deliveries of the identical request: each must be 2xx with no RPC error, and
+  mutation uuid and full payload must be identical (200 then 409 fails).
+- S5 captures the upstream reply of the attempt whose response is dropped: it must be an accepted commit, and all three attempts
+  must carry the same mutation uuid and payload.
+- Convergence compares value-level, deterministically serialised rows (attendance status+revision, vote choice, queue
+  position, speech state/classification, event points/category/speech, POIs, debate mode), excluding only timestamps. Negative
+  self-tests prove it detects For->Against, reversed queue, finished->speaking, attendance and points changes.
+
+**Unverified in hosted mode:** the 21 October hosted run below predates the deployment binding, the origin guard, the host-bound
+fault routes, the S5/S6 evidence capture and the value-level digest. Those hosted-only paths (bundle verification against a real
+deployment, `route.fulfill` with a captured body, digest equality on real snapshots) have only been exercised by the self-tests and
+demo mode; re-run hosted mode on a re-provisioned temporary conference to validate them.
 
 ## Hosted run record (21 October 2026)
 

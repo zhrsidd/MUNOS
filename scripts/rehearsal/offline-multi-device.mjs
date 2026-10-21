@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+import {DeliveryLog, allowedRequest, checkBaseOrigin, checkBundles, checkHealthIdentity, pointsOf, stateDigest} from './delivery-audit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HOSTED = (process.env.REHEARSAL_MODE || 'demo').toLowerCase() === 'hosted';
@@ -122,38 +123,27 @@ function scope(d) {
     resolution: d.documents.find(r => r.committeeId === committee.id && r.status === 'In Debate'),
   };
 }
-const live = (d, id) => d.events.filter(e => e.delegateId === id && !e.voidedAt);
-const pointsOf = (d, id) => live(d, id).reduce((n, e) => n + e.points, 0) + (d.pointAdjustments ?? []).filter(a => a.delegateId === id).reduce((n, a) => n + a.points, 0);
+
 const attendanceOf = (d, id, sessionId) => d.attendance.find(a => a.delegateId === id && a.sessionId === sessionId)?.status ?? null;
 const votesOf = (d, id, resolutionId, sessionId) => d.votes.filter(v => v.delegateId === id && v.resolutionId === resolutionId && v.sessionId === sessionId);
 const openQueue = (d, sessionId) => d.queue.filter(q => q.sessionId === sessionId && (q.lane ?? 'open') === 'open').sort((a, b) => a.position - b.position);
 const speechesIn = (d, sessionId) => (d.speeches ?? []).filter(s => s.sessionId === sessionId);
 function duplicates(list) { const seen = new Set(); return list.filter(x => seen.has(x.id) ? true : (seen.add(x.id), false)); }
-/** Compact comparable view of everything the rehearsal touches, for convergence checks. */
-function digest(d) {
-  const { committee, sessionId, resolution } = scope(d);
-  const ids = list => list.map(x => x.id).sort();
-  return JSON.stringify({
-    attendance: d.attendance.filter(a => a.sessionId === sessionId).map(a => [a.delegateId, a.status]).sort(),
-    events: ids(d.events.filter(e => e.sessionId === sessionId)),
-    points: scope(d).delegates.map(x => [x.id, pointsOf(d, x.id)]).sort(),
-    votes: ids(d.votes.filter(v => v.resolutionId === resolution?.id && v.sessionId === sessionId)),
-    queue: ids(d.queue.filter(q => q.sessionId === sessionId)),
-    speeches: ids(speechesIn(d, sessionId)),
-    current: committee.currentSessionId,
-  });
-}
+const digest = d => stateDigest(d, COMMITTEE_CODE);
 
 // --------------------------------------------------------------------------------------------------------------- device
 let browser;
 let baseUrl;
 let hostedCtx = null;
+let allowOrigins = null; // {baseOrigin, supabaseOrigin}: the only destinations a browser context may reach
+let supabaseOrigin = null;
 let chairCode = null;
 const devices = [];
 class Device {
   constructor(name) { this.name = name; this.errors = []; this.dialogs = []; }
   async start() {
     this.ctx = await browser.newContext({viewport: {width: 1280, height: 1000}, acceptDownloads: true, serviceWorkers: 'allow'});
+    await guardContext(this.ctx);
     this.page = await this.newPage();
     devices.push(this);
     return this;
@@ -293,6 +283,25 @@ async function settle(device) {
   await device.stripIs(/^(All changes synced|Demo · saved in this browser)$/, 30_000);
   await new Promise(resolve => setTimeout(resolve, 4000));
 }
+/** Deny by default: abort every request that is not the app origin or the validated Supabase origin (codes could ride on any). */
+async function guardContext(ctx) {
+  await ctx.route('**/*', route => allowedRequest(route.request().url(), allowOrigins) ? route.fallback() : route.abort('blockedbyclient'));
+}
+/** Before any code is typed: the deployment's own bundles must embed the validated Supabase project and conference. */
+async function verifyDeployment(config) {
+  const ctx = await browser.newContext({serviceWorkers: 'block'});
+  try {
+    await guardContext(ctx);
+    const page = await ctx.newPage();
+    await page.goto(`${baseUrl}/chair`, {waitUntil: 'load', timeout: 60_000});
+    const scripts = await page.evaluate(() => performance.getEntriesByType('resource').map(r => r.name).filter(n => /\.js(\?|$)/.test(n)));
+    const texts = [];
+    for (const url of new Set(scripts)) if (allowedRequest(url, allowOrigins)) texts.push(await (await ctx.request.get(url)).text());
+    checkBundles(texts, {supabaseUrl: config.url, conferenceId: config.conferenceId});
+    const health = await (await ctx.request.get(`${baseUrl}/api/health`)).json().catch(() => null);
+    checkHealthIdentity(health, process.env.REHEARSAL_EXPECTED_COMMIT);
+  } finally { await ctx.close(); }
+}
 async function snapshotFailure(id) {
   mkdirSync(ARTIFACTS, {recursive: true});
   for (const d of devices) { try { await d.page.screenshot({path: path.join(ARTIFACTS, `${id}-${d.name}.png`)}); } catch { /* page closed */ } }
@@ -308,22 +317,21 @@ async function authoritative(device) { return HOSTED ? serverState() : device.ba
 async function main() {
   const startedAt = new Date().toISOString();
   let server = {stop: async () => {}};
+  let config = null;
+  let hosted = null;
   if (HOSTED) {
-    // All guards run here, before a browser exists. A refusal exits non-zero having contacted nothing, or (for the
-    // temporary-conference marker) only redeemed the Executive code on the confirmed conference id.
-    const hosted = await import('./offline-hosted.mts');
-    const config = hosted.readConfig();
-    hostedCtx = await hosted.preflight(config);
-    chairCode = await hosted.chairCodeFromEnv();
-    if (!chairCode && process.env.REHEARSAL_MINT === '1') chairCode = await hosted.mintRoleCode(hostedCtx, 'chair', hostedCtx.committeeId);
-    assert.ok(chairCode, 'Set REHEARSAL_CHAIR_CODE, REHEARSAL_CODES_FILE (from offline-hosted.mts mint), or REHEARSAL_MINT=1');
-    readChairView = await hosted.chairAuditor(hostedCtx, chairCode);
+    // Order matters. (1) Offline checks of the inputs: nothing is contacted. (2) Browser opens the deployment WITHOUT any code
+    // and proves it embeds the validated project and conference. (3) Only then is any code used (Executive preflight, devices).
     baseUrl = (process.env.REHEARSAL_BASE_URL || '').replace(/\/$/, '');
-    assert.match(baseUrl, /^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, 'REHEARSAL_BASE_URL must be https (or a localhost build)');
-    log(`HOSTED mode. project=${config.ref} conference=${config.conferenceId} committee=${hostedCtx.committeeId} (${hostedCtx.conferenceName})`);
+    const origin = checkBaseOrigin(baseUrl, process.env.REHEARSAL_EXPECTED_ORIGIN);
+    hosted = await import('./offline-hosted.mts');
+    config = hosted.readConfig();
+    allowOrigins = {baseOrigin: origin, supabaseOrigin: new URL(config.url).origin};
+    supabaseOrigin = allowOrigins.supabaseOrigin;
   } else {
     server = await startDemoServer();
     baseUrl = server.url;
+    allowOrigins = {baseOrigin: new URL(baseUrl).origin, supabaseOrigin: null};
     log(`DEMO mode (no server): ${baseUrl}`);
   }
   const {chromium} = loadPlaywright();
@@ -332,6 +340,18 @@ async function main() {
     executablePath: process.env.REHEARSAL_CHROMIUM_PATH || undefined,
     args: process.getuid?.() === 0 ? ['--no-sandbox'] : [],
   });
+  if (HOSTED) {
+    try {
+      await verifyDeployment(config);
+      log('Deployment identity verified: embeds the validated project and conference; browser limited to the app and project origins.');
+      hostedCtx = await hosted.preflight(config);
+      chairCode = await hosted.chairCodeFromEnv();
+      if (!chairCode && process.env.REHEARSAL_MINT === '1') chairCode = await hosted.mintRoleCode(hostedCtx, 'chair', hostedCtx.committeeId);
+      assert.ok(chairCode, 'Set REHEARSAL_CHAIR_CODE, REHEARSAL_CODES_FILE (from offline-hosted.mts mint), or REHEARSAL_MINT=1');
+      readChairView = await hosted.chairAuditor(hostedCtx, chairCode);
+    } catch (error) { await browser.close().catch(() => undefined); throw error; }
+    log(`HOSTED mode. project=${config.ref} conference=${config.conferenceId} committee=${hostedCtx.committeeId} (${hostedCtx.conferenceName})`);
+  }
   try {
     await runScenarios();
   } finally {
@@ -520,15 +540,21 @@ async function runScenarios() {
       // Request 1 never reaches the server (connection failure). Request 2 reaches the server but its response is lost.
       // Request 3 passes. The Chair did one thing; the server must record one effect.
       let seen = 0;
+      const log5 = new DeliveryLog();
       const rule = async route => {
         const request = route.request();
         if (request.method() !== 'POST') { await route.continue(); return; }
         seen += 1;
-        if (seen === 1) { await route.abort('connectionfailed'); return; }
-        if (seen === 2) { await route.fetch(); await route.abort('connectionreset'); return; }
-        await route.continue();
+        const n = seen;
+        if (n === 1) { log5.record('attempt 1 (dropped before the server)', request.postData(), undefined, undefined); await route.abort('connectionfailed'); return; }
+        // Attempts 2+ really reach the server; the reply is captured BEFORE it is dropped (2) or passed on (3+).
+        const upstream = await route.fetch();
+        const text = await upstream.text();
+        log5.record(`attempt ${n}${n === 2 ? ' (response then lost)' : ''}`, request.postData(), upstream.status(), text);
+        if (n === 2) { await route.abort('connectionreset'); return; }
+        await route.fulfill({response: upstream, body: text});
       };
-      await A.ctx.route('**/rest/v1/rpc/apply_*_mutation*', rule);
+      await A.ctx.route(`${supabaseOrigin}/rest/v1/rpc/apply_*_mutation*`, rule);
       try {
       await A.at('/chair/participation');
       await settle(A);
@@ -538,9 +564,12 @@ async function runScenarios() {
         assert.equal((await A.pending()).length, 1);
       });
       await A.drained();
-      } finally { await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule); }
+      } finally { await A.ctx.unroute(`${supabaseOrigin}/rest/v1/rpc/apply_*_mutation*`, rule); }
       await check('automatic retry used the SAME mutation (3 attempts) and the server holds exactly one effect', async () => {
         assert.ok(seen >= 3, `expected at least 3 attempts, saw ${seen}`);
+        // The lost response must have followed an ACCEPTED commit, and every retry must be the same mutation and payload.
+        log5.assertAccepted('attempt 2 (response then lost)');
+        log5.assertIdentical(3);
         const server = await serverState();
         assert.equal(pointsOf(server, ctx.dPts.id), pts0 + 1, 'points counted once');
         assert.equal(server.events.filter(e => e.sessionId === ctx.sessionId).length, events0 + 1);
@@ -594,23 +623,32 @@ async function runScenarios() {
       const state = await serverState();
       const pts0 = pointsOf(state, ctx.dPts.id);
       let sent = 0;
+      const log6 = new DeliveryLog();
       const rule = async route => {
-        if (route.request().method() !== 'POST') { await route.continue(); return; }
+        const request = route.request();
+        if (request.method() !== 'POST') { await route.continue(); return; }
         sent += 1;
-        // Deliver the SAME request (same mutation uuid and payload) to the server twice; answer the app with the first reply.
+        // Deliver the SAME request (same mutation uuid and payload) to the server twice; capture both upstream replies and
+        // answer the app with the first. A rejected replay is recorded and fails the check below, never hidden.
         const first = await route.fetch();
-        await route.fetch();
-        await route.fulfill({response: first});
+        const firstText = await first.text();
+        log6.record(`request ${sent} delivery 1`, request.postData(), first.status(), firstText);
+        const second = await route.fetch();
+        log6.record(`request ${sent} delivery 2`, request.postData(), second.status(), await second.text());
+        await route.fulfill({response: first, body: firstText});
       };
-      await A.ctx.route('**/rest/v1/rpc/apply_*_mutation*', rule);
+      await A.ctx.route(`${supabaseOrigin}/rest/v1/rpc/apply_*_mutation*`, rule);
       try {
         await A.at('/chair/participation');
         await settle(A);
         await A.participation(ctx.dPts.country, 'Speech', 2);
         await A.drained();
-      } finally { await A.ctx.unroute('**/rest/v1/rpc/apply_*_mutation*', rule); }
+      } finally { await A.ctx.unroute(`${supabaseOrigin}/rest/v1/rpc/apply_*_mutation*`, rule); }
       await check('the server received the identical mutation twice and applied it once (+2, not +4)', async () => {
         assert.ok(sent >= 1);
+        log6.assertAccepted(); // both deliveries: 2xx and no RPC error
+        assert.ok(log6.records.length >= 2 && log6.records.length % 2 === 0, 'deliveries come in identical pairs');
+        log6.assertIdentical(2);
         assert.equal(pointsOf(await serverState(), ctx.dPts.id), pts0 + 2);
       });
     }
