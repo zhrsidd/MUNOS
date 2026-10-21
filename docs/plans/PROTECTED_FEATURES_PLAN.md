@@ -43,6 +43,7 @@ Close the resolution with a declared result instead of counted ballots. No new t
   * require `outcome` to be `Passed` or `Failed`, then store `outcome`, `"outcomeMethod"='observed'`, `"declaredBy"=actor` and `"declaredAt"=client_time`;
   * retain a nonzero eligible-attendance requirement; skip only named-ballot completeness and the counted-rule comparison;
   * reject a mismatched ballot/session context; the UI action and confirmation must retain the same session safeguard as counted voting;
+  * require `command->>'ballotRevision'` to equal the document's current `revision` (PT409 otherwise): the declaration is bound to the ballot revision the Chair opened it on, so a restart from any Chair device invalidates it;
   * leave any ballots recorded earlier untouched: not deleted and not counted;
   * `"vetoedBy"` stays empty.
 * The `method` key is optional, and an absent key keeps today's counted path byte for byte.

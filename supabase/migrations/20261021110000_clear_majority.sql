@@ -7,7 +7,9 @@
 -- An observed close skips only named-ballot completeness and the counted-rule comparison. It still needs the
 -- ballot's session context (the command names the session the Chair confirmed, which must be the resolution's
 -- session) and at least one delegation present in that session: no attendance, or everyone Absent, is refused.
--- Ballots recorded before an observed close are kept and not counted. The counted path is unchanged.
+-- The declaration is bound to the ballot revision the Chair opened it on (command ballotRevision, also the expected
+-- revision): restarting the ballot, here or from another Chair device, bumps documents.revision and the stale
+-- declaration is refused as a PT409 conflict. Ballots recorded before an observed close are kept and not counted. The counted path is unchanged.
 -- Additive: four columns on documents; private.apply_mutation is PATCHED with exact anchors. Fail closed.
 
 alter table public.documents
@@ -37,6 +39,9 @@ begin
      if command->>'outcome'='Withdrawn' then result:='Withdrawn';
      elsif command->>'method'='observed' then
        if command->>'outcome' is null or command->>'outcome' not in ('Passed','Failed') then raise exception 'Choose Passed or Failed' using errcode='22023'; end if;
+       -- Bound to the ballot the Chair saw: a restart (this Chair or another) bumps documents.revision. A missing or
+       -- stale ballotRevision is a stale-write conflict, independent of the generic expected-revision check above.
+       if (select m[1]::bigint from regexp_match(command->>'ballotRevision','^([0-9]{1,18})$') m) is distinct from rec.revision then raise sqlstate 'PT409' using message='The ballot was restarted or changed since Clear majority was opened. Choose Clear majority again.'; end if;
        select coalesce(c.voting_rule,f.voting_rule) into rule from public.committees c join public.conferences f on f.id=c.conference_id where c.id=cid;
        if rec."voteMode"='divide' then raise exception 'Divide the House needs a counted roll call' using errcode='22023'; end if;
        if rule is distinct from 'simple_majority' then raise exception 'A two-thirds vote needs counted ballots' using errcode='22023'; end if;

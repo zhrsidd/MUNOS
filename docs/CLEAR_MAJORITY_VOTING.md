@@ -15,6 +15,15 @@ general voting convenience; existing committee procedures and veto rules remain 
 - The Clear majority actions keep the counted close's session safeguard: disabled when the console's session
   is not the ballot session or nobody is present; the confirmation names the ballot session; a session switch
   (from any Chair device) cancels an open confirmation instead of closing against the wrong session.
+- The declaration is bound to the exact ballot it was opened on. Opening Clear majority captures the resolution's
+  document `revision`; restarting the ballot (Normal vote, Divide the House or the vote type) bumps that revision,
+  from this Chair device or another. The confirmation is then withdrawn with "restarted or changed since Clear
+  majority was opened... Nothing was closed" (Dismiss, then choose Clear majority again for the new ballot). The
+  close command carries `ballotRevision`, and it is enforced below the UI: the sync layer sends it as the expected
+  revision (not the one current at confirm time), the local handler refuses a mismatch, and
+  `private.apply_mutation` raises PT409 (a stale-write conflict, kept visible in the outbox) when `ballotRevision`
+  is missing, malformed or not the document's current revision. Any other change to the document while it is in
+  debate also invalidates an open declaration; opening it again takes one click.
 - Stored: `outcomeMethod='observed'`, the declaring Chair (`declaredBy`, plus `declaredByName` from the staff
   directory when the account is linked) and `declaredAt`. The `documents_observed_declared` CHECK requires a
   non-NULL Passed/Failed outcome, Chair and time for every observed row (written so NULL is false, not unknown).

@@ -48,6 +48,9 @@ export type Command =
       method?: "observed";
       /** Observed close only: the ballot session the Chair confirmed. It must still be the resolution's session. */
       sessionId?: string;
+      /** Observed close only: the document revision the Chair saw when opening the declaration. A restarted ballot
+       *  (this Chair or another) bumps the revision, so a stale declaration is refused as a conflict. */
+      ballotRevision?: number;
     }
   | { type: "version"; id: string; fileName: string; text: string }
   | {
@@ -350,6 +353,7 @@ export function applyCommand(
           "Close the current debate before opening another resolution.",
         );
       const previous = r.status;
+      const openedRevision = r.revision ?? 0;
       r.revision = (r.revision ?? 0) + 1;
       // Every approval (including re-approval after changes) recounts copies from the committee roster.
       if (c.status === "Approved") r.copies = printCopies(d, r.committeeId);
@@ -358,6 +362,7 @@ export function applyCommand(
         // Same order as private.apply_mutation. Ballot completeness and the counted rule are skipped; the ballot's
         // session context and a nonzero eligible attendance are not.
         if(c.outcome!=='Passed'&&c.outcome!=='Failed')throw Error('Choose Passed or Failed.');
+        if(c.ballotRevision!==openedRevision)throw Error(OBSERVED_STALE);
         const problem=observedMajorityProblem(d,r.id) ?? observedContextProblem(d,r.id,c.sessionId);
         if(problem)throw Error(problem);
       } else if(c.status==='Closed' && c.outcome!=='Withdrawn') {
@@ -635,6 +640,8 @@ export function votingOutcome(data: ConferenceData, resolutionId: string): "Pass
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
  return yes+no>0 && (rule==='two_thirds'?yes*3>=(yes+no)*2:yes>no)?'Passed':'Failed';
 }
+/** Shown when the ballot changed (restarted here or on another Chair device) after a declaration was opened. */
+export const OBSERVED_STALE='The ballot was restarted or changed since Clear majority was opened. Choose Clear majority again.';
 /** Why a clear (observed) majority cannot close this vote, or null. Mirrors private.apply_mutation: an observation
  *  can only establish a simple-majority result in a normal vote where no veto could apply. */
 export function observedMajorityProblem(data:ConferenceData,resolutionId:string):string|null{
