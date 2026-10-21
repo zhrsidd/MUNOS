@@ -3431,7 +3431,7 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
 @keyframes spinner-turn { to { transform: rotate(360deg); } }
 
 /* Skeleton: decorative row-shaped placeholders for a genuine first read; same box as the rows they stand in for. */
-.skeleton-rows { display: grid; gap: var(--space-3); }
+.skeleton-rows { display: grid; gap: var(--skeleton-row-gap, 12px); }
 .skeleton-row {
   display: flex;
   flex-direction: column;
@@ -3449,8 +3449,29 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
 .skeleton-line[data-last="true"] { width: 60%; }
 @keyframes skeleton-pulse { 50% { opacity: 0.55; } }
 
+/* Continuous tabs: one indicator moved by transform. Without data-indicator="on" the per-tab underline above still works. */
+.tabs-inner { position: relative; }
+.tab-indicator { display: none; }
+.tabs[data-indicator="on"] .tab-indicator {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 3px;
+  background: var(--brand);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.tabs[data-indicator="on"] .tab-indicator[data-animate="true"] { transition: transform 150ms ease-out; }
+.tabs[data-indicator="on"] .tab.active,
+.tabs[data-indicator="on"] a.tab.active,
+.tabs[data-indicator="on"] .tab.active:hover,
+.tabs[data-indicator="on"] a.tab.active:hover { border-bottom-color: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
-  .copy-labels > span { transition: none; }
+  .copy-labels > span,
+  .tabs[data-indicator="on"] .tab-indicator[data-animate="true"] { transition: none; }
   .spinner[data-active="true"] { animation: none; }
   .skeleton-row { animation: none; }
 }

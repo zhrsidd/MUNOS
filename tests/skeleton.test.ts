@@ -15,7 +15,7 @@ import type { StaffAccess } from "../lib/access";
 test("skeleton rows are decorative, announced once and sized to the rows they replace", () => {
   const html = renderToStaticMarkup(createElement(SkeletonRows, { label: "Loading passed amendments…", rows: 3, height: 150, lines: 3 }));
   assert.equal((html.match(/role="status"/g) ?? []).length, 1);
-  assert.match(html, /^<div class="skeleton-list" role="status" aria-busy="true" style="--skeleton-row-height:150px">/);
+  assert.match(html, /^<div class="skeleton-list" role="status" aria-busy="true" style="--skeleton-row-height:150px;--skeleton-row-gap:12px">/);
   assert.match(html, /<span class="sr-only">Loading passed amendments…<\/span>/);
   assert.equal((html.match(/class="skeleton-row"/g) ?? []).length, 3);
   assert.equal((html.match(/class="skeleton-line"/g) ?? []).length, 9);
