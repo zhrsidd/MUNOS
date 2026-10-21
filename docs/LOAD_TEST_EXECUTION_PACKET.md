@@ -10,7 +10,10 @@ Related: [INFRASTRUCTURE_LIFECYCLE.md](INFRASTRUCTURE_LIFECYCLE.md), [ISOLATION_
 
 ## 0. Read this first
 
-1. **The final capacity gate is only valid through the write path intended for release.** [Verified] today every browser and every harness device writes directly to PostgREST (`SupabaseTransport.send` calls `rpc('apply_conference_mutation' ...)`, [ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) F3). [Proposed, not built] the lifecycle's gate 6 requires a production-only write gateway, which adds one server hop per write ([ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) 6.6, test T20). If the release ships with the gateway, **only an H3 run through the gateway-capable build counts as the gate**; any run through the current direct path is **development evidence only**. Section 11 states the effect on the schedule.
+1. **The final capacity run must exercise the write path that actually ships.** [Verified] today every browser and every harness device writes directly to PostgREST (`SupabaseTransport.send` calls `rpc('apply_conference_mutation' ...)`, [ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) F3). [Proposed, not built] the lifecycle's gate 6 requires a production-only write gateway, which adds one server hop per write ([ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) 6.6, test T20). Which path ships is an **owner decision not yet made** (nothing is approved):
+   * **If the gateway ships:** only an H3 run through the gateway-capable build counts as the gate; a direct-path run is then development evidence.
+   * **If the owner records an explicit, approved scope change that keeps the existing direct RPC architecture for this conference (deferring the gateway and attestation system):** the direct-path H3 **can** count as the capacity gate, because it is the path that ships. That scope change does **not** satisfy the lifecycle's original production-only write-gateway requirement; it must say so in writing, and the other lifecycle gates are unaffected.
+   * A direct-path run is development-only **only** when the shipped path is not the direct path. Section 11 states the effect on the schedule.
 2. **The runner has no auto-abort, no go/no-go between stages and no settle** ([Verified], `scripts/rehearsal-run.mts`, plan section 4). Every stop is a person's decision (section 7). One invocation is one stage; never use `--stages`.
 3. **Delegate count 420 is an ASSUMPTION** ([Verified] not recorded in the repository). Section 12.
 4. **Micro results are development evidence, not capacity acceptance** ([Verified], lifecycle "Pre-cutover evidence"; checklist 1.8.1 says do not run the load phases on Micro).
@@ -40,7 +43,7 @@ All items are operator checks recorded in the run sheet (section 9). Items marke
 | P1 | Written owner approval of the exact workload, window (UTC and Qatar time) and the people | [LOAD_TEST_PLAN.md](LOAD_TEST_PLAN.md) decisions 1-11, recorded in [VERIFICATION.md](VERIFICATION.md) | Exists and names this packet's commit SHA | Proposed |
 | P2 | Real conference data does not exist in the project and no real Executive has been bootstrapped | Owner statement; [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md) not yet run for real data | Confirmed in writing | Untested |
 | P3 | **Target guard output (local, no network):** the ref is allow-listed and not production | `NEXT_PUBLIC_SUPABASE_URL=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' .env.local \| cut -d= -f2-) STAGING_SUPABASE_REFS=kllhswucdhqqywnzxado npx tsx -e "import {checkToolTarget} from './lib/platform/target-guard'; console.log(JSON.stringify(checkToolTarget(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env)))"` | `{"ok":true,"ref":"kllhswucdhqqywnzxado"}`. With `EXPECTED_SUPABASE_REF` also set to that ref it must refuse ("a project has exactly one role") | Verified (run locally with a stand-in URL, both outcomes seen); the run against the real `.env.local` is Untested |
-| P4 | Operator shell: `EXPECTED_SUPABASE_REF` unset; `STAGING_SUPABASE_REFS` lists exactly `kllhswucdhqqywnzxado` (and `DEVELOPMENT_SUPABASE_REFS` does not list it) | `printenv EXPECTED_SUPABASE_REF` prints nothing; read the two lists | As stated. Shell variables override `.env.local` (the tools merge `{...env, ...process.env}`), so check the shell, not only the file | Verified (code); values Untested |
+| P4 | Operator shell: `EXPECTED_SUPABASE_REF` unset; the ref `kllhswucdhqqywnzxado` is listed in **exactly one** of `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS` (the guard accepts either; which one is an operational choice; both is refused) | `printenv EXPECTED_SUPABASE_REF` prints nothing; read the two lists | As stated. Shell variables override `.env.local` (the tools merge `{...env, ...process.env}`), so check the shell, not only the file | Verified (code); values Untested |
 | P5 | **`NEXT_PUBLIC_CONFERENCE_ID`** is set (shell or `.env.local`) to the original conference `0331ceb6-3fa8-4731-92cb-2b4c0316d0cb`. **`PROTECTED_CONFERENCE_IDS`** is a comma list holding the 21 Oct temporary conference id (not recorded in the repository: the owner supplies it) and any other conference to protect | Read the values; each must be a UUID | Missing, blank or malformed means the tools refuse (fail-closed) | Verified (guard code and `tests/load-guard-no-network.test.ts`); ids Untested |
 | P6 | **Fixture conference isolation:** each fixture's `fixture.json` `conference` differs from both protected ids | Compare by eye and rely on the guard; the guard runs before any request in `load-test.mts`, `rehearsal-run.mts` and `rehearsal-snapshots.mts` | Different UUIDs | Verified (guard); per-fixture check Untested |
 | P7 | `supabase/fixture-ids.json` exists and `.test-sessions/development.json` exists (every hosted script imports `scripts/remote-context.mts`, which reads both). Create the session file with `npx tsx scripts/prepare-session.mts` (one anonymous sign-in; counts against the hourly limit) | `ls supabase/fixture-ids.json .test-sessions/development.json` | Both present. **The plan's step list does not mention `prepare-session`; the scripts need it** | Verified (code: `remote-context.mts`, `prepare-session.mts`); run Untested |
@@ -264,7 +267,7 @@ Run sheet template (one per stage):
 # <stage ID> run sheet
 - Date / UTC start / UTC end:                    Qatar time:
 - Commit SHA under test:        Preview URL (host only):        Deployment id:
-- Write path: direct | gateway-capable (build id)      Counts toward the gate? yes | no (reason)
+- Write path: direct | gateway-capable (build id)      Shipped path (owner decision ref):      Counts toward the gate? yes | no (reason)
 - Supabase compute / disk (from dashboard):      Plan:       PITR:
 - Fixture conference id (A or B):      Protected ids differ? yes/no      NEXT_PUBLIC_CONFERENCE_ID set? yes
 - Command line run (paste, with the token replaced by $SUBMIT_TOKEN):
@@ -279,18 +282,44 @@ Run sheet template (one per stage):
 
 Copy the summary into [VERIFICATION.md](VERIFICATION.md) stating, for each report, its label and whether it counts toward the gate (only a qualifying H3 can).
 
-## 10. Cleanup (revoke-only first; guarded deletion later)
+## 10. Cleanup (revoke-only per fixture; final retirement once; guarded deletion later)
 
-[Verified] `cleanup.sql` (generated per fixture by `rehearsal-fixture.mts`; the legacy `prepare-load.mts` writes `.test-sessions/load-cleanup.sql`) revokes, **only for the fixture conference id**, every `user_access` grant, `submission_links`, `amendment_links` and `private.access_credentials`; it **deletes nothing** and ends with a verify query expected to return 0.
+[Verified] `cleanup.sql` (generated per fixture by `rehearsal-fixture.mts`; the legacy `prepare-load.mts` writes `.test-sessions/load-cleanup.sql`) revokes, **only for the fixture conference id**, every `user_access` grant, `submission_links`, `amendment_links` and `private.access_credentials` (the SQL touches these tables; it makes no claim about what PostgREST exposes); it **deletes nothing** and ends with a verify query expected to return 0.
 
-| Step | Who | When |
+**Two different things, never mixed.** [Verified] fixtures A and B (and any rerun fixture) reuse the **same 22-identity pool** and the same `development.json`: fixture B is generated from the pool just before H3, after A has ended.
+
+* **(a) Per-fixture revoke and isolation check** (happens after each fixture's last stage, and at once after any stop). It touches **only the database** for that fixture. It must **not** delete the identity pool, `development.json`, `rehearsal-multi-identities.json` or any other fixture's files.
+* **(b) FINAL global retirement** (happens once, only after **every approved fixture and stage, including contingency reruns, has finished** and the evidence is saved).
+
+### 10.1 Ordered timeline
+
+| Order | When | Action | Who |
+| --- | --- | --- | --- |
+| 1 | After R3 (fixture A done) | (a) for A: apply `A/cleanup.sql`, run its verify query (0); P13 fingerprint equals baseline. **Keep** the pool, `development.json`, A's local files (needed for evidence and, if a rerun on A is approved, for it) | Approver or technical contact; Harness operator |
+| 2 | Before H3 | Generate fixture B from the same pool (section 3.3); apply its SQL | Harness operator; Approver |
+| 3 | After H3 (and H4/H5 if approved) | (a) for B: apply `B/cleanup.sql`, verify (0), fingerprint. Keep the pool and session files **if a contingency rerun is still approved** | As above |
+| 4 | Each contingency rerun (for example 1 Nov) | New fixture from the same pool; at its end (a) for that fixture. Repeat until no further run is approved | As above |
+| 5 | After the LAST approved run, evidence saved | (b) final retirement, checklist below | Harness operator; technical contact; owner approves Preview deletion |
+| 6 | After the last synthetic test, before promotion | Guarded deletion of synthetic data (10.3) | Human operator after review |
+
+### 10.2 What is deleted when
+
+| Item | After each fixture (a) | FINAL (b) |
 | --- | --- | --- |
-| 1. Apply `cleanup.sql` for **every** fixture created (A and B, and any rerun fixture) in the SQL editor; run the verify query (0) | Approver or technical contact | Immediately after the last stage of that fixture, and at once after any stop |
-| 2. Re-run the P13 fingerprint; must equal baseline; confirm the original conference's active credentials and grants are as recorded, the migration ledger count is unchanged, Advisors show nothing new | Technical contact | After step 1 |
-| 3. Delete from the operator machine: `.test-sessions/rehearsal/*.json`, `.test-sessions/fixtures/*`, `development.json`, `rehearsal-multi-identities.json`; unset `VERCEL_AUTOMATION_BYPASS_SECRET` and `SUBMIT_TOKEN` | Harness operator | After step 2 |
-| 4. Delete the Preview deployment(s) used (lifecycle cutover step 5) | Technical contact with owner approval | After the evidence is saved |
-| 5. Optionally delete the anonymous test users in the dashboard (Authentication, Users); otherwise cutover covers them | Owner decision | Optional |
-| 6. **Guarded deletion** of the labelled `LOAD TEST ·` conferences and test auth users (lifecycle cutover step 2; checklist 1.9.5 and 2.2) | Reviewed by Codex, owner approves, a human operator runs | **After the last synthetic test and before promotion.** **Not implemented** ([Verified] checklist 1.9.5 is OUTSTANDING: "a reviewed, guarded cleanup script or procedure with a read-only before/after count"); no one deletes rows by hand during the test window |
+| Fixture grants, submission and amendment links, access credentials (database, via that fixture's `cleanup.sql`) | **Revoke**, verify 0 | Confirm every fixture shows 0 |
+| Original-conference fingerprint and Advisors check | Run | Run once more |
+| `.test-sessions/fixtures/<that conference>/` local files | Keep (evidence; needed for reruns on it) | Delete all |
+| `.test-sessions/rehearsal/*.json` (the 22 pool session files), `.test-sessions/rehearsal-multi-identities.json` | **Keep** | Delete |
+| `.test-sessions/development.json` | **Keep** | Delete |
+| Harness reports `.test-sessions/rehearsal-<time>.json` | Keep until copied (samples removed) to the evidence folder | Delete the originals after copying |
+| `VERCEL_AUTOMATION_BYPASS_SECRET`, `SUBMIT_TOKEN` in shells | Keep set only while another run is approved | Unset |
+| Preview deployment(s) used | Keep | Delete (lifecycle cutover step 5), owner approves |
+| Anonymous test users in the dashboard | Keep | Optional now; otherwise cutover covers them |
+| Labelled `LOAD TEST ·` conferences and auth users | Keep (labelled, no active access) | Keep until guarded deletion |
+
+### 10.3 Guarded deletion and ordering
+
+**Guarded deletion** of the labelled `LOAD TEST ·` conferences, Storage objects and test auth users (lifecycle cutover step 2; checklist 1.9.5 and 2.2) is reviewed by Codex, approved by the owner and run by a human operator **after the last synthetic test and before promotion**. It is **not implemented** ([Verified] checklist 1.9.5 is OUTSTANDING: "a reviewed, guarded cleanup script or procedure with a read-only before/after count"). No one deletes rows by hand during the test window.
 
 **Ordering rule** ([Verified], lifecycle "Formal cutover" steps 2 and 6): revocation and guarded deletion of all synthetic data must complete **before** the project is promoted and before any real conference data exists. Revoke-only cleanup does not satisfy cutover step 2.
 
@@ -298,13 +327,18 @@ Copy the summary into [VERIFICATION.md](VERIFICATION.md) stating, for each repor
 
 [Verified] facts: all browser writes and all harness writes use `SupabaseTransport` straight to PostgREST today; the harness constructs `SupabaseTransport` directly (`scripts/rehearsal-run.mts`). [Verified] the design in [ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) section 6 adds a gateway (one extra hop per mutation, T20 "capacity through the gateway at Small") and its rollout step 4 says the load and rehearsal harness "is moved onto the gateway with a `test` key, so rehearsals exercise the real path. Re-run capacity at Small through the gateway". Its step 5 then revokes direct execute on the gated functions, after which **pre-gateway builds and the current direct-path harness stop working**. None of this is built, approved or reviewed ([Verified] "design for review, not implemented").
 
-Rules for the owner and the reviewer ([Proposed]):
+Rules for the owner and the reviewer ([Proposed]; nothing here is approved):
 
-1. **If the release ships with the gateway:** the gate is an H3 run against a Preview that is the gateway-capable build (preproduction runtime policy), with a harness that sends through the gateway. A direct-path H3 is **development evidence only** and must be labelled so in the run sheet ("Counts toward the gate? no: direct path").
-2. **If the owner records a scope change and ships the direct path** ([ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) D1 option (b) or similar), the gate is a direct-path H3, but the lifecycle gate 6 is then explicitly not met and the owner's written scope change must say so. The packet does not decide this.
-3. Whatever is chosen, the gate run, the build released and the write path of the conference must be the **same**. A later change to the write path invalidates the gate and requires a rerun.
-4. The earlier stages (S0-R3) through the current direct path remain useful **development evidence**: they validate the guards, identities, fixtures, runner and the read path. They do not validate the gateway's added latency, the Vercel function concurrency or cost of the write route, or the proof-minting cost. R2 and R3 should be repeated through the gateway if time allows, otherwise H3 is the first time the gateway meets load ([Proposed]).
-5. **Effect on the schedule:** the earliest gateway-capable gate is the date the gateway (and the harness change, and the additive migration of rollout step 3) land after review, **plus** the time to deploy and verify the gateway-capable Preview. If that is after the 31 October target, the 31 October load rehearsal can only be development evidence (direct path), and the real gate moves to 1 November (the owner's rerun day), leaving cutover on 2 November with no further slack. If it is after 1 November, the cutover on 2 November cannot rest on a qualifying gate. See [LOAD_TEST_PLAN.md](LOAD_TEST_PLAN.md) "Schedule targets and conflicts".
+1. **The gate run, the build released and the write path of the conference must be the same path.** A later change to the write path invalidates the gate and requires a rerun.
+2. **If the gateway ships:** the gate is an H3 run against a Preview that is the gateway-capable build (preproduction runtime policy), with a harness that sends through the gateway. A direct-path H3 is then development evidence and the run sheet says "Counts toward the gate? no: shipped path is the gateway".
+3. **If the owner approves, in writing, a scope change that retains the existing direct RPC architecture for this conference** (the gateway and attestation system deferred; [ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) D1 option (b) or similar): a direct-path H3 **counts as the capacity gate**, and the run sheet says "Counts toward the gate? yes: direct path is the approved release path (scope change ref: ...)". This does **not** satisfy the lifecycle's original production-only write-gateway requirement; the scope change must record that, and the compensating controls, and the other lifecycle gates still apply.
+4. **Until the owner chooses,** a direct-path H3 is recorded as "gate-eligible only if the direct path is approved as the release path". Do not label it development-only or gate-qualifying in advance.
+5. Direct-path stages S0-R3 validate the guards, identities, fixtures, runner and the read path in either case. They do not validate the gateway's added latency, the Vercel function concurrency or cost of the write route, or the proof-minting cost; if the gateway ships, R2 and R3 should be repeated through it if time allows, otherwise H3 is the first time the gateway meets load.
+6. **Effect on the schedule:**
+   * *Direct path approved as release path:* no gateway dependency; the 31 October H3 can be the gate (subject to the other conflicts in the plan), 1 November is the rerun day.
+   * *Gateway ships:* the earliest qualifying gate is the date the gateway, the harness change and the additive migration (rollout step 3) land after review, **plus** the time to deploy and verify the gateway-capable Preview. If that is after 31 October, the 31 October run is development evidence and the gate moves to 1 November, leaving cutover on 2 November with no slack. If it is after 1 November, the 2 November cutover cannot rest on a qualifying gate.
+   * *Owner has not decided by the time the Preview is prepared:* the schedule cannot be confirmed, because which build to prepare depends on it.
+   See [LOAD_TEST_PLAN.md](LOAD_TEST_PLAN.md) "Schedule targets and conflicts".
 
 ## 12. Delegate count: confirmed versus assumed
 
@@ -346,7 +380,7 @@ Nothing is approved. Each line needs the owner's written approval (recorded in [
 2. Compute upgrade to Small on this same project and its cost; whether an S0 smoke may run on Micro first; PITR and backup decisions. No upgrade is made by this packet.
 3. Applying `fixture.sql` and `cleanup.sql` for fixture A, fixture B and any rerun fixture; creating the identity pool (22 anonymous users); the Preview with the server key; deleting it afterward.
 4. The two protected conference ids and the delegate count (420 assumed).
-5. The write path under test (direct or gateway-capable) and whether the owner accepts a scope change for the gateway. (R, J)
+5. The write path that ships (gateway, or the existing direct RPC path under an explicit owner-approved scope change that defers the gateway and does not meet the original gateway requirement) and therefore the path under test. (R, J)
 6. People: who holds the harness, watches, decides go/no-go, times the settle, may stop; whether H4 runs and who closes votes and how they get access.
 7. Reruns: a contingency approval for a rerun of a failed stage on 1 November (the plan requires each rerun to be approved).
 8. The guarded deletion procedure for cutover (not yet written). (R)
