@@ -4,7 +4,7 @@ Status: **PROPOSED, NOT APPROVED.** Written 21 October 2026 for the 5-7 November
 
 This plan sits on top of the existing harness and does not replace [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md), which stays the source for phases A-F, the harness description and the historical measurements. This document adds: the derived conference model, an explicit test-data isolation design, ramp and sustained phases with request rates, the metrics to capture, hard stop conditions, cleanup, the Micro versus Small comparison, and a local dry run.
 
-Related: [DEPLOYMENT.md](DEPLOYMENT.md) (target guard, single-project cutover), [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md) (project state), [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) (conference-week gate), [RELIABILITY.md](RELIABILITY.md), [PT409_FIX_REPORT.md](PT409_FIX_REPORT.md).
+Related: [LOAD_TEST_EXECUTION_PACKET.md](LOAD_TEST_EXECUTION_PACKET.md) (operator-ready execution packet and separate-check gaps; prepared, not approved), [DEPLOYMENT.md](DEPLOYMENT.md) (target guard, single-project cutover), [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md) (project state), [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) (conference-week gate), [RELIABILITY.md](RELIABILITY.md), [PT409_FIX_REPORT.md](PT409_FIX_REPORT.md).
 
 ## 1. Conference model and expected concurrency
 
@@ -266,29 +266,59 @@ So Small doubles memory, connection limits, baseline throughput and baseline IOP
 
 * Expect **Micro to fail the 110-device gate** or pass only with thin margin: earlier 100-staff runs on a smaller tier had read p95 4.3 s and the API pool at 10 of 11 connections even after the read-path fixes. These are evidence, not a prediction for this instance.
 * Expect Small to help most with memory pressure (snapshots of 120-470 KB for Executive devices), connection headroom and sustained IO.
-* **Recommendation (consistent with the existing setup doc and checklist): upgrade to Small before 5 November** ([SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md), [DEPLOYMENT.md](DEPLOYMENT.md)); [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) wants the gate at T-7 days, about 29 October. The previous guidance says load phases are not run on the smaller tier.
+* **Recommendation (consistent with the existing setup doc and checklist): upgrade to Small before 5 November** ([SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md), [DEPLOYMENT.md](DEPLOYMENT.md)); [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) wants the gate at T-7 days, about 29 October (**superseded as a target by the owner's 31 October proposal below, which is T-5 days and is a conflict, see [Schedule targets and conflicts](#schedule-targets-and-conflicts)**). The previous guidance says load phases are not run on the smaller tier.
 * **What to test on which:**
   * **Micro (current; only if the owner approves a baseline): L0 and the S0 smoke only** (10 staff). No ramp, no gate. It confirms tooling and gives a before number. R1 (25 staff) only with explicit extra approval.
   * **Small: S0, R1, R2, R3, H3, and H4/H5 if approved** (the full plan), then re-run only the failed phase after any fix, each re-run needing its own approval.
   * A compute change restarts the database briefly; schedule it outside any run and re-baseline the original-conference fingerprint afterwards.
 
-### Suggested timeline (owner decides)
+### Schedule targets and conflicts
 
-| Date | Step |
+**Nothing in this section is approved and nothing is spent or scheduled by it.** The dates below are the owner's *proposed targets* (21 October 2026), not approvals: not for the Small upgrade or its cost, not for any hosted run, not for the cutover. Each hosted action still needs the written approval in [Owner approval required before any hosted run](#owner-approval-required-before-any-hosted-run). The operator steps are in [LOAD_TEST_EXECUTION_PACKET.md](LOAD_TEST_EXECUTION_PACKET.md). Status markers: **Verified** (read in the repository), **Proposed**, **Untested**.
+
+| Date (2026) | Proposed target | Status |
+| --- | --- | --- |
+| Now to 30 Oct (Micro) | Review this plan and the packet; local L0-L6; owner decisions; build and review the gateway (see conflict 3); identity pool the day before (22 identities, about 8 minutes); only an S0 smoke on Micro, and only if the owner approves a baseline | Proposed |
+| **Sat 31 Oct** | Small upgrade (database restarts briefly; re-baseline the fingerprint), then the full load rehearsal in one block: S0, R1, R2, R3, then H3 (+ H5, and H4 if approved), cleanup the same day | Proposed; counts as the gate only if the write-path rule holds (conflict 3) |
+| **Sun 1 Nov** | Fixes and reruns of only the failed phase; each rerun needs its own approval; cleanup of every fixture | Proposed |
+| **Mon 2 Nov** | Cutover, **only if every gate passes** (lifecycle "Formal cutover"): guarded deletion of synthetic data, revocation, promotion, production build | Proposed; depends on conflicts 2-6 |
+| **Tue 3 Nov** | Freeze: `CONFERENCE_FREEZE=1`, T-48 hours (checklist 4.2) | Proposed |
+| **5-7 Nov (Thu-Sat)** | Conference | Verified dates |
+| 31 Oct - 7 Nov | Small compute window, eight days inclusive | Proposed; the upgrade and its cost are not approved; Untested whether Small can be held for exactly that window |
+
+**Earlier placeholders now superseded (flag, not silently dropped).** The earlier text of this plan had: 24-26 Oct upgrade to Small; 27-29 Oct load day (placeholder, never an agreed window); 30-31 Oct fixes and release freeze; 1-4 Nov no load tests and test-data removal. Under the owner's proposal the load day moves two to four days later, the freeze moves from 30-31 Oct to 3 Nov, and fixes/reruns compress into one day. [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) (T-7, about 29 October) and [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md) still carry the earlier dates and need an owner decision to align (not edited here).
+
+**Conflicts the owner must resolve** (each also stated in the packet where it affects the run):
+
+1. **Rehearsal later than the earlier deadline.** 31 October is T-5 days, not the T-7 (about 29 October) in RELEASE_CHECKLIST.md, and the earlier 27-29 October placeholder is dropped. A failed H3 on 31 October leaves exactly one day (1 November) for diagnosis, a fix, review, redeploy and a rerun, and none for a second rerun. Verified arithmetic; the rerun duration is Untested.
+2. **Ramp stages need time while the project is still on Micro.** [Verified] this plan and checklist 1.8.1 say Micro runs only L0 and an S0 smoke (R1 only with extra approval) and no ramp or gate. The stages S0-R3 therefore cannot give useful evidence before 31 October. Either they all run on 31 October after the upgrade (the plan's own about 5-hour block: S0-R3 about 50 minutes, H3 about 35, H4/H5 about 30, plus setup and cleanup, with no slack for a stop), or the owner approves Micro runs of S0-R3 as **development evidence only**, which proves tooling, not capacity. A slipped or slow upgrade slips everything after it. Proposed: approve S0 on Micro early to prove tooling, keep R1-R3 and H3 for Small.
+3. **Gateway dependency.** [Verified] [ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) is a design for review; none of its register, marker, migrations, gateway route, `SupabaseTransport` change or harness change exists. The final capacity run **must exercise the write path intended for release**: if the release uses the gateway, an H3 run must go through the gateway-capable build, and a 31 October direct-path run is development evidence only. Gateway work needs the owner's decision D1 and independent review, plus migrations during a feature freeze. The gateway-capable gate is achievable on 31 October **only if** the gateway, the harness change and the additive migration are reviewed and deployed to a protected preproduction Preview before then; otherwise the gate falls to 1 November (the rerun day) with no slack, or the owner records a scope change ([ISOLATION_DESIGN.md](ISOLATION_DESIGN.md) D1). See the packet, section 11.
+4. **Small window overlaps the freeze, cutover and conference.** [Verified] the window 31 Oct - 7 Nov contains the cutover (2 Nov), the freeze (3 Nov) and the conference. That is consistent with the lifecycle (Small before and through the conference) but means Small is billed during the days that carry no load testing. Load, destructive and write-isolation tests must **finish before real data exists and before the cutover**; after promotion no load or rehearsal runs ([Verified] INFRASTRUCTURE_LIFECYCLE.md). A compute change restarts the database: do it outside any run and not during the cutover write pause.
+5. **Cleanup must precede promotion.** [Verified] revoke-only `cleanup.sql` is not the cutover step: the guarded deletion of the labelled test conferences, grants and auth users (cutover step 2; checklist 1.9.5, 2.2) is **not written**. It needs review and approval and must run after the last synthetic test, which is the 1 November rerun, and before 2 November's promotion. Revoke-only cleanup of every fixture is due the same day as its run.
+6. **Isolation proofs and revocation wait-out sit inside the same two days.** [Verified] rollout steps 6-9 of ISOLATION_DESIGN.md (evidence phase, production-classified synthetic proofs, key rotation, token floor, attestation barrier of about 25 minutes with the proposed values, and the token wait-out of its section 7.3) run after all load tests and before real-data entry. Cutover on 2 November and the freeze on 3 November leave about one day for the real Executive bootstrap, real data entry, codes and QR links ([V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md) phase 4). Whether that fits is Untested.
+7. **Other required rehearsals compete for the same days.** [Verified] the lifecycle requires, at Small and before promotion, separate delegate bursts and shared-NAT enrollment, offline/reconnect/restart, overload, role/revocation, failure and rollback rehearsals, and a restore exercise; the packet lists these as separate checks (G1-G7) with owners. They are not covered by H3 and are not in the owner's 31 October block. Those that do not need Small capacity can run earlier on Micro as functional evidence, but the lifecycle wants the decisive runs at Small.
+8. **Weekend and availability.** 31 October and 1 November fall on a Saturday and Sunday (Verified by calendar). People and dashboard access for those days are not confirmed (Untested).
+9. **Every rerun needs its own approval**, and a fixture is not reused after a stop ([Verified] section 7); the owner can pre-approve a contingency rerun on 1 November in the same written approval.
+
+**Achievable only if upstream work lands (dependency table, Proposed):**
+
+| Target | Achievable only if |
 | --- | --- |
-| 21-23 Oct | Review this plan; run L0 locally; owner decisions below |
-| 24-26 Oct | Confirm plan/compute/PITR in the dashboard; upgrade to Small; prepare identities (the day before; 22 pool identities take about 8 minutes at the 20 s pace) |
-| 27-29 Oct (placeholder, not an agreed window) | S0, R1, R2, R3, H3, H5 (and H4 if approved) on one day with the on-call team; cleanup the same day |
-| 30-31 Oct | Fix findings; repeat only the failed phase; release freeze |
-| 1-4 Nov | No load tests. Remove test data per DEPLOYMENT cutover step 2 |
+| 31 Oct upgrade and S0-R3 | The owner approves the Small upgrade and cost, plus the run, in writing by 30 Oct; identities prepared on 30 Oct; the Preview of a named commit is ready; P2-P17 of the packet are done |
+| 31 Oct H3 counting as the gate | The release write path is identical to the path under test: either the gateway, harness change and additive migration are reviewed and deployed on a Preview before 31 Oct, or the owner records a direct-path scope change |
+| 1 Nov reruns | A finding is small enough to fix, get independent review (Codex, protected areas) and redeploy within one day; an approved contingency exists |
+| 2 Nov cutover | All gates pass; guarded deletion script reviewed; isolation proofs (evidence suite) done; backup and restore exercised on local/disposable state; revocation wait-out accounted for; no real data yet |
+| 3 Nov freeze | The production build was released and verified on 2 Nov; the real Executive bootstrap and data entry fit in the remaining time |
+
+If any row above fails, the dates do not hold and the owner chooses between moving the cutover, accepting a recorded scope change, or not cutting over; this document makes none of those decisions.
 
 ## Owner approval required before any hosted run
 
-**Status: awaiting owner decision. Nothing in this document is approved.** No hosted request has been made. This plan approves **no** hosted load, **no** fixture creation or SQL application, **no** identity creation, **no** compute or PITR upgrade and **no** spending. The dates below are placeholders for discussion, not an agreed window, and nothing here extends or schedules any agreed Small-compute window. The owner (Zuhayr Siddique) must approve, in writing, the exact workload in section 4 (the commands, the 150-delegate burst in the first 120 s of H3 with 16 submissions, and the manual ramp) and each item below. Approve **the workload that will execute**, not a description of it. John Paul Ribeiru approves releases; Zuhayr Siddique is in charge during any live problem.
+**Status: awaiting owner decision. Nothing in this document is approved.** No hosted request has been made. This plan approves **no** hosted load, **no** fixture creation or SQL application, **no** identity creation, **no** compute or PITR upgrade and **no** spending. The dates below and in [Schedule targets and conflicts](#schedule-targets-and-conflicts) are targets and placeholders for discussion, not an agreed window, and nothing here extends or schedules any agreed Small-compute window. The owner (Zuhayr Siddique) must approve, in writing, the exact workload in section 4 (the commands, the 150-delegate burst in the first 120 s of H3 with 16 submissions, and the manual ramp) and each item below. Approve **the workload that will execute**, not a description of it. John Paul Ribeiru approves releases; Zuhayr Siddique is in charge during any live problem.
 
 | # | Decision needed | Proposed default (pending the owner) |
 | --- | --- | --- |
-| 1 | **Date and time window** (start/end, UTC and Qatar time), with the confirmation that the window ends before the real Executive bootstrap and before any real conference data enters the project | Placeholder 27-29 October; one block of about 5 hours (S0-R3 about 50 min, H3 about 35 min, H4/H5 about 30 min, setup and cleanup) |
+| 1 | **Date and time window** (start/end, UTC and Qatar time), with the confirmation that the window ends before the real Executive bootstrap and before any real conference data enters the project | Owner's proposed target 31 October (supersedes the earlier 27-29 October placeholder), with 1 November for fixes and reruns; one block of about 5 hours (S0-R3 about 50 min, H3 about 35 min, H4/H5 about 30 min, setup and cleanup) |
 | 2 | **Size and phases**: which of S0, R1, R2, R3, H3, H4, H5 may run; maximum staff devices (110); delegates (150) and submissions on one link (16, runner maximum 18); acceptance that **H3 starts public traffic in its first two minutes** (not later) | S0-R3, H3, H5; H4 only if decision 11 is yes |
 | 3 | **Compute tier**: confirm plan, compute and PITR from the dashboard; whether to upgrade to Small and on which date; whether to allow an S0 smoke on Micro | Recommend Small before any run beyond S0; the owner decides; no upgrade is made by this plan |
 | 4 | **Delegate count** (420 assumed, **pending owner confirmation**; sensitivity 570) | 420 |
