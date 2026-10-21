@@ -8,12 +8,23 @@ export const FELIX_FRAMES = ["idle", "half-blink", "blink", "closed-beak", "happ
 export type FelixFrame = (typeof FELIX_FRAMES)[number];
 export type FelixMotionState = "idle" | "blink" | "typing" | "petting";
 
-/** Timings from docs/FELIX.md (owner ANIMATION.md). */
-export const MOTION = { blinkMinMs: 5200, blinkJitterMs: 3200, blinkMs: 260, typingCycleMs: 1400, typingQuietMs: 950, petMs: 1120, petCooldownMs: 1250 } as const;
+/**
+ * Timings from docs/FELIX.md. Idle, blink and petting are the owner's ANIMATION.md values; typing was retuned on
+ * 21 October 2026 (owner brief "faster, unobtrusive Felix typing"):
+ * - typingCycleMs: one gentle cycle, inside the requested 1.0–1.2 s (the 19 October preview was 1.4 s);
+ * - typingQuietMs: the face settles 600 ms after the last keystroke (was 950 ms).
+ * Reply text is not timed here: replies are shown instantly (0 ms), so there is no reveal to tune.
+ */
+export const MOTION = { blinkMinMs: 5200, blinkJitterMs: 3200, blinkMs: 260, typingCycleMs: 1100, typingQuietMs: 600, petMs: 1120, petCooldownMs: 1250 } as const;
 
 type Step = readonly [at: number, frame: FelixFrame];
 const BLINK: Step[] = [[0, "half-blink"], [75, "blink"], [155, "half-blink"], [230, "idle"]];
-const TYPING: Step[] = [[0, "idle"], [240, "closed-beak"], [440, "idle"], [720, "half-blink"], [795, "blink"], [875, "half-blink"], [950, "idle"], [1140, "closed-beak"]];
+/**
+ * One typing cycle (MOTION.typingCycleMs): the beak closes once and reopens (a single beak change), then one brief
+ * 230 ms blink (the same shape as the idle blink), then rests open until the next cycle. A keystroke never restarts
+ * this: it only moves the inactivity deadline.
+ */
+const TYPING: Step[] = [[0, "idle"], [260, "closed-beak"], [440, "idle"], [640, "half-blink"], [715, "blink"], [795, "half-blink"], [870, "idle"]];
 const PET: Step[] = [[0, "half-blink"], [90, "happy-squint"], [310, "content"], [690, "happy-squint"], [960, "half-blink"], [1060, "idle"]];
 
 export type Conditions = { enabled: boolean; reduced: boolean; hidden: boolean; offscreen: boolean; ready: boolean };
@@ -55,7 +66,10 @@ export class FelixMotion {
     if ((Object.keys(next) as (keyof Conditions)[]).some(k => before[k] !== this.conditions[k])) { this.typingUntil = 0; this.idle(); }
   }
 
-  /** A keystroke in the Felix composer: run (or keep running) the beak cycle until 950 ms of quiet. */
+  /**
+   * A keystroke in the Felix composer. The first one starts a cycle; later ones, while it runs, only push the
+   * inactivity deadline out (the cycle is never restarted), and the face settles typingQuietMs after the last.
+   */
   typing() {
     this.typingUntil = this.clock.now() + MOTION.typingQuietMs;
     if (!this.canMove()) return;

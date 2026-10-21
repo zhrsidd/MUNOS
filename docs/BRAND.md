@@ -169,6 +169,6 @@ Felix, the Doha College mascot, is the staff helper (see [FELIX.md](FELIX.md)). 
 the bottom-right corner (safe-area aware). Short notices above it follow the toast rule (≤ 12 words, real text,
 dismissible) and use the callout pattern: 3 px left rule in `--action`, or `--attention` with its tint when urgent.
 The panel uses existing tokens: hairline sections, 40 px controls, one primary Send button. Exception to "nothing
-animates while typing": Felix's own composer may move his beak, as the owner requested; no other screen does.
+animates while typing": Felix's own composer may move his beak (a gentle 1.1 s cycle that settles 600 ms after the last key), as the owner requested; no other screen does.
 Expressions are decorative and never carry save, sync or error meaning. Reduced motion and the Animate Felix
 switch hold the face still.
