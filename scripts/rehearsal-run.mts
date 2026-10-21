@@ -29,7 +29,7 @@ import { SimClient, sumStats, type Clock, type RefreshSource } from "./rehearsal
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
 import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type IdentityFile, type StaffRoleKey } from "./rehearsal/identities";
-import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
+import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, capacityGateLabel, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -66,9 +66,6 @@ for (const n of stages) {
   if (!plan.ok) { console.error(`Refused: ${plan.reason}`); process.exit(2); }
   if (submitToken) console.log(`Stage ${n} staff: ${plan.pageLoads} public page loads, ${plan.planned} resolution submissions planned on one link (max ${MAX_SINGLE_LINK_SUBMISSIONS}).`);
 }
-const health = await appFetch(`${base}/api/health`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-const env = checkHealthEnvironment(health);
-if (!env.ok) { console.error(`Refused: ${env.reason}`); process.exit(2); }
 // Loaded only after the guards: these enforce the development Supabase project and an authorized test session.
 const context = await import("./remote-context.mts").catch((e: Error) => {
   console.error(`Rehearsal setup missing: ${e.message}\nNeeds .env.local for the DEVELOPMENT Supabase project and an authorized session (see docs/STAGING_REHEARSAL.md → Preparation).`);
@@ -76,6 +73,11 @@ const context = await import("./remote-context.mts").catch((e: Error) => {
 });
 const { clientFor, session, ref } = context;
 { const synthetic = checkFixtureConference(fixture.conference, { ...context.env, ...process.env }); if (!synthetic.ok) { console.error(`Refused: ${synthetic.reason}`); process.exit(2); } }
+// Network starts here: everything above (app URL shape, fixture, Supabase project guard, synthetic-conference guard) is local.
+// The deployment's own /api/health may contact the database, Auth and Storage, so it runs only after every local guard passed.
+const health = await appFetch(`${base}/api/health`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+const env = checkHealthEnvironment(health);
+if (!env.ok) { console.error(`Refused: ${env.reason}`); process.exit(2); }
 // Role-scoped identities (--identities <file>): pre-authorized sessions, each holding ONLY its role's grant, so every
 // simulated device reads the RLS payload a real device of that role would receive.
 //  * realistic-multi-committee: one Chair identity per real committee (readiness).
@@ -297,9 +299,7 @@ const note = mode === "realistic-multi-committee"
     ? "LEGACY single-committee floors: one Chair identity scoped to ONE committee; simulated committees are extra sessions inside it, so every Chair write serializes on one committees row (overstates contention). Historical comparison only — NOT A READINESS RUN."
     : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Historical comparison only — NOT A READINESS RUN.";
 const peakStaff = Math.max(...stages);
-const capacityGate = peakStaff >= 100 ? "OPTIONAL STRESS / HEADROOM (100 staff) — not a release requirement"
-  : peakStaff >= 50 ? "REQUIRED capacity gate (C2: 50 staff across the real committees plus resolution public-form traffic)"
-  : "BELOW the required 50-staff gate (warm-up only)";
+const capacityGate = capacityGateLabel(peakStaff);
 const publicForm = { delegates: delegateCount, singleLink: Boolean(submitToken), submissionsPlannedPerStage: Object.fromEntries(stages.map((n) => [n, plannedSubmissions(scenarioFor(n))])), maxSingleLinkSubmissions: MAX_SINGLE_LINK_SUBMISSIONS, note: "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately." };
 const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: verdict.label, readiness, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "production DurableRepository (one flush in flight; see scripts/rehearsal/client-model.ts)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });

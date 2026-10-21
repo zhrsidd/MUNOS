@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {capacityGateLabel} from '../scripts/rehearsal/readiness';
 import {buildFixture,cleanupSql,fixtureJson} from '../scripts/rehearsal/fixture';
 import {checkFixtureConference} from '../scripts/rehearsal/guard';
 import {resolveChairMapping,identityModeOf,type ChairIdentity,type MultiCommitteeFile,type LegacyScopedFile} from '../scripts/rehearsal/identities';
@@ -214,7 +215,12 @@ test('fixture guard: a fixture may never name the configured conference; cleanup
  assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live}).ok,true);
  assert.equal(checkFixtureConference(live,{NEXT_PUBLIC_CONFERENCE_ID:live.toUpperCase()}).ok,false,'case-insensitive match');
  assert.equal(checkFixtureConference(live,{NEXT_PUBLIC_CONFERENCE_ID:` ${live} `}).ok,false);
- for(const bad of [undefined,'',null,'not-a-uuid',"x'; select 1; --"])assert.equal(checkFixtureConference(bad,{}).ok,false,String(bad));
+ for(const bad of [undefined,'',null,'not-a-uuid',"x'; select 1; --"])assert.equal(checkFixtureConference(bad,{NEXT_PUBLIC_CONFERENCE_ID:live}).ok,false,String(bad));
+ // Fail closed: a valid fixture is refused when the protected conference cannot be established.
+ for(const config of [{},{NEXT_PUBLIC_CONFERENCE_ID:''},{NEXT_PUBLIC_CONFERENCE_ID:'   '},{NEXT_PUBLIC_CONFERENCE_ID:'your-conference-uuid'}])assert.equal(checkFixtureConference(conference,config).ok,false,JSON.stringify(config));
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:`${conference}`}).ok,false,'explicit protected registry');
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:'nope'}).ok,false,'malformed registry entry refuses');
+ assert.equal(checkFixtureConference(conference,{NEXT_PUBLIC_CONFERENCE_ID:live,PROTECTED_CONFERENCE_IDS:' ,'}).ok,true,'blank registry entries are ignored');
  assert.throws(()=>cleanupSql("x'; select 1; --"),/conference UUID/);
  const f=multi();assert.equal(f.cleanup,cleanupSql(conference));
  assert.doesNotMatch(f.cleanup,/\bdelete\b|\btruncate\b|\bdrop\b/i,'cleanup revokes, it never removes rows');
@@ -233,4 +239,13 @@ test('fixture guard: a fixture may never name the configured conference; cleanup
   assert.equal((await query<{n:number}>('select count(*)::int n from public.user_access where conference_id=$1 and revoked_at is null',[original]))[0].n,1,'another conference is untouched');
   assert.equal((await query<{n:number}>('select count(*)::int n from public.delegates where conference_id=$1',[conference]))[0].n,N*30,'no rows removed');
  }finally{await db.close();}
+});
+
+test('capacity gate label follows the current 110-device gate, not the historical 50-staff gate',()=>{
+ assert.match(capacityGateLabel(110),/CURRENT capacity gate size \(110 devices/);
+ assert.match(capacityGateLabel(110),/READINESS RUN/);
+ assert.match(capacityGateLabel(100),/OPTIONAL STRESS/);
+ assert.match(capacityGateLabel(80),/BELOW the current 110-device gate/);
+ assert.match(capacityGateLabel(50),/BELOW the current 110-device gate/);
+ assert.match(capacityGateLabel(25),/smoke \/ warm-up only/);
 });

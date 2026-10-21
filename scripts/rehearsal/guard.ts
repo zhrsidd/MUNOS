@@ -41,7 +41,13 @@ export function checkUsers(n: number): GuardResult {
  */
 export function checkFixtureConference(conference: unknown, env: Record<string, string | undefined>): GuardResult {
   if (typeof conference !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conference)) return { ok: false, reason: "The fixture file does not name a conference UUID." };
-  const protectedIds = [env.NEXT_PUBLIC_CONFERENCE_ID].map((v) => v?.trim().toLowerCase()).filter(Boolean);
-  if (protectedIds.includes(conference.toLowerCase())) return { ok: false, reason: `Fixture conference ${conference} is the configured NEXT_PUBLIC_CONFERENCE_ID. Load tools only use a dedicated synthetic conference.` };
+  // Fail closed: without a valid protected conference id the fixture cannot be shown to differ from it.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const configured = env.NEXT_PUBLIC_CONFERENCE_ID?.trim() ?? "";
+  if (!UUID.test(configured)) return { ok: false, reason: "NEXT_PUBLIC_CONFERENCE_ID is missing or not a UUID, so the fixture cannot be checked against the protected conference. Set it in .env.local (the conference this project is configured for)." };
+  const extra = (env.PROTECTED_CONFERENCE_IDS ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  if (extra.some((v) => !UUID.test(v))) return { ok: false, reason: "PROTECTED_CONFERENCE_IDS contains a value that is not a UUID." };
+  const protectedIds = [configured, ...extra].map((v) => v.toLowerCase());
+  if (protectedIds.includes(conference.toLowerCase())) return { ok: false, reason: `Fixture conference ${conference} is a protected conference (NEXT_PUBLIC_CONFERENCE_ID or PROTECTED_CONFERENCE_IDS). Load tools only use a dedicated synthetic conference.` };
   return { ok: true, reason: "synthetic fixture conference" };
 }

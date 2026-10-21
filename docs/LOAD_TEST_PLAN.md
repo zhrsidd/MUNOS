@@ -30,30 +30,32 @@ Related: [DEPLOYMENT.md](DEPLOYMENT.md) (target guard, single-project cutover), 
 * **Delegate public traffic: 150-200 page loads in about 2 minutes** after "submissions open", and at most 18 real submissions per link per 10 minutes. Across 19 links the theoretical ceiling is 19 x 20 = 380 accepted per 10 minutes (0.63 per second). The harness exercises one link; the multi-link figure is extrapolated, not tested.
 * **Auth identities:** 0 for delegates; one anonymous identity per staff device that has redeemed an access code. In the test, 19 Chair + Approval + Admins + Executive = **22 pooled identities** (one Chair identity per committee), shared by all simulated devices of that role. This is **not** a 110-distinct-user sign-in test; Phase D covers fresh sign-ins separately.
 
-### Request rates implied by the dry run
+### Request rates implied by the commands in section 4
 
-`npm run rehearsal:plan -- --staff 110 --delegates 150 --committees 19 --minutes 10` (local, deterministic, verified 21 October):
+All figures are the deterministic scenario (seed 42, 19 committees, 150 s start window) as computed by `scripts/rehearsal/scenario.ts` and `scripts/rehearsal/estimate.ts` on 21 October 2026 (`npm run rehearsal:plan` uses the same code). Writes are an **upper bound** (the live runner skips a step whose precondition is not met). Snapshot RPC counts are the client-model estimate with Realtime `topic-aware`, the 2 s Executive Chair window and an assumed 600 ms refresh (2.5 s in brackets); the live run reports the real count. Rates are averages over the whole run **including the start burst**, so a 5-minute run reads higher per minute than the 30-minute run.
 
-| Quantity | Value |
-| --- | --- |
-| Roles | 77 Chair, 11 Approval, 11 Admins, 11 Executive, 150 delegates |
-| Staff writes | 1,528 in 10 minutes = **153 per minute (about 2.5 per second)**; no person faster than every 3 s, at most 3 writes per user per minute |
-| Of which | 807 attendance, 376 queue adds, 72 speech starts, 62 scores, 59 speech finishes, 35 approvals, 17 prints, 12 sends to Approval, 53 photo acknowledgements |
-| Snapshot RPCs (topic-aware Realtime, 600 ms read) | about **9,995 in 10 minutes = about 1,000 per minute (16.7 per second)**; 6.6 per write; 1,839 triggers dropped because the device was busy |
-| By role | Chair 5,788, Executive 2,832 (with the 2 s Chair window; 5,156 without), Approval 692, Admins 682 |
-| Public form | 150 page loads, 0 auth sessions; 44 submissions at the default fraction 0.3 (**too many for one link**: use `--submit-fraction 0.10`, about 11) |
+| Invocation | Staff mix (Chair / Approval / Admins / Executive) | Committees with Chair traffic | Staff writes | Snapshot RPCs |
+| --- | --- | --- | --- | --- |
+| S0: `--staff 10 --minutes 5` | 7 / 1 / 1 / 1 | **7 of 19** | 106 (21 per min) | about 199 (40 per min) |
+| R1: `--staff 25 --minutes 5` | 16 / 3 / 3 / 3 | **16 of 19** | 252 (50 per min) | about 609 (122 per min, 2.0 per s) [525] |
+| R2: `--staff 50 --minutes 5` | 35 / 5 / 5 / 5 | 19 | 463 (93 per min) | about 1,574 (315 per min, 5.2 per s) [1,327] |
+| R3: `--staff 80 --minutes 5` | 56 / 8 / 8 / 8 | 19 | 702 (140 per min) | about 3,325 (665 per min, 11.1 per s) [2,629] |
+| H3: `--staff 110 --minutes 30` (+150 delegates) | 77 / 11 / 11 / 11 | 19 | 3,841 (128 per min) | about 27,206 (907 per min, 15.1 per s) [20,511] |
+| H4 background: `--staff 50 --minutes 15` | 35 / 5 / 5 / 5 | 19 | 1,151 (77 per min) | about 4,386 (292 per min, 4.9 per s) [3,635] |
 
-Refreshes, not writes, dominate: this is why the pass criteria watch snapshot read latency and API connection use first.
+Per role for H3 (600 ms case): Chair about 14,800, Executive about 8,400, Approval about 2,000, Admins about 2,000 refreshes. Refreshes, not writes, dominate: the pass criteria watch snapshot read latency and API connection use first. (`npm run rehearsal:plan -- --staff 110 --delegates 150 --minutes 10 ...`, used in L2, prints a 10-minute scenario: 1,528 writes, about 9,995 snapshot RPCs; it is a plan-only figure and is **not** what H3 executes.)
+
+Public form (H3): the scenario schedules **150 page loads uniformly at random inside the first 120 s** of the run (about 1.25 per second on average) and, with `--submit-fraction 0.08`, **16 resolution submissions**, each 30-180 s after its own page load, i.e. **between about 57 s and 282 s into the run**, all inside one 10-minute window on one link (limit 20, runner refusal above 18). At the default fraction 0.10 the same scenario plans **18** (no headroom; 0.05 plans 10; 200 delegates at 0.10 plans 22 and is refused).
 
 ## 2. Simulated workloads
 
 | # | Workload | Real-world trigger | How it is simulated | Coverage |
 | --- | --- | --- | --- | --- |
-| W1 | **Roll call burst** | Session opens; every Chair marks about 22 delegates | Harness `attendance` steps (807 per 10 min), starts inside the 150 s start window. Worst realistic case: 19 Chairs x one write per 3 s = about 6.3 writes per second for about 66 s | Harness (human-paced). A faster-than-3 s burst is deliberately not modelled |
+| W1 | **Roll call burst** | Session opens; every Chair marks about 22 delegates | Harness `attendance` steps (each Chair device marks up to 8 delegates, 3-8 s apart, right after opening; plus later roll-call writes), starting inside the 150 s start window. Worst realistic case: 19 Chairs x one write per 3 s = about 6.3 writes per second for about 66 s | Harness (human-paced). A faster-than-3 s burst is deliberately not modelled |
 | W2 | **Speaker queue and score writes** | Debate | `queueAdd`, `speechStart`, `speechScore`, `speechFinish`, POIs; one floor device per committee | Harness |
-| W3 | **Votes closing simultaneously across committees** | The Chair of every committee closes a vote at the end of a session | **Not in the harness** (no vote action). Run as a **people-driven scenario** in Phase B style: 19 Chairs (or fewer real people plus the harness already running in the background) each close one vote within a 10 s window, then repeat 3 times. Expect 19 `apply_conference_mutation` calls in about 10 s plus a refresh wave on Approval/Admins/Executive devices | **Gap**, manual. See [Owner decisions](#owner-approval-required-before-any-hosted-run): who performs it. Do not add harness features during the freeze |
+| W3 | **Votes closing simultaneously across committees** | The Chair of every committee closes a vote at the end of a session | **Not in the harness** (no vote action). Only possible as an optional **people-driven scenario** (H4, decision 11): up to 19 people close one vote each within a 10 s window, 3 rounds, while the harness runs 50 staff in the background. Expect 19 `apply_conference_mutation` calls in about 10 s plus a refresh wave on Approval/Admins/Executive devices | **Gap**, manual and optional. Who performs it, and how they get staff access to the temporary conference, is an owner decision. Do not add harness features during the freeze |
 | W4 | **Approval / Logistics polling** | Panels left open all day | 11 Approval + 11 Admins devices: focus returns every 30-90 s, recovery poll, topic-aware (ignore `chair` events), occasional approve/print | Harness |
-| W5 | **Public submission burst** | "Submissions open" announcement | `--delegates 150` (or 200), `--delegate-window 120`, `--submit-token <token> --submit-committee <code> --submit-fraction 0.10`: page loads plus about 11-16 real submissions on one link | Harness |
+| W5 | **Public submission burst** | "Submissions open" announcement | `--delegates 150`, `--delegate-window 120`, `--submit-token <token> --submit-committee <code> --submit-fraction 0.08`: 150 page loads in the first 120 s of the H3 run plus 16 real submissions (at about 57-282 s) on one link. This starts with the run, not later | Harness |
 | W6 | **Snapshot reads** | All of the above | Every device runs the production sync model (one flush in flight, 350 ms debounce, 60 s recovery); `rehearsal-snapshots.mts` measures bytes and unloaded latency per role | Harness + probe |
 | W7 | Realtime connect / reconnect | Wi-Fi blips | `npm run test:load` (up to 200 channels) is **not** used for the hosted run (see below); Realtime behaviour is observed through the harness's simulated notifications and Phase E2 with real browsers | Partial |
 | W8 | Duplicate / lost-response retries | Flaky venue Wi-Fi | 10 % of writes re-sent with the same mutation id; exactly-once check | Harness |
@@ -70,7 +72,7 @@ All hosted traffic goes to a **dedicated TEMPORARY conference** (fresh random UU
 
 1. **Project guard.** Every script resolves the project through `lib/platform/target-guard.ts` (`assertToolTarget`) before any connection: the URL must be a hosted `https://<ref>.supabase.co`, the ref must be in `STAGING_SUPABASE_REFS` or `DEVELOPMENT_SUPABASE_REFS`, never `EXPECTED_SUPABASE_REF` (production), and never the PHESMUN project `gglltljhdpkfjnyjmnif`. No allow-list means refuse. No override exists. Used by `remote-context.mts` (load-test, snapshots, rehearsal-run), `prepare-session.mts` and `rehearsal-identities.mts`.
 2. **App guard** (`scripts/rehearsal/guard.ts`): `rehearsal-run.mts` only talks to `localhost` or a Vercel Preview/branch URL, refuses bare aliases and custom domains, and refuses a target whose `/api/health` says `production`.
-3. **Fixture-conference guard (added with this plan).** `checkFixtureConference` is called by `load-test.mts`, `rehearsal-run.mts` and `rehearsal-snapshots.mts` before any request: the fixture must name a well-formed conference UUID that is **not** the configured `NEXT_PUBLIC_CONFERENCE_ID`. Before this change a mistaken fixture file could point the harness at the configured conference.
+3. **Fixture-conference guard (added with this plan).** `checkFixtureConference` is called by `load-test.mts`, `rehearsal-run.mts` and `rehearsal-snapshots.mts` **before any network request** (for `rehearsal-run` that includes the deployment's `/api/health`): the fixture must name a well-formed conference UUID that is **not** the configured `NEXT_PUBLIC_CONFERENCE_ID` and not in the optional comma-separated `PROTECTED_CONFERENCE_IDS`. It **fails closed**: if `NEXT_PUBLIC_CONFERENCE_ID` is missing, blank or not a UUID (or a `PROTECTED_CONFERENCE_IDS` entry is malformed) the tool refuses, because it cannot then show that the fixture differs from the protected conference. Before this change a mistaken fixture file could point the harness at the configured conference. `tests/load-guard-no-network.test.ts` runs the real scripts with fetch, sockets and DNS blocked and asserts zero attempts for a protected, malformed or unverifiable case.
 4. **Database scoping.** The fixture SQL creates the conference, committees, one session each, delegations, a scoring definition, and `user_access` grants **only for that conference id** with `expires_at = now() + grant-hours` (default 3, max 12). RLS and the `apply_conference_mutation` role checks mean an identity with no grant on another conference cannot write to it. Fixture ids are derived from the conference id.
 5. **Labelled data.** `LOAD TEST` in the conference name, `Load test <code>` committees, `Simulated delegate N` / `loadN@example.com`, so the cutover cleanup ([DEPLOYMENT.md](DEPLOYMENT.md#single-project-cutover) step 2) finds everything by label.
 
@@ -83,7 +85,7 @@ All hosted traffic goes to a **dedicated TEMPORARY conference** (fresh random UU
 
 ### Isolation checks the operator performs
 
-* H0 (before): `.env.local` ref is `kllhswucdhqqywnzxado`; `STAGING_SUPABASE_REFS` lists exactly that ref; `EXPECTED_SUPABASE_REF` is **unset** in the operator shell; the fixture conference id differs from both recorded ids.
+* H0 (before): `.env.local` ref is `kllhswucdhqqywnzxado`; `STAGING_SUPABASE_REFS` lists exactly that ref; `EXPECTED_SUPABASE_REF` is **unset** in the operator shell; `NEXT_PUBLIC_CONFERENCE_ID` is **set** to the original conference (the guard refuses otherwise) and `PROTECTED_CONFERENCE_IDS` lists the earlier temporary conference; each fixture conference id differs from both recorded ids.
 * Baseline fingerprint of the original conference, recorded read-only in the Supabase SQL editor (replace `<ORIG>`):
 
 ```sql
@@ -97,23 +99,73 @@ select (select count(*) from public.operational_changes where conference_id = '<
 
 Run the same query before, at the end of each phase, and after cleanup. Any difference is a STOP condition (and a cleanup failure).
 
-## 4. Phases, durations and request rates
+## 4. Phases, exact commands and what the runner does
 
-All hosted phases run on **Small compute** (see [section 8](#8-micro-versus-small-compute)). Every performance run uses a **fresh fixture** (a reused one accumulates history and inflates snapshots). The 110-device figure and 19 committees are the release gate; lower stages are ramp steps.
+### What `scripts/rehearsal-run.mts` actually does (read from the code, 21 October 2026)
 
-| Phase | Duration | Load | Purpose | Command sketch |
+* **Local preflight first, no network:** app URL shape (localhost or a Vercel Preview/branch URL), user and delegate limits (1-200), the planned single-link submissions (refuses above 18), the Supabase project guard, the fixture-conference guard (fails closed; see [section 3](#3-test-data-isolation)). Only after all of these does it request the deployment's `/api/health` (which may itself contact the database, Auth and Storage) and refuse if the environment is `production` or unknown. A regression test runs the real scripts with `fetch`, sockets and DNS blocked and asserts zero attempts on every refusal.
+* **One invocation = one or more stages** (`--stages 25,50` or `--staff N`). For each stage in order it builds the scenario, waits 1 s, then runs all steps; staff open inside a **150 s start window** (`--start-window`), steps end at `--minutes`, then it **drains** up to 120 s (`--drain-seconds`) until every outbox is empty, then **starts the next stage immediately**. There is **no go/no-go between stages, no settle period, no stop-on-threshold and no automatic abort**. Thresholds are evaluated **once, at the end, over all samples of all stages**; the exit code is 1 if that verdict fails. Stopping early is only Ctrl-C (which discards in-memory outboxes).
+* **Labels.** A multi-stage report takes the label of its **worst** stage (one under-covered stage makes the whole report `NOT A READINESS RUN`) but the capacity-gate text of its **largest** stage. `--minutes` has no upper bound; staff and delegates are each capped at 200.
+* **Delegates** are scheduled per stage relative to that stage's start, not to a later minute. With a submit token they load `/submit/<token>` and POST `/api/submissions`; without one they request a deliberately invalid link.
+* **Not done by the runner:** creating fixtures or identities, applying SQL, creating the submission link, reading Supabase dashboards or logs, closing votes, cleanup. Those are manual steps below.
+
+For these reasons this plan uses **only single-stage invocations (`--staff N`), never `--stages`**, with an operator go/no-go and a manual two-minute settle between them.
+
+### Invocations
+
+Common arguments `COMMON` = `--app <preview-url> --identities <fixture>/identities.json --fixture <fixture>/fixture.json` (realtime `topic-aware` and Executive window 2000 ms are the defaults). Every hosted invocation needs the approvals in [Owner approval](#owner-approval-required-before-any-hosted-run).
+
+| ID | Fixture | Command | Duration (about) | Classification of its report |
 | --- | --- | --- | --- | --- |
-| **L0 Local dry run** | 30 min, no hosted calls | none | Validate scripts, fixtures, scenario math, SQL, tests | [section 10](#10-local-dry-run-no-hosted-calls) |
-| **H1 Smoke** | 10 min | 10 staff, 0 delegates; about 15 writes/min, about 100 snapshot RPC/min | Prove guards, identities, grants, Realtime path, metrics capture | `npm run rehearsal:run -- --app <preview> --identities <f>/identities.json --fixture <f>/fixture.json --staff 10 --minutes 5` |
-| **H2 Ramp** | 4 stages x 5 min + 2 min settle between = about 28 min | 25 -> 50 -> 80 -> 110 staff over 19 committees; writes about 35 -> 70 -> 110 -> 153 per min; snapshot RPC about 230 -> 450 -> 720 -> 1,000 per min | Find the knee before the gate; advance only if the previous stage meets [thresholds](#6-passfail-thresholds) | `--stages 25,50,80,110 --minutes 5` on a fresh fixture |
-| **H3 Sustained (gate)** | 30 min | 110 staff / 19 committees steady (about 153 writes per min, about 1,000 snapshot RPC per min) **plus** the delegate burst at minute 10: 150 page loads in 120 s (about 1.25 per s) and about 11 submissions on one link | The C2 capacity gate; sustained behaviour, memory/IO drift, pool recovery | `--staff 110 --delegates 150 --delegate-window 120 --submit-token <t> --submit-committee <code> --submit-fraction 0.10 --minutes 30 --realtime topic-aware` on a fresh fixture |
-| **H4 Spike (people)** | 15 min | W3: 19 simultaneous vote closes x 3 rounds, while the harness runs 50 staff in the background | Burst of `apply_conference_mutation` on distinct committee rows plus the refresh wave | Manual, with Chairs/volunteers; harness `--staff 50 --minutes 15` |
-| **H5 Recovery** | 10 min | Stop load; watch | Connections idle, CPU and IO back to baseline, outbox drained, no 40001 loops | Dashboard only |
-| **H6 Optional headroom** | 10 min | 150 staff | Information only; not a release requirement ([STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)) | Only with explicit owner approval |
+| **L0** | none | local dry run, [section 10](#10-local-dry-run-no-hosted-calls) | 30 min | not a hosted run |
+| **S0 Smoke** | A | `npm run rehearsal:run -- COMMON --staff 10 --minutes 5` | 5 + up to 2 min drain | `NOT A READINESS RUN` (Chair traffic in 7 of 19 committees). Proves guards, identities, grants and metrics capture only. Its verdict can never PASS |
+| **R1 Ramp 25** | A (reused) | `... COMMON --staff 25 --minutes 5` | 5 + drain | `NOT A READINESS RUN` (16 of 19 committees, "no Chair traffic for 3 committee(s)"). Partial: a ramp step only |
+| **R2 Ramp 50** | A (reused) | `... COMMON --staff 50 --minutes 5` | 5 + drain | Structurally `READINESS RUN` (all 19 committees, 19 Chair identities) but **below the 110-device gate**: the runner prints "BELOW the current 110-device gate". Does **not** count toward the gate |
+| **R3 Ramp 80** | A (reused) | `... COMMON --staff 80 --minutes 5` | 5 + drain | Same as R2 |
+| **H3 Gate** | B (fresh) | `... COMMON --staff 110 --minutes 30 --delegates 150 --delegate-window 120 --submit-token <token> --submit-committee <code> --submit-fraction 0.08` | 30 + drain | The **only** report that can count as the 110-device / 19-committee gate: it must say `READINESS RUN` **and** "CURRENT capacity gate size (110 devices...)". See the public-form timing below |
+| **H4 Spike** | B (after H3) | background `... COMMON --staff 50 --minutes 15` plus manual vote closures | 15 + drain | Partial/informational. **Optional and separately gated** (needs human access, see decision 11). Without it, W3 stays unverified |
+| **H5 Recovery** | B | no command; dashboard only after all processes exit | 10 min | Observation |
 
-Delegate-form and fresh-sign-in (Phase D) tests stay as defined in [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md); the fresh-sign-in test is the only one that approaches the Auth rate limit and is run last and separately, with the limit value recorded first.
+Fixture A (smoke and ramp): `rehearsal-fixture.mts ... --committees 19 --delegates 420 --grant-hours 3`. The ramp invocations **reuse** it, which deviates from the "fresh fixture per run" rule: attendance, queue and audit history accumulate across S0-R3 and slightly inflate later snapshots, so ramp latencies are informational; the gate is H3 on fresh fixture B (`--grant-hours 4`, so that H3, H4 and H5 fit inside one grant lifetime). Each fixture needs its own owner-approved `fixture.sql` and `cleanup.sql`.
 
-Total hosted time: about 2 hours of load plus setup and cleanup. Do not run H2/H3 back to back on the same fixture.
+### Operator-controlled ramp (S0 -> R1 -> R2 -> R3 -> H3)
+
+After **every** invocation, before starting the next, the operator (named in decision 5) does the following. The runner does none of it.
+
+1. Read the printed verdict: the six automated checks (no duplicates, no lost writes, error rate under 1 %, no rate limits, worst per-action write p95 <= 1,500 ms, worst per-action read p95 <= 2,500 ms). For S0, R1, R2 and R3 the readiness line is expected to say what the table above says; only the six metric checks count for go/no-go.
+2. Check the Supabase dashboard and logs for that run window against the manual items in [section 6](#6-passfail-thresholds) and every stop condition in [section 7](#7-stop-conditions); re-run the original-conference fingerprint.
+3. **Settle for two minutes (manual, timed by the operator):** database connections idle, CPU and IO back near baseline, no `PGRST003` or `40001` in the logs. If not back to baseline after a further 3 minutes, stop.
+4. Write **go** or **no-go** in the run sheet with the time. Go only if 1-3 are clean. A no-go ends the ramp; do not skip to a larger stage.
+5. Next invocation.
+
+The ramp is S0, then R1, R2, R3, then **H3 on a fresh fixture B**. H3 is itself the 110-device stage; there is no separate 110-device ramp step. Expected hosted time for S0-R3 including reviews and settles: about 50 minutes; H3: about 35 minutes.
+
+### H3 gate: what actually executes
+
+* 110 staff (77 Chair, 11 Approval, 11 Admins, 11 Executive) across 19 committees for 30 minutes: about 3,841 writes (128 per minute) and about 27,200 snapshot RPCs (about 900 per minute, 15 per second) at an assumed 600 ms refresh.
+* **Public traffic starts with the run, not at minute 10.** All 150 page loads land in the first 120 s and the 16 submissions at about 57-282 s, **overlapping the staff start burst** (all 110 devices open within the first 150 s). That is a harsher combination than a delayed burst. A delayed burst is not available without new, separately reviewed tooling and is **not** part of this plan.
+* The runner prints `Stage 110 staff: 150 public page loads, 16 resolution submissions planned on one link (max 18).` before any request. The operator confirms the number **16** (the count depends on seed, minutes, delegates, fraction, staff and committee count; it was computed for exactly these parameters) and stops if it differs.
+* The submission link must belong to the fixture committee named by `--submit-committee` (created on the Preview by the fixture Executive identity).
+
+### Out of scope
+
+No 150-200 staff stress run (not expected at this conference, [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)); no `npm run test:load`; no fresh-staff-sign-in burst (Phase D) in this approval; no failure injection (Phase E). Each would need its own approval.
+
+### Plan versus runner
+
+| Phase | Exact command | What the runner actually does | Manual steps |
+| --- | --- | --- | --- |
+| L0 | `npm test`, `npm run rehearsal:plan`, fixture generation with placeholder identities | Local only; plan prints a 10-minute scenario | Delete `.test-sessions/` |
+| S0 | `rehearsal:run COMMON --staff 10 --minutes 5` | One stage: health after local guards, 10 devices, 7 committees, 5 min, drain <= 2 min, verdict | Operator go/no-go and fingerprint |
+| R1 | `... --staff 25 --minutes 5` | One stage, 16 committees, same fixture A | Go/no-go, 2-min settle |
+| R2 | `... --staff 50 --minutes 5` | One stage, 19 committees | Go/no-go, 2-min settle |
+| R3 | `... --staff 80 --minutes 5` | One stage, 19 committees | Go/no-go, 2-min settle |
+| H3 | `... --staff 110 --minutes 30 --delegates 150 --delegate-window 120 --submit-token T --submit-committee C --submit-fraction 0.08` | One stage; 150 page loads in first 120 s; 16 submissions at about 57-282 s; drain <= 2 min; verdict; exactly-once check | Create link and fixture B beforehand; dashboards watched live; stop conditions applied by a person |
+| H4 | `... --staff 50 --minutes 15` in the background | One stage; the runner has **no vote action** | People close votes in the app; needs staff access (decision 11) |
+| H5 | none | none | Dashboard observation for 10 minutes |
+| Cleanup | `cleanup.sql` for A and B | not run by the runner | Apply, verify, delete local files, fingerprint |
+
+The delegate-form and fresh-sign-in tests (Phase D) stay as defined in [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md) and are not approved here.
 
 ## 5. Metrics to capture
 
@@ -137,38 +189,39 @@ Capture for the exact run window (UTC start and end written in the run sheet).
 | **Disk IO** | Observability: disk IO bandwidth and IOPS, and the IO-budget view | Burst-based instances can degrade after the burst budget is spent; sustained H3 is the test of this |
 | **Slow queries / locks** | `get_advisors` (performance and security), `query_logs` (postgres), `pg_stat_statements`, `pg_locks` | Advisors before and after: no new findings |
 | **PostgREST limits** | API logs: 429, `PGRST003`, 504/502 gateway errors | |
-| **Auth rate limits** | Auth logs: anonymous sign-ins, token refresh, `over_request_rate_limit` | Expect near-zero during H1-H5 (pool identities pre-created) |
+| **Auth rate limits** | Auth logs: anonymous sign-ins, token refresh, `over_request_rate_limit` | Expect near-zero during every phase (pool identities pre-created) |
 | **Realtime** | Realtime logs and Observability (connections, messages) | 110 devices is far below documented plan limits; still record |
 | **Vercel** | Logs/Functions: 5xx, duration of `/api/*`, `/submit/*`, `/api/health`; function concurrency and timeouts | Region `bom1` ([vercel.json](../vercel.json)); read the team's current limits in the dashboard |
 | **Real devices** | One real Chair browser kept open; System health page | Subjective responsiveness |
 
 ## 6. Pass/fail thresholds
 
-Starting points, inherited from [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md) readiness criteria. Record actuals; adjust only with the owner and an independent reviewer.
+Starting points, inherited from [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md) readiness criteria and from `evaluate()` in `scripts/rehearsal/metrics.ts`. Record actuals; adjust only with the owner and an independent reviewer. The last column says who checks it: **runner** means the harness computes it and prints PASS/FAIL; **operator** means a person reads it from the dashboard, logs or SQL. Nothing marked operator is enforced by code.
 
-| Metric (H3 sustained gate, 110 staff / 19 committees) | PASS |
-| --- | --- |
-| Run label | `READINESS RUN` (one Chair identity per committee, Chair traffic in all 19) |
-| Staff error rate (conflicts excluded) | < 1 % |
-| Write p95 (aggregate; also report worst per-action) | <= 1.5 s |
-| Read (snapshot) p95 | <= 2.5 s |
-| Write/read p99 | recorded; no hard limit, but > 10 s is a WARNING that needs explanation |
-| Public page p95 | <= 2 s, no 5xx; planned submissions (<= 18) all succeed; zero Auth activity from delegates; zero 429 |
-| Unexplained 5xx, `PGRST003`, `40001`, `57014` | **0** |
-| Duplicate / lost writes | **0** |
-| PT409 conflicts | reported; each explainable by concurrent roll call; none lost |
-| Postgres CPU | sustained average < 70 % in H3, no 5-minute window above 85 % |
-| Connections | peak < 75 % of the plan limit; all idle after H5 |
-| Memory | no sustained growth over H3; no swap thrash |
-| Disk IO | no IO-budget depletion; IOPS/bandwidth not pinned at baseline during H3 |
-| Recovery (H5) | outbox drained and connections idle within 5 minutes of stop |
-| Isolation | original-conference fingerprint identical; no write outside the fixture conference |
+| Metric (H3 gate, 110 staff / 19 committees) | PASS | Checked by |
+| --- | --- | --- |
+| Run label | `READINESS RUN` and capacity text "CURRENT capacity gate size (110 devices...)" | runner (label); operator reads it |
+| No duplicate writes, no lost acknowledged writes | 0 and 0 | runner (exactly-once check on scoring mutations) |
+| Error rate (samples with outcome `error`, conflicts and rate-limited excluded, over **all** samples including reads) | < 1 % | runner |
+| Rate-limited responses (429) | 0 | runner |
+| Write p95 | <= 1,500 ms. The runner uses the **worst per-action p95** (for 12-13-sample actions that is their single slowest request); the aggregate write p95 is reported separately and read too | runner (worst per-action), operator (aggregate) |
+| Read p95 | <= 2,500 ms, worst per-action p95 over `refresh`, `open`, `read`, `refocus`, `postWriteRead`, `realtimeRefresh` | runner |
+| p99 write / read | recorded; over 10 s is a WARNING needing an explanation | operator |
+| Public page p95 | <= 2 s, no 5xx; planned submissions (16) all succeed; zero Auth activity from delegates | operator (the runner records page timings and counts 5xx as errors but has no page-p95 check) |
+| Unexplained 5xx, `PGRST003`, `40001`, `57014` in logs | **0** | operator (5xx also raise the runner's error rate) |
+| PT409 conflicts | reported; each explainable by concurrent roll call; none lost | operator |
+| Postgres CPU | sustained average < 70 %, no 5-minute window above 85 % | operator |
+| Connections | peak < 75 % of the plan limit; all idle after H5 | operator |
+| Memory | no sustained growth over H3; no swap thrash | operator |
+| Disk IO | no IO-budget depletion; IOPS/bandwidth not pinned at baseline | operator |
+| Recovery (H5) | outbox drained (runner prints drain seconds and `pendingAtClose`) and connections idle within 5 minutes of stop | runner (drain), operator (connections) |
+| Isolation | original-conference fingerprint identical; no write outside the fixture conference | operator |
 
-The historical harness verdict takes the worst *per-action* p95, which for 12-13 sample actions is their single slowest request; read both the aggregate and the per-action number before declaring FAIL.
+Ramp go/no-go (S0, R1, R2, R3) uses the same six runner checks plus the operator items and stop conditions; their readiness label is as classified in section 4 and is not part of go/no-go.
 
 ## 7. Stop conditions
 
-**Whoever is on call stops the run immediately (Ctrl-C the harness, then apply `cleanup.sql`) on any of:**
+**The runner has no automatic abort and no threshold check during a run; every condition below is applied by a person.** Whoever is on call stops the run immediately (Ctrl-C the harness, then apply `cleanup.sql`) on any of:
 
 1. **Any write to a real or original conference** (fingerprint difference, or a `conference_id` in API logs other than the fixture). Stop, do not resume, notify the owner, run the isolation checks.
 2. **Error rate**: > 2 % real failures in any 60 s window, or > 1 % over 5 minutes (conflicts excluded).
@@ -177,13 +230,13 @@ The historical harness verdict takes the worst *per-action* p95, which for 12-13
 5. **Connection saturation**: any `PGRST003`; database connections > 85 % of the limit; pool fully busy for more than 60 s.
 6. **Memory** > 90 % or swap growing; **disk IO budget** depleted or IOPS pinned.
 7. **Statement timeout** (`57014`) twice in a window, any `40001`, or any 5xx burst (>= 3 in 60 s).
-8. **Auth rate limiting**: any 429 or `over_request_rate_limit` from Auth during H1-H5 (the pool is pre-created; a sign-in attempt means something is wrong). Do not loop retries.
+8. **Auth rate limiting**: any 429 or `over_request_rate_limit` from Auth during any phase (the pool is pre-created; a sign-in attempt means something is wrong). Do not loop retries.
 9. **PostgREST rate limiting** or any 429 on staff routes; **public form** 429 (means the plan exceeded the per-link limit).
 10. Target guard or health check reports `production`, or the wrong project ref appears anywhere.
 11. Anything unexpected on the **real** Supabase or Vercel production surface (alerts, deployments).
 12. The owner or the person in charge says stop.
 
-After a stop, do not restart on the same fixture. Record the time, cause and last good metrics; the next attempt needs a new approval for the changed scope.
+After a stop, do not restart on the same fixture, and do not continue the ramp. Record the time, cause and last good metrics; the next attempt needs a new approval for the changed scope.
 
 ## 8. Micro versus Small compute
 
@@ -215,8 +268,8 @@ So Small doubles memory, connection limits, baseline throughput and baseline IOP
 * Expect Small to help most with memory pressure (snapshots of 120-470 KB for Executive devices), connection headroom and sustained IO.
 * **Recommendation (consistent with the existing setup doc and checklist): upgrade to Small before 5 November** ([SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md), [DEPLOYMENT.md](DEPLOYMENT.md)); [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) wants the gate at T-7 days, about 29 October. The previous guidance says load phases are not run on the smaller tier.
 * **What to test on which:**
-  * **Micro (current, only if the owner wants a baseline): L0 and H1 smoke only** (10 staff). No ramp, no gate. It confirms tooling and gives a before number. Optionally H2 capped at the 25-staff stage with explicit approval.
-  * **Small: H1, H2, H3, H4, H5** (the full plan), then re-run only the failed phase after any fix.
+  * **Micro (current; only if the owner approves a baseline): L0 and the S0 smoke only** (10 staff). No ramp, no gate. It confirms tooling and gives a before number. R1 (25 staff) only with explicit extra approval.
+  * **Small: S0, R1, R2, R3, H3, and H4/H5 if approved** (the full plan), then re-run only the failed phase after any fix, each re-run needing its own approval.
   * A compute change restarts the database briefly; schedule it outside any run and re-baseline the original-conference fingerprint afterwards.
 
 ### Suggested timeline (owner decides)
@@ -225,43 +278,45 @@ So Small doubles memory, connection limits, baseline throughput and baseline IOP
 | --- | --- |
 | 21-23 Oct | Review this plan; run L0 locally; owner decisions below |
 | 24-26 Oct | Confirm plan/compute/PITR in the dashboard; upgrade to Small; prepare identities (the day before; 22 pool identities take about 8 minutes at the 20 s pace) |
-| 27-29 Oct | H1 smoke, then H2, H3, H4, H5 on one day with the on-call team; cleanup the same day |
+| 27-29 Oct (placeholder, not an agreed window) | S0, R1, R2, R3, H3, H5 (and H4 if approved) on one day with the on-call team; cleanup the same day |
 | 30-31 Oct | Fix findings; repeat only the failed phase; release freeze |
 | 1-4 Nov | No load tests. Remove test data per DEPLOYMENT cutover step 2 |
 
 ## Owner approval required before any hosted run
 
-**Status: awaiting owner decision. No hosted request has been made.** The hosted load test must not run until the owner (Zuhayr Siddique) approves, in writing, each of the following. John Paul Ribeiru approves releases; Zuhayr Siddique is in charge during any live problem.
+**Status: awaiting owner decision. Nothing in this document is approved.** No hosted request has been made. This plan approves **no** hosted load, **no** fixture creation or SQL application, **no** identity creation, **no** compute or PITR upgrade and **no** spending. The dates below are placeholders for discussion, not an agreed window, and nothing here extends or schedules any agreed Small-compute window. The owner (Zuhayr Siddique) must approve, in writing, the exact workload in section 4 (the commands, the 150-delegate burst in the first 120 s of H3 with 16 submissions, and the manual ramp) and each item below. Approve **the workload that will execute**, not a description of it. John Paul Ribeiru approves releases; Zuhayr Siddique is in charge during any live problem.
 
-| # | Decision needed | Proposed default |
+| # | Decision needed | Proposed default (pending the owner) |
 | --- | --- | --- |
-| 1 | **Date and time window** (start/end, UTC and Qatar time), with the confirmation that the window ends before the real Executive bootstrap and before any real conference data enters the project | 27-29 October, one block of about 4 hours including setup and cleanup |
-| 2 | **Size**: scope of phases (H1-H5 only, or also H6), maximum staff devices (110 gate), maximum delegates (150-200), submissions on one link (<= 18) | H1-H5, 110 staff, 150 delegates, 11 submissions |
-| 3 | **Compute tier**: confirm plan and compute from the dashboard; approve upgrading to Small and the date; approve (or decline) a Micro smoke baseline | Upgrade to Small first; Micro only L0/H1 |
-| 4 | **Delegate count** to use (420 assumed) | 420, sensitivity 570 if time |
-| 5 | **Who is on call** with Supabase and Vercel dashboard access, who holds the harness, who watches logs, who can stop the run, and who performs the H4 vote closures (Chairs/volunteers) | Claude runs the harness; technical contact on the dashboards; Executive observes |
-| 6 | Approval to apply the fixture SQL and cleanup SQL (a write to the staging project) and to create about 22 temporary anonymous identities | Yes, labelled, expiring in 3 hours |
-| 7 | Approval to use a Vercel Preview (named commit) with `SUPABASE_SECRET_KEY` for the public-form part, and to delete it afterwards | Yes |
-| 8 | The two protected conference ids (original and earlier temporary conference), and confirmation they will not be edited during the window | Recorded in the run sheet |
-| 9 | Anonymous sign-in rate limit value to expect (default 30/hour/IP), and from which network the run is made | Cloud container / office; Phase D from the venue network, last |
+| 1 | **Date and time window** (start/end, UTC and Qatar time), with the confirmation that the window ends before the real Executive bootstrap and before any real conference data enters the project | Placeholder 27-29 October; one block of about 5 hours (S0-R3 about 50 min, H3 about 35 min, H4/H5 about 30 min, setup and cleanup) |
+| 2 | **Size and phases**: which of S0, R1, R2, R3, H3, H4, H5 may run; maximum staff devices (110); delegates (150) and submissions on one link (16, runner maximum 18); acceptance that **H3 starts public traffic in its first two minutes** (not later) | S0-R3, H3, H5; H4 only if decision 11 is yes |
+| 3 | **Compute tier**: confirm plan, compute and PITR from the dashboard; whether to upgrade to Small and on which date; whether to allow an S0 smoke on Micro | Recommend Small before any run beyond S0; the owner decides; no upgrade is made by this plan |
+| 4 | **Delegate count** (420 assumed, **pending owner confirmation**; sensitivity 570) | 420 |
+| 5 | **Who is on call**: Supabase and Vercel dashboard access, who holds the harness, who watches logs, **who makes each ramp go/no-go and times the two-minute settle**, who can stop the run | Claude runs the harness; the technical contact on the dashboards; the Executive observes |
+| 6 | Applying `fixture.sql` and `cleanup.sql` for **two** fixtures (A for S0-R3, B for H3/H4) to the staging project, and creating about 22 temporary anonymous identities | Labelled, expiring in 3 hours (A) and 4 hours (B) |
+| 7 | A Vercel Preview (named commit) with `SUPABASE_SECRET_KEY` for the public-form part, and deleting it afterwards | Yes |
+| 8 | The two protected conference ids (original and earlier temporary conference): set `NEXT_PUBLIC_CONFERENCE_ID` and `PROTECTED_CONFERENCE_IDS`; confirm they will not be edited during the window | Recorded in the run sheet |
+| 9 | Anonymous sign-in rate limit value to expect (default 30/hour/IP), and the network the run is made from | Cloud container / office |
 | 10 | Whether an independent reviewer (Codex) reviews the run report and the stop-condition decisions | Yes |
+| 11 | **H4 (optional):** whether people close votes in the temporary conference, who they are, and how they obtain staff access to it (no script provides that; it needs the bootstrap procedure for the temporary conference) | Decline unless the owner names the people and the access method; W3 then stays unverified |
 
 Record the approval (who, when, scope) in [VERIFICATION.md](VERIFICATION.md) before the run.
 
 ## Hosted run procedure (after approval only)
 
 1. **H0 checks** ([section 3](#isolation-checks-the-operator-performs)); record the baseline fingerprint, Advisors, and the dashboard plan/compute/PITR screenshot.
-2. Create the pool: `npm run rehearsal:identities -- --chairs 19` (one day before; refuses non-allow-listed projects; paced; no secrets printed).
-3. Create the fixture: `npx tsx scripts/rehearsal-fixture.mts --identities .test-sessions/rehearsal-multi-identities.json --committees 19 --delegates 420 --grant-hours 3`. It writes `fixture.json`, `identities.json`, `fixture.sql` and **`cleanup.sql`** under `.test-sessions/fixtures/<conference>/`.
-4. Apply `fixture.sql` to the staging project (SQL editor, owner-approved). Create one submission link for one fixture committee on the Preview (Executive -> Submission links).
-5. Measure payloads: `npx tsx scripts/rehearsal-snapshots.mts --identities <f>/identities.json --fixture <f>/fixture.json --all-chairs`.
-6. Run H1, then H2, H3, H4, H5, each on its fixture rule, watching the dashboards live against [section 7](#7-stop-conditions).
-7. Save the harness report, Supabase screenshots/exports and Vercel logs for each window; copy the summary into [VERIFICATION.md](VERIFICATION.md).
-8. **Cleanup** (below).
+2. Create the pool: `npm run rehearsal:identities -- --chairs 19` (one day before; refuses non-allow-listed projects; paced; no secrets printed). The same 22 identities serve both fixtures.
+3. Create fixture A: `npx tsx scripts/rehearsal-fixture.mts --identities .test-sessions/rehearsal-multi-identities.json --committees 19 --delegates 420 --grant-hours 3`. It writes `fixture.json`, `identities.json`, `fixture.sql` and **`cleanup.sql`** under `.test-sessions/fixtures/<conference>/`. Apply `fixture.sql` (SQL editor, owner-approved).
+4. Measure payloads: `npx tsx scripts/rehearsal-snapshots.mts --identities <A>/identities.json --fixture <A>/fixture.json --all-chairs`.
+5. Run S0, then R1, R2, R3 as single-stage invocations with the go/no-go and two-minute settle of section 4.
+6. Create fixture B with `--grant-hours 4`, apply its `fixture.sql`, and create one submission link for the committee passed as `--submit-committee` on the Preview (Executive -> Submission links); note the token without writing it into the run sheet.
+7. Run H3 (confirm the printed plan says 150 page loads and 16 submissions), then H4 if approved, then observe H5, watching the dashboards live against [section 7](#7-stop-conditions).
+8. Save the harness reports (`.test-sessions/rehearsal-<time>.json`), Supabase screenshots/exports and Vercel logs for each window; copy the summary into [VERIFICATION.md](VERIFICATION.md), stating for each report its label and whether it counts toward the gate (only H3 can).
+9. **Cleanup** (below), for fixtures A and B.
 
 ## 9. Cleanup and verification
 
-Run immediately after the last phase, and at once after any stop:
+Run immediately after the last phase, and at once after any stop (for every fixture created):
 
 1. **Revoke temporary access:** apply `.test-sessions/fixtures/<conference>/cleanup.sql` (for the legacy `prepare-load.mts` fixture: `.test-sessions/load-cleanup.sql`). It revokes, **only for the fixture conference id**, every `user_access` grant, `submission_links`, `amendment_links` and `private.access_credentials`. It deletes nothing, because audit, receipts and procedure history are append-only and the labelled rows are removed at cutover. Verify: the query at the end of `cleanup.sql` returns 0.
 2. **Credentials:** delete `.test-sessions/rehearsal/*.json`, `.test-sessions/fixtures/*` and `development.json` from the operator machine; the grants have already expired (3 h) or been revoked. Delete the anonymous test users in the dashboard (Authentication -> Users) if the owner wants them gone now; otherwise cutover step 2 covers them.
@@ -278,11 +333,11 @@ Everything here uses local files or an in-process PGlite database; none of it co
 * **L2. Scenario math at the gate size:**
 
 ```bash
-npm run rehearsal:plan -- --staff 110 --delegates 150 --committees 19 --minutes 10 \
-  --read-ms 600,7000 --realtime topic-aware --submit-fraction 0.10
+npm run rehearsal:plan -- --staff 110 --delegates 150 --committees 19 --minutes 30 \
+  --read-ms 600,2500 --realtime topic-aware --submit-fraction 0.08
 ```
 
-  Prints roles, writes per minute, snapshot RPC estimates per Realtime model and read latency, and the delegate-form plan. Compare with [section 1](#request-rates-implied-by-the-dry-run).
+  The parameters match H3. It prints roles (77/11/11/11), 3,841 staff writes, the snapshot RPC estimate per read latency, and the delegate-form plan (150 page loads, **16 submissions**); confirm these against [section 1](#request-rates-implied-by-the-commands-in-section-4) before any approval. Repeat with `--staff 25|50|80 --minutes 5 --delegates 0` for the ramp rows.
 * **L3. Fixture generation with placeholder identities** (writes only to the ignored `.test-sessions/`; the placeholder files contain random user ids and no tokens):
 
 ```bash
@@ -311,12 +366,19 @@ Fixed in this change (tooling only, no product code):
 | `load-test.mts`, `rehearsal-run.mts` and `rehearsal-snapshots.mts` trusted whatever conference id the fixture file held; a wrong file could aim a write load at the configured conference | New `checkFixtureConference` guard (well-formed UUID, not `NEXT_PUBLIC_CONFERENCE_ID`), called before any request | `tests/rehearsal-multi-committee.test.ts` |
 | `load-test.mts` overwrote the committed historical `docs/load-test-results.json` on every run | Results now go to ignored `.test-sessions/load-test-results-<time>.json` | n/a (path change) |
 | No cleanup artefact existed: neither fixture generator produced a way to revoke the temporary grants and links | `cleanupSql()` (revoke-only, filtered by conference id) written as `cleanup.sql` by `rehearsal-fixture.mts` and `load-cleanup.sql` by `prepare-load.mts` | PGlite test applies it and checks isolation |
+| `rehearsal-run.mts` requested the deployment's `/api/health` (which can touch the database, Auth and Storage) before the local project and fixture guards | Project and fixture guards now run first; the first request is `/api/health` | `tests/load-guard-no-network.test.ts` (fetch, sockets and DNS blocked: zero attempts on every refusal; positive control reaches `/api/health` only for a valid fixture) |
+| The first fixture guard accepted any valid UUID when `NEXT_PUBLIC_CONFERENCE_ID` was missing, blank or malformed, so it could not show the fixture differed from the protected conference | Fails closed on a missing, blank or malformed protected id; optional `PROTECTED_CONFERENCE_IDS` registry (malformed entry refuses) | `tests/rehearsal-multi-committee.test.ts` and the child-process test |
+| `rehearsal-run.mts` labelled a 110-staff run "OPTIONAL STRESS / HEADROOM (100 staff)" and a 50-staff run "REQUIRED capacity gate" (the historical gate) | `capacityGateLabel()`: 110 or more is the current gate size, 100-109 optional stress, 50-99 "BELOW the current 110-device gate", under 50 smoke | `tests/rehearsal-multi-committee.test.ts` |
 | `prepare-load.mts` hard-coded the venue `Development only` and date `2026-10-05` | Venue `TEST DATA - temporary, not a real conference`, date `current_date` | n/a |
 
 Noted, not changed (would be feature work during the freeze or needs owner input):
 
-* The harness has no vote-closing action, so W3 is a manual scenario.
+* The harness has no vote-closing action, so W3 is a manual, optional scenario.
+* `--stages` auto-escalates with no per-stage go/no-go or settle and evaluates once at the end; a single under-covered stage (25 staff covers 16 of 19 committees) makes the whole report `NOT A READINESS RUN`. The plan therefore uses single-stage invocations with a manual go/no-go (section 4). A wrapper that stops between stages would need separate review and was not added.
+* Delegate traffic always starts with the stage (page loads in the first `--delegate-window` seconds); there is no option for a delayed burst.
+* The runner's checks are the six in `evaluate()` plus the distribution check; page p95, 5xx logs, CPU, connections and every stop condition are manual.
+* `--minutes` has no upper bound and the runner has no automatic abort; Ctrl-C discards in-memory outboxes.
 * `load-test.mts` has a default of 150 clients and shares one identity; it is excluded from the hosted plan.
-* `target-guard` protects the project, not the conference; the conference-level protection is the new fixture check plus RLS, and only knows `NEXT_PUBLIC_CONFERENCE_ID`.
+* `target-guard` protects the project, not the conference; the conference-level protection is the new fixture check plus RLS, and it knows only `NEXT_PUBLIC_CONFERENCE_ID` and the optional `PROTECTED_CONFERENCE_IDS` (the earlier temporary conference must be listed there by hand).
 * The harness models a 60 s recovery poll; production polls every 120 s when Realtime is connected, so the harness read load is conservative.
 * Percentiles of `apply_conference_mutation` on the server cannot be derived from `pg_stat_statements`; use client percentiles plus API logs.
