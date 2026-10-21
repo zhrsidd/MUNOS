@@ -2453,8 +2453,10 @@ color: var(--ink-3);
 .submission-panel > div:not(.qr-box) { flex:1; min-width:220px; display:grid; gap:10px; }
 .panel > .panel-body { margin:22px 24px; }
 .panel > .panel-body input { width:100%; max-width:420px; }
-.link-field { display:flex; gap:8px; }
-.link-field input { flex:1; min-width:0; font-family:ui-monospace, monospace; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:7px; }
+/* A link field and its copy button wrap instead of squeezing the field: on a narrow screen the button drops below
+   the link (touch targets stay 40–44 px) rather than the field collapsing to a few pixels. */
+.link-field { display:flex; flex-wrap:wrap; gap:8px; }
+.link-field input { flex:1 1 14rem; min-width:0; font-family:ui-monospace, monospace; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:7px; }
 @media print {.no-print,
 .workspace-footer { display:none !important; }
   .room-sheet { padding:0; }
