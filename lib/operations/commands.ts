@@ -1,6 +1,6 @@
 import type { ConferenceData, Role } from "../domain";
 import { GOOGLE_DOC_ID } from "../submissions/google-doc";
-import { advancePhotoEpochs, photoEpoch } from "./photo-reminders";
+import { advancePhotoEpochs, photoEpoch, syncPhotoChairs } from "./photo-reminders";
 // Extension commands travel through the same durable outbox as core commands, but are
 // applied server-side by public.apply_operations_mutation (see the operations migrations).
 export type OperationsCommand =
@@ -202,6 +202,8 @@ export function applyOperationsCommand(
       // the PostgreSQL trigger does, so no earlier acknowledgement can silence them again.
       if ((staff.schoolId ?? null) !== c.schoolId) advancePhotoEpochs(d, staff.committeeIds, [staff.schoolId, c.schoolId]);
       staff.schoolId = c.schoolId;
+      // A hosted snapshot's photoChairs is preferred over staff, so keep its rows in step until the confirming read.
+      syncPhotoChairs(d, staff);
       break;
     }
     case "photoAck": {

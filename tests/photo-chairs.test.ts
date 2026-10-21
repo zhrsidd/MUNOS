@@ -60,6 +60,91 @@ test('client: a Chair with a school is reminded with their committee; a Chair-on
  assert.deepEqual(committeePhotoReminders(server,'ga1',NOW).find(r=>r.slot.schoolId===delegateSchool)!.chairs,[]);
 });
 
+// Codex nonblocking P3 on PR #36: hosted snapshots carry photoChairs, which photoChairs() prefers over staff, so an
+// optimistic school change must update those rows too (private.photo_chairs shape: Chairs with a school, one row per
+// committee, ordered by name, staff id, committee).
+test('client: an optimistic school change keeps a server-shaped photoChairs projection in step (present, including empty)',()=>{
+ const sam='chair-demo';
+ const build=(photoChairs?:ConferenceData['photoChairs'])=>{const d:ConferenceData=createSeed();d.schools.push({id:'school-chairs',name:'Chair School'},{id:'school-b',name:'School B'});if(photoChairs)d.photoChairs=photoChairs;return d;};
+ const run=(d:ConferenceData,c:Command,role:'admin'|'chair'='admin')=>applyCommand(d,c,role,meta());
+ const slot=(d:ConferenceData,schoolId:string)=>run(d,{type:'photoSlot',action:'create',schoolId,startsAt:'2026-11-05T10:05:00Z',endsAt:null,location:'Hall',note:'',warnMinutes:10});
+ const row=(committeeId:string,schoolId:string)=>({staffId:sam,name:'Alex Morgan',committeeId,schoolId});
+
+ // Empty array: set -> row added, with reminders and the Executive overview following at once.
+ let d=slot(build([]),'school-chairs');
+ assert.deepEqual(committeePhotoReminders(d,'ga1',NOW),[],'no projection rows, no Chair reminder');
+ const before=d;
+ d=run(d,{type:'staffSchool',staffId:sam,schoolId:'school-chairs'});
+ assert.deepEqual(d.photoChairs,[row('ga1','school-chairs')]);
+ assert.deepEqual(before.photoChairs,[],'the previous snapshot is not mutated');
+ const reminder=committeePhotoReminders(d,'ga1',NOW)[0];
+ assert.deepEqual(reminder.chairs.map(c=>c.name),['Alex Morgan']);assert.ok(reminder.attention);
+ const slotRow=d.photoSlots!.find(x=>x.schoolId==='school-chairs')!;
+ assert.deepEqual(affectedCommittees(d,slotRow).map(a=>[a.committee.id,a.chairs,a.noChairLeft]),[['ga1',1,true]]);
+
+ // Change school: the row moves to the new school (and staff agrees).
+ d=slot(d,'school-b');
+ d=run(d,{type:'staffSchool',staffId:sam,schoolId:'school-b'});
+ assert.deepEqual(d.photoChairs,[row('ga1','school-b')]);
+ assert.equal(d.staff.find(x=>x.id===sam)!.schoolId,'school-b');
+ assert.deepEqual(committeePhotoReminders(d,'ga1',NOW).filter(r=>r.chairs.length).map(r=>r.slot.schoolId),['school-b']);
+ assert.deepEqual(affectedCommittees(d,d.photoSlots!.find(x=>x.schoolId==='school-chairs')!),[],'the old school no longer lists the Chair');
+ assert.equal(photoEpoch(d,'ga1','school-chairs'),2,'the epoch logic still advances for both schools');
+ assert.equal(photoEpoch(d,'ga1','school-b'),1);
+
+ // Clear: row removed, back to the empty projection (not a fallback to staff).
+ d=run(d,{type:'staffSchool',staffId:sam,schoolId:null});
+ assert.deepEqual(d.photoChairs,[]);
+ assert.deepEqual(photoChairs(d),[]);
+ assert.ok(committeePhotoReminders(d,'ga1',NOW).every(r=>r.chairs.length===0));
+ assert.equal(photoEpoch(d,'ga1','school-b'),2);
+
+ // A multi-committee Chair yields one row per committee; other Chairs' rows are kept in server order.
+ const others=[{staffId:'b-chair',name:'Bea Cole',committeeId:'ga1',schoolId:'school-b'},{staffId:'z-chair',name:'Zed Zane',committeeId:'ecosoc',schoolId:'school-b'}];
+ const populated=build([others[1],others[0]]);
+ populated.staff.find(x=>x.id===sam)!.committeeIds=['unhrc','ga1'];
+ d=run(populated,{type:'staffSchool',staffId:sam,schoolId:'school-chairs'});
+ assert.deepEqual(d.photoChairs,[row('ga1','school-chairs'),row('unhrc','school-chairs'),...others]);
+ d=run(d,{type:'staffSchool',staffId:sam,schoolId:null});
+ assert.deepEqual(d.photoChairs,others);
+ // Setting the school a Chair already has changes nothing and does not advance an epoch.
+ d=run(populated,{type:'staffSchool',staffId:sam,schoolId:null});
+ assert.deepEqual(d.photoChairs,[others[1],others[0]].sort((a,b)=>a.name<b.name?-1:1));assert.equal(d.photoEpochs?.length??0,0);
+
+ // Absent projection (local demo): untouched, Chairs still derive from staff.
+ d=run(build(),{type:'staffSchool',staffId:sam,schoolId:'school-chairs'});
+ assert.equal(d.photoChairs,undefined);
+ assert.deepEqual(photoChairs(d),[row('ga1','school-chairs')]);
+});
+
+test('client: offline queued school changes and acknowledgements on a server-shaped snapshot match the confirming read',()=>{
+ const sam='chair-demo';
+ const server:ConferenceData={...createSeed(),photoChairs:[],photoEpochs:[]};
+ server.schools.push({id:'school-chairs',name:'Chair School'});
+ let d=applyCommand(server,{type:'photoSlot',action:'create',schoolId:'school-chairs',startsAt:'2026-11-05T10:05:00Z',endsAt:null,location:'Hall',note:'',warnMinutes:10},'admin',meta());
+ const base=d; // the last server snapshot, still shown while the save is queued offline
+ const queued:Command={type:'staffSchool',staffId:sam,schoolId:'school-chairs'};
+ d=applyCommand(base,queued,'admin',meta());
+ // Offline: the optimistic state shows the Chair at once; the base snapshot is untouched.
+ assert.deepEqual(d.photoChairs,[{staffId:sam,name:'Alex Morgan',committeeId:'ga1',schoolId:'school-chairs'}]);
+ assert.deepEqual(base.photoChairs,[]);
+ // A reconnect re-applies the queued change onto the unchanged server snapshot: the same rows, once.
+ assert.deepEqual(applyCommand(base,queued,'admin',meta()).photoChairs,d.photoChairs);
+ // The confirming read returns what private.photo_chairs / photo_list_epochs produce; it changes nothing.
+ const confirming:ConferenceData={...d,photoChairs:[{staffId:sam,name:'Alex Morgan',committeeId:'ga1',schoolId:'school-chairs'}],photoEpochs:[{committeeId:'ga1',schoolId:'school-chairs',epoch:1}]};
+ assert.deepEqual(confirming.photoChairs,d.photoChairs);
+ assert.deepEqual(committeePhotoReminders(confirming,'ga1',NOW),committeePhotoReminders(d,'ga1',NOW));
+ const r=committeePhotoReminders(d,'ga1',NOW)[0];
+ assert.deepEqual(r.chairs.map(c=>c.staffId),[sam]);assert.equal(r.epoch,1);
+ // A queued acknowledgement of the new list silences it; one queued for the old list is history only.
+ const slotId=d.photoSlots![0].id;
+ const stale=applyCommand(d,{type:'photoAck',committeeId:'ga1',slotId,stage:'warning',revision:1,epoch:0,chairs:''},'chair',meta());
+ assert.equal(committeePhotoReminders(stale,'ga1',NOW)[0].attention,true);
+ const acked=applyCommand(stale,{type:'photoAck',committeeId:'ga1',slotId,stage:'warning',revision:1,epoch:r.epoch,chairs:r.chairsVersion},'chair',meta());
+ assert.equal(committeePhotoReminders(acked,'ga1',NOW)[0].attention,false);
+ assert.deepEqual(acked.photoChairs,d.photoChairs);
+});
+
 test('real PostgreSQL: Executive sets a Chair school; Chairs see only the photoChairs projection for their committees',async()=>{
  const {db,ids,query,as,asOwner,grant,operationsExpected}=await freshDatabase();
  const executive='73000000-0000-4000-8000-000000000001',ga1Chair='73000000-0000-4000-8000-000000000002',whoChair='73000000-0000-4000-8000-000000000003',approval='73000000-0000-4000-8000-000000000004';

@@ -41,6 +41,17 @@ export function photoChairs(data: ConferenceData): PhotoChair[] {
     data.staff.filter((s) => s.role === "chair" && s.schoolId).flatMap((s) => s.committeeIds.map((committeeId) => ({ staffId: s.id, name: s.name, committeeId, schoolId: s.schoolId! })))
   );
 }
+/** Keeps a server snapshot's cached photoChairs projection in step with an optimistic change to one Chair's school.
+ *  Mirrors private.photo_chairs: one row per committee for a Chair that has a school, ordered by name, staff id and
+ *  committee. Does nothing without a cached projection (the local demo derives Chairs from staff). */
+export function syncPhotoChairs(data: ConferenceData, staff: { id: string; name: string; role: string; schoolId?: string | null; committeeIds: readonly string[] }) {
+  if (!data.photoChairs) return;
+  const rows = data.photoChairs.filter((c) => c.staffId !== staff.id);
+  if (staff.role === "chair" && staff.schoolId)
+    for (const committeeId of new Set(staff.committeeIds)) rows.push({ staffId: staff.id, name: staff.name, committeeId, schoolId: staff.schoolId });
+  const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  data.photoChairs = rows.sort((a, b) => order(a.name, b.name) || order(a.staffId, b.staffId) || order(a.committeeId, b.committeeId));
+}
 /** The participant list's current epoch for one committee and school (0 until a Chair change ever happened). */
 export function photoEpoch(data: ConferenceData, committeeId: string, schoolId: string): number {
   return data.photoEpochs?.find((e) => e.committeeId === committeeId && e.schoolId === schoolId)?.epoch ?? 0;
