@@ -23,7 +23,7 @@ export default async function SubmissionSheet({ params }: { params: Promise<{ to
       {(link.chairs ?? []).length ? link.chairs!.map(chair=><p key={chair.email}>{chair.name} · {chair.email}</p>) : <p>Ask your committee Chair for their address.</p>}
       <ol>
         <li>Write the resolution in Google Docs. Make sure the Chairs can edit it.</li>
-        <li>Scan the QR code. Choose your country, enter the title and paste the Google Doc link (Share → Copy link).</li>
+        <li>Scan the QR code. Choose your country and paste the Google Doc link (Share → Copy link).</li>
         <li>Tap <b>Submit</b> and keep the reference number. Your Chair sends it on to the Approval Panel.</li>
       </ol>
       <p className="room-sheet-url">{url}</p>

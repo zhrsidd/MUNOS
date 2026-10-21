@@ -68,7 +68,7 @@ and build pass; a retirement checklist is in `docs/OPERATIONS.md`.
 ## W4 · Resolution documents tab ☑ (Chair tab, Approval detail, print queue; history via W6c)
 
 Remove the document preview (the demo "paper", version picker and `<pre>` text). The list becomes the page. Each
-resolution is one row showing, without opening anything: title, submitter, status chip, working-document link
+resolution is one row showing, without opening anything: its identity (`GA1/01 — France`, never a title), status chip, working-document link
 (opens Google Doc), and the Approval Panel feedback (latest decision plus full comment text in a callout). One
 primary next action per row from `nextAction`; redundant controls (mock version, timeline duplication, status
 paragraph) removed. Approval history opens inline under the row.
@@ -214,7 +214,7 @@ Source documents, kept verbatim: [UI/QoL brief](briefs/UI_QOL_BRIEF_2026-10-19.m
 ## Resolution identity (handoff 21 October, section 2): display and search · 21 October 2026
 
 Rule, fallbacks and styling: [BRAND.md](BRAND.md#resolution-identity--21-october-2026). Done on `claude/resolution-identity`
-(display and search only; no schema, RLS, command-contract or submission-form change): Chair Resolutions, Debate, Voting,
+(display and search only; no schema, RLS, command-contract or submission-form change; the title-field removal follows below): Chair Resolutions, Debate, Voting,
 Amendments and Participation, Approval queue/detail/history, Executive resolution status and its search (code, country,
 status, outcome), Logistics print queue and Completed, delegate submission cards, Felix reminders and answers, the public
 amendment page, the device amendment-history cache and the submission confirmation.
@@ -227,5 +227,60 @@ Open, for independent review (none are made here):
   and falls back to a published `submitterCountry`, so the UI needs no further change.
 - The public amendment page shows `GA1/01 — Main submitter unavailable` until `amendment_link_info` publishes the resolution's
   `submitterId` (its `delegates` list is already public; `AmendmentLinkInfo.resolution.submitterId` is read when present).
-- Title is still required by the new-resolution form, the submission form and the `document` create command; removing it
-  is the separate contract task.
+- Removing the title field is the contract task below (done on `claude/title-free-resolutions`).
+
+## Title-free resolutions (handoff 21 October, section 2): contract change · 21 October 2026
+
+Status: implemented on `claude/title-free-resolutions` (stacked on `claude/resolution-identity`); needs independent review.
+Nobody is asked for, or shown, a resolution title any more.
+
+Removed: the Chair "New resolution" form (`NewResolutionForm` in `components/documents.tsx`, now only the Main Submitter and
+the `Resolution number assigned on submission — <country>` preview), the public form (`components/operations/submission-form.tsx`:
+label, input, validation and the `title` field it posted), the room-sheet instruction (`app/submit/[token]/sheet/page.tsx`)
+and the `invalid_title` error path. There is no Chair edit-title flow in the app (the `document` command never carried a title).
+Felix, FELIX.md, TROUBLESHOOTING.md and START_HERE.md never told anyone to enter a title; one Felix step now says the Main
+Submitter is chosen and the number is assigned automatically. The paper-fallback intake log and the rehearsal checklists no
+longer list a title.
+
+### Review notes for Codex
+
+What changed (this is a contract change, hence the review):
+- **One compatibility rule**, `lib/resolution-title.ts`: `compatResolutionTitle()` returns the fixed, non-descriptive
+  `"Untitled resolution"` (19 characters). It takes no input, so nothing a person typed can reach `documents.title`; being a
+  constant, a retried submission is byte-identical, so the server's idempotency payload comparison still replays. It is never
+  displayed (the identity change made every screen ignore stored titles).
+- **Public endpoint.** `lib/submissions/service.ts` no longer reads `form.get("title")`, no longer validates it, and
+  `SubmitArgs` has no `title`: a legacy client that still posts one gets the same success, and the value is neither forwarded
+  nor stored. `lib/submissions/supabase-backend.ts` passes `title: compatResolutionTitle()` to the unchanged
+  `submit_resolution` RPC. `invalid_title` is removed from `SubmissionError`, `submissionMessages` and the known-error list
+  (the RPC can only raise it for a title outside 3 to 200 characters, which the constant never is; an unexpected raise would
+  surface as the generic "could not confirm" error). The bounded-body (64 KB), rate-limit, Docs-only and token checks are untouched.
+- **Chair create.** `newDocument.title` is optional in `lib/commands.ts`. The Chair form always sends the compatibility
+  value, so the existing SQL (`command->>'title'` into `documents.title text not null`, and into the draft version text) keeps
+  working unchanged; the local reducer falls back to the same value if a caller omits it. A command with NO title would be
+  rejected by PostgreSQL (not-null); that is deliberate and tested, which is why the client, not the server, supplies the value.
+- **Fingerprints and the outbox.** `newDocument` has no optimistic fingerprint (it returns null with or without a title), so
+  commands queued before this change (with a real title) replay exactly as before and are stored with that title.
+- Draft version text for a Chair-created draft is `Untitled resolution` followed (locally) by the draft notice, as before with the
+  title; no screen renders version text.
+
+What did not change: no migration, no RLS or grant change, no change to `submit_resolution`, `apply_mutation`, the snapshot
+projections or the `Resolution`/`Delegate` types. Existing stored titles, Google Doc names, version text and audit records
+are untouched, and nothing rewrites a code. `lib/supabase/*`, `lib/sync/*` and migrations are not edited here.
+
+Why no migration: both server checks already accept the compatibility value (`title text not null`, 3 to 200 characters), so
+loosening them would only widen a protected contract for no benefit. A later migration could make `documents.title` nullable
+and drop the RPC parameter; that is optional cleanup, not a prerequisite.
+
+Risks to check:
+- A delegate who loaded the OLD form, submitted once (real title stored in the receipt payload) and retries the SAME submission id
+  after this deploys now sends the compatibility title, so `submit_resolution` returns `idempotency_conflict` (409). The
+  message tells them to check with their Chair; a fresh submission id (reload the page) works. Window: only retries across the deploy.
+- `scripts/verify-submission-http.mts` used a changed title as its "changed payload" case; it now changes the Google Doc and adds a
+  legacy-title post (it is a staging tool, not run here).
+- Search and aggregations: nothing outside `lib/seed.ts` (demo text), `lib/amendments/history-cache.ts` (history only) and the
+  approval-history projection reads `title`; none displays or matches it.
+
+Tests: `tests/title-free-resolutions.test.ts` (public route in demo and Supabase-backend paths, legacy title ignored, static
+forms, local create, fingerprint, outbox replay, identity on every screen) and `tests/title-free-resolutions-db.test.ts`
+(route to the real `submit_resolution` on the migrated schema, Chair create, history through Draft, Printed, In Debate and Closed).

@@ -178,7 +178,9 @@ switch hold the face still.
 A resolution is named by its number and Main Submitter, never by a title: **`GA1/01 — France`** (existing code, an
 em dash, the Main Submitter's country). The stored code is `GA1 / 01`; the spaces round the slash are dropped for
 display only and no code is ever rewritten. Never use a delegate's personal name, and never show the old title as the
-primary label (historical `title` data and Google Doc names are untouched; the title is not displayed or searched).
+primary label (historical `title` data and Google Doc names are untouched; the title is not displayed or searched). No form asks
+for a title: new resolutions carry the fixed compatibility title `Untitled resolution` (`lib/resolution-title.ts`) only to fill the
+legacy not-null column.
 
 - One module, `lib/resolution-identity.ts`, produces the string and its parts (code, country); every screen, notice,
   Felix reminder and search uses it. Render with `ResolutionName` (`components/resolution-identity.tsx`): the code

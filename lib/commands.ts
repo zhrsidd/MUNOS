@@ -1,5 +1,6 @@
 import {applyBatch,materializeCommitteeSessions} from './batch/commands';
 import { printCopies } from "./print";
+import { compatResolutionTitle } from "./resolution-title";
 import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
@@ -50,7 +51,12 @@ export type Command =
       type: "newDocument";
       committeeId: string;
       sessionId: string;
-      title: string;
+      /**
+       * Legacy compatibility value only (`documents.title` is not null). New resolutions are not named: the client sends
+       * `compatResolutionTitle()` and nothing displays it. Optional so a caller may omit it; commands queued before the
+       * title was removed still carry a real one, which is kept as history.
+       */
+      title?: string;
       submitterId: string;
     }
   | { type: "queue"; delegateId?: string; sessionId: string; advance?: boolean }
@@ -408,13 +414,14 @@ export function applyCommand(
       )
         throw Error("Select a main submitter in this committee.");
       const documentId = nextId(),
-        versionId = nextId();
+        versionId = nextId(),
+        title = c.title?.trim() || compatResolutionTitle();
       d.documents.push({
         id: documentId,
         committeeId: c.committeeId,
         sessionId: c.sessionId,
         code: `${d.committees.find((x) => x.id === c.committeeId)?.code} / ${String(d.documents.filter((r) => r.committeeId === c.committeeId).length + 1).padStart(2, "0")}`,
-        title: c.title,
+        title,
         submitterId: c.submitterId,
         status: "Draft",
         revision: 1,
@@ -430,7 +437,7 @@ export function applyCommand(
         createdBy: metadata?.actorId ?? "chair-demo",
         fileName: "draft-preview.txt",
         storageKey: null,
-        text: c.title + "\n\nDraft document. Add a mock version to continue.",
+        text: title + "\n\nDraft document. Add a mock version to continue.",
       });
       break;
     }

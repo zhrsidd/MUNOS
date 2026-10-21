@@ -3,16 +3,12 @@
 /** A Docs-only submission is a few hundred bytes of form fields; anything larger is refused unread. */
 export const MAX_SUBMISSION_BODY = 64 * 1024;
 export const SUBMISSION_TOKEN = /^[A-Za-z0-9_-]{22,64}$/;
-export function cleanTitle(title: string) {
-  return title.replace(/\s+/g, " ").trim();
-}
 export type SubmissionError =
   | "invalid_link"
   | "missing_source"
   | "invalid_google_doc"
   | "docs_only"
   | "too_large"
-  | "invalid_title"
   | "invalid_submitter"
   | "rate_limited"
   | "idempotency_conflict"
@@ -25,7 +21,6 @@ export const submissionMessages: Record<SubmissionError, string> = {
   invalid_google_doc: "That is not a Google Docs link. Open your resolution in Google Docs, press Share → Copy link, and paste it here.",
   docs_only: "Resolutions are submitted as Google Docs links only, not files. Open your resolution in Google Docs, press Share → Copy link, and paste it here.",
   too_large: "This submission is too large. Paste only the link to your Google Doc.",
-  invalid_title: "Enter the resolution title (3 to 200 characters).",
   invalid_submitter: "Choose your country from the list.",
   rate_limited: "Too many submissions for this committee in the last few minutes. Wait a few minutes and try again.",
   idempotency_conflict: "This submission reference was already used for different details. Check the original submission with your Chair before sending a new one.",
