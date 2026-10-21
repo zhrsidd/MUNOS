@@ -289,15 +289,28 @@ longer list a title.
 
 What changed (this is a contract change, hence the review):
 - **One compatibility rule**, `lib/resolution-title.ts`: `compatResolutionTitle()` returns the fixed, non-descriptive
-  `"Untitled resolution"` (19 characters). It takes no input, so nothing a person typed can reach `documents.title`; being a
-  constant, a retried submission is byte-identical, so the server's idempotency payload comparison still replays. It is never
-  displayed (the identity change made every screen ignore stored titles).
-- **Public endpoint.** `lib/submissions/service.ts` no longer reads `form.get("title")`, no longer validates it, and
-  `SubmitArgs` has no `title`: a legacy client that still posts one gets the same success, and the value is neither forwarded
-  nor stored. `lib/submissions/supabase-backend.ts` passes `title: compatResolutionTitle()` to the unchanged
-  `submit_resolution` RPC. `invalid_title` is removed from `SubmissionError`, `submissionMessages` and the known-error list
-  (the RPC can only raise it for a title outside 3 to 200 characters, which the constant never is; an unexpected raise would
-  surface as the generic "could not confirm" error). The bounded-body (64 KB), rate-limit, Docs-only and token checks are untouched.
+  `"Untitled resolution"` (19 characters). It takes no input; being a constant, a retried title-free submission is
+  byte-identical, so the server's idempotency payload comparison still replays. It is never displayed (the identity change made
+  every screen ignore stored titles). The only other value that can reach `documents.title` is a legacy title, below.
+- **Public endpoint, and legacy-title retries (Codex P2 on the first push).** `submit_resolution` stores `trim(title)` in the
+  idempotency receipt (`private.resolution_submissions.request_payload`) and compares it on every retry of a submission id. A
+  delegate whose OLD cached form was accepted before the deploy has their real title in that receipt, so an unconditional
+  compatibility title made their automatic retry of the same id a 409 `idempotency_conflict`. Fix, with no migration and no RPC
+  change: `legacySubmissionTitle()` (`lib/resolution-title.ts`) reads a posted `title` and reduces it exactly as the pre-PR
+  `cleanTitle` did (every whitespace run to one space, then trim), then bounds it as before (3 to 200 characters after reduction).
+  `lib/submissions/service.ts` passes a valid one as the optional `SubmitArgs.title`; `lib/submissions/supabase-backend.ts`
+  sends `legacySubmissionTitle(a.title) ?? compatResolutionTitle()` (re-validated there, idempotent) to the unchanged RPC. So a
+  retry from an old form is byte-identical to its original receipt payload (verified against the real RPC), while the new form
+  never has a title field, never posts one and gets the compatibility title. **An invalid legacy title is not an error**: not
+  text (a file part), empty, under 3 or over 200 characters after reduction all fall back to the compatibility title. The old code
+  refused such a request with 400 `invalid_title`, so no receipt can exist for it and nothing can conflict; failing it now would
+  only block a delegate on a field they cannot see. The body stays bounded (64 KB, counted before parsing) and the title is
+  capped at 200 characters before anything leaves the route. A valid legacy title on a NEW submission is stored in
+  `documents.title` exactly as before this PR (it is never displayed or searched). `invalid_title` stays removed from
+  `SubmissionError`, `submissionMessages` and the known-error list (the RPC can only raise it outside 3 to 200 characters, which
+  neither value is; an unexpected raise would surface as the generic "could not confirm" error). The bounded-body, rate-limit,
+  Docs-only and token checks are untouched. A reload (new submission id) of the same Google Doc still resolves through the RPC's
+  duplicate detection, with or without a title.
 - **Chair create.** `newDocument.title` is REQUIRED again in the `Command` type (`lib/commands.ts`), so the typed contract
   guarantees it (a `@ts-expect-error` in `tests/title-free-resolutions.test.ts` fails typecheck if it ever turns optional). The
   Chair form always sends the compatibility value, so the existing SQL (`command->>'title'` into `documents.title text not null`,
@@ -327,16 +340,23 @@ loosening them would only widen a protected contract for no benefit. A later mig
 and drop the RPC parameter; that is optional cleanup, not a prerequisite.
 
 Risks to check:
-- A delegate who loaded the OLD form, submitted once (real title stored in the receipt payload) and retries the SAME submission id
-  after this deploys now sends the compatibility title, so `submit_resolution` returns `idempotency_conflict` (409). The
-  message tells them to check with their Chair; a fresh submission id (reload the page) works. Window: only retries across the deploy.
+- **Rollout condition (legacy retries).** An old cached form keeps working across the deploy only because it still posts the
+  title it posted before: the retry then carries the stored title and replays. This holds for every submission accepted before
+  the deploy, with no database check needed. What cannot be recovered is a retry that omits the title for a submission that was
+  accepted WITH one (nothing in the app does that: the new form has a new id per page load and never reuses an old id); the RPC
+  would answer 409 and the delegate reloads, which finds the original through duplicate detection. Conversely, once this is
+  live, an old form that posts a valid title creates a row whose `documents.title` is that title (as before the PR). If every
+  old form can be assumed gone (e.g. the sheet was only ever opened after the deploy), the legacy path is simply never taken.
 - `scripts/verify-submission-http.mts` used a changed title as its "changed payload" case; it now changes the Google Doc and adds a
-  legacy-title post (it is a staging tool, not run here).
+  legacy-title post (it is a staging tool, not run here; it does not exercise the pre-deploy receipt case, the PGlite test does).
 - Search and aggregations: nothing outside `lib/seed.ts` (demo text), `lib/amendments/history-cache.ts` (history only) and the
   approval-history projection reads `title`; none displays or matches it.
 
-Tests: `tests/title-free-resolutions.test.ts` (public route in demo and Supabase-backend paths, legacy title ignored, static
+Tests: `tests/title-free-resolutions.test.ts` (public route in demo and Supabase-backend paths, legacy title reduction/bounds/fallback, static
 forms, local create, type contract, `normalizeCommand`, persisted outbox payload and replay, fingerprint, identity on every screen) and
-`tests/title-free-resolutions-db.test.ts` (route to the real `submit_resolution` on the migrated schema, Chair create, strict
+`tests/title-free-resolutions-db.test.ts` (route to the real `submit_resolution` on the migrated schema, including the Codex P2
+case: a submission created with the pre-PR RPC payload shape, retried through the new route with the same id and inputs and the
+legacy title, replays with no 409 and no second document; the same retry without the title is the 409 the fix removes; a title-free
+retry, an invalid-legacy-title retry and a new-id reload; Chair create, strict
 server, a title-less create through the real `DurableRepository` and `SupabaseTransport` into `apply_conference_mutation` in
 PGlite, history through Draft, Printed, In Debate and Closed).

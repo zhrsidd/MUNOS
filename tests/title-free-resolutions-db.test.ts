@@ -43,14 +43,18 @@ async function setup(){
  return {...f,send,history,openLink};
 }
 
-test('public route -> Supabase backend -> real submit_resolution: title-free and legacy-title posts both create a Draft titled with the compatibility value',async()=>{
- const {db,ids,query,asOwner,asServer,openLink}=await setup();
+type Fixture=Awaited<ReturnType<typeof setup>>;
+/**
+ * Runs `run` with the public route wired to the Supabase backend, and with a stand-in for PostgREST: the supabase client's
+ * rpc() call is executed against the migrated database as service_role. `rpcTitles` records every title sent to submit_resolution.
+ */
+async function withRoute(f:Fixture,run:(rpcTitles:unknown[])=>Promise<void>){
  const realFetch=globalThis.fetch;
  const previous={backend:process.env.NEXT_PUBLIC_DATA_BACKEND,url:process.env.NEXT_PUBLIC_SUPABASE_URL,key:process.env.SUPABASE_SECRET_KEY,vercel:process.env.VERCEL_ENV};
+ const {query,asServer}=f;
  try{
-  await openLink();
+  await f.openLink();
   const rpcTitles:unknown[]=[];
-  // A stand-in for PostgREST: the supabase client's rpc() call is executed against the migrated database as service_role.
   globalThis.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
    const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);
    const body=JSON.parse(String(init?.body??'{}')) as Record<string,unknown>;
@@ -64,39 +68,103 @@ test('public route -> Supabase backend -> real submit_resolution: title-free and
    }catch(error){return new Response(JSON.stringify({message:(error as Error).message,code:'P0001'}),{status:400,headers:{'content-type':'application/json'}});}
   }) as typeof fetch;
   process.env.NEXT_PUBLIC_DATA_BACKEND='supabase';process.env.NEXT_PUBLIC_SUPABASE_URL='https://devtestrefabcdefghij.supabase.co';process.env.SUPABASE_SECRET_KEY='test-secret-not-real';delete process.env.VERCEL_ENV;
+  await run(rpcTitles);
+ }finally{
+  globalThis.fetch=realFetch;
+  for(const [k,v] of [['NEXT_PUBLIC_DATA_BACKEND',previous.backend],['NEXT_PUBLIC_SUPABASE_URL',previous.url],['SUPABASE_SECRET_KEY',previous.key],['VERCEL_ENV',previous.vercel]] as const){if(v===undefined)delete process.env[k];else process.env[k]=v;}
+  await f.db.close();
+ }
+}
+const docIdOf=(submission:string)=>submission.slice(0,24)+'000000000001';
+const receipt=async(f:Fixture,submission:string)=>{await f.asOwner();return f.query<{title:string;documentId:string}>(`select request_payload->>'title' title,document_id "documentId" from private.resolution_submissions where id=$1`,[submission]);};
+const docCount=async(f:Fixture)=>{await f.asOwner();return (await f.query<{n:number}>('select count(*)::int n from public.documents where committee_id=$1',[f.ids.ga1]))[0].n;};
+
+test('public route -> Supabase backend -> real submit_resolution: a title-free post creates a Draft titled with the compatibility value; retries replay and a reload finds the original',async()=>{
+ const f=await setup();const {ids,query,asOwner}=f;
+ await withRoute(f,async(rpcTitles)=>{
   const fields={token,submitterId:ids.france};
-  // 1. No title at all.
-  const first=crypto.randomUUID(),doc=first.slice(0,24)+'000000000001';
+  const first=crypto.randomUUID(),doc=docIdOf(first);
   const created=await submit(multipart({...fields,submissionId:first,googleDoc:docOf('dbTitleFree')}));
   assert.equal(created.status,201);
   const createdBody=await created.json();assert.equal(createdBody.status,'created');assert.match(createdBody.code,/^GA1 \/ \d{2}$/,'code assigned by the database as before');
+  assert.deepEqual(rpcTitles,[COMPAT_RESOLUTION_TITLE],'no title posted -> only the compatibility title reaches the RPC');
   await asOwner();
   const row=(await query<{title:string;status:string;code:string;submitterId:string}>('select title,status,code,"submitterId" from public.documents where id=$1',[doc]))[0];
   assert.deepEqual(row,{title:COMPAT_RESOLUTION_TITLE,status:'Draft',code:createdBody.code,submitterId:ids.france});
   assert.match((await query<{text:string}>('select text from public.document_versions where "documentId"=$1',[doc]))[0].text,/^Submitted through the GA1 submission link by France\./,'version text does not depend on the title');
-  // 2. An older cached page still posts a title: succeeds (even one the old 3-character rule refused) and is never stored.
-  const second=crypto.randomUUID(),doc2=second.slice(0,24)+'000000000001';
-  const legacy=await submit(multipart({...fields,submissionId:second,googleDoc:docOf('dbLegacyTitle'),title:'x'}));
-  assert.equal(legacy.status,201);
-  await asOwner();
-  assert.equal((await query<{title:string}>('select title from public.documents where id=$1',[doc2]))[0].title,COMPAT_RESOLUTION_TITLE,'the supplied title is not stored');
-  assert.equal((await query('select 1 from public.documents where title=$1',['x'])).length,0);
-  assert.deepEqual(rpcTitles,[COMPAT_RESOLUTION_TITLE,COMPAT_RESOLUTION_TITLE],'only the compatibility title ever reaches the RPC');
-  // 3. Idempotency still holds: retrying the same submission id, with or without a legacy title, is a replay, not a conflict.
+  const docs=await docCount(f);
+  // (b) A retry of the same title-free submission replays, as does one carrying an INVALID legacy title (it falls back to the compatibility value).
   const retry=await submit(multipart({...fields,submissionId:first,googleDoc:docOf('dbTitleFree')}));
   assert.equal(retry.status,200);assert.equal((await retry.json()).status,'replayed');
-  const retryLegacy=await submit(multipart({...fields,submissionId:first,googleDoc:docOf('dbTitleFree'),title:'Typed into an old form'}));
-  assert.equal(retryLegacy.status,200);assert.equal((await retryLegacy.json()).status,'replayed');
-  // 4. The rest of the validation is untouched: the same submission id with a different document is still a conflict.
+  for(const bad of ['x','   ','y'.repeat(201)]){
+   const r=await submit(multipart({...fields,submissionId:first,googleDoc:docOf('dbTitleFree'),title:bad}));
+   assert.equal(r.status,200,`invalid legacy title of ${bad.length} characters falls back to the compatibility title`);assert.equal((await r.json()).status,'replayed');
+  }
+  // (c) A reload (new submission id) of the same Google Doc finds the original through duplicate detection, with or without a legacy title.
+  const reload=await submit(multipart({...fields,submissionId:crypto.randomUUID(),googleDoc:docOf('dbTitleFree')}));
+  assert.equal(reload.status,200);const reloadBody=await reload.json();assert.deepEqual([reloadBody.status,reloadBody.code],['duplicate',createdBody.code]);
+  const reloadLegacy=await submit(multipart({...fields,submissionId:crypto.randomUUID(),googleDoc:docOf('dbTitleFree'),title:'Typed into an old form'}));
+  assert.equal(reloadLegacy.status,200);assert.equal((await reloadLegacy.json()).status,'duplicate');
+  assert.equal(await docCount(f),docs,'still exactly one document for that source');
+  // The rest of the validation is untouched: the same submission id with a different document is still a conflict.
   const changed=await submit(multipart({...fields,submissionId:first,googleDoc:docOf('dbOtherDoc')}));
   assert.equal(changed.status,409);assert.equal((await changed.json()).error,'idempotency_conflict');
-  await asOwner();
-  assert.equal((await query('select 1 from public.documents where title=$1 and id in ($2,$3)',[COMPAT_RESOLUTION_TITLE,doc,doc2])).length,2);
- }finally{
-  globalThis.fetch=realFetch;
-  for(const [k,v] of [['NEXT_PUBLIC_DATA_BACKEND',previous.backend],['NEXT_PUBLIC_SUPABASE_URL',previous.url],['SUPABASE_SECRET_KEY',previous.key],['VERCEL_ENV',previous.vercel]] as const){if(v===undefined)delete process.env[k];else process.env[k]=v;}
-  await db.close();
- }
+ });
+});
+
+test('LEGACY RETRY (Codex P2): a submission accepted by the pre-deploy code is retried by an old cached form with the same id and inputs -> original result, no 409, no second document',async()=>{
+ const f=await setup();const {ids,query,asOwner,asServer}=f;
+ await withRoute(f,async(rpcTitles)=>{
+  const sid=crypto.randomUUID(),googleDoc=docOf('dbPreDeploy'),googleDocId=googleDoc.split('/d/')[1].split('/')[0];
+  // 1. Accepted BEFORE the deploy: exactly the RPC call the pre-title-free backend made (the old form's cleaned title, file parameters null).
+  const original='Protecting civilians in cyberspace';
+  await asServer();
+  const first=(await query<{r:{status:string;code:string}}>('select public.submit_resolution($1,$2,$3,$4,$5,null,null,null,null) r',[token,sid,ids.france,original,googleDocId]))[0].r;
+  assert.equal(first.status,'created');
+  assert.deepEqual((await receipt(f,sid)).map(r=>r.title),[original]);
+  const docs=await docCount(f);
+  // 2. The delegate's old page retries the SAME submission id after the deploy. A retry that could not send the title is a 409 (the reproduced bug)...
+  const bare=await submit(multipart({token,submitterId:ids.france,submissionId:sid,googleDoc}));
+  assert.equal(bare.status,409,'a retry that cannot send the original title cannot match the stored receipt');
+  assert.equal((await bare.json()).error,'idempotency_conflict');
+  // ...but the old form does send its title, and it is now passed through unchanged, so the receipt matches.
+  rpcTitles.length=0;
+  const retry=await submit(multipart({token,submitterId:ids.france,submissionId:sid,googleDoc,title:original}));
+  assert.equal(retry.status,200);const body=await retry.json();assert.deepEqual([body.ok,body.status,body.code],[true,'replayed',first.code]);
+  assert.deepEqual(rpcTitles,[original],'the exact original title reaches the RPC');
+  // The old server also reduced whitespace before sending, so a differently spaced copy of the same title is byte-identical too.
+  const spaced=await submit(multipart({token,submitterId:ids.france,submissionId:sid,googleDoc,title:'  Protecting \t civilians\r\n in   cyberspace  '}));
+  assert.equal(spaced.status,200);assert.equal((await spaced.json()).status,'replayed');
+  assert.deepEqual(rpcTitles,[original,original]);
+  // Nothing was created or rewritten.
+  assert.equal(await docCount(f),docs,'no second document');
+  assert.deepEqual((await receipt(f,sid)).map(r=>r.title),[original],'the receipt is untouched');
+  await asOwner();assert.equal((await query<{title:string}>('select title from public.documents where id=$1',[docIdOf(sid)]))[0].title,original);
+  // A genuinely changed title on the same id is still an idempotency conflict (the RPC contract is unchanged).
+  const changed=await submit(multipart({token,submitterId:ids.france,submissionId:sid,googleDoc,title:'A different title'}));
+  assert.equal(changed.status,409);
+  // (c) The delegate reloads instead: a new submission id with the same Google Doc finds the original through duplicate detection.
+  const reload=await submit(multipart({token,submitterId:ids.france,submissionId:crypto.randomUUID(),googleDoc}));
+  assert.equal(reload.status,200);const reloadBody=await reload.json();assert.deepEqual([reloadBody.status,reloadBody.code],['duplicate',first.code]);
+  assert.equal(await docCount(f),docs,'still one document');
+ });
+});
+
+test('a valid legacy title on a NEW submission is forwarded and stored as the old code did; an invalid or oversized one falls back to the compatibility title',async()=>{
+ const f=await setup();const {ids,query,asOwner}=f;
+ await withRoute(f,async(rpcTitles)=>{
+  const fields={token,submitterId:ids.france};
+  const cases:[string,string,string][]=[['dbLegacyOk','  Protecting   civilians ','Protecting civilians'],['dbLegacyShort','x',COMPAT_RESOLUTION_TITLE],['dbLegacyLong','z'.repeat(201),COMPAT_RESOLUTION_TITLE],['dbLegacyEdge','e'.repeat(200),'e'.repeat(200)],['dbLegacyBlank','   ',COMPAT_RESOLUTION_TITLE]];
+  for(const [name,sent,stored] of cases){
+   const sid=crypto.randomUUID();rpcTitles.length=0;
+   const r=await submit(multipart({...fields,submissionId:sid,googleDoc:docOf(name),title:sent}));
+   assert.equal(r.status,201,name);
+   assert.deepEqual(rpcTitles,[stored],name);
+   await asOwner();
+   assert.equal((await query<{title:string}>('select title from public.documents where id=$1',[docIdOf(sid)]))[0].title,stored,name);
+   assert.deepEqual((await receipt(f,sid)).map(x=>x.title),[stored],name);
+  }
+ });
 });
 
 test('the compatibility title passes the unchanged submit_resolution check, and a bad title is still refused by it (the RPC was not loosened)',async()=>{

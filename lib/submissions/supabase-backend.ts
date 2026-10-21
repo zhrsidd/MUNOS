@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { LinkInfo, SubmissionError } from "./rules";
-import { compatResolutionTitle } from "../resolution-title";
+import { compatResolutionTitle, legacySubmissionTitle } from "../resolution-title";
 import { SubmissionRejected, type SubmissionBackend } from "./service";
 // SERVER ONLY. Uses SUPABASE_SECRET_KEY, which must never reach the browser. It is used for exactly
 // two things: resolve a submission link and call public.submit_resolution (both executable only by
@@ -17,8 +17,10 @@ export function supabaseSubmissionBackend(url: string, secret: string): Submissi
     async submit(a) {
       const { data, error } = await client.rpc("submit_resolution", {
         link_token: a.token, submission: a.submissionId, submitter: a.submitterId,
-        // `documents.title` is not null and the RPC wants 3 to 200 characters: one fixed compatibility value, never user input.
-        title: compatResolutionTitle(),
+        // `documents.title` is not null and the RPC wants 3 to 200 characters. New submissions send the one fixed
+        // compatibility value. A title is passed only when an old cached form posted a valid one (re-validated here), so
+        // a retry of a submission accepted before the deploy sends the same value as its stored idempotency receipt.
+        title: legacySubmissionTitle(a.title) ?? compatResolutionTitle(),
         // The RPC keeps its file parameters for historical rows; new submissions never set them.
         google_doc_id: a.googleDocId, file_name: null, storage_key: null, file_sha256: null, file_size: null,
       });

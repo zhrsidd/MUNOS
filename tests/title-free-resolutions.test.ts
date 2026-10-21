@@ -15,7 +15,7 @@ import { createSeed } from "../lib/seed";
 import { applyCommand, normalizeCommand, type Command } from "../lib/commands";
 import { DurableRepository, fingerprint, type Transport } from "../lib/sync/repository";
 import { DurableStore, type Mutation } from "../lib/sync/store";
-import { COMPAT_RESOLUTION_TITLE, compatResolutionTitle } from "../lib/resolution-title";
+import { COMPAT_RESOLUTION_TITLE, compatResolutionTitle, legacySubmissionTitle } from "../lib/resolution-title";
 import { matchesResolutionSearch } from "../lib/resolution-identity";
 import { handleSubmission, type SubmissionBackend, type SubmitArgs } from "../lib/submissions/service";
 import type { LinkInfo } from "../lib/submissions/rules";
@@ -52,7 +52,7 @@ test("the compatibility title is one fixed, non-descriptive value that satisfies
   assert.equal(compatResolutionTitle.length, 0, "takes no input: nothing a person typed can reach the legacy column through it");
 });
 
-test("public endpoint, local/demo backend: a title-free multipart post succeeds; a legacy title is accepted and ignored", async () => {
+test("public endpoint, local/demo backend: a title-free multipart post succeeds; a legacy title is accepted (the demo backend keeps no title)", async () => {
   await withEnv({ NEXT_PUBLIC_DATA_BACKEND: "local" }, async () => {
     const base = { token: DEMO_TOKEN, submitterId: "d0" };
     const bare = await submit(multipart({ ...base, submissionId: crypto.randomUUID(), googleDoc: GOOGLE_DOC("demoTitleFreeOne") }));
@@ -60,7 +60,7 @@ test("public endpoint, local/demo backend: a title-free multipart post succeeds;
     const created = await bare.json();
     assert.deepEqual([created.ok, created.status], [true, "created"]);
     assert.match(created.code, /^GA1 \/ D\d+$/, "a code is assigned exactly as before");
-    // An older cached page still posts `title`: not read, not required, not stored, never an error.
+    // An older cached page still posts `title`: never required, never an error (the demo backend keeps no title).
     const legacy = await submit(multipart({ ...base, submissionId: crypto.randomUUID(), googleDoc: GOOGLE_DOC("demoTitleFreeTwo"), title: "x" }));
     assert.equal(legacy.status, 201, "a legacy title too short for the old rule is no longer a rejection");
     const legacyBody = await legacy.json();
@@ -72,6 +72,19 @@ test("public endpoint, local/demo backend: a title-free multipart post succeeds;
   });
 });
 
+test("legacySubmissionTitle reduces and bounds a legacy title exactly as the pre-title-free cleanTitle + 3 to 200 rule did", () => {
+  // The receipt payload stores trim(title); the old code sent title.replace(/\s+/g, " ").trim(). Byte-identical output is the point.
+  const oldClean = (t: string) => t.replace(/\s+/g, " ").trim();
+  for (const t of ["Plain title", "  padded  ", "tabs\tand\nnewlines", "multi   space", "non\u00a0breaking\u2003spaces", "ünïcödé — dash"]) assert.equal(legacySubmissionTitle(t), oldClean(t), JSON.stringify(t));
+  assert.equal(legacySubmissionTitle("abc"), "abc", "3 characters is the minimum");
+  assert.equal(legacySubmissionTitle("ab"), undefined);
+  assert.equal(legacySubmissionTitle("a".repeat(200))?.length, 200, "200 characters is the maximum");
+  assert.equal(legacySubmissionTitle("a".repeat(201)), undefined);
+  assert.equal(legacySubmissionTitle(`  ${"a ".repeat(100)}`), oldClean("a ".repeat(100)), "length is measured after reduction");
+  for (const bad of [undefined, null, 7, {}, "", "   ", new File(["abc"], "t.txt")]) assert.equal(legacySubmissionTitle(bad), undefined, String(bad));
+  assert.equal(legacySubmissionTitle(legacySubmissionTitle("  A  title ")), "A title", "idempotent: the backend can safely re-validate");
+});
+
 class RecordingBackend implements SubmissionBackend {
   calls: SubmitArgs[] = [];
   async linkInfo(token: string): Promise<LinkInfo | null> {
@@ -79,26 +92,39 @@ class RecordingBackend implements SubmissionBackend {
   }
   async submit(args: SubmitArgs) { this.calls.push(args); return { status: "created" as const, code: "GA1 / 01" }; }
 }
-test("the service never reads, validates or forwards a posted title", async () => {
+test("the service forwards only a VALID legacy title (reduced exactly as before); anything else is not an error and sends no title", async () => {
   const backend = new RecordingBackend();
   const form = (extra: Record<string, string> = {}) => {
     const f = new FormData();
     for (const [k, v] of Object.entries({ token: "T".repeat(22), submissionId: crypto.randomUUID(), submitterId: "11111111-1111-4111-8111-111111111111", googleDoc: GOOGLE_DOC("serviceTitleFree"), ...extra })) f.set(k, v);
     return f;
   };
-  assert.equal((await handleSubmission(form(), backend)).status, 201, "no title field at all");
-  for (const title of ["  ", "x", "y".repeat(500), "Protecting civilians online"]) {
-    const result = await handleSubmission(form({ title, googleDoc: GOOGLE_DOC("serviceTitle" + title.length) }), backend);
-    assert.equal(result.status, 201, `legacy title of ${title.length} characters`);
+  // [posted, forwarded]; undefined means the call carries no title at all and the backend uses the compatibility value.
+  const cases: [string | undefined, string | undefined][] = [
+    [undefined, undefined],
+    ["Protecting civilians online", "Protecting civilians online"],
+    ["  Protecting \t civilians\r\n online  ", "Protecting civilians online"],
+    ["abc", "abc"],
+    ["e".repeat(200), "e".repeat(200)],
+    ["", undefined], ["  ", undefined], ["ab", undefined], ["x", undefined], ["y".repeat(201), undefined], ["y".repeat(500), undefined],
+    [" ".repeat(3) + "z" + " ".repeat(3), undefined],
+  ];
+  for (const [posted, forwarded] of cases) {
+    backend.calls.length = 0;
+    const result = await handleSubmission(form(posted === undefined ? {} : { title: posted }), backend);
+    assert.equal(result.status, 201, `a legacy title of ${posted?.length ?? "no"} characters is never a rejection`);
+    assert.equal(backend.calls.length, 1);
+    if (forwarded === undefined) assert.ok(!("title" in backend.calls[0]), `no title forwarded for ${JSON.stringify(posted)}`);
+    else assert.equal(backend.calls[0].title, forwarded);
   }
-  assert.equal(backend.calls.length, 5);
-  for (const call of backend.calls) {
-    assert.ok(!("title" in call), "the backend contract carries no title");
-    assert.ok(!JSON.stringify(call).includes("Protecting civilians online") && !JSON.stringify(call).includes("yyyy"));
-  }
+  // A non-text part (a file posted as `title`) is not a title; the request is still refused only because it carries a file elsewhere.
+  const file = form(); file.set("title", new File(["abc"], "title.txt"));
+  backend.calls.length = 0;
+  assert.equal((await handleSubmission(file, backend)).status, 201);
+  assert.ok(!("title" in backend.calls[0]));
 });
 
-test("public endpoint, Supabase backend path: the route sends only the compatibility title to submit_resolution", async () => {
+test("public endpoint, Supabase backend path: the compatibility title is sent unless an old cached form posted a valid title, which is passed through unchanged", async () => {
   const seen: { path: string; body: Record<string, unknown> }[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -112,14 +138,24 @@ test("public endpoint, Supabase backend path: the route sends only the compatibi
   }) as typeof fetch;
   try {
     await withEnv({ NEXT_PUBLIC_DATA_BACKEND: "supabase", NEXT_PUBLIC_SUPABASE_URL: "https://devtestrefabcdefghij.supabase.co", SUPABASE_SECRET_KEY: "test-secret-not-real", VERCEL_ENV: undefined }, async () => {
-      for (const fields of [{}, { title: "A title typed into an old cached form" }] as Record<string, string>[]) {
+      const cases: [Record<string, string>, string][] = [
+        [{}, COMPAT_RESOLUTION_TITLE],
+        [{ title: "A title typed into an old cached form" }, "A title typed into an old cached form"],
+        [{ title: "  Spaced \n  out\ttitle " }, "Spaced out title"],
+        [{ title: "e".repeat(200) }, "e".repeat(200)],
+        [{ title: "" }, COMPAT_RESOLUTION_TITLE],
+        [{ title: "ab" }, COMPAT_RESOLUTION_TITLE],
+        [{ title: "   " }, COMPAT_RESOLUTION_TITLE],
+        [{ title: "e".repeat(201) }, COMPAT_RESOLUTION_TITLE],
+      ];
+      for (const [fields, expected] of cases) {
         seen.length = 0;
         const response = await submit(multipart({ token: "T".repeat(22), submissionId: crypto.randomUUID(), submitterId: "11111111-1111-4111-8111-111111111111", googleDoc: GOOGLE_DOC("supabasePath"), ...fields }));
-        assert.equal(response.status, 201, JSON.stringify(fields));
+        assert.equal(response.status, 201, JSON.stringify(fields).slice(0, 80));
         const rpc = seen.find(call => call.path.endsWith("/submit_resolution"));
         assert.ok(rpc, "submit_resolution was called");
-        assert.equal(rpc.body.title, COMPAT_RESOLUTION_TITLE);
-        assert.ok(!JSON.stringify(seen).includes("old cached form"), "the supplied title is never sent anywhere");
+        assert.equal(rpc.body.title, expected);
+        assert.equal(seen.filter(call => call.path.endsWith("/submit_resolution")).length, 1);
       }
     });
   } finally { globalThis.fetch = realFetch; }

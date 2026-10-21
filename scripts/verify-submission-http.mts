@@ -28,8 +28,9 @@ async function post(values:Record<string,string>={},file?:Blob){
 const first=await post();assert.equal(first.status,201);assert.equal(first.body.status,'created');results.created=first.body.code;
 const retries=await Promise.all([post(),post(),post()]);assert.ok(retries.every(r=>r.status===200&&r.body.status==='replayed'&&r.body.code===first.body.code));results.concurrentRetriesExactlyOnce=true;
 const duplicate=await post({submissionId:randomUUID()});assert.equal(duplicate.body.status,'duplicate');assert.equal(duplicate.body.code,first.body.code);results.duplicateSource=true;
-// The form has no title; a legacy client's title is ignored, so a different Google Doc is the changed payload.
-const legacy=await post({submissionId:randomUUID(),title:'Legacy client title',googleDoc:`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`});assert.equal(legacy.status,201);results.legacyTitleIgnored=true;
+// The form has no title; an old client's valid title is still accepted (and forwarded so its retries match), and an absent one is fine.
+// A different Google Doc is the changed payload.
+const legacy=await post({submissionId:randomUUID(),title:'Legacy client title',googleDoc:`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`});assert.equal(legacy.status,201);results.legacyTitleAccepted=true;
 const changed=await post({googleDoc:`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`});assert.equal(changed.status,409);assert.equal(changed.body.error,'idempotency_conflict');results.changedRetryDenied=true;
 const invalid=await post({submissionId:randomUUID(),googleDoc:'https://example.com/not-a-doc'});assert.equal(invalid.status,400);results.invalidHostDenied=true;
 const foreign=await post({submissionId:randomUUID(),submitterId:randomUUID()});assert.equal(foreign.status,400);results.invalidSubmitterDenied=true;
