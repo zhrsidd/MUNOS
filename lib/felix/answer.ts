@@ -1,7 +1,7 @@
 /**
  * Felix's answers. Deterministic and local: the same question in the same app state always gets the same answer, and
  * nothing leaves the browser. Felix only describes and links; it never changes conference data. Replies are returned
- * immediately: there is no artificial "thinking" delay and no simulated streaming.
+ * immediately with no "thinking" delay; the panel types them out at lib/felix/reveal.ts pace.
  */
 import type { Role } from "../domain";
 import { destinationSlugs } from "../navigation";
@@ -55,7 +55,7 @@ export function situation(ctx: FelixContext): string {
     const c = ctx.chair;
     if (!c.sessionName) return `${c.committeeCode ?? "Your committee"}: no current session selected.`;
     const roll = c.delegates === 0 ? "no delegates in this committee yet" : c.marked === 0 ? "roll call not started" : `roll call ${c.marked}/${c.delegates} marked, ${c.present} present`;
-    return `${c.committeeCode ?? "Your committee"} · ${c.sessionName}: ${roll}; ${c.speaking ? "a speaker has the floor" : "the floor is with the Chair"}${c.queued ? `; ${c.queued} queued to speak` : ""}${c.inDebate ? `; “${c.inDebate}” is in debate` : ""}.`;
+    return `${c.committeeCode ?? "Your committee"} · ${c.sessionName}: ${roll}; ${c.speaking ? "a speaker has the floor" : "the floor is with the Chair"}${c.queued ? `; ${c.queued} queued to speak` : ""}${c.inDebate ? `; ${c.inDebate} is in debate` : ""}.`;
   }
   if (ctx.role === "approval") return `Review inbox: ${count("Submitted")} waiting to start review, ${count("Review")} in review.`;
   if (ctx.role === "logistics") return `Print queue: ${count("Approved")} approved resolution${count("Approved") === 1 ? "" : "s"} waiting to print.`;

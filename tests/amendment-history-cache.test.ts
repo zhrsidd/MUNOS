@@ -15,7 +15,7 @@ const now = new Date('2026-11-05T12:00:00Z');
 
 test('history cache: merges by id, keeps only this committee’s passed rows, newest first and bounded', () => {
  const context = historyContext([row('1')], [resolution], [delegate], [{ documentId: 'r1', workingDocId: DOC }]);
- assert.deepEqual(context, { resolutions: { r1: { code: 'GA1 / 01', title: 'Safeguarding civilians' } }, delegations: { d1: { flag: '🇫🇷', country: 'France' } }, workingDocs: { r1: DOC } });
+ assert.deepEqual(context, { resolutions: { r1: { code: 'GA1 / 01', title: 'Safeguarding civilians', country: 'France' } }, delegations: { d1: { flag: '🇫🇷', country: 'France' } }, workingDocs: { r1: DOC } });
  assert.deepEqual(historyContext([row('1')], [], [], [{ documentId: 'r1', workingDocId: 'https://evil.example/doc' }]).workingDocs, {}, 'only a valid Doc id is kept');
  const first = mergeCache(undefined, 'k', 'ga1', [row('1'), row('2', { committeeId: 'who' }), row('3', { outcome: 'Failed' }), row('4', { status: 'In Debate', outcome: null })], context, now);
  assert.deepEqual(first.rows.map(r => r.id), ['1']);
@@ -56,4 +56,19 @@ test('history cache in IndexedDB: survives a reload, is scoped by actor and comm
  assert.equal(await reloaded.read(actorB), undefined, 'another staff identity on this device reads nothing');
  assert.equal(await reloaded.read(otherCommittee), undefined, 'another committee reads nothing');
  await reloaded.close();
+});
+
+test('history cache: the Main Submitter country is cached with the resolution; entries cached before it existed still load', () => {
+ const withCountry = historyContext([row('1')], [resolution], [delegate], []);
+ assert.equal(withCountry.resolutions.r1.country, 'France');
+ assert.equal(historyContext([row('1')], [resolution], [{ ...delegate, committeeId: 'sc', country: 'China' } as Delegate], []).resolutions.r1.country, undefined, 'another committee’s delegate is never cached');
+ assert.equal(historyContext([row('1')], [resolution], [], []).resolutions.r1.country, undefined, 'no delegate on hand: no country');
+ // An entry written before the country existed: title only. It is read as is, and a newer save keeps working without dropping a known country.
+ const old = { key: 'k', rows: [row('1')], savedAt: now.toISOString(), context: { resolutions: { r1: { code: 'GA1 / 01', title: 'Safeguarding civilians' } }, delegations: {}, workingDocs: {} } };
+ assert.equal(usableCache(old, now).context.resolutions.r1.country, undefined);
+ const upgraded = mergeCache(old, 'k', 'ga1', [row('1')], withCountry, now);
+ assert.equal(upgraded.context.resolutions.r1.country, 'France');
+ const later = mergeCache(upgraded, 'k', 'ga1', [row('1')], historyContext([row('1')], [resolution], [], []), now);
+ assert.equal(later.context.resolutions.r1.country, 'France', 'a save made without the delegate list keeps the country already known');
+ assert.equal(later.context.resolutions.r1.title, 'Safeguarding civilians', 'the historical title is still stored');
 });

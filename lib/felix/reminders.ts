@@ -1,5 +1,5 @@
 import type { Role } from "../domain";
-import type { FelixContext } from "./context";
+import { felixResolutionLabel, type FelixContext } from "./context";
 
 export type ReminderPriority = "urgent" | "action" | "info";
 export type Reminder = {
@@ -21,18 +21,18 @@ export const LIST_LIMIT = 3;
 /** Longest popup message, in words. */
 export const SHORT_WORDS = 12;
 
-const quoted = (titles: string[]) => {
-  const shown = titles.slice(0, LIST_LIMIT).map(title => `“${title}”`);
-  const rest = titles.length - shown.length;
+const listed = (labels: string[]) => {
+  const shown = labels.slice(0, LIST_LIMIT);
+  const rest = labels.length - shown.length;
   return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown.at(-1)}` : shown[0] ?? "";
 };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** One reminder per situation, grouping same-kind items and summarising large backlogs. */
-function group(kind: string, priority: ReminderPriority, items: { id: string; title: string }[], text: (count: number, titles: string) => string, short: (count: number) => string, href: string, linkLabel: string): Reminder[] {
+function group(kind: string, priority: ReminderPriority, items: { id: string; label: string }[], text: (count: number, labels: string) => string, short: (count: number) => string, href: string, linkLabel: string): Reminder[] {
   if (!items.length) return [];
   const sorted = [...items].sort((a, b) => a.id.localeCompare(b.id));
-  return [{ key: `${kind}:${sorted.map(item => item.id).join(",")}`, kind, priority, text: text(items.length, quoted(sorted.map(item => item.title))), short: short(items.length), href, linkLabel }];
+  return [{ key: `${kind}:${sorted.map(item => item.id).join(",")}`, kind, priority, text: text(items.length, listed(sorted.map(item => item.label))), short: short(items.length), href, linkLabel }];
 }
 
 /**
@@ -48,10 +48,11 @@ export function buildReminders(ctx: FelixContext): Reminder[] {
   else if (health?.state === "error") out.push({ key: "sync:error", kind: "sync:error", priority: "urgent", text: "This device cannot save changes right now. Open System health to see why before recording anything else.", short: "This device cannot save changes. Open System health.", href: healthHref, linkLabel: "Open System health" });
   if (health?.pending && health.state !== "error" && !health.conflicts && health.mode !== "local") out.push({ key: "sync:pending", kind: "sync:pending", priority: "info", text: `${plural(health.pending, "change is", "changes are")} saved on this device and not yet synced. Keep this device and browser open; they send automatically, in order, when the connection allows.`, short: "Changes saved on this device, waiting to sync.", href: healthHref, linkLabel: "Open System health" });
 
-  const docs = ctx.documents.map(d => ({ id: d.id, title: d.title, status: d.status }));
+  // Resolutions are named by their identity (`GA1/01 — France`), never by title.
+  const docs = ctx.documents.map(d => ({ id: d.id, label: felixResolutionLabel(ctx, d), status: d.status }));
   const byStatus = (...statuses: string[]) => docs.filter(d => statuses.includes(d.status));
   const amendments = ctx.amendments;
-  const titleOf = (resolutionId: string) => ctx.documents.find(d => d.id === resolutionId)?.title ?? "a resolution";
+  const labelOf = (resolutionId: string) => docs.find(d => d.id === resolutionId)?.label ?? "a resolution";
 
   if (ctx.role === "chair" && ctx.chair) {
     const c = ctx.chair;
@@ -72,14 +73,14 @@ export function buildReminders(ctx: FelixContext): Reminder[] {
     out.push(...group("chair:changes", "action", c.changesRequested, (n, t) => `The Approval Panel requested changes on ${t}. Read the feedback on Resolutions, edit the Google Doc, then use “Resubmit after editing →”.`, n => `Changes requested on ${plural(n, "resolution", "resolutions")}.`, "/chair/documents", "Open Resolutions"));
     out.push(...group("chair:access", "action", c.submissions.filter(s => s.accessProblem), (n, t) => `${plural(n, "submission is", "submissions are")} marked “Can’t access”: ${t}. Ask the delegation to set Share → General access → Anyone with the link → Editor (or share with a Chair as Editor), then press “Access fixed”.`, n => `${plural(n, "submitted Google Doc", "submitted Google Docs")} can’t be opened.`, "/chair/documents", "Open Resolutions"));
     out.push(...group("chair:submissions", "action", c.submissions.filter(s => !s.accessProblem), (n, t) => `${plural(n, "delegate submission is", "delegate submissions are")} waiting for you: ${t}. Open the Google Doc, review it, then “Submit to Approval”.`, n => `${plural(n, "delegate submission", "delegate submissions")} waiting for you.`, "/chair/documents", "Open Resolutions"));
-    out.push(...group("chair:amend-submitted", "action", amendments.filter(a => a.status === "Submitted").map(a => ({ id: a.id, title: `${a.type} ${a.clause} on ${titleOf(a.resolutionId)}` })), (n, t) => `${plural(n, "amendment is", "amendments are")} waiting for your review: ${t}.`, n => `${plural(n, "amendment", "amendments")} waiting for your review.`, "/chair/amendments", "Open Amendments"));
+    out.push(...group("chair:amend-submitted", "action", amendments.filter(a => a.status === "Submitted").map(a => ({ id: a.id, label: `${a.type} ${a.clause} on ${labelOf(a.resolutionId)}` })), (n, t) => `${plural(n, "amendment is", "amendments are")} waiting for your review: ${t}.`, n => `${plural(n, "amendment", "amendments")} waiting for your review.`, "/chair/amendments", "Open Amendments"));
     out.push(...group("chair:amend-apply", "action", c.passedToApply, (n, t) => `${plural(n, "passed amendment", "passed amendments")} (${t}) must be applied to the working Google Doc by hand: Conference OS records the outcome only.`, () => "Apply passed amendments to the working Google Doc.", "/chair/amendments", "Open Amendments"));
     const drafts = byStatus("Draft").filter(d => !c.submissions.some(s => s.id === d.id) && !c.changesRequested.some(s => s.id === d.id));
     out.push(...group("chair:draft", "action", drafts, (n, t) => `${plural(n, "resolution is", "resolutions are")} still in Draft: ${t}. Use “Submit for review” on Resolutions when ready.`, n => `${plural(n, "draft resolution", "draft resolutions")} not yet submitted.`, "/chair/documents", "Open Resolutions"));
     out.push(...group("chair:printed", "action", byStatus("Printed"), (n, t) => `${plural(n, "resolution is", "resolutions are")} printed and ready to open for debate: ${t}.`, n => `${plural(n, "printed resolution", "printed resolutions")} ready for debate.`, "/chair/documents", "Open Resolutions"));
-    out.push(...group("chair:amend-debate", "info", amendments.filter(a => a.status === "In Debate").map(a => ({ id: a.id, title: `${a.type} ${a.clause}` })), (_n, t) => `Amendment debate is open (${t}). Record its outcome on the Debate page when the floor is with the Chair.`, () => "Amendment debate is open.", "/chair", "Open Debate"));
+    out.push(...group("chair:amend-debate", "info", amendments.filter(a => a.status === "In Debate").map(a => ({ id: a.id, label: `${a.type} ${a.clause}` })), (_n, t) => `Amendment debate is open (${t}). Record its outcome on the Debate page when the floor is with the Chair.`, () => "Amendment debate is open.", "/chair", "Open Debate"));
     out.push(...group("chair:debate", "info", byStatus("In Debate"), (_n, t) => `${t} is in debate. When debate ends, use “Go to voting”.`, () => "A resolution is in debate.", "/chair", "Open Debate"));
-    out.push(...group("chair:accepted", "info", amendments.filter(a => a.status === "Accepted for Debate").map(a => ({ id: a.id, title: `${a.type} ${a.clause}` })), (n, t) => `${plural(n, "amendment is", "amendments are")} accepted and waiting for debate: ${t}.`, n => `${plural(n, "amendment", "amendments")} accepted for debate.`, "/chair/amendments", "Open Amendments"));
+    out.push(...group("chair:accepted", "info", amendments.filter(a => a.status === "Accepted for Debate").map(a => ({ id: a.id, label: `${a.type} ${a.clause}` })), (n, t) => `${plural(n, "amendment is", "amendments are")} accepted and waiting for debate: ${t}.`, n => `${plural(n, "amendment", "amendments")} accepted for debate.`, "/chair/amendments", "Open Amendments"));
     out.push(...group("chair:with-approval", "info", byStatus("Submitted", "Review"), (n, t) => `${plural(n, "resolution is", "resolutions are")} with the Approval Panel: ${t}.`, n => `${plural(n, "resolution", "resolutions")} with the Approval Panel.`, "/chair/documents", "Open Resolutions"));
     out.push(...group("chair:approved", "info", byStatus("Approved"), (n, t) => `${plural(n, "resolution is", "resolutions are")} approved and waiting for printing: ${t}.`, n => `${plural(n, "resolution", "resolutions")} waiting for printing.`, "/chair/documents", "Open Resolutions"));
   } else if (ctx.role === "approval") {

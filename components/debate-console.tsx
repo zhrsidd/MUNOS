@@ -11,6 +11,8 @@ import { activeAmendment, activeLane, activePoi, FLOOR_NOT_WITH_CHAIR, laneEntri
 import { scoringValues } from "@/lib/scoring";
 import { Chip, DelegateIdentity, Panel, Timer } from "./ui";
 import { CountryPicker } from "./country-picker";
+import { ResolutionName } from "./resolution-identity";
+import { resolutionIdentity } from "@/lib/resolution-identity";
 import { sessionOpportunities } from "@/lib/country-search";
 
 type QueueRow = { id: string; delegateId: string; position: number };
@@ -77,6 +79,8 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
   const present = delegates.filter(d => data.attendance.some(a => a.sessionId === sessionId && a.delegateId === d.id && a.status !== "Absent"));
   const country = (id: string | undefined) => delegates.find(d => d.id === id)?.country ?? "Delegation";
   const resolution = data.documents.find(d => d.committeeId === committeeId && d.status === "In Debate");
+  // Only this committee's delegates are in scope, so another committee's country can never be shown here.
+  const identity = resolution ? resolutionIdentity(resolution, delegates) : null;
   const amendment = activeAmendment(data, committeeId);
   const passedAmendments = (data.amendments ?? []).filter(a => a.resolutionId === resolution?.id && a.outcome === "Passed");
   const state = data.debateStates?.find(s => s.sessionId === sessionId);
@@ -124,7 +128,7 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
         <h2>{amendment.type} · {amendment.clause}</h2>
         <p className="amendment-paused">Resolution debate paused · amendment has priority</p>
         <dl className="amendment-facts">
-          <div><dt>Resolution</dt><dd>{resolution.code} · {resolution.title}</dd></div>
+          <div><dt>Resolution</dt><dd>{identity && <ResolutionName identity={identity} />}</dd></div>
           <div><dt>Submitted by</dt><dd>{country(amendment.submitterId)}</dd></div>
           <div><dt>Type</dt><dd>{amendment.type}</dd></div>
           <div><dt>Clause</dt><dd>{amendment.clause}</dd></div>
@@ -139,12 +143,12 @@ export function DebateConsole({ committeeId, sessionId }: { committeeId: string;
         <Link className="button" href="/chair/amendments">Rule out in Amendments →</Link>
       </div>
     </section> : <section className="procedure-context" aria-label="Current resolution">
-      <div><span className="eyebrow">{resolution ? "RESOLUTION IN DEBATE" : "ON THE FLOOR"}</span><h2>{resolution?.title ?? "General debate"}</h2><p>{resolution ? `${resolution.code} · ${resolution.status}` : "You can recognize speeches before a resolution enters debate."}</p></div>
+      <div><span className="eyebrow">{resolution ? "RESOLUTION IN DEBATE" : "ON THE FLOOR"}</span><h2>{identity ? <ResolutionName identity={identity} /> : "General debate"}</h2><p>{resolution ? resolution.status : "You can recognize speeches before a resolution enters debate."}</p></div>
       <Link className="button" href="/chair/documents">Documents →</Link>
     </section>}
     {!amendment && passedAmendments.length > 0 && <div className="callout amendment-applied" role="note">
       <strong>Apply the passed amendment to the working Google Doc.</strong>
-      <p>Conference OS records the outcome only. Passed for {resolution?.code}: {passedAmendments.map(a => `${a.type} · ${a.clause} (${country(a.submitterId)})`).join("; ")}.</p>
+      <p>Conference OS records the outcome only. Passed for {identity?.text}: {passedAmendments.map(a => `${a.type} · ${a.clause} (${country(a.submitterId)})`).join("; ")}.</p>
     </div>}
     <div className="procedure-live-grid">
       <Panel title={speaker ? "The floor is with" : "The floor is with the Chair"} action={active ? <Chip tone="blue">{active.classification}{active.amendmentId ? " · amendment" : ""}</Chip> : undefined}>

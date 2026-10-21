@@ -69,7 +69,9 @@ test('Chair Debate: amendment in debate takes over the console; passed reminder 
  const d=seed();
  d.amendments=[{id:'am1',committeeId:'ga1',resolutionId:'r1',sessionId:'s1',submitterId:'d3',type:'Replace',clause:'Operative clause 2',wording:'Replace “working group” with “expert panel”.',status:'In Debate',outcome:null,createdAt:'2026-10-05T06:00:00.000Z',revision:3}];
  const html=text(await renderChair(t,d));
- for(const s of ['AMENDMENT IN DEBATE','Resolution debate paused · amendment has priority','GA1 / 01','Safeguarding civilians in autonomous warfare','Kenya','Replace','Operative clause 2','expert panel','Pass amendment','Fail amendment','Withdraw','Rule out'])assert.ok(html.includes(s),s);
+ const submitter=d.delegates.find(x=>x.id==='d0')!.country;
+ for(const s of ['AMENDMENT IN DEBATE','Resolution debate paused · amendment has priority',`GA1/01 — ${submitter}`,'Kenya','Replace','Operative clause 2','expert panel','Pass amendment','Fail amendment','Withdraw','Rule out'])assert.ok(html.includes(s),s);
+ assert.ok(!html.includes('Safeguarding civilians in autonomous warfare'),'the resolution is named by code and Main Submitter, not title');
  assert.doesNotMatch(html,/Invite Main Submitter/);
  assert.doesNotMatch(await renderChair(t,d),/<button[^>]*disabled[^>]*>Pass amendment/,'floor with the Chair: closing is available');
  d.speeches=[{id:'sp1',sessionId:'s1',delegateId:'d1',resolutionId:'r1',amendmentId:'am1',classification:'For',yieldedFrom:null,state:'pois',poiLimit:1,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];

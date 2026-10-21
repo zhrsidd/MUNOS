@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import { renderSVG } from "uqr";
 import { useConference } from "@/lib/context";
 import { repository } from "@/lib/repository";
 import { newSubmissionToken } from "@/lib/operations/commands";
 import type { Committee } from "@/lib/domain";
 import { Chip, PageHeading, Panel } from "../ui";
+import { CopyButton } from "../copy-button";
 
 const submitUrl = (token: string) => `${typeof window === "undefined" ? "" : window.location.origin}/submit/${token}`;
 export function useDemo() {
@@ -14,16 +15,11 @@ export function useDemo() {
   return health.mode === "local";
 }
 function CopyLink({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
   return (
     <div className="link-field">
-      <input readOnly value={url} aria-label="Submission link" onFocus={(e) => e.currentTarget.select()} />
-      <button
-        type="button"
-        onClick={() => void navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }, () => setCopied(false))}
-      >
-        {copied ? "Copied" : "Copy"}
-      </button>
+      <input ref={field} readOnly value={url} aria-label="Submission link" onFocus={(e) => e.currentTarget.select()} />
+      <CopyButton text={url} onFailure={() => field.current?.select()} />
     </div>
   );
 }

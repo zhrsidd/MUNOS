@@ -7,7 +7,10 @@ import type { Resolution } from "@/lib/domain";
 import { approvalHistory, decisionTone, type HistoryEntry } from "@/lib/approval-history";
 import { observedDeclaration } from "@/lib/repository";
 import { resolutionNextAction, resolutionOrder, sentBack } from "@/lib/resolution-view";
+import { previewIdentity } from "@/lib/resolution-identity";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
+import { ResolutionName } from "./resolution-identity";
+import { useResolutionIdentities } from "@/lib/use-resolution-identity";
 import { ResolutionSources } from "./operations/resolution-links";
 
 const qatarTime = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Qatar", dateStyle: "medium", timeStyle: "short" });
@@ -51,7 +54,7 @@ export function ApprovalHistory({ entries, showResolution = false, label = "Appr
             <Chip tone={decisionTone[e.kind]}>{e.kind === "approved" && !e.comment ? "Approved — no comment added" : e.label}</Chip>
             {showResolution && (
               <strong className="history-resolution">
-                {e.code} · {e.title}
+                <ResolutionName identity={e.identity} />
               </strong>
             )}
             <span className="muted">
@@ -81,7 +84,7 @@ export function DeclarationLine({ resolutionId }: { resolutionId: string }) {
 }
 function ResolutionRow({ resolution }: { resolution: Resolution }) {
   const { data, act } = useConference();
-  const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
+  const identity = useResolutionIdentities()(resolution);
   const history = approvalHistory(data, resolution.id);
   const withComment = history.filter((e) => e.comment);
   const latest = withComment[0] ?? null;
@@ -98,9 +101,9 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
     <article className={`resolution-row${back ? " changes" : ""}`} aria-labelledby={heading}>
       <header className="resolution-head">
         <div>
-          <small className="eyebrow">{resolution.code}</small>
-          <h3 id={heading}>{resolution.title}</h3>
-          <p className="muted">{submitter ? `${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
+          <h3 id={heading}>
+            <ResolutionName identity={identity} />
+          </h3>
         </div>
         <div className="resolution-status">
           <Chip tone={back ? "review" : ""}>{back ? "Changes requested" : resolution.status}</Chip>
@@ -133,7 +136,7 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
       {history.length > 0 && (
         <details className="feedback-earlier">
           <summary>Approval history · {history.length}</summary>
-          <ApprovalHistory entries={history} label={`Approval history for ${resolution.code}`} />
+          <ApprovalHistory entries={history} label={`Approval history for ${identity.text}`} />
         </details>
       )}
     </article>
@@ -211,6 +214,9 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
                   ))}
               </select>
             </label>
+            <p className="muted" aria-live="polite">
+              <ResolutionName identity={previewIdentity(submitterId, data.delegates, committeeId)} />
+            </p>
             <button className="primary">Create draft</button>
           </form>
         </Modal>
@@ -220,23 +226,23 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
 }
 function ResolutionDetail({ resolution }: { resolution: Resolution }) {
   const { data } = useConference();
-  const submitter = data.delegates.find((d) => d.id === resolution.submitterId);
+  const identity = useResolutionIdentities()(resolution);
   const history = approvalHistory(data, resolution.id);
   return (
     <div className="resolution-detail">
-      <p className="muted">{submitter ? `${submitter.country} · ${submitter.name}` : "Submitter unknown"}</p>
       <Sources resolution={resolution} />
       <section aria-labelledby={`history-${resolution.id}`}>
         <h3 id={`history-${resolution.id}`} className="history-heading">
           Decisions on this resolution
         </h3>
-        <ApprovalHistory entries={history} label={`Decisions on ${resolution.code}`} />
+        <ApprovalHistory entries={history} label={`Decisions on ${identity.text}`} />
       </section>
     </div>
   );
 }
 export function Approval({ section = "" }: { section?: string }) {
   const { data, act } = useConference();
+  const identify = useResolutionIdentities();
   const [selected, setSelected] = useState("");
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
@@ -296,17 +302,12 @@ export function Approval({ section = "" }: { section?: string }) {
                   }}
                 >
                   <div>
-                    <span className="eyebrow">{r.code}</span>
+                    <span className="eyebrow">VERSION {r.versionIds.length}</span>
                     <Chip>{r.status}</Chip>
                   </div>
-                  <h3>{r.title}</h3>
-                  <p>
-                    Version {r.versionIds.length} ·{" "}
-                    {
-                      data.delegates.find((d) => d.id === r.submitterId)
-                        ?.country
-                    }
-                  </p>
+                  <h3>
+                    <ResolutionName identity={identify(r)} />
+                  </h3>
                   <span className="card-link">Review submission →</span>
                 </button>
               ))}
@@ -316,10 +317,10 @@ export function Approval({ section = "" }: { section?: string }) {
             <div>
               <div className="review-title">
                 <div>
-                  <div className="eyebrow">
-                    {resolution.code} · VERSION {resolution.versionIds.length}
-                  </div>
-                  <h2>{resolution.title}</h2>
+                  <div className="eyebrow">VERSION {resolution.versionIds.length}</div>
+                  <h2>
+                    <ResolutionName identity={identify(resolution)} />
+                  </h2>
                 </div>
                 <Chip>{resolution.status}</Chip>
               </div>
@@ -388,6 +389,7 @@ export function Approval({ section = "" }: { section?: string }) {
 }
 export function Logistics({ section = "" }: { section?: string }) {
   const { data, act } = useConference();
+  const identify = useResolutionIdentities();
   const queue = data.documents.filter((r) => r.status === "Approved");
   const completed = data.documents.filter((r) =>
     ["Printed", "In Debate", "Closed"].includes(r.status),
@@ -402,7 +404,7 @@ export function Logistics({ section = "" }: { section?: string }) {
                 <div className="summary-row" key={r.id}>
                   <div>
                     <strong>
-                      {r.code} · {r.title}
+                      <ResolutionName identity={identify(r)} />
                     </strong>
                     <p>
                       {r.copies} copies · v{r.versionIds.length}
@@ -449,10 +451,10 @@ export function Logistics({ section = "" }: { section?: string }) {
                 <div className="print-job" key={r.id}>
                   <span className="committee-badge">{c.code}</span>
                   <div>
-                    <span className="eyebrow">
-                      {r.code} · VERSION {r.versionIds.length}
-                    </span>
-                    <h3>{r.title}</h3>
+                    <span className="eyebrow">VERSION {r.versionIds.length}</span>
+                    <h3>
+                      <ResolutionName identity={identify(r)} />
+                    </h3>
                     <p>{c.room} · Deliver to committee chair</p>
                   </div>
                   <div className="copies">

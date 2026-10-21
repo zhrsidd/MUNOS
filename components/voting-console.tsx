@@ -3,6 +3,7 @@ import {useState} from 'react';
 import {useConference} from '@/lib/context';
 import {observedContextProblem,observedMajorityProblem,vetoDelegates,votingOutcome} from '@/lib/repository';
 import {Chip,DelegateIdentity,Empty,Panel} from './ui';
+import {resolutionLabel} from '@/lib/resolution-identity';
 type PendingObserved={outcome:'Passed'|'Failed';resolutionId:string;sessionId:string};
 export function VotingConsole({committeeId,sessionId}:{committeeId:string;sessionId:string}){
  const {data,act}=useConference();const [confirm,setConfirm]=useState(false);const [observed,setObserved]=useState<PendingObserved|null>(null);
@@ -27,7 +28,7 @@ export function VotingConsole({committeeId,sessionId}:{committeeId:string;sessio
  const declare=(outcome:'Passed'|'Failed')=>{setConfirm(false);setObserved({outcome,resolutionId:r.id,sessionId});};
  const chooseMode=(mode:'normal'|'divide',voteType:'substantive'|'procedural')=>{if(votes.length&&!window.confirm('Start a fresh ballot? Earlier choices remain in the audit history.'))return;void act({type:'voteMode',resolutionId:r.id,sessionId,mode,voteType},'chair');};
  return <>
- <Panel title={`${r.code} · Voting procedure`} subtitle="Choose the procedure. Starting a fresh ballot preserves earlier choices in the audit history. Each eligible delegation has one vote.">
+ <Panel title={`${resolutionLabel(r,data.delegates.filter(d=>d.committeeId===committeeId))} · Voting procedure`} subtitle="Choose the procedure. Starting a fresh ballot preserves earlier choices in the audit history. Each eligible delegation has one vote.">
  <div className="panel-body voting-setup">
  <div className="actions voting-mode"><button className={!divide?'selected':''} onClick={()=>chooseMode('normal',r.voteType??'substantive')}>Normal vote</button><button className={divide?'selected':''} onClick={()=>chooseMode('divide',r.voteType??'substantive')}>Divide the House</button><label>Vote type<select value={r.voteType??'substantive'} onChange={e=>chooseMode(r.voteMode??'normal',e.target.value as 'substantive'|'procedural')}><option value="substantive">Substantive</option><option value="procedural">Procedural · no veto</option></select></label></div>
  <div className="actions clear-majority" aria-label="Clear majority">{observedProblem?<span className="muted">Clear majority unavailable: {observedProblem} Record counted ballots.</span>:<><span className="muted">{contextProblem?`Clear majority unavailable: ${contextProblem}`:'Obvious result?'}</span><button disabled={!!contextProblem} onClick={()=>declare('Passed')}>Clear majority For</button><button disabled={!!contextProblem} onClick={()=>declare('Failed')}>Clear majority Against</button></>}</div>

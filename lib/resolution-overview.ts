@@ -1,5 +1,6 @@
 import type { ConferenceData, DocumentStatus } from "./domain";
 import { sentBack } from "./resolution-view";
+import { matchesResolutionSearch, resolutionIdentities } from "./resolution-identity";
 
 /** Progress is derived from the recorded workflow stage, without inventing decision timestamps. */
 export function resolutionProgress(status: DocumentStatus) {
@@ -12,17 +13,19 @@ export function resolutionProgress(status: DocumentStatus) {
   }
 }
 
-/** Read-only projection of the existing scoped snapshot, including empty and archived committees. */
+/**
+ * Read-only projection of the existing scoped snapshot, including empty and archived committees. Each resolution carries
+ * its shared identity (`GA1/01 — France`); the search matches code, Main Submitter country, status and outcome, never title.
+ */
 export function resolutionOverview(data: ConferenceData, committeeId = "", query = "") {
-  const needle = query.trim().toLocaleLowerCase("en");
-  const delegates = new Map(data.delegates.map(d => [d.id, d]));
+  const identify = resolutionIdentities(data.delegates);
   return [...data.committees].filter(c => !committeeId || c.id === committeeId)
     .sort((a, b) => a.code.localeCompare(b.code, "en", { numeric: true }) || a.id.localeCompare(b.id))
     .map(committee => ({ committee, resolutions: data.documents.filter(r => r.committeeId === committee.id)
-      .map(resolution => ({ resolution, submitter: delegates.get(resolution.submitterId)?.country ?? "Unknown delegation",
+      .map(resolution => { const identity = identify(resolution); return { resolution, identity, submitter: identity.submitter ?? "",
         status: sentBack(resolution) || (resolution.status === "Draft" && data.documentDecisions?.some(d => d.documentId === resolution.id && d.decision === "changes_requested")) ? "Changes requested" : resolution.status,
-        ...resolutionProgress(resolution.status) }))
-      .filter(r => !needle || `${committee.code} ${committee.name} ${r.resolution.code} ${r.resolution.title} ${r.submitter} ${r.status} ${r.resolution.outcome ?? ""}`.toLocaleLowerCase("en").includes(needle))
+        ...resolutionProgress(resolution.status) }; })
+      .filter(r => matchesResolutionSearch(query, { code: r.identity.code, country: r.identity.country, extra: [committee.code, committee.name, r.status, r.resolution.outcome] }))
       .sort((a, b) => a.resolution.code.localeCompare(b.resolution.code, "en", { numeric: true }) || a.resolution.id.localeCompare(b.resolution.id)) }))
-    .filter(group => !needle || group.resolutions.length);
+    .filter(group => !query.trim() || group.resolutions.length);
 }
