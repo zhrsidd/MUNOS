@@ -34,3 +34,14 @@ export function checkUsers(n: number): GuardResult {
   if (n > MAX_USERS) return { ok: false, reason: `At most ${MAX_USERS} simulated users.` };
   return { ok: true, reason: `${n} users` };
 }
+
+/**
+ * The fixture file must name a synthetic conference, never the conference this deployment is configured for.
+ * Called before any request by every script that reads a fixture; there is no override.
+ */
+export function checkFixtureConference(conference: unknown, env: Record<string, string | undefined>): GuardResult {
+  if (typeof conference !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conference)) return { ok: false, reason: "The fixture file does not name a conference UUID." };
+  const protectedIds = [env.NEXT_PUBLIC_CONFERENCE_ID].map((v) => v?.trim().toLowerCase()).filter(Boolean);
+  if (protectedIds.includes(conference.toLowerCase())) return { ok: false, reason: `Fixture conference ${conference} is the configured NEXT_PUBLIC_CONFERENCE_ID. Load tools only use a dedicated synthetic conference.` };
+  return { ok: true, reason: "synthetic fixture conference" };
+}

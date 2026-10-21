@@ -23,7 +23,7 @@
 // .test-sessions/development.json (npm script prepare-session), and a fixture + identities from
 // scripts/rehearsal-fixture.mts applied to the development project. Never targets production; no override exists.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { checkAppUrl, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
+import { checkAppUrl, checkFixtureConference, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
 import { TOPIC_OF, buildScenario, recipients, type Action, type RealtimeModel, type SimUser, type Topic } from "./rehearsal/scenario";
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./rehearsal/client-model";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
@@ -75,6 +75,7 @@ const context = await import("./remote-context.mts").catch((e: Error) => {
   process.exit(2);
 });
 const { clientFor, session, ref } = context;
+{ const synthetic = checkFixtureConference(fixture.conference, { ...context.env, ...process.env }); if (!synthetic.ok) { console.error(`Refused: ${synthetic.reason}`); process.exit(2); } }
 // Role-scoped identities (--identities <file>): pre-authorized sessions, each holding ONLY its role's grant, so every
 // simulated device reads the RLS payload a real device of that role would receive.
 //  * realistic-multi-committee: one Chair identity per real committee (readiness).

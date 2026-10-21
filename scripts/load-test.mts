@@ -1,11 +1,13 @@
 // Development guard is enforced by remote-context. Never substitute production URLs.
 import {readFile,writeFile} from 'node:fs/promises';
-import {clientFor,session,ref} from './remote-context.mts';
+import {clientFor,session,ref,env} from './remote-context.mts';
+import {checkFixtureConference} from './rehearsal/guard';
 import {SupabaseTransport} from '../lib/supabase/repository';
 import type {Mutation} from '../lib/sync/store';
 import type {Command} from '../lib/commands';
 import type {Role} from '../lib/domain';
 const fixture=JSON.parse(await readFile('.test-sessions/load-fixtures.json','utf8')) as {conference:string;delegates:{id:string;committee:string;session:string}[]};
+const fixtureCheck=checkFixtureConference(fixture.conference,{...env,...process.env});if(!fixtureCheck.ok)throw Error(`Refused: ${fixtureCheck.reason}`);
 const concurrency=Number(process.env.LOAD_CLIENTS||150);if(concurrency<1||concurrency>200)throw Error('Use 1–200 clients');
 const timings:Record<string,number[]>={};const errors:{phase:string;message:string}[]=[];
 let disconnects=0,connections=0,reconnections=0;
@@ -42,4 +44,5 @@ const writes={expectedParticipation:concurrency,actualParticipation:data.events.
 await Promise.all(clients.map(c=>c.removeAllChannels()));
 const percentiles=Object.fromEntries(Object.entries(timings).map(([phase,t])=>{t.sort((a,b)=>a-b);const p=(n:number)=>Math.round(t[Math.min(t.length-1,Math.ceil(t.length*n)-1)]);return[phase,{requests:t.length,p50_ms:p(.5),p95_ms:p(.95),p99_ms:p(.99)}];}));
 const report={date:new Date().toISOString(),project:ref,conference:fixture.conference,concurrency,distinctAuthIdentities:1,authNote:'150 simulated operational clients reuse one explicitly authorized test identity. This is not a 150-person anonymous enrollment/NAT burst test.',requests:Object.values(timings).reduce((n,t)=>n+t.length,0),errorRate:errors.length/Object.values(timings).reduce((n,t)=>n+t.length,0),errors,writes,realtime:{connections,reconnections,disconnects},latency:percentiles,databaseCpu:'Not available from Data API; inspect Supabase Observability for this time window.'};
-await writeFile('docs/load-test-results.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));if(errors.length||writes.actualParticipation!==concurrency||writes.printed!==concurrency)process.exitCode=1;
+// Results go to the ignored .test-sessions/ folder (never over the committed historical docs/load-test-results.json).
+const out=`.test-sessions/load-test-results-${new Date().toISOString().replace(/[:.]/g,'-')}.json`;await writeFile(out,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));if(errors.length||writes.actualParticipation!==concurrency||writes.printed!==concurrency)process.exitCode=1;

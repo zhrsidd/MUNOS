@@ -15,6 +15,7 @@
 //   .test-sessions/fixtures/<conference>/fixture.json     → harness/probe --fixture
 //   .test-sessions/fixtures/<conference>/identities.json  → harness/probe --identities (same session files, new scope)
 //   .test-sessions/fixtures/<conference>/fixture.sql      → apply to the DEVELOPMENT project (SQL editor / MCP)
+//   .test-sessions/fixtures/<conference>/cleanup.sql      → apply after the run: revokes that conference's grants and links
 // The SQL creates the conference, committees, sessions, delegations, the speech scoring definition and temporary
 // single-role grants for the identities' existing Auth users. It never creates Auth users, never writes tokens, and
 // never touches the identities' session files.
@@ -62,10 +63,11 @@ if (isMultiCommittee(ids)) {
   fixture = buildFixture({ mode: "legacy-floors", conference, committees: committeesCount, delegates: delegatesCount, floors: floorsCount, grantHours: hours, users: { chair: await userId(ids.chair.session), ...support } });
   runIdentities = { ...ids, chair: { ...ids.chair, committee: fixture.chairCommittee.id, sessions: fixture.floors } };
 }
-const { delegates, floors, sql, mode, chairGrants } = fixture;
+const { delegates, floors, sql, cleanup, mode, chairGrants } = fixture;
 await mkdir(dir, { recursive: true, mode: 0o700 });
 // fixture.json carries the exact delegate ids fixture.sql inserts (public-form submitters); no Auth users, no tokens.
 await writeFile(`${dir}/fixture.json`, JSON.stringify(fixtureJson(fixture), null, 1), { mode: 0o600 });
 await writeFile(`${dir}/identities.json`, JSON.stringify(runIdentities, null, 1), { mode: 0o600 });
 await writeFile(`${dir}/fixture.sql`, sql, { mode: 0o600 });
-console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, delegatesInFixtureJson: delegates.length, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));
+await writeFile(`${dir}/cleanup.sql`, cleanup, { mode: 0o600 }); // revokes this conference's grants/links after the run (docs/LOAD_TEST_PLAN.md)
+console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, delegatesInFixtureJson: delegates.length, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`, `${dir}/cleanup.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));
