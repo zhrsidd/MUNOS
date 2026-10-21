@@ -1,6 +1,7 @@
 "use client";
 import { useState, useSyncExternalStore } from "react";
 import { googleDocMessages, parseGoogleDocLink } from "@/lib/submissions/google-doc";
+import { PendingButton } from "../pending";
 import { cleanTitle, submissionMessages, type LinkInfo, type SubmissionResponse } from "@/lib/submissions/rules";
 
 type State =
@@ -140,9 +141,9 @@ export function SubmissionForm({ token, link }: { token: string; link: LinkInfo 
           {state.message}
         </p>
       )}
-      <button className="button primary submit-button" disabled={state.phase === "sending" || !hydrated}>
-        {!hydrated ? "Loading form…" : state.phase === "sending" ? "Submitting…" : "Submit resolution"}
-      </button>
+      <PendingButton className="button primary submit-button" type="submit" disabled={state.phase === "sending" || !hydrated} pending={state.phase === "sending"} pendingLabel="Submitting your resolution…">
+        {!hydrated ? "Loading form…" : "Submit resolution"}
+      </PendingButton>
       {!hydrated && <p className="muted" role="status">If this form does not load, ask your Chair how to submit your resolution.</p>}
       <noscript><p className="submit-error" role="alert">This form needs JavaScript to submit. Ask your Chair how to submit your resolution.</p></noscript>
       <p className="muted submit-note">Only the main submitter submits. No account is needed — your Chair is notified automatically.</p>

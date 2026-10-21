@@ -8,6 +8,7 @@ import type { Amendment } from '@/lib/batch/types';
 import { Chip, Empty, Panel } from '@/components/ui';
 import { GoogleDocButton } from '@/components/operations/resolution-links';
 import { CopyButton } from '@/components/copy-button';
+import { PendingButton } from '@/components/pending';
 
 const time = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -82,7 +83,7 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
         </section>;
       })}
     </div>
-    {cloud && next && <div className="actions"><button type="button" disabled={status === 'loading'} onClick={() => void older(next)}>{status === 'loading' ? 'Loading…' : 'Load older passed amendments'}</button></div>}
+    {cloud && next && <div className="actions"><PendingButton disabled={status === 'loading'} pending={status === 'loading'} pendingLabel="Loading older passed amendments…" onClick={() => void older(next)}>Load older passed amendments</PendingButton></div>}
     <p className="footnote">{cloud ? `Older history loads ${PASSED_HISTORY_PAGE} at a time.` : 'Showing amendments held on this device.'} The time shown is when the amendment was submitted; Conference OS does not record the time it passed.</p>
   </Panel>;
 }
