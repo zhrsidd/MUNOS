@@ -1,0 +1,12 @@
+{
+ "_comment": "Reviewed allow-lists for the permission-drift policy (scripts/isolation-inventory/policy.mts). Changing this file widens what the database may expose: it needs the same review as a migration that adds a grant. Keys are schema.name(identity arguments) exactly as in docs/generated/isolation-t1-inventory.md.",
+ "serviceRoleExecute": [
+  "public.amendment_link_info(link_token text)",
+  "public.submission_link_info(link_token text)",
+  "public.submit_amendment(link_token text, submission uuid, submitter uuid, resolution uuid, amendment_type text, clause text, wording text)",
+  "public.submit_resolution(link_token text, submission uuid, submitter uuid, title text, google_doc_id text, file_name text, storage_key text, file_sha256 text, file_size integer)"
+ ],
+ "authenticatedTablePrivileges": ["SELECT"],
+ "viewsWithoutRls": ["public.participation_history"],
+ "defaultAclGrantees": []
+}

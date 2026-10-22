@@ -13,15 +13,20 @@ import {createHash,randomUUID} from 'node:crypto';
 import {readFileSync,readdirSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {evaluatePolicy} from './policy.mts';
 
 const here=dirname(fileURLToPath(import.meta.url));
 const root=resolve(here,'../..');
-const base=process.env.TEST_POSTGRES_URL;
-if(!base)throw new Error('Set TEST_POSTGRES_URL to a loopback PostgreSQL 17 URL');
-const url=new URL(base);
-if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw new Error('Refusing a non-loopback PostgreSQL server');
+function connection():URL{
+ const base=process.env.TEST_POSTGRES_URL;
+ if(!base)throw new Error('Set TEST_POSTGRES_URL to a loopback PostgreSQL 17 URL');
+ const url=new URL(base);
+ if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw new Error('Refusing a non-loopback PostgreSQL server');
+ return url;
+}
 
-function psql(db:string,sql:string,file?:string):string{
+export function psql(db:string,sql:string,file?:string):string{
+ const url=connection();
  const args=['-X','-q','-At','-v','ON_ERROR_STOP=1',...(file?['-f',file]:[])];
  const r=spawnSync(process.env.PSQL_BIN??'psql',args,{input:file?undefined:sql,encoding:'utf8',maxBuffer:256*1024*1024,
   env:{...process.env,PGHOST:url.hostname.replace(/^\[|\]$/g,''),PGPORT:url.port||'5432',PGUSER:decodeURIComponent(url.username),PGPASSWORD:decodeURIComponent(url.password),PGDATABASE:db}});
@@ -38,7 +43,7 @@ interface Fn{schema:string;name:string;args:string;result:string;kind:string;sec
  usage:Record<string,boolean>;exec:Record<string,boolean>;publicExec:boolean}
 interface Rel{schema:string;name:string;kind:string;owner:string;rls:boolean;forceRls:boolean;options:string;aclRaw:string;privs:Record<string,string[]>}
 interface Policy{table:string;name:string;cmd:string;roles:string;permissive:boolean;using:string;check:string}
-interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
+export interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
  schemas:{name:string;owner:string;acl:string;usage:Record<string,boolean>;create:Record<string,boolean>}[];roleAttrs:{name:string;super:boolean;login:boolean;inherit:boolean;bypassrls:boolean;memberOf:string}[];
  customRoles:string[];version:string;probe:Probe}
 interface Probe{lines:string[]}
@@ -46,7 +51,7 @@ interface Probe{lines:string[]}
 const roleList=ROLES.map(r=>`'${r}'`).join(',');
 const roleObj=(expr:(r:string)=>string)=>`json_build_object(${ROLES.map(r=>`'${r}',${expr(r)}`).join(',')})`;
 
-function collect(db:string):Omit<Mode,'probe'>{
+export function collect(db:string):Omit<Mode,'probe'>{
  const fns=json<Fn[]>(db,`select coalesce(json_agg(x order by x."schema",x."name",x."args"),'[]') from (
   select n.nspname "schema",p.proname "name",pg_get_function_identity_arguments(p.oid) "args",pg_get_function_result(p.oid) "result",p.prokind "kind",
    case when p.prosecdef then 'definer' else 'invoker' end "security",pg_get_userbyid(p.proowner) "owner",
@@ -127,13 +132,21 @@ function a13Probe(db:string,bare:boolean):Probe{
  return {lines};
 }
 
-function run(label:'supabase-model'|'bare'){
+/** Creates a disposable database, applies the baseline bootstrap and every migration, returns its name. The caller drops it. */
+export function build(label:'supabase-model'|'bare'):string{
  const db=`munos_inv_${randomUUID().replaceAll('-','')}`;
  psql('postgres',`create database ${db};`);
  try{
   psql(db,'',join(here,label==='bare'?'bootstrap-bare.sql':'bootstrap-supabase-model.sql'));
   const dir=join(root,'supabase/migrations');
   for(const f of readdirSync(dir).filter(n=>n.endsWith('.sql')).sort())psql(db,'',join(dir,f));
+  return db;
+ }catch(e){psql('postgres',`drop database if exists ${db};`);throw e;}
+}
+
+function run(label:'supabase-model'|'bare'){
+ const db=build(label);
+ try{
   const mode=collect(db);
   const probe=a13Probe(db,label==='bare');
   return {...mode,probe} as Mode;
@@ -263,24 +276,34 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
  return out.join('\n')+'\n';
 }
 
+/** The model as committed in docs/generated/isolation-t1-inventory.json (function bodies dropped). */
+export const stable=(m:Mode)=>({...m,fns:m.fns.map(({src,...rest})=>{void src;return rest;})});
+
+function main(){
 const files=readdirSync(join(root,'supabase/migrations')).filter(n=>n.endsWith('.sql')).sort();
 const hash=createHash('sha256').update(files.map(f=>readFileSync(join(root,'supabase/migrations',f))).join('\n--\n')).digest('hex');
 const model=run('supabase-model');
 const bare=run('bare');
 const md=render('supabase-model',model,hash,files,bare);
 const bareMd=render('bare',bare,hash,files);
-const stable=(m:Mode)=>({...m,fns:m.fns.map(({src,...rest})=>{void src;return rest;})});
 const jsonOut=JSON.stringify({generator:'scripts/isolation-inventory/inventory.mts',migrations:files,migrationsSha256:hash,'supabase-model':stable(model),bare:stable(bare)},null,1)+'\n';
 
 const outDir=join(root,'docs/generated');
 const targets:[string,string][]=[['isolation-t1-inventory.md',md],['isolation-t1-inventory-bare.md',bareMd],['isolation-t1-inventory.json',jsonOut]];
+// Policy (policy.mts) runs on the hosted-calibrated model in every mode: regenerating the files never makes a breach acceptable.
+const violations=evaluatePolicy(model);
+let bad=false;
 if(process.argv.includes('--check')){
- let bad=false;
- for(const [name,body] of targets){const p=join(outDir,name);if(!existsSync(p)||readFileSync(p,'utf8')!==body){console.error(`STALE: docs/generated/${name}`);bad=true;}}
- if(bad)process.exit(1);
- console.log('docs/generated is up to date');
+ for(const [name,body] of targets){const p=join(outDir,name);if(!existsSync(p)||readFileSync(p,'utf8')!==body){console.error(`STALE: docs/generated/${name} differs from the migrations in this tree. Run: npm run grants:regenerate (then review the diff).`);bad=true;}}
+ if(!bad)console.log('docs/generated is up to date');
 }else{
  mkdirSync(outDir,{recursive:true});
  for(const [name,body] of targets)writeFileSync(join(outDir,name),body);
  console.log(`wrote ${targets.map(t=>t[0]).join(', ')}; ${model.fns.length} functions, ${model.rels.length} relations, ${model.policies.length} policies`);
 }
+for(const v of violations){console.error(`POLICY: ${v}`);bad=true;}
+if(!violations.length)console.log('privilege policy: no violations');
+if(bad)process.exit(1);
+}
+
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main();
