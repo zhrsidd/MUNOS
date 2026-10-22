@@ -32,7 +32,7 @@ const PRIVILEGE_SQL = `select json_object_agg(n.nspname || '.' || p.proname || '
  from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private')`;
 
 interface InventoryFn {schema: string; name: string; args: string; exec: Record<string, boolean>; usage: Record<string, boolean>; publicExec: boolean; trigger: boolean}
-interface Inventory {bare: {fns: InventoryFn[]; schemas: {name: string; usage: Record<string, boolean>}[]}; 'supabase-model': {fns: InventoryFn[]}}
+interface Inventory {migrations: string[]; bare: {fns: InventoryFn[]; schemas: {name: string; usage: Record<string, boolean>}[]}; 'supabase-model': {fns: InventoryFn[]}}
 const inventory = (): Inventory => JSON.parse(readFileSync('docs/generated/isolation-t1-inventory.json', 'utf8')) as Inventory;
 const keyOf = (fn: {schema: string; name: string; args: string}) => `${fn.schema}.${fn.name}(${fn.args})`;
 
@@ -98,10 +98,10 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
   assert.deepEqual(usage.private, {anon: false, authenticated: true, service_role: false});
  });
 
- await t.test('the Supabase default-privilege model differs from the tested baseline only by service_role EXECUTE on public functions (why service_role denial must not rely on EXECUTE alone)', () => {
+ await t.test('the model privilege comparison matches its recorded calibration and hardening state', () => {
   const model = new Map(inv['supabase-model'].fns.map(fn => [keyOf(fn), fn]));
   const differing = inv.bare.fns.filter(fn => JSON.stringify(fn.exec) !== JSON.stringify(model.get(keyOf(fn))!.exec));
-  assert.ok(differing.length > 0);
+  const hardened=inv.migrations.includes('20261022090000_privilege_hardening.sql');
   for (const fn of differing) {
    const m = model.get(keyOf(fn))!;
    assert.equal(fn.schema, 'public', `${keyOf(fn)}: only public functions differ`);
@@ -110,7 +110,7 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
    assert.equal(m.exec.anon, fn.exec.anon);
    assert.equal(m.exec.authenticated, fn.exec.authenticated);
   }
-  assert.equal(differing.length, 12, 'ISOLATION_FEASIBILITY.md: 12 of 56 functions differ');
+  assert.equal(differing.length, hardened?0:12, hardened?'the hosted-calibrated/hardened model preserves the same explicit RPC grants as the bare bootstrap':'the historical pre-audit model exposes 12 extra public functions to service_role');
  });
 }
 

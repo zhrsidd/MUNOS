@@ -33,6 +33,6 @@ export function pgliteEngine(db: PGlite): Engine {
 export function postgresEngine(connection: PostgresConnection): Engine {
  return {
   name: 'PostgreSQL 17',
-  run: sql => connection.query(sql),
+  run: sql => connection.query(sql.trimEnd().endsWith(';') ? sql : `${sql};`),
  };
 }

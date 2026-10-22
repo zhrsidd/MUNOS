@@ -10,7 +10,6 @@ const DOC_ID = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456';
 const json = (o: Outcome): Record<string, unknown> => { try { return JSON.parse(o.message) as Record<string, unknown>; } catch { return {}; } };
 
 /** Public submissions and link look-ups: reachable only by the server-side service_role (the Next.js route handlers). */
-const CALLERS: ActorKey[] = ['anon', 'authNoSub', 'noGrant', 'exec', 'chairGa1', 'approval', 'execB', 'chairRevoked', 'serviceModel'];
 const SERVICE: ActorKey[] = ['service', 'serviceSub', 'serviceModel'];
 
 const resolutionCall = (f: Fixture, a: Partial<{token: string; submission: string | null; submitter: string; title: string; doc: string | null; fileName: string | null; storage: string | null; sha: string | null; size: number | null}> = {}) => {
@@ -169,7 +168,7 @@ export async function helperSection(t: TestContext, {engine, f}: Ctx) {
  await t.test('private.access_grants() and private.has_access(): callable only by authenticated, and only ever describe the CALLER (revoked, expired and other-conference grants never count)', async () => {
   const problems: string[] = [];
   for (const key of ACTOR_KEYS) {
-   const a = ACTORS[key];
+   const a: Actor = ACTORS[key];
    const grants = await attempt(engine, {actor: a, call: 'private.access_grants()'});
    if (NOT_SIGNED_IN(a)) {
     if (grants.code !== '42501') problems.push(`access_grants as ${a.name}: expected a privilege denial, got ${grants.code}`);
