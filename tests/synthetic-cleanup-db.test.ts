@@ -218,8 +218,8 @@ for(const [label,make,skip] of backends){
   await b.exec(`insert into private.resolution_submissions(id,conference_id,committee_id,link_id,document_id,google_doc_id,request_payload)
    values ('${uid('real','rsub-x')}','${R}','${fixtureIds('real').committee}','${uid('real','sublink')}','${uid('syn','doc')}','${'B'.repeat(30)}','{}');`);
   const before={s:await snapshot(b,S),r:await snapshot(b,R),g:await globalSnapshot(b)};
-  const reviewed=await dry(b,[S],[R]);
-  await assert.rejects(run(b,'execute',[S],[R],reviewed.token),/foreign key/i);
+  await refused(dry(b,[S],[R]),/foreign key .* spans selected and retained/i);
+  await refused(run(b,'execute',[S],[R],'0'.repeat(64)),/foreign key .* spans selected and retained/i);
   assert.deepEqual({s:await snapshot(b,S),r:await snapshot(b,R),g:await globalSnapshot(b)},before);
  });
 
@@ -233,7 +233,7 @@ for(const [label,make,skip] of backends){
   await b.exec('drop table public.new_scoped; create table private.unclassified(x int);');
   await refused(dry(b,[S],[R]),/without a cleanup rule.*private\.unclassified/);
   await b.exec('drop table private.unclassified; create schema extra; create table extra.t(c uuid references public.conferences(id));');
-  await refused(dry(b,[S],[R]),/outside public\/private reference conferences: extra\.t/);
+  await refused(dry(b,[S],[R]),/unreviewed incoming foreign keys.*extra\.t/);
   await b.exec('drop schema extra cascade; alter table public.timers rename to timers_gone;');
   await refused(dry(b,[S],[R]),/(do not exist|without a cleanup rule)/);
   await b.exec('alter table public.timers_gone rename to timers;');

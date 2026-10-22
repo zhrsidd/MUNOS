@@ -54,6 +54,7 @@ const refusals:[string,Options,string[]][]=[
  ['malformed id',{},dry('not-a-uuid')],
  ['duplicate id',{},dry(SYNTHETIC,SYNTHETIC.toUpperCase())],
  ['unknown flag',{},[...dry(SYNTHETIC),'--force']],
+ ['duplicate output directory',{},[...dry(SYNTHETIC),...exec,'--out','a','--out','b']],
  ['positional argument',{},[...dry(SYNTHETIC),'all']],
  ['flag without a value',{},['--conference']],
  ['pattern selection is not a thing',{},['--all']],
@@ -90,6 +91,7 @@ const refusals:[string,Options,string[]][]=[
 
 // The specific reason each case must be refused for (a refusal for the wrong reason would hide a hole).
 const reasons:Record<string,RegExp>={
+ 'duplicate output directory':/--out was given more than once/,
  'no ids':/no conference ids/,'blank id list':/no conference ids/,'malformed id':/not a UUID/,'duplicate id':/listed twice/,'unknown flag':/unknown argument --force/,
  'positional argument':/positional arguments/,'flag without a value':/needs a value/,'pattern selection is not a thing':/unknown argument --all/,
  'id equals NEXT_PUBLIC_CONFERENCE_ID':/is protected/,'id equals NEXT_PUBLIC_CONFERENCE_ID in upper case':/is protected/,'id in PROTECTED_CONFERENCE_IDS':/is protected/,

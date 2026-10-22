@@ -37,6 +37,7 @@ for(let i=0;i<argv.length;i++){
  values.set(a,[...(values.get(a)??[]),v]);
 }
 const one=(flag:string)=>{const v=values.get(flag);if(v&&v.length>1)refuse(`${flag} was given more than once`);return v?.[0];};
+const requestedOut=one('--out'); // Validate this singleton before any database work, including execute.
 
 // 1. The explicit id list.
 const parsed=parseConferenceIds([...(values.get('--conference')??[]),...(values.get('--conferences')??[])]);
@@ -85,15 +86,28 @@ if(execute){
 const dir=fileURLToPath(new URL('./cleanup/',import.meta.url));
 const script=await buildScript(dir,{mode:execute?'execute':'dry-run',label,ids,protectedIds,token});
 let report:Report;
-try{report=parseReport(await new PsqlRunner(dbUrl).run(script));}
+let output:string[]=[];
+try{output=await new PsqlRunner(dbUrl).run(script);report=parseReport(output);}
 catch(error){
  const message=(error as Error).message;
  if(error instanceof CleanupError&&/REFUSED/.test(message)){console.error(`Refused: ${message.replace(/^.*?REFUSED:\s*/,'')}`);process.exit(2);}
- console.error(`Failed: ${message}. The transaction was rolled back; nothing was deleted.`);process.exit(1);
+ output=error instanceof CleanupError?error.output:output;
+ if(execute){
+  const out=requestedOut??join('.test-sessions','cleanup',`${new Date().toISOString().replace(/[:.]/g,'-')}-${label}`);
+  let candidate:Report|undefined;
+  try{candidate=parseReport(output);}catch{/* An acknowledgement may be missing or incomplete. */}
+  try{
+   await mkdir(out,{recursive:true,mode:0o700});
+   await writeFile(join(out,'execute-unknown.json'),JSON.stringify({outcome:'unknown',label,requested_ids:ids,token,operator:{backup_evidence:backup,owner_approval:approval},candidate_report:candidate},null,2),{mode:0o600});
+   console.error(`Reconciliation evidence: ${join(out,'execute-unknown.json')}`);
+  }catch{console.error('Reconciliation evidence could not be written. Keep this invocation and its reviewed dry-run evidence.');}
+  console.error(`Failed: ${message}. Execution outcome is unknown: deletion may have committed. Do not retry execution; reconcile with a read-only dry run and the retained evidence first.`);
+ }else console.error(`Failed: ${message}. Dry run could not be verified; no deletion was requested.`);
+ process.exit(1);
 }
 
 // 7. Output and evidence (no secrets: the report holds counts, names, ids and storage paths only).
-const out=one('--out')??join('.test-sessions','cleanup',`${new Date().toISOString().replace(/[:.]/g,'-')}-${label}`);
+const out=requestedOut??join('.test-sessions','cleanup',`${new Date().toISOString().replace(/[:.]/g,'-')}-${label}`);
 await mkdir(out,{recursive:true,mode:0o700});
 const file=execute?'execute-audit.json':'dry-run.json';
 await writeFile(join(out,file),JSON.stringify({...report,operator:execute?{backup_evidence:backup,owner_approval:approval}:undefined,requested_ids:ids},null,2),{mode:0o600});

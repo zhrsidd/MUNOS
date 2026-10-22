@@ -28,7 +28,7 @@ Every refusal is checked **before** anything is deleted, and the wrapper's refus
 | Protected | Any listed id equals `NEXT_PUBLIC_CONFERENCE_ID` or an entry of `PROTECTED_CONFERENCE_IDS`; `NEXT_PUBLIC_CONFERENCE_ID` missing/blank/placeholder (**fail closed**: the protected list may never be empty). Checked in the wrapper and again in SQL. One protected id in a list refuses the whole list. | wrapper, SQL |
 | Synthetic marker | A listed conference's `name` does not start with an approved prefix (section 3), or `features.real` is true. | SQL |
 | Active access | Any non-revoked, non-expired `user_access` grant or `private.access_credentials` credential, or any non-revoked submission/amendment link, for a listed conference. **Revoke first.** | SQL |
-| Schema drift | A base table in `public`/`private` has no cleanup rule; a rule names a missing table; a table outside those schemas has a foreign key to `conferences`. | SQL (and a test) |
+| Schema drift | A base table in `public`/`private` has no cleanup rule; a rule names a missing table; an unreviewed table has an incoming foreign key to any cleanup table; or an FK spans selected and retained rows (including grant-source and amendment-receipt junctions). | SQL (and a test) |
 | Role | The connected role is neither superuser nor `BYPASSRLS` (counts under RLS would silently be zero). | SQL |
 | Confirmation token | `--execute` without a 64-hex token, or a token that is not the digest recomputed **now** under locks (section 4). | wrapper, SQL |
 | Recorded approvals | `--execute` without `--backup-evidence` and `--owner-approval` (free-text references recorded in the audit file). | wrapper |
@@ -127,7 +127,7 @@ Deletion is irreversible. There is no undo, no soft delete and no trash. What ex
 
 * **Prevention**: dry run, token, counts asserted equal to the dry run, one transaction, protected list, active-access refusal, owner approval, second-person review.
 * **Backup/PITR state recorded first.** Restoring is a whole-project operation that also discards everything written after the restore point; it cannot restore selected rows. The Supabase plan and PITR/backups state must be confirmed and recorded **before** the run; if there is no recoverable state, that fact is recorded and accepted by the owner. No hosted restore project is created without the owner's approval (AGENTS.md).
-* **Failure inside the transaction** (the only failure the tool can cause) leaves the database exactly as it was. Storage and Auth deletions (steps C, D) are separate and are *not* transactional; do them only from the listed keys and ids.
+* **A confirmed database error before COMMIT** leaves the database exactly as it was. Storage and Auth deletions (steps C, D) are separate and are *not* transactional; do them only from the listed keys and ids.
 * The synthetic data is, by definition, reproducible from the fixtures; real data must not be in scope, which is what the protected list and the "conferences that stay" review exist to prove.
 
 ## 10. Evidence to capture (no secrets)
@@ -169,3 +169,10 @@ Please look hardest at:
 8. **Auth candidates** are advisory; the SQL cannot see references from outside `public`/`private`. The manual step must treat them so.
 9. **PGlite quirk (test infrastructure only).** PGlite's `exec` returns silently, without throwing, when a `BEFORE DELETE` row trigger deletes a sibling row of the same statement (PostgreSQL raises error 27000). The count-mismatch test therefore uses an `AFTER` statement trigger that removes a row for the *next* step. `PsqlRunner` (used on hosted and PostgreSQL 17) throws on any non-zero exit.
 10. **What was not exercised**: anything hosted; `rolbypassrls` of the hosted `postgres` role is assumed true and is checked at run time.
+
+
+## Review fixes: routing, scope and uncertain outcomes
+
+The database child receives controlled libpq settings from the guarded URL. Ambient PGHOSTADDR, PGSERVICE, PGSERVICEFILE, PGOPTIONS and other PG settings are stripped. SQL preflight rejects unreviewed incoming foreign keys for the full cleanup table set and any FK whose joined rows cross selected/retained scopes.
+
+A lost connection, process failure or unreadable report during execute has an **unknown** outcome: it may have committed. The wrapper writes `execute-unknown.json` with the reviewed ids, token, operator references and any complete candidate report. A candidate report is not proof of commit. Do not retry execution on the old token or assume rollback; reconcile through a fresh read-only dry run and retained evidence first. If local evidence cannot be written, retain the invocation and earlier dry-run packet manually.

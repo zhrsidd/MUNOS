@@ -95,7 +95,7 @@ declare
   -- fixture label 'LOAD TEST · ...'. Widening this list is a reviewed code change, never a command-line option.
   v_prefixes text[] := array['LOAD TEST ' || chr(183) || ' ', 'DCMUN Development Test', 'SYNTHETIC ' || chr(183) || ' '];
   v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
-  part text; r record; n bigint; fp text; msg text; canon text; h_grants bigint; h_creds bigint; h_sub bigint; h_amd bigint;
+  part text; r record; n bigint; fp text; msg text; canon text; h_grants bigint; h_creds bigint; h_sub bigint; h_amd bigint; crosses_scope boolean;
 begin
   if v_mode not in ('dry-run', 'execute') then raise exception 'REFUSED: unknown mode' using errcode = 'MR001'; end if;
   if v_label is null or v_label !~ '^[a-z0-9][a-z0-9_.-]{0,62}$' then raise exception 'REFUSED: the target label is missing or malformed' using errcode = 'MR001'; end if;
@@ -133,8 +133,9 @@ begin
   select string_agg(distinct tbl, ', ') into msg from cleanup_rules where to_regclass(tbl) is null;
   if msg is not null then raise exception 'REFUSED: cleanup rules name tables that do not exist: %', msg using errcode = 'MR001'; end if;
   select string_agg(format('%I.%I', ns.nspname, c.relname), ', ') into msg from pg_constraint k join pg_class c on c.oid = k.conrelid join pg_namespace ns on ns.oid = c.relnamespace
-   where k.contype = 'f' and k.confrelid = 'public.conferences'::regclass and ns.nspname not in ('public', 'private');
-  if msg is not null then raise exception 'REFUSED: tables outside public/private reference conferences: %', msg using errcode = 'MR001'; end if;
+   where k.contype = 'f' and k.confrelid in (select to_regclass(tbl) from cleanup_rules where kind = 'delete')
+     and k.conrelid not in (select to_regclass(tbl) from cleanup_rules where kind = 'delete');
+  if msg is not null then raise exception 'REFUSED: unreviewed incoming foreign keys reference cleanup tables: %', msg using errcode = 'MR001'; end if;
 
   -- 5. Execute only: lock every cleanup table so the counts below are the counts the deletes see.
   if v_mode = 'execute' then
@@ -149,6 +150,28 @@ begin
     end if;
     if lower(coalesce(r.features ->> 'real', 'false')) in ('true', 't', '1', 'yes') then
       raise exception 'REFUSED: conference % is flagged real (features.real)', r.id using errcode = 'MR001';
+    end if;
+  end loop;
+
+  -- Every FK between cleanup tables must stay wholly within the selected or retained rows.
+  -- This includes junction rows without conference_id: selecting either parent never authorises deleting the other parent's provenance.
+  for r in
+    select k.conname, child.tbl as child_tbl, parent.tbl as parent_tbl, child.scope as child_scope,
+      replace(parent.scope, 't.', 'p.') as parent_scope,
+      (select string_agg(format('t.%I = p.%I', ca.attname, pa.attname), ' and ' order by pos.i)
+         from generate_subscripts(k.conkey, 1) pos(i)
+         join pg_attribute ca on ca.attrelid = k.conrelid and ca.attnum = k.conkey[pos.i]
+         join pg_attribute pa on pa.attrelid = k.confrelid and pa.attnum = k.confkey[pos.i]) as key_join
+    from pg_constraint k
+    join cleanup_rules child on child.kind = 'delete' and to_regclass(child.tbl) = k.conrelid
+    join cleanup_rules parent on parent.kind = 'delete' and to_regclass(parent.tbl) = k.confrelid
+    where k.contype = 'f'
+    order by child.tbl, k.conname
+  loop
+    execute format('select exists(select 1 from %s t join %s p on %s where ((%s) is true) <> ((%s) is true))',
+      r.child_tbl, r.parent_tbl, r.key_join, r.child_scope, r.parent_scope) into crosses_scope;
+    if crosses_scope then
+      raise exception 'REFUSED: foreign key % spans selected and retained rows (% -> %)', r.conname, r.child_tbl, r.parent_tbl using errcode = 'MR001';
     end if;
   end loop;
 

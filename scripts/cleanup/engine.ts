@@ -104,13 +104,22 @@ export function parseReport(lines: string[]): Report {
 
 export interface Runner { run(script: string): Promise<string[]> }
 
+/** No ambient libpq settings may redirect the guarded URL or alter the cleanup session. */
+export function connectionEnvironment(url: string, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const u = new URL(url);
+  const env = { ...source };
+  for (const key of Object.keys(env)) if (key.toUpperCase().startsWith("PG")) delete env[key];
+  const database = decodeURIComponent(u.pathname.slice(1)) || "postgres";
+  if (!/^[a-zA-Z0-9_]+$/.test(database)) throw Error("Database name must be a plain identifier");
+  return { ...env, PGHOST: u.hostname.replace(/^\[|\]$/g, ""), PGPORT: u.port || "5432", PGUSER: decodeURIComponent(u.username), PGPASSWORD: decodeURIComponent(u.password), PGDATABASE: database, PGSSLMODE: u.searchParams.get("sslmode") ?? (["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) ? "prefer" : "require"), PGAPPNAME: "munos-synthetic-cleanup", PGCONNECT_TIMEOUT: "10" };
+}
+
 /** Runs a script in one psql session (one connection, so the transaction and temp tables hold). The password travels in the environment only. */
 export class PsqlRunner implements Runner {
   constructor(private readonly url: string, private readonly psql = process.env.PSQL_BIN ?? "psql") {}
   run(script: string): Promise<string[]> {
-    const u = new URL(this.url);
     const child = spawn(this.psql, ["-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-f", "-"], {
-      env: { ...process.env, PGHOST: u.hostname.replace(/^\[|\]$/g, ""), PGPORT: u.port || "5432", PGUSER: decodeURIComponent(u.username), PGPASSWORD: decodeURIComponent(u.password), PGDATABASE: decodeURIComponent(u.pathname.slice(1)) || "postgres", PGSSLMODE: u.searchParams.get("sslmode") ?? (["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) ? "prefer" : "require"), PGAPPNAME: "munos-synthetic-cleanup" },
+      env: connectionEnvironment(this.url),
       stdio: ["pipe", "pipe", "pipe"],
     });
     let out = "", err = "";
@@ -121,13 +130,13 @@ export class PsqlRunner implements Runner {
       // crash: the exit code and stderr on "close" carry the outcome, so a stdin error is deliberately ignored (unhandled, it killed the process).
       child.stdin.on("error", () => undefined);
       child.on("error", (e) => reject(e));
-      child.on("close", (code) => code === 0 ? resolve(out.split("\n").filter(Boolean)) : reject(new CleanupError(describeFailure(err), code ?? 1)));
+      child.on("close", (code) => code === 0 ? resolve(out.split("\n").filter(Boolean)) : reject(new CleanupError(describeFailure(err), code ?? 1, out.split("\n").filter(Boolean))));
       child.stdin.end(script);
     });
   }
 }
 
-export class CleanupError extends Error { constructor(message: string, readonly code = 1) { super(message); } }
+export class CleanupError extends Error { constructor(message: string, readonly code = 1, readonly output: string[] = []) { super(message); } }
 
 /** Error text from psql, reduced to the lines that explain the refusal; the connection string and any password never appear in psql output. */
 export function describeFailure(stderr: string): string {
