@@ -30,6 +30,15 @@ Not touched: **`supabase_admin`-owned default privileges** (not alterable by `po
 
 New functions are executable by their owner only. **A later migration that adds an RPC must `GRANT EXECUTE` explicitly** to the role that should call it (`authenticated` for staff RPCs, `service_role` for server-route RPCs); until then the function is unreachable. The existing migrations already follow this (`revoke all ... from public, anon` then `grant execute ... to ...`), so nothing existing needs a new grant. New tables get no `anon`/`authenticated`/`service_role` privileges from defaults, so a table that needs `authenticated` SELECT must also `GRANT SELECT` explicitly, as every existing table migration does.
 
+## Permission-drift check in CI (HD4)
+
+CI step "Check grants drift" runs `npm run check:grants` on the same PostgreSQL 17 as the tests (`TEST_POSTGRES_URL`, loopback only). It replays every migration on the hosted-calibrated model and fails the pull request when either:
+
+1. `docs/generated/isolation-t1-inventory*` differs from what the migrations now produce (any new or changed function, overload, table, view, sequence, policy, default ACL or privilege, including a DROP + CREATE that changes a grant), or
+2. the **privilege policy** (`scripts/isolation-inventory/policy.mts`, allow-lists in `scripts/isolation-inventory/policy-allowlist.json`) is breached, even when the generated files were regenerated: anon or PUBLIC holding any function EXECUTE or table/sequence privilege; service_role holding any table privilege; authenticated holding anything but SELECT; service_role EXECUTE beyond the four submission/link-info functions; a SECURITY DEFINER function without a pinned `search_path`; a table without RLS (views only if listed in `viewsWithoutRls`); a default ACL granting to anyone but the owner.
+
+To clear a failure caused by an intended change: run `TEST_POSTGRES_URL=postgresql://postgres:...@127.0.0.1:PORT/postgres npm run grants:regenerate` on a disposable local PostgreSQL 17, commit the regenerated files, and review the diff. **Reviewers must read the diff of `docs/generated/isolation-t1-inventory.md` and `.json`**, not just confirm it was regenerated: look for new rows in Functions (EXECUTE held by, Data API callers, Security, search_path), Tables (any letter other than `r` for authenticated, any letter for anon or service_role, RLS column), default privileges and the "Flags" sections. A change to `policy-allowlist.json` widens what the database may expose and needs the same review as a grant. A body-only `CREATE OR REPLACE` does not change privileges and is reviewed in the migration diff, not here. `tests/grants-drift-db.test.ts` proves each kind of drift is caught (mutations on a disposable database) and that the current tree passes.
+
 ## Expected hosted before/after diff
 
 Derived from the audit; **Proposed** until the hosted dry run confirms it.
@@ -115,4 +124,4 @@ Migrations are forward-only; an applied migration is never edited. The inverse i
 
 1. Approval to apply (separate from this approval in principle), the window, and who applies it.
 2. Whether to keep the global (all-schema) function default revoke, or restrict it to `public` and `private` only (then a function created by `postgres` in another schema would again be PUBLIC-executable by default; none exist today).
-3. Whether the repository's inventory check (`--check`) should be wired into CI (HD4).
+3. HD4 (inventory `--check` plus policy in CI): approved by the owner and implemented on branch `claude/grants-drift-ci`; it becomes effective when that branch merges.

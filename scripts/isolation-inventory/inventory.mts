@@ -13,7 +13,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {readFileSync,readdirSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {evaluatePolicy} from './policy.mts';
+import {evaluatePolicy} from './policy.mjs';
 
 const here=dirname(fileURLToPath(import.meta.url));
 const root=resolve(here,'../..');
