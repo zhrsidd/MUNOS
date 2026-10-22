@@ -279,7 +279,23 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
 /** The model as committed in docs/generated/isolation-t1-inventory.json (function bodies dropped). */
 export const stable=(m:Mode)=>({...m,fns:m.fns.map(({src,...rest})=>{void src;return rest;})});
 
+/** Roles are cluster-wide and the bootstrap only creates missing ones. A cluster that already holds anon/authenticated/service_role
+ *  with other attributes (for example after the PostgreSQL tests ran on it) would make the inventory differ for reasons that are not
+ *  the migrations, so fail with that explanation instead of a misleading STALE. CI runs this on a fresh cluster before the tests. */
+function assertCleanRoles(){
+ const want:Record<string,string>={anon:'f|f|f|f',authenticated:'f|f|f|f',service_role:'f|f|f|t',authenticator:'t|f|f|f',supabase_admin:'t|t|t|f'};
+ const have=psql('postgres',`select rolname||'='||rolcanlogin::text||'|'||rolsuper::text||'|'||rolinherit::text||'|'||rolbypassrls::text from pg_roles where rolname in ('anon','authenticated','service_role','authenticator','supabase_admin') order by 1;`).split('\n').filter(Boolean);
+ const flag=(s:string)=>s.replaceAll('true','t').replaceAll('false','f');
+ for(const line of have){
+  const [name,attrs]=line.split('=');
+  const [login,sup,inherit,bypass]=flag(attrs).split('|');
+  const got=`${login}|${sup}|${inherit}|${bypass}`;
+  if(got!==want[name])throw new Error(`Role ${name} already exists in this cluster with attributes login|super|inherit|bypassrls=${got} (model: ${want[name]}). Use a fresh PostgreSQL cluster (the inventory output depends on cluster-wide roles).`);
+ }
+}
+
 function main(){
+assertCleanRoles();
 const files=readdirSync(join(root,'supabase/migrations')).filter(n=>n.endsWith('.sql')).sort();
 const hash=createHash('sha256').update(files.map(f=>readFileSync(join(root,'supabase/migrations',f))).join('\n--\n')).digest('hex');
 const model=run('supabase-model');
