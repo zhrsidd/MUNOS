@@ -5,11 +5,11 @@
 --
 -- REVIEW NOTE FOR CODEX
 -- Why: the hosted privilege audit of 2026-10-22 (docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md) found
---   (1) `service_role` holds TRUNCATE, REFERENCES, TRIGGER and MAINTAIN on all 36 public tables, and `anon` and
---       `authenticated` hold the same four (their SELECT / EXECUTE grants are the intended ones). They come from
---       pg_default_acl (tables in public for role postgres: anon/authenticated/service_role = Dxtm), which would also hand
---       the four to every table a later migration creates. PostgREST does not expose them, so this is defense in depth,
---       not a fix for a reachable bypass; direct SQL as these roles is the only way to use them.
+--   (1) `service_role` holds TRUNCATE, REFERENCES, TRIGGER and MAINTAIN on all 36 public tables (and no SELECT/INSERT/
+--       UPDATE/DELETE). `anon` and `authenticated` hold none of the four today (the foundation migration revoked them), but
+--       the table default ACL for role postgres in public (anon/authenticated/service_role = Dxtm) would hand all four to
+--       every table a later migration creates. PostgREST does not expose them, so this is defense in depth, not a fix for
+--       a reachable bypass; direct SQL as these roles is the only way to use them.
 --   (2) New postgres-owned functions are protected on hosted only because the default ACL for functions in public was
 --       already stripped to {postgres=X}. Nothing in the repository enforces that, so a later DROP FUNCTION + CREATE or a
 --       new overload could be silently exposed again if the platform default changed (assumption A13).
@@ -52,7 +52,7 @@ begin
  if current_setting('server_version_num')::int>=170000 then
   execute 'revoke maintain on all tables in schema public from anon, authenticated, service_role';
   execute 'alter default privileges for role postgres in schema public revoke maintain on tables from anon, authenticated, service_role';
-  removed:=removed||'MAINTAIN';
+  removed:=array_append(removed,'MAINTAIN');
  end if;
  select string_agg(format('%s %s on public.%s',r.rolname,a.privilege_type,c.relname),', ' order by c.relname,r.rolname,a.privilege_type) into left_over
  from pg_class c join pg_namespace n on n.oid=c.relnamespace and n.nspname='public'

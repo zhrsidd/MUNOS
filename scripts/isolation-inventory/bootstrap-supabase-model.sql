@@ -1,7 +1,9 @@
 -- MODEL of a hosted Supabase project's role/schema/default-privilege baseline, for DISPOSABLE LOCAL PostgreSQL only.
--- It is reconstructed from Supabase's documented behaviour (see supabase/config.toml `auto_expose_new_tables`,
--- "matching the cloud default") and from the roles/grants the repository's own tests assume. It is NOT an observation of
--- the hosted project. Anything that depends on it is "verified against the model", never "verified on hosted".
+-- Roles and schemas are reconstructed from Supabase's documented behaviour and from the roles/grants the repository's own
+-- tests assume; the DEFAULT PRIVILEGES at the end were corrected on 2026-10-22 to match the hosted privilege audit (an
+-- earlier version modelled `ALL` for the API roles, which the hosted project does not have). It is still NOT an
+-- observation of the hosted project beyond what the audit read (see the audit's "does not cover" list). Anything that
+-- depends on it is "verified against the model", never "verified on hosted".
 --
 -- Run as the local superuser `postgres` (the migration owner). On hosted Supabase `postgres` is not a superuser; that
 -- difference is listed in docs/ISOLATION_FEASIBILITY.md.
@@ -42,8 +44,17 @@ grant usage on schema storage to anon, authenticated, service_role;
 grant all on all tables in schema storage to service_role;
 grant select on storage.objects to anon, authenticated;
 
--- Hosted default: objects the migration owner creates in public are reachable by the Data API roles without GRANTs.
+-- Default privileges, CALIBRATED to the hosted read-only audit of 2026-10-22 (docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md;
+-- DCMUN Staging, PostgreSQL 17.11, before migration 20261022090000_privilege_hardening). pg_default_acl as observed for
+-- role postgres in schema public:
+--   tables     {postgres=arwdDxtm, anon=Dxtm, authenticated=Dxtm, service_role=Dxtm}   (no SELECT/INSERT/UPDATE/DELETE)
+--   sequences  {postgres=rwU}                                                           (nothing for the API roles)
+--   functions  {postgres=X}                                                             (nothing for the API roles)
+-- Not observed and therefore not modelled: a global (all-schema) default for role postgres, so PostgreSQL's own default
+-- (EXECUTE to PUBLIC on new functions) applies here. supabase_admin's defaults (arwdDxtm/rwU/X to the API roles in public)
+-- only affect objects supabase_admin creates; the migrations never do, so they are omitted.
 grant usage on schema public to postgres, anon, authenticated, service_role;
-alter default privileges for role postgres in schema public grant all on tables to postgres, anon, authenticated, service_role;
-alter default privileges for role postgres in schema public grant all on functions to postgres, anon, authenticated, service_role;
-alter default privileges for role postgres in schema public grant all on sequences to postgres, anon, authenticated, service_role;
+alter default privileges for role postgres in schema public grant all on tables to postgres;
+alter default privileges for role postgres in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated, service_role;
+alter default privileges for role postgres in schema public grant usage, select, update on sequences to postgres;
+alter default privileges for role postgres in schema public grant execute on functions to postgres;
