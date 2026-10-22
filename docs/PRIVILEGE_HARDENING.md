@@ -68,9 +68,9 @@ Prerequisites: owner approval recorded with the exact commit; Codex review of th
    declare leftover int; auth_sel int; other_acl int; svc text; pub int; defs text;
    begin
      select count(*) into leftover from pg_class c join pg_namespace s on s.oid = c.relnamespace
-       cross join lateral aclexplode(c.relacl) a join pg_roles r on r.oid = a.grantee
+       cross join pg_roles r cross join unnest(array['TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) privilege
        where s.nspname = 'public' and r.rolname in ('anon','authenticated','service_role')
-         and a.privilege_type in ('TRUNCATE','REFERENCES','TRIGGER','MAINTAIN');
+         and c.relkind in ('r','p','v','m','f') and has_table_privilege(r.oid,c.oid,privilege);
      select count(*) into auth_sel from pg_class c join pg_namespace s on s.oid = c.relnamespace
        where s.nspname = 'public' and c.relkind in ('r','p') and has_table_privilege('authenticated', c.oid, 'SELECT');
      select count(*) into other_acl from pg_class c join pg_namespace s on s.oid = c.relnamespace
@@ -97,7 +97,7 @@ Prerequisites: owner approval recorded with the exact commit; Codex review of th
 
 ## Forward-only revert
 
-Migrations are forward-only; an applied migration is never edited. The inverse is prepared and kept **unapplied** at [`supabase/prepared-reverts/20261022090000_privilege_hardening_revert.sql`](../supabase/prepared-reverts/20261022090000_privilege_hardening_revert.sql) (outside `supabase/migrations`, so no replay or `db push` picks it up). If the owner decides to undo the hardening, copy it into `supabase/migrations` under a **new, later timestamp**, review it, replay from empty, and apply it through the same human-controlled release. It restores the audited pre-hardening state (the four privileges for `service_role` on existing tables; the table defaults for the three roles; PostgreSQL's default PUBLIC EXECUTE on new functions) and re-opens the exposure. [`tests/privilege-hardening-db.test.ts`](../tests/privilege-hardening-db.test.ts) replays it after the hardening and asserts the ACLs equal the pre-hardening snapshot.
+Migrations are forward-only; an applied migration is never edited. The inverse is prepared and kept **unapplied** at [`supabase/prepared-reverts/20261022090000_privilege_hardening_revert.sql`](../supabase/prepared-reverts/20261022090000_privilege_hardening_revert.sql) (outside `supabase/migrations`, so no replay or `db push` picks it up). If the owner decides to undo the hardening, copy it into `supabase/migrations` under a **new, later timestamp**, review it, replay from empty, and apply it through the same human-controlled release. It restores the audited relation/table defaults. Its global function default MUST be selected from the saved before-capture: `granted` only if PUBLIC previously had global EXECUTE, otherwise `revoked`. In the same transaction, set `munos_hardening_revert.global_public_execute` to that recorded value before the inverse runs. Missing or invalid selection refuses before any grant. Do not choose `granted` merely because it is PostgreSQL's factory default. Copy the selected setting and the captured evidence reference into the new reviewed migration; the prepared file alone is intentionally insufficient. [`tests/privilege-hardening-db.test.ts`](../tests/privilege-hardening-db.test.ts) replays it after the hardening and asserts the ACLs equal the pre-hardening snapshot.
 
 ## Risks
 
@@ -116,3 +116,7 @@ Migrations are forward-only; an applied migration is never edited. The inverse i
 1. Approval to apply (separate from this approval in principle), the window, and who applies it.
 2. Whether to keep the global (all-schema) function default revoke, or restrict it to `public` and `private` only (then a function created by `postgres` in another schema would again be PUBLIC-executable by default; none exist today).
 3. Whether the repository's inventory check (`--check`) should be wired into CI (HD4).
+
+## Review fixes: effective privileges and captured defaults
+
+The migration refuses unexpected global API-role function, removed table, or sequence default grants before changing ACLs. Its final checks use effective table and sequence privileges, so inherited or PUBLIC rights cannot produce a false success. An unsupported parent/global grant requires separate review; this migration does not revoke unknown parent-role rights. Regression cases cover inherited/PUBLIC TRUNCATE, global function/table/sequence grants, missing revert selection and both observed global PUBLIC baseline states on PGlite and PostgreSQL 17.

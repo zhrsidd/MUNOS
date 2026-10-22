@@ -34,6 +34,22 @@
 -- Self-check: the final block aborts the whole migration (it is one transaction) if any of the three roles still holds a
 -- removed privilege on any public relation afterwards, for example because it was granted by a role other than the owner.
 
+-- Schema-local REVOKEs cannot remove global grants. Refuse unexpected global API defaults rather than widening this change.
+do $defaults$
+declare unexpected text;
+begin
+ select string_agg(format('%s %s to %s', d.defaclobjtype, a.privilege_type, coalesce(pg_get_userbyid(a.grantee), 'PUBLIC')), ', ')
+ into unexpected
+ from pg_default_acl d cross join lateral aclexplode(d.defaclacl) a
+ where d.defaclrole = 'postgres'::regrole and d.defaclnamespace = 0
+   and a.grantee <> 'postgres'::regrole
+   and (a.grantee = 0 or exists(select 1 from pg_roles r where r.rolname in ('anon','authenticated','service_role') and pg_has_role(r.oid, a.grantee, 'USAGE')))
+   and ((d.defaclobjtype = 'f' and a.grantee <> 0)
+     or (d.defaclobjtype = 'r' and a.privilege_type in ('TRUNCATE','REFERENCES','TRIGGER','MAINTAIN'))
+     or d.defaclobjtype = 'S');
+ if unexpected is not null then raise exception 'privilege hardening refused: unsupported global API defaults: %', unexpected; end if;
+end $defaults$;
+
 alter default privileges for role postgres revoke execute on functions from public;
 alter default privileges for role postgres in schema public revoke execute on functions from anon, authenticated, service_role;
 alter default privileges for role postgres in schema private revoke execute on functions from anon, authenticated, service_role;
@@ -54,10 +70,15 @@ begin
   execute 'alter default privileges for role postgres in schema public revoke maintain on tables from anon, authenticated, service_role';
   removed:=array_append(removed,'MAINTAIN');
  end if;
- select string_agg(format('%s %s on public.%s',r.rolname,a.privilege_type,c.relname),', ' order by c.relname,r.rolname,a.privilege_type) into left_over
+ select string_agg(format('%s %s on public.%s',r.rolname,pr,c.relname),', ' order by c.relname,r.rolname,pr) into left_over
  from pg_class c join pg_namespace n on n.oid=c.relnamespace and n.nspname='public'
- cross join lateral aclexplode(c.relacl) a
- join pg_roles r on r.oid=a.grantee and r.rolname in ('anon','authenticated','service_role')
- where c.relkind in ('r','p','v','m','f') and a.privilege_type=any(removed);
+ cross join pg_roles r cross join unnest(removed) pr
+ where c.relkind in ('r','p','v','m','f') and r.rolname in ('anon','authenticated','service_role')
+   and has_table_privilege(r.oid,c.oid,pr);
  if left_over is not null then raise exception 'privilege hardening incomplete: %',left_over; end if;
+ select string_agg(format('%s %s on public.%s',r.rolname,pr,c.relname),', ') into left_over
+ from pg_class c join pg_namespace n on n.oid=c.relnamespace and n.nspname='public'
+ cross join pg_roles r cross join unnest(array['USAGE','SELECT','UPDATE']) pr
+ where c.relkind='S' and r.rolname in ('anon','authenticated','service_role') and has_sequence_privilege(r.oid,c.oid,pr);
+ if left_over is not null then raise exception 'privilege hardening incomplete: sequence access: %',left_over; end if;
 end$$;
