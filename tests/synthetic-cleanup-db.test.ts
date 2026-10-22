@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assemble,buildScript,parseConferenceIds,parseReport,type Mode,type Report} from '../scripts/cleanup/engine';
+import {assemble,buildScript,parseConferenceIds,parseReport,type Mode} from '../scripts/cleanup/engine';
 import {backends,globalSnapshot,snapshot,sqlDir,type Backend} from './helpers/cleanup-backend';
 import {fixtureIds,populateSql,uid,type FixtureOptions} from './helpers/cleanup-fixture';
 
@@ -9,7 +9,6 @@ import {fixtureIds,populateSql,uid,type FixtureOptions} from './helpers/cleanup-
 const SYN='LOAD TEST · multi-committee · 2 committees';
 const REAL='DCMUN 2026';
 const SHARED='99999999-9999-4999-8999-999999999999';
-const NOBODY='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const hex=/^[0-9a-f]{64}$/;
 
 const add=(b:Backend,tag:string,o:Partial<FixtureOptions>&{name:string})=>b.exec(populateSql(tag,{sharedUser:SHARED,...o}));
@@ -32,6 +31,9 @@ for(const [label,make,skip] of backends){
   const report=await dry(b,[S],[R]);
   assert.equal(report.kind,'dry-run');assert.equal(report.status,'ready');assert.match(report.token,hex);
   assert.deepEqual(report.conferences.map(c=>c.id),[S]);assert.deepEqual(report.absent_ids,[]);
+  // The report names every conference that stays, so the operator can see no real conference is in the list.
+  const stay=(await b.rows<{id:string}>(`select id from public.conferences where id<>'${S}'`)).map(r=>r.id);
+  assert.deepEqual(sorted(report.kept_conferences.map(c=>c.id)),sorted(stay));assert.ok(stay.includes(O)&&stay.includes(R));
   // Counts equal an independent, catalogue-derived count of the synthetic conference's rows.
   const deletes=report.tables.filter(r=>r.kind==='delete');
   assert.equal(deletes.length,Object.keys(before.s).length,'one delete rule per table');
@@ -142,7 +144,7 @@ for(const [label,make,skip] of backends){
   const named=(await dry(b,[S],[R])).token;await b.exec(`update public.conferences set name=name||' x' where id='${S}';`);
   await refused(exec([S],named),/does not match/);
   await b.exec(`update public.conferences set name='${SYN}' where id='${S}';`);
-  assert.deepEqual({t:await snapshot(b,T),r:await snapshot(b,R)},{t:before.t,r:before.r});
+  await unchanged();
   assert.equal((await dry(b,[S],[R])).token,good.token,'back to the reviewed state: the original token is valid again');
  });
 
@@ -239,4 +241,3 @@ for(const [label,make,skip] of backends){
   assert.deepEqual(await snapshot(b,S),before);
  });
 }
-export type {Report};

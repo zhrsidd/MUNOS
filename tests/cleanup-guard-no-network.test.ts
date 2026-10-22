@@ -21,7 +21,7 @@ const SYNTHETIC='8f5f0b28-17e6-4e91-998d-41556d4afa28';
 const TOKEN='a'.repeat(64);
 const PASSWORD='s3cretpassw0rd';
 const poolerUrl=(ref:string)=>`postgresql://postgres.${ref}:${PASSWORD}@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`;
-const CANNED={kind:'dry-run',status:'ready',label:REF,token:'b'.repeat(64),conferences:[{id:SYNTHETIC,name:'LOAD TEST · x',venue:'Development only'}],absent_ids:[],
+const CANNED={kind:'dry-run',status:'ready',label:REF,token:'b'.repeat(64),conferences:[{id:SYNTHETIC,name:'LOAD TEST · x',venue:'Development only'}],absent_ids:[],kept_conferences:[{id:PROTECTED,name:'DCMUN 2026',venue:'Doha',created_at:'2026-10-05T00:00:00Z'}],
  tables:[{seq:1,table:'public.schools',kind:'delete',rows:1,exact:true,fingerprint:'x'},{seq:43,table:'public.conferences',kind:'delete',rows:1,exact:true,fingerprint:'y'}],total_rows_deleted_if_executed:2,
  storage:{document_version_keys:['k/1'],bucket_objects:[]},auth_user_candidates:['11111111-1111-4111-8111-111111111111'],auth_users_kept_because_referenced_elsewhere:0};
 
@@ -128,7 +128,7 @@ test('positive control: a valid dry run starts the database client only after th
   const r=await run(dir,dry(SYNTHETIC));
   assert.equal(r.code,0,r.stderr);
   assert.ok(await exists(join(dir,'psql-started')),'the stub database client was reached');
-  assert.match(r.stdout,/DRY RUN \(nothing changed\)/);assert.ok(r.stdout.includes('b'.repeat(64)),'prints the confirmation token');
+  assert.match(r.stdout,/DRY RUN \(nothing changed\)/);assert.match(r.stdout,/conferences that stay \(1\): "DCMUN 2026"/);assert.ok(r.stdout.includes('b'.repeat(64)),'prints the confirmation token');
   assert.ok(!(r.stdout+r.stderr).includes(PASSWORD));assert.deepEqual(attempts(r.stderr),[]);
   const runs=await readdir(join(dir,'.test-sessions/cleanup'));assert.equal(runs.length,1);assert.ok(runs[0].endsWith(`-${REF}`));
   const evidence=join(dir,'.test-sessions/cleanup',runs[0]);

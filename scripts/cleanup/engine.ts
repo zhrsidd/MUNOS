@@ -89,7 +89,7 @@ export async function assemble(sqlDir: string, settings: Record<string, string>,
 export interface TableRow { seq: number; table: string; kind: string; rows?: number; expected?: number; affected?: number; exact?: boolean; fingerprint?: string }
 export interface Report {
   kind: "dry-run" | "execute"; status: "ready" | "nothing_to_delete" | "deleted"; label: string; token: string; executed_at?: string;
-  conferences: { id: string; name: string; venue: string }[]; absent_ids: string[]; tables: TableRow[];
+  conferences: { id: string; name: string; venue: string }[]; absent_ids: string[]; kept_conferences: { id: string; name: string; venue: string; created_at: string }[]; tables: TableRow[];
   total_rows_deleted_if_executed?: number; total_rows_deleted?: number;
   storage: { document_version_keys: string[]; bucket_objects: { bucket: string; key: string }[]; note?: string };
   auth_user_candidates: string[]; auth_users_kept_because_referenced_elsewhere?: number;

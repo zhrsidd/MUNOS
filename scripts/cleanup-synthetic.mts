@@ -103,6 +103,7 @@ if(report.auth_user_candidates.length)await writeFile(join(out,'auth-user-candid
 
 console.log(`${execute?'EXECUTED':'DRY RUN (nothing changed)'} against ${label}: ${report.status}`);
 for(const c of report.conferences)console.log(`  conference ${c.id}  "${c.name}"`);
+console.log(`  conferences that stay (${report.kept_conferences.length}): ${report.kept_conferences.map(c=>`"${c.name}"`).join(', ')||'none'}`);
 for(const t of report.tables)if((t.rows??t.affected??0)>0)console.log(`  ${String(t.seq).padStart(2)} ${t.table.padEnd(36)} ${t.kind==='update'?'update':'delete'} ${execute?`${t.affected} (expected ${t.expected})`:t.rows}`);
 console.log(`  total rows ${execute?'deleted':'that execution would delete'}: ${execute?report.total_rows_deleted:report.total_rows_deleted_if_executed}`);
 console.log(`  storage objects to remove by hand: ${keys.length}   auth users that only these conferences reference: ${report.auth_user_candidates.length}`);
