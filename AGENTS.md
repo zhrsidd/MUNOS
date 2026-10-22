@@ -39,7 +39,9 @@ reviewed, tested change.
    reviewed, replayed from empty locally, checked for backward compatibility and applied through an authorised
    human-controlled release, without re-enabling cloud-agent hosted testing. Never edit an applied migration. One person substantially
    changes schema, RLS, auth, shared domain types or repository contracts at a time; announce it and have it
-   reviewed.
+   reviewed. Once migration `20261022090000_privilege_hardening` is applied, new functions and tables get no API-role
+   privileges by default, so a migration that adds an RPC or table must grant access explicitly
+   ([docs/PRIVILEGE_HARDENING.md](docs/PRIVILEGE_HARDENING.md)).
 4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation takes
    effect immediately. Chair, Approval Panel, printing and Executive permissions stay separate. Any UI that
    hides a control is not the permission; the server-side rule is.
