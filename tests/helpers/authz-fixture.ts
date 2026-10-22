@@ -58,6 +58,8 @@ export interface Fixture {
  /** Conference A (the seeded one) and conference B. */
  confA: string; confB: string;
  committee: Record<'ga1' | 'who' | 'sc', string>;
+ /** The only committee of conference B. */
+ committeeB: string;
  session: string; sessionWho: string;
  france: string; japan: string; brazilWho: string;
  resolution: string; docReview: string; docApproved: string; docSubmitted: string; docDraft: string;
@@ -74,7 +76,7 @@ const q = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export async function installFixture(engine: Engine, ids: Record<string, string>): Promise<Fixture> {
  const f: Fixture = {
   ids, confA: ids.conference, confB: CONF_B,
-  committee: {ga1: ids.ga1, who: ids.who, sc: ids.sc},
+  committee: {ga1: ids.ga1, who: ids.who, sc: ids.sc}, committeeB: COMMITTEE_B,
   session: ids.session, sessionWho: '', france: ids.france, japan: ids.japan, brazilWho: '',
   resolution: ids.resolution, docReview: '', docApproved: '', docSubmitted: '', docDraft: '7c000000-0000-4000-8000-000000000001',
   schoolA: '', chairStaff: '', photoSlot: '7c000000-0000-4000-8000-000000000002', participationEvent: '7c000000-0000-4000-8000-000000000003',

@@ -2,6 +2,9 @@ import test from 'node:test';
 import type {Engine} from './authz-engine';
 import {installFixture} from './authz-fixture';
 import {cellsRun} from './authz-matrix';
+import {accessCodeSection, idempotencySection} from './authz-suite-writes';
+import {stateSection} from './authz-suite-state';
+import {helperSection, submissionSection} from './authz-suite-public';
 import {coverageSection, crossReferenceSection, mutationMatrixSection, privilegeSection, type Ctx} from './authz-suite-core';
 
 export interface SuiteEnv {engine: Engine; ids: Record<string, string>; close(): Promise<void>}
@@ -20,6 +23,11 @@ export function registerAuthzSuite(label: string, open: () => Promise<SuiteEnv>,
    await t.test('vocabulary coverage', s => coverageSection(s, ctx));
    await t.test('command matrix', s => mutationMatrixSection(s, ctx));
    await t.test('cross-reference cases', s => crossReferenceSection(s, ctx));
+   await t.test('idempotent replay and stale-write parity', s => idempotencySection(s, ctx));
+   await t.test('access-code RPCs', s => accessCodeSection(s, ctx));
+   await t.test('public submissions and link look-ups', s => submissionSection(s, ctx));
+   await t.test('helper functions executable by authenticated', s => helperSection(s, ctx));
+   await t.test('state, lifecycle, observations and findings', s => stateSection(s, ctx));
    t.diagnostic(`total authorisation cells executed on ${label}: ${cellsRun()}`);
   } finally {
    await env.close();
