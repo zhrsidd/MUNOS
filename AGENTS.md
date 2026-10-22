@@ -40,8 +40,9 @@ reviewed, tested change.
    human-controlled release, without re-enabling cloud-agent hosted testing. Never edit an applied migration. One person substantially
    changes schema, RLS, auth, shared domain types or repository contracts at a time; announce it and have it
    reviewed.
-4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation takes
-   effect immediately. Chair, Approval Panel, printing and Executive permissions stay separate. Any UI that
+4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation blocks fresh work immediately. Exact same-actor, same-conference, same-payload retries may
+   acknowledge a receipt accepted before revocation without executing another write or creating authority (owner decision,
+   22 October 2026). Chair, Approval Panel, printing and Executive permissions stay separate. Any UI that
    hides a control is not the permission; the server-side rule is.
 5. **Offline data.** Preserve the independent IndexedDB outbox and the server idempotency contract (mutation
    receipts, optimistic fingerprints, PT409/40001 handling). A saved action must never be silently lost or
@@ -70,3 +71,4 @@ in the same change when the system changes.
 - `docs/BACKLOG.md`: remaining product and release work.
 - Conference-week validation on Supabase Pro with Small compute (110-device, 19-committee rehearsal, Realtime
   and read-path limits, rollback drills) stays outstanding and is a release gate, not part of UI work.
+

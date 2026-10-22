@@ -134,11 +134,8 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
 
  // ---- findings ---------------------------------------------------------------------------------------------------
 
- // FINDING F1. The receipt look-up of every write function precedes the access check. A revoked, expired or
- // re-scoped caller who replays an action that was applied while they still had access gets SUCCESS (and no effect).
- // AGENTS.md "Access revocation takes effect immediately" and the access-code design ("expired or revoked access
- // does not discard the durable outbox") both need the opposite signal to reach a client whose access was
- // withdrawn: the outbox must learn that it lost access, not be told the action was accepted.
+ // Owner decision, 22 October 2026: acknowledge only the exact receipt of work accepted before revocation.
+ // This makes no new write and creates no authority; a fresh action still fails immediately.
  const afterRevocation = async (rep: (typeof REPS)[number]) => {
   const cmd = cmdOf(rep.cmd);
   const result = {} as {first: Outcome; replay: Outcome; fresh: Outcome};
@@ -153,17 +150,12 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
   });
   return result;
  };
- await t.test('FINDING F1 (characterisation, current behaviour): a replay of an already-applied action by a caller whose grant has since been revoked returns success and writes nothing, in all four implementations; a NEW action is refused', async () => {
+ await t.test('revocation contract: an exact previously accepted replay is acknowledged without a write; a new action is refused in all four implementations', async () => {
   const seen: string[] = [];
   for (const rep of REPS) {
    const r = await afterRevocation(rep);
    seen.push(`${rep.cmd}: first=${r.first.code} replay-after-revoke=${r.replay.code}/${r.replay.delta} new-action-after-revoke=${r.fresh.code}`);
   }
   assert.deepEqual(seen, REPS.map(r => `${r.cmd}: first=ok replay-after-revoke=ok/0 new-action-after-revoke=42501`));
- });
- await t.test('FINDING F1 (documented intent): a replay by a revoked caller must be refused with 42501 so the outbox learns it lost access', {todo: 'FINDING F1: all four write implementations answer a replay from a revoked or expired grant with success, because the idempotency receipt is read before has_access. Nothing is written and the action was applied while access was valid, but the revoked device is told "accepted".'}, async () => {
-  const codes: string[] = [];
-  for (const rep of REPS) codes.push((await afterRevocation(rep)).replay.code);
-  assert.deepEqual(codes, REPS.map(() => '42501'));
  });
 }
