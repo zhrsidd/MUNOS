@@ -27,9 +27,10 @@
   "20261021110000_clear_majority.sql",
   "20261021120000_print_copies.sql",
   "20261021130000_identity_projection.sql",
-  "20261021140000_sequential_chair_numbering.sql"
+  "20261021140000_sequential_chair_numbering.sql",
+  "20261022090000_privilege_hardening.sql"
  ],
- "migrationsSha256": "ba870aa1059d887108b5bfad63ef9b66f23e7dbc70d8a8ee954f1ac1659f1966",
+ "migrationsSha256": "771c24ae609c63fcabd267a8ae9867840799e309660e27b42e5fef65d92a3061",
  "supabase-model": {
   "fns": [
    {
@@ -1245,7 +1246,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1256,7 +1257,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1305,7 +1306,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1316,7 +1317,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1335,7 +1336,7 @@
     "lang": "sql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1346,7 +1347,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1365,7 +1366,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1376,7 +1377,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1395,7 +1396,7 @@
     "lang": "sql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1406,7 +1407,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1425,7 +1426,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1436,7 +1437,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1455,7 +1456,7 @@
     "lang": "sql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1466,7 +1467,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1485,7 +1486,7 @@
     "lang": "sql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1496,7 +1497,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1515,7 +1516,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1526,7 +1527,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1545,7 +1546,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1556,7 +1557,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1575,7 +1576,7 @@
     "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1586,7 +1587,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1605,7 +1606,7 @@
     "lang": "sql",
     "trigger": false,
     "aclDefault": false,
-    "aclRaw": "postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres",
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
     "usage": {
      "anon": true,
      "authenticated": true,
@@ -1616,7 +1617,7 @@
     "exec": {
      "anon": false,
      "authenticated": true,
-     "service_role": true,
+     "service_role": false,
      "authenticator": false,
      "postgres": true
     },
@@ -1735,7 +1736,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1760,7 +1762,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1785,7 +1788,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1810,7 +1814,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1835,7 +1840,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1860,7 +1866,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1872,21 +1879,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -1895,7 +1894,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1907,21 +1907,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -1930,7 +1922,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1942,21 +1935,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -1965,7 +1950,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -1977,21 +1963,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2000,7 +1978,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2012,21 +1991,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2035,7 +2006,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2047,21 +2019,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2070,7 +2034,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2082,21 +2047,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2105,7 +2062,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2117,21 +2075,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2140,7 +2090,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2152,21 +2103,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2175,7 +2118,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2187,21 +2131,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2210,7 +2146,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2222,21 +2159,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2245,7 +2174,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2257,21 +2187,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2280,7 +2202,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2292,21 +2215,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2315,7 +2230,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2327,21 +2243,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2350,7 +2258,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2362,21 +2271,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2385,7 +2286,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2397,21 +2299,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2420,7 +2314,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2432,21 +2327,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2455,7 +2342,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2467,21 +2355,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2490,7 +2370,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2502,21 +2383,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2525,7 +2398,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2537,21 +2411,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2560,7 +2426,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2572,21 +2439,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2595,7 +2454,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2607,21 +2467,13 @@
     "rls": false,
     "forceRls": false,
     "options": "security_invoker=true",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2630,7 +2482,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2642,21 +2495,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2665,7 +2510,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2677,21 +2523,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2700,7 +2538,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2712,21 +2551,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2735,7 +2566,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2747,21 +2579,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2770,7 +2594,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2782,21 +2607,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2805,7 +2622,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2817,21 +2635,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2840,7 +2650,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2852,21 +2663,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2875,7 +2678,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2887,21 +2691,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2910,7 +2706,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2922,21 +2719,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2945,7 +2734,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2957,21 +2747,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -2980,7 +2762,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -2992,21 +2775,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -3015,7 +2790,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -3027,21 +2803,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -3050,7 +2818,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -3062,21 +2831,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -3085,7 +2846,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -3097,21 +2859,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -3120,7 +2874,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -3132,21 +2887,13 @@
     "rls": true,
     "forceRls": false,
     "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
     "privs": {
      "anon": [],
      "authenticated": [
       "SELECT"
      ],
-     "service_role": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER"
-     ],
+     "service_role": [],
      "authenticator": [],
      "postgres": [
       "SELECT",
@@ -3155,7 +2902,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    }
@@ -3553,21 +3301,27 @@
   "defaults": [
    {
     "owner": "postgres",
+    "schema": "(global)",
+    "type": "functions",
+    "acl": "postgres=X/postgres"
+   },
+   {
+    "owner": "postgres",
     "schema": "public",
     "type": "functions",
-    "acl": "postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres"
+    "acl": "postgres=X/postgres"
    },
    {
     "owner": "postgres",
     "schema": "public",
     "type": "sequences",
-    "acl": "postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres"
+    "acl": "postgres=rwU/postgres"
    },
    {
     "owner": "postgres",
     "schema": "public",
     "type": "tables",
-    "acl": "postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres"
+    "acl": "postgres=arwdDxtm/postgres"
    }
   ],
   "schemas": [
@@ -3672,7 +3426,7 @@
     "name": "anon",
     "super": false,
     "login": false,
-    "inherit": true,
+    "inherit": false,
     "bypassrls": false,
     "memberOf": ""
    },
@@ -3680,7 +3434,7 @@
     "name": "authenticated",
     "super": false,
     "login": false,
-    "inherit": true,
+    "inherit": false,
     "bypassrls": false,
     "memberOf": ""
    },
@@ -3704,8 +3458,8 @@
     "name": "service_role",
     "super": false,
     "login": false,
-    "inherit": true,
-    "bypassrls": false,
+    "inherit": false,
+    "bypassrls": true,
     "memberOf": ""
    },
    {
@@ -3717,21 +3471,15 @@
     "memberOf": ""
    }
   ],
-  "customRoles": [
-   "gw_owner",
-   "lifecycle_operator",
-   "lifecycle_owner",
-   "proto_agent",
-   "proto_nobody"
-  ],
+  "customRoles": [],
   "version": "PostgreSQL 17",
   "probe": {
    "lines": [
-    "1. new function created by the migration owner, nothing revoked: PUBLIC=yes anon=yes authenticated=yes service_role=yes",
+    "1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants): PUBLIC=no anon=no authenticated=no service_role=no",
     "2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role: PUBLIC=no anon=no authenticated=no service_role=no",
     "3. after CREATE OR REPLACE (a later migration that redefines the body): PUBLIC=no anon=no authenticated=no service_role=no",
-    "4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=yes anon=yes authenticated=yes service_role=yes",
-    "5. new overload a13_probe(int) next to the revoked one: anon=yes authenticated=yes service_role=yes",
+    "4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=no anon=no authenticated=no service_role=no",
+    "5. new overload a13_probe(int) next to the revoked one: anon=no authenticated=no service_role=no",
     "6. after ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS (schema public and global PUBLIC), then DROP + CREATE: PUBLIC=no anon=no authenticated=no service_role=no"
    ]
   }
@@ -5441,7 +5189,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5466,7 +5215,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5491,7 +5241,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5516,7 +5267,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5541,7 +5293,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5566,7 +5319,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5593,7 +5347,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5620,7 +5375,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5647,7 +5403,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5674,7 +5431,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5701,7 +5459,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5728,7 +5487,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5755,7 +5515,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5782,7 +5543,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5809,7 +5571,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5836,7 +5599,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5863,7 +5627,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5890,7 +5655,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5917,7 +5683,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5944,7 +5711,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5971,7 +5739,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -5998,7 +5767,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6025,7 +5795,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6052,7 +5823,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6079,7 +5851,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6106,7 +5879,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6133,7 +5907,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6160,7 +5935,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6187,7 +5963,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6214,7 +5991,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6241,7 +6019,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6268,7 +6047,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6295,7 +6075,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6322,7 +6103,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6349,7 +6131,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6376,7 +6159,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6403,7 +6187,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6430,7 +6215,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6457,7 +6243,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6484,7 +6271,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6511,7 +6299,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6538,7 +6327,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    },
@@ -6565,7 +6355,8 @@
       "DELETE",
       "TRUNCATE",
       "REFERENCES",
-      "TRIGGER"
+      "TRIGGER",
+      "MAINTAIN"
      ]
     }
    }
@@ -6951,7 +6742,14 @@
     "check": ""
    }
   ],
-  "defaults": [],
+  "defaults": [
+   {
+    "owner": "postgres",
+    "schema": "(global)",
+    "type": "functions",
+    "acl": "postgres=X/postgres"
+   }
+  ],
   "schemas": [
    {
     "name": "auth",
@@ -7016,7 +6814,7 @@
     "name": "anon",
     "super": false,
     "login": false,
-    "inherit": true,
+    "inherit": false,
     "bypassrls": false,
     "memberOf": ""
    },
@@ -7024,7 +6822,7 @@
     "name": "authenticated",
     "super": false,
     "login": false,
-    "inherit": true,
+    "inherit": false,
     "bypassrls": false,
     "memberOf": ""
    },
@@ -7048,8 +6846,8 @@
     "name": "service_role",
     "super": false,
     "login": false,
-    "inherit": true,
-    "bypassrls": false,
+    "inherit": false,
+    "bypassrls": true,
     "memberOf": ""
    },
    {
@@ -7061,21 +6859,15 @@
     "memberOf": ""
    }
   ],
-  "customRoles": [
-   "gw_owner",
-   "lifecycle_operator",
-   "lifecycle_owner",
-   "proto_agent",
-   "proto_nobody"
-  ],
+  "customRoles": [],
   "version": "PostgreSQL 17",
   "probe": {
    "lines": [
-    "1. new function created by the migration owner, nothing revoked: PUBLIC=yes anon=yes authenticated=yes service_role=yes",
+    "1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants): PUBLIC=no anon=no authenticated=no service_role=no",
     "2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role: PUBLIC=no anon=no authenticated=no service_role=no",
     "3. after CREATE OR REPLACE (a later migration that redefines the body): PUBLIC=no anon=no authenticated=no service_role=no",
-    "4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=yes anon=yes authenticated=yes service_role=yes",
-    "5. new overload a13_probe(int) next to the revoked one: anon=yes authenticated=yes service_role=yes"
+    "4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=no anon=no authenticated=no service_role=no",
+    "5. new overload a13_probe(int) next to the revoked one: anon=no authenticated=no service_role=no"
    ]
   }
  }

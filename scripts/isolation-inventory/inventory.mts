@@ -60,7 +60,7 @@ function collect(db:string):Omit<Mode,'probe'>{
   where n.nspname in ${FILTER_SCHEMAS} and p.prokind in ('f','p')
    and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')) x;`);
  const privSql=(kind:'t'|'s')=>kind==='t'
-  ?`array(select pr from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) pr where has_table_privilege(%R%,c.oid,pr))`
+  ?`array(select pr from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) pr where has_table_privilege(%R%,c.oid,pr))`
   :`array(select pr from unnest(array['USAGE','SELECT','UPDATE']) pr where has_sequence_privilege(%R%,c.oid,pr))`;
  const rels=json<Rel[]>(db,`select coalesce(json_agg(x order by x."schema",x."name"),'[]') from (
   select n.nspname "schema",c.relname "name",c.relkind "kind",pg_get_userbyid(c.relowner) "owner",c.relrowsecurity "rls",c.relforcerowsecurity "forceRls",
@@ -106,7 +106,7 @@ function a13Probe(db:string,bare:boolean):Probe{
   lines.push(`${label}: ${Object.entries(r).map(([k,v])=>`${k}=${v?'yes':'no'}`).join(' ')}`);
  };
  psql(db,`create function public.a13_probe() returns int language sql as $$select 1$$;`);
- who('1. new function created by the migration owner, nothing revoked');
+ who('1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants)');
  psql(db,`revoke execute on function public.a13_probe() from public,anon,authenticated,service_role;`);
  who('2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role');
  psql(db,`create or replace function public.a13_probe() returns int language sql as $$select 2$$;`);
@@ -179,7 +179,7 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
   `Generator: \`scripts/isolation-inventory/inventory.mts\`. Baseline: **${label}**. ${m.version}, disposable local database replayed from empty.`,
   `Migrations replayed: ${files.length} files, combined SHA-256 \`${hash.slice(0,16)}\`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.`,'',
   label==='supabase-model'
-   ?'**This is a model.** Roles and default privileges are reconstructed from documented Supabase behaviour (`scripts/isolation-inventory/bootstrap-supabase-model.sql`); the hosted project was not read. Re-run the same queries on the hosted project during the preproduction phase (ISOLATION_DESIGN T1/A13) before relying on any row.'
+   ?'**This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.'
    :'**Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.','',
   'Scope: functions and relations in schemas `public` and `private` (the only schemas the migrations create or own), policies on those schemas plus `storage.objects`. Extension and Supabase-internal objects are excluded.','');
  out.push('## Roles and schemas','','| Role | superuser | login | inherit | bypassrls | member of |','| --- | --- | --- | --- | --- | --- |');
@@ -231,8 +231,8 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
  void exposed;
 
  // Relations
- const privCol=(r:Rel,role:string)=>r.privs[role].map(p=>p==='SELECT'?'r':p==='INSERT'?'a':p==='UPDATE'?'w':p==='DELETE'?'d':p==='TRUNCATE'?'D':p==='REFERENCES'?'x':p==='TRIGGER'?'t':p==='USAGE'?'U':p).join('')||'-';
- out.push('## Tables, views and sequences','','Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.','');
+ const privCol=(r:Rel,role:string)=>r.privs[role].map(p=>p==='SELECT'?'r':p==='INSERT'?'a':p==='UPDATE'?'w':p==='DELETE'?'d':p==='TRUNCATE'?'D':p==='REFERENCES'?'x':p==='TRIGGER'?'t':p==='MAINTAIN'?'m':p==='USAGE'?'U':p).join('')||'-';
+ out.push('## Tables, views and sequences','','Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER m=MAINTAIN; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.','');
  const kindName:Record<string,string>={r:'table',p:'partitioned table',v:'view',m:'materialized view',S:'sequence',f:'foreign table'};
  out.push('| Relation | Kind | Owner | RLS | Forced | Options | '+ROLES.join(' | ')+' |','| --- | --- | --- | --- | --- | --- | '+ROLES.map(()=>'---').join(' | ')+' |');
  for(const r of m.rels)out.push(`| \`${r.schema}.${r.name}\` | ${kindName[r.kind]} | ${r.owner} | ${['S','v','m'].includes(r.kind)?'n/a':r.rls?'yes':'NO'} | ${['S','v','m'].includes(r.kind)?'n/a':r.forceRls?'yes':'no'} | ${r.options||'-'} | ${ROLES.map(role=>privCol(r,role)).join(' | ')} |`);
