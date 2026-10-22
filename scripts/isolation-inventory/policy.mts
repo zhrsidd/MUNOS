@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 
 export interface PolicyFn{schema:string;name:string;args:string;security:string;config:string;exec:Record<string,boolean>;publicExec:boolean}
 export interface PolicyRel{schema:string;name:string;kind:string;rls:boolean;privs:Record<string,string[]>}
-export interface PolicyModel{fns:PolicyFn[];rels:PolicyRel[];defaults:{owner:string;schema:string;type:string;acl:string}[]}
+export interface PolicyModel{fns:PolicyFn[];rels:PolicyRel[];colAcl:{table:string;column:string;privs:Record<string,string[]>}[];defaults:{owner:string;schema:string;type:string;acl:string}[]}
 export interface Allow{serviceRoleExecute:string[];authenticatedTablePrivileges:string[];viewsWithoutRls:string[];defaultAclGrantees:string[]}
 
 export const loadAllow=():Allow=>JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)),'policy-allowlist.json'),'utf8')) as Allow;
@@ -42,6 +42,13 @@ export function evaluatePolicy(m:PolicyModel,allow:Allow=loadAllow()):string[]{
   else if(!noRls.has(k))v.push(`${r.kind==='v'?'view':'relation of kind '+r.kind} ${k}: not in viewsWithoutRls (review it, then list it)`);
  }
  const known=new Set(m.rels.map(r=>`${r.schema}.${r.name}`));
+ for(const c of m.colAcl){
+  const k=`${c.table}.${c.column}`;
+  if(c.privs.anon.length)v.push(`column ${k}: anon (or PUBLIC) holds ${c.privs.anon.join('+')}`);
+  if(c.privs.service_role.length)v.push(`column ${k}: service_role holds ${c.privs.service_role.join('+')} (policy: none)`);
+  const extra=c.privs.authenticated.filter(p=>!authOk.has(p));
+  if(extra.length)v.push(`column ${k}: authenticated holds ${extra.join('+')} beyond ${[...authOk].join('+')}`);
+ }
  for(const k of noRls)if(!known.has(k))v.push(`allow-list entry ${k} in viewsWithoutRls does not exist (stale allow-list)`);
  const grantees=new Set(allow.defaultAclGrantees);
  for(const d of m.defaults){

@@ -10,13 +10,28 @@
 --   existing public relations: service_role holds TRUNCATE, REFERENCES, TRIGGER (+ MAINTAIN on PostgreSQL 17); anon and
 --     authenticated hold none of them (so they are NOT re-granted on existing relations);
 --   table default ACL for role postgres in public: anon, authenticated, service_role get Dxtm on new tables;
---   functions: PostgreSQL's default again (EXECUTE for PUBLIC on new functions) by re-granting the global default. The
---     hosted per-schema function default {postgres=X} is unchanged by the hardening, so nothing to restore there.
+--   functions: select the global PUBLIC default from the saved before-capture; its absence was NOT established by the audit.
+--     The hosted per-schema function default {postgres=X} is unchanged by the hardening, so nothing to restore there.
 -- It does not recreate anything the hardening never removed (sequence privileges did not exist before).
 -- NOTE: this reopens the same exposure the hardening closed. Reverting is a deliberate owner decision, not a rollback of a failure.
+-- A human must select this from the saved BEFORE capture when preparing the new migration. No default is safe.
+-- SET LOCAL munos_hardening_revert.global_public_execute = 'granted' (or 'revoked') in the SAME transaction.
+do $baseline$
+begin
+ if coalesce(current_setting('munos_hardening_revert.global_public_execute',true),'') not in ('granted','revoked') then
+  raise exception 'revert refused: select granted/revoked global_public_execute from the saved pre-hardening default ACL capture';
+ end if;
+end $baseline$;
 grant truncate, references, trigger on all tables in schema public to service_role;
 alter default privileges for role postgres in schema public grant truncate, references, trigger on tables to anon, authenticated, service_role;
-alter default privileges for role postgres grant execute on functions to public;
+do $global$
+begin
+ if current_setting('munos_hardening_revert.global_public_execute') = 'granted' then
+  alter default privileges for role postgres grant execute on functions to public;
+ else
+  alter default privileges for role postgres revoke execute on functions from public;
+ end if;
+end $global$;
 do $$begin
  if current_setting('server_version_num')::int>=170000 then
   execute 'grant maintain on all tables in schema public to service_role';

@@ -94,8 +94,14 @@ const SAFE_FN=`create function public.hd4_probe() returns int language sql as $$
 const REOPEN='alter default privileges for role postgres grant execute on functions to public;';
 const LOCK_FN=`revoke execute on function public.hd4_probe() from public,anon,authenticated,service_role;`;
 
-interface Case{name:string;sql:string;expect:RegExp|null;drifted?:boolean}
+interface Case{name:string;sql:string;expect:RegExp|null;drifted?:boolean;cleanup?:string}
+const columnParent=`hd4_column_${randomUUID().replaceAll('-','')}`;
 const cases:Case[]=[
+ {name:'column grant: anon SELECT',sql:'grant select(name) on public.committees to anon;',expect:/column public\.committees\.name: anon \(or PUBLIC\) holds SELECT/},
+ {name:'column grant: PUBLIC SELECT',sql:'grant select(name) on public.committees to public;',expect:/column public\.committees\.name: anon \(or PUBLIC\) holds SELECT/},
+ {name:'column grant: authenticated INSERT',sql:'grant insert(name) on public.committees to authenticated;',expect:/column public\.committees\.name: authenticated holds INSERT/},
+ {name:'column grant: service_role UPDATE',sql:'grant update(name) on public.committees to service_role;',expect:/column public\.committees\.name: service_role holds UPDATE/},
+ {name:'column grant: inherited UPDATE',sql:`create role ${columnParent}; grant update(name) on public.committees to ${columnParent}; grant ${columnParent} to service_role with inherit true;`,cleanup:`revoke ${columnParent} from service_role; drop role ${columnParent};`,expect:/column public\.committees\.name: service_role holds UPDATE/},
  {name:'extra table grant: anon SELECT',sql:'grant select on public.committees to anon;',expect:/anon \(or PUBLIC\) holds SELECT/},
  {name:'extra table grant: PUBLIC SELECT',sql:'grant select on public.committees to public;',expect:/anon \(or PUBLIC\) holds SELECT/},
  {name:'extra table grant: authenticated INSERT',sql:'grant insert on public.committees to authenticated;',expect:/authenticated holds INSERT/},
@@ -124,7 +130,8 @@ const cases:Case[]=[
 ];
 
 for(const c of cases)dbTest(`mutation is caught: ${c.name}`,()=>{
- const r=inClone(c.sql);
+ let r:ReturnType<typeof inClone>;
+ try{r=inClone(c.sql);}finally{if(c.cleanup)psql('postgres',c.cleanup);}
  assert.ok(r.drifted,'the byte comparison with docs/generated must also fail (npm run check:grants)');
  if(c.expect)assert.ok(has(r.violations,c.expect),`expected ${c.expect}, got ${JSON.stringify(r.violations)}`);
  else assert.deepEqual(r.violations,[]);

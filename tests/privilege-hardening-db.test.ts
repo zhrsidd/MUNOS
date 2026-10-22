@@ -225,11 +225,53 @@ async function suite(make:()=>Promise<Engine>,label:string,t:test.TestContext){
    await before(db);
    const pre=await snapshot(db);
    await applyFiles(db,[MIGRATION]);
-   await db.exec(await readFile(REVERT,'utf8'));
+   await db.exec(`begin; set local munos_hardening_revert.global_public_execute='granted'; ${await readFile(REVERT,'utf8')} commit;`);
    const post=await snapshot(db);
    assert.deepEqual(post.rels,pre.rels);
    assert.deepEqual(post.fns,pre.fns);
    assert.deepEqual(post.defaults,pre.defaults);
+  }finally{await db.close();}
+ });
+
+ await t.test(`${label}: inherited and PUBLIC privileges refuse hardening atomically`,async()=>{
+  for(const inherited of [false,true]){
+   const db=await make();const parent=`priv_parent_${randomUUID().replaceAll('-','')}`;
+   try{
+    await before(db);
+    if(inherited)await db.exec(`create role ${parent}; grant truncate on public.conferences to ${parent}; grant ${parent} to service_role with inherit true;`);
+    else await db.exec('grant truncate on public.conferences to public;');
+    const pre=await snapshot(db);
+    assert.match(await sqlstate(db,'postgres',await readFile(`supabase/migrations/${MIGRATION}`,'utf8')),/privilege hardening incomplete/);
+    assert.deepEqual(await snapshot(db),pre,'refusal preserves the full baseline');
+   }finally{
+    if(inherited)await db.exec(`revoke ${parent} from service_role; drop owned by ${parent}; drop role ${parent};`).catch(()=>undefined);
+    await db.close();
+   }
+  }
+ });
+
+ await t.test(`${label}: unexpected global function/table/sequence defaults refuse before mutation`,async()=>{
+  for(const grant of ['execute on functions to authenticated','truncate on tables to anon','usage on sequences to service_role']){
+   const db=await make();try{
+    await before(db);await db.exec(`alter default privileges for role postgres grant ${grant};`);
+    const pre=await snapshot(db);
+    assert.match(await sqlstate(db,'postgres',await readFile(`supabase/migrations/${MIGRATION}`,'utf8')),/unsupported global API defaults/);
+    assert.deepEqual(await snapshot(db),pre);
+   }finally{await db.close();}
+  }
+ });
+
+ await t.test(`${label}: revert requires captured selection and preserves an already-revoked global PUBLIC default`,async()=>{
+  const db=await make();try{
+   await before(db);await db.exec('alter default privileges for role postgres revoke execute on functions from public;');
+   const pre=await snapshot(db);await applyFiles(db,[MIGRATION]);const hardened=await snapshot(db);
+   const inverse=await readFile(REVERT,'utf8');
+   assert.match(await sqlstate(db,'postgres',inverse),/revert refused/);
+   assert.deepEqual(await snapshot(db),hardened);
+   await db.exec(`begin; set local munos_hardening_revert.global_public_execute='revoked'; ${inverse} commit;`);
+   assert.deepEqual(await snapshot(db),pre);
+   await db.exec('create function public.revert_probe() returns int language sql as $$select 1$$;');
+   assert.equal((await sqlstate(db,'anon','select public.revert_probe()')).slice(0,5),'42501');
   }finally{await db.close();}
  });
 }

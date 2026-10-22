@@ -43,7 +43,7 @@ interface Fn{schema:string;name:string;args:string;result:string;kind:string;sec
  usage:Record<string,boolean>;exec:Record<string,boolean>;publicExec:boolean}
 interface Rel{schema:string;name:string;kind:string;owner:string;rls:boolean;forceRls:boolean;options:string;aclRaw:string;privs:Record<string,string[]>}
 interface Policy{table:string;name:string;cmd:string;roles:string;permissive:boolean;using:string;check:string}
-export interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
+export interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string;privs:Record<string,string[]>}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
  schemas:{name:string;owner:string;acl:string;usage:Record<string,boolean>;create:Record<string,boolean>}[];roleAttrs:{name:string;super:boolean;login:boolean;inherit:boolean;bypassrls:boolean;memberOf:string}[];
  customRoles:string[];version:string;probe:Probe}
 interface Probe{lines:string[]}
@@ -75,7 +75,8 @@ export function collect(db:string):Omit<Mode,'probe'>{
   where n.nspname in ${FILTER_SCHEMAS} and c.relkind in ('r','p','v','m','S','f')
    and not exists(select 1 from pg_depend d where d.objid=c.oid and d.deptype in ('e','i') )) x;`);
  const colAcl=json<Mode['colAcl']>(db,`select coalesce(json_agg(x order by x."table",x."column"),'[]') from (
-  select n.nspname||'.'||c.relname "table",a.attname "column",array_to_string(a.attacl,',') "acl"
+  select n.nspname||'.'||c.relname "table",a.attname "column",array_to_string(a.attacl,',') "acl",
+   json_build_object(${DATA_API.map(r=>`'${r}',array(select pr from unnest(array['SELECT','INSERT','UPDATE','REFERENCES']) pr where has_column_privilege('${r}',c.oid,a.attnum,pr))`).join(',')}) "privs"
   from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
   where a.attacl is not null and not a.attisdropped and n.nspname in ${FILTER_SCHEMAS}) x;`);
  const policies=json<Policy[]>(db,`select coalesce(json_agg(x order by x."table",x."name"),'[]') from (
