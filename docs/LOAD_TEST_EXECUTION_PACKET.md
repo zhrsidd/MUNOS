@@ -319,7 +319,7 @@ Copy the summary into [VERIFICATION.md](VERIFICATION.md) stating, for each repor
 
 ### 10.3 Guarded deletion and ordering
 
-**Guarded deletion** of the labelled `LOAD TEST ·` conferences, Storage objects and test auth users (lifecycle cutover step 2; checklist 1.9.5 and 2.2) is reviewed by Codex, approved by the owner and run by a human operator **after the last synthetic test and before promotion**. It is **not implemented** ([Verified] checklist 1.9.5 is OUTSTANDING: "a reviewed, guarded cleanup script or procedure with a read-only before/after count"). No one deletes rows by hand during the test window.
+**Guarded deletion** of the labelled `LOAD TEST ·` conferences, Storage objects and test auth users (lifecycle cutover step 2; checklist 1.9.5 and 2.2) is reviewed by Codex, approved by the owner and run by a human operator **after the last synthetic test and before promotion**. The tool is now **prepared but not reviewed, approved or run** (`docs/SYNTHETIC_CLEANUP.md`; `scripts/cleanup/`, `scripts/cleanup-synthetic.mts`; local PGlite and PostgreSQL 17 tests only, no hosted contact). Running it on the hosted project needs the owner's separate approval. Checklist 1.9.5 stays OUTSTANDING until Codex review and the owner's approval ([Verified] it said: "a reviewed, guarded cleanup script or procedure with a read-only before/after count"). No one deletes rows by hand during the test window.
 
 **Ordering rule** ([Verified], lifecycle "Formal cutover" steps 2 and 6): revocation and guarded deletion of all synthetic data must complete **before** the project is promoted and before any real conference data exists. Revoke-only cleanup does not satisfy cutover step 2.
 
@@ -383,7 +383,7 @@ Nothing is approved. Each line needs the owner's written approval (recorded in [
 5. The write path that ships (gateway, or the existing direct RPC path under an explicit owner-approved scope change that defers the gateway and does not meet the original gateway requirement) and therefore the path under test. (R, J)
 6. People: who holds the harness, watches, decides go/no-go, times the settle, may stop; whether H4 runs and who closes votes and how they get access.
 7. Reruns: a contingency approval for a rerun of a failed stage on 1 November (the plan requires each rerun to be approved).
-8. The guarded deletion procedure for cutover (not yet written). (R)
+8. The guarded deletion procedure for cutover: prepared in `docs/SYNTHETIC_CLEANUP.md`, awaiting Codex review and the owner's approval to run it on the hosted project. (R)
 9. Which separate checks apply (G1-G7 as classified in section 13: required, optional or owner-accepted-as-unverified), each with its own scope.
 
 ## Appendix A: command and flag cross-check
