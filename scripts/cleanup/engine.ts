@@ -117,6 +117,9 @@ export class PsqlRunner implements Runner {
     child.stdout.on("data", (d: Buffer) => { out += d.toString(); });
     child.stderr.on("data", (d: Buffer) => { err += d.toString(); });
     return new Promise((resolve, reject) => {
+      // psql may exit (refused, bad connection) before it has read the whole script; the write then fails with EPIPE. That is not a
+      // crash: the exit code and stderr on "close" carry the outcome, so a stdin error is deliberately ignored (unhandled, it killed the process).
+      child.stdin.on("error", () => undefined);
       child.on("error", (e) => reject(e));
       child.on("close", (code) => code === 0 ? resolve(out.split("\n").filter(Boolean)) : reject(new CleanupError(describeFailure(err), code ?? 1)));
       child.stdin.end(script);
