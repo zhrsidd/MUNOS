@@ -11,6 +11,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:database": "tsx --test tests/database.test.ts",
     "test:offline": "tsx --test tests/offline.test.ts",
+    "check:grants": "tsx scripts/isolation-inventory/inventory.mts --check",
+    "grants:regenerate": "tsx scripts/isolation-inventory/inventory.mts",
     "test:remote": "tsx scripts/remote-workflow.mts",
     "test:load": "tsx scripts/load-test.mts",
     "seed:generate": "tsx scripts/generate-seed.mts",
@@ -19,6 +21,7 @@
     "rehearsal:run": "tsx scripts/rehearsal-run.mts",
     "rehearsal:identities": "tsx scripts/rehearsal-identities.mts",
     "smoke:project": "tsx scripts/smoke-project.mts",
+    "cleanup:synthetic": "tsx scripts/cleanup-synthetic.mts",
     "test:rehearsal:offline": "node --import tsx scripts/rehearsal/offline-multi-device.mjs"
   },
   "dependencies": {

@@ -39,7 +39,9 @@ reviewed, tested change.
    reviewed, replayed from empty locally, checked for backward compatibility and applied through an authorised
    human-controlled release, without re-enabling cloud-agent hosted testing. Never edit an applied migration. One person substantially
    changes schema, RLS, auth, shared domain types or repository contracts at a time; announce it and have it
-   reviewed.
+   reviewed. Once migration `20261022090000_privilege_hardening` is applied, new functions and tables get no API-role
+   privileges by default, so a migration that adds an RPC or table must grant access explicitly
+   ([docs/PRIVILEGE_HARDENING.md](docs/PRIVILEGE_HARDENING.md)).
 4. **Access control.** Do not widen RLS or role permissions for development convenience. Access revocation blocks fresh work immediately. Exact same-actor, same-conference, same-payload retries may
    acknowledge a receipt accepted before revocation without executing another write or creating authority (owner decision,
    22 October 2026). Chair, Approval Panel, printing and Executive permissions stay separate. Any UI that
@@ -71,4 +73,3 @@ in the same change when the system changes.
 - `docs/BACKLOG.md`: remaining product and release work.
 - Conference-week validation on Supabase Pro with Small compute (110-device, 19-committee rehearsal, Realtime
   and read-path limits, rollback drills) stays outstanding and is a release gate, not part of UI work.
-

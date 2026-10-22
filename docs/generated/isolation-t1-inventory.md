@@ -1,9 +1,9 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 27 files, combined SHA-256 `ba870aa1059d8871`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 28 files, combined SHA-256 `cb8f098500ef5785`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
-**This is a model.** Roles and default privileges are reconstructed from documented Supabase behaviour (`scripts/isolation-inventory/bootstrap-supabase-model.sql`); the hosted project was not read. Re-run the same queries on the hosted project during the preproduction phase (ISOLATION_DESIGN T1/A13) before relying on any row.
+**This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
 Scope: functions and relations in schemas `public` and `private` (the only schemas the migrations create or own), policies on those schemas plus `storage.objects`. Extension and Supabase-internal objects are excluded.
 
@@ -11,14 +11,14 @@ Scope: functions and relations in schemas `public` and `private` (the only schem
 
 | Role | superuser | login | inherit | bypassrls | member of |
 | --- | --- | --- | --- | --- | --- |
-| anon | false | false | true | false | - |
-| authenticated | false | false | true | false | - |
+| anon | false | false | false | false | - |
+| authenticated | false | false | false | false | - |
 | authenticator | false | true | false | false | anon,authenticated,service_role |
 | postgres | true | true | true | true | anon,authenticated,service_role |
-| service_role | false | false | true | false | - |
+| service_role | false | false | false | true | - |
 | supabase_admin | true | true | true | false | - |
 
-Custom roles created by the migrations or the bootstrap beyond the list above: gw_owner, lifecycle_operator, lifecycle_owner, proto_agent, proto_nobody.
+Custom roles created by the migrations or the bootstrap beyond the list above: none.
 
 | Schema | owner | USAGE: anon / authenticated / service_role / authenticator / postgres | CREATE: anon / authenticated / service_role / authenticator / postgres |
 | --- | --- | --- | --- |
@@ -34,9 +34,10 @@ Custom roles created by the migrations or the bootstrap beyond the list above: g
 
 | Created by | Schema | Object type | ACL granted to new objects |
 | --- | --- | --- | --- |
-| postgres | public | functions | `postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres` |
-| postgres | public | sequences | `postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres` |
-| postgres | public | tables | `postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres` |
+| postgres | (global) | functions | `postgres=X/postgres` |
+| postgres | public | functions | `postgres=X/postgres` |
+| postgres | public | sequences | `postgres=rwU/postgres` |
+| postgres | public | tables | `postgres=arwdDxtm/postgres` |
 
 PostgreSQL grants `EXECUTE` to `PUBLIC` on every new function unless a default privilege revokes it. `PUBLIC` is therefore listed separately below.
 
@@ -44,11 +45,11 @@ PostgreSQL grants `EXECUTE` to `PUBLIC` on every new function unless a default p
 
 Executed in the disposable database after the inventory was read:
 
-- 1. new function created by the migration owner, nothing revoked: PUBLIC=yes anon=yes authenticated=yes service_role=yes
+- 1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants): PUBLIC=no anon=no authenticated=no service_role=no
 - 2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role: PUBLIC=no anon=no authenticated=no service_role=no
 - 3. after CREATE OR REPLACE (a later migration that redefines the body): PUBLIC=no anon=no authenticated=no service_role=no
-- 4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=yes anon=yes authenticated=yes service_role=yes
-- 5. new overload a13_probe(int) next to the revoked one: anon=yes authenticated=yes service_role=yes
+- 4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=no anon=no authenticated=no service_role=no
+- 5. new overload a13_probe(int) next to the revoked one: anon=no authenticated=no service_role=no
 - 6. after ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS (schema public and global PUBLIC), then DROP + CREATE: PUBLIC=no anon=no authenticated=no service_role=no
 
 ## Functions
@@ -97,19 +98,19 @@ Executed in the disposable database after the inventory was read:
 | `private.uuid_or_null(value text)` | function | invoker | postgres | immutable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.valid_flag(value text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.veto_delegates(rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
-| `public.access_code_status(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
+| `public.access_code_status(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.amendment_link_info(link_token text)` | function | definer | postgres | stable | search_path="" | service_role, postgres | service_role | reads/none |
-| `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, service_role, postgres | authenticated, service_role | writes (via callee) |
-| `public.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, service_role, postgres | authenticated, service_role | writes (via callee) |
-| `public.conference_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
-| `public.conference_state_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
-| `public.executive_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
-| `public.executive_state_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
-| `public.operations_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
-| `public.redeem_access_code(conf uuid, code text)` | function | definer | postgres | volatile | search_path="" | authenticated, service_role, postgres | authenticated, service_role | writes |
-| `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | function | definer | postgres | volatile | search_path="" | authenticated, service_role, postgres | authenticated, service_role | writes |
-| `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_at timestamp with ti...)` | function | definer | postgres | volatile | search_path="" | authenticated, service_role, postgres | authenticated, service_role | writes |
-| `public.staff_batch_snapshot(conf uuid, include_amendments boolean)` | function | invoker | postgres | stable | search_path="" | authenticated, service_role, postgres | authenticated, service_role | reads/none |
+| `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes (via callee) |
+| `public.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes (via callee) |
+| `public.conference_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.conference_state_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.executive_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.executive_state_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.operations_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.redeem_access_code(conf uuid, code text)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
+| `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
+| `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_at timestamp with ti...)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
+| `public.staff_batch_snapshot(conf uuid, include_amendments boolean)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.submission_link_info(link_token text)` | function | definer | postgres | stable | search_path="" | service_role, postgres | service_role | reads/none |
 | `public.submit_amendment(link_token text, submission uuid, submitter uuid, resolution uuid, amendment_type text,...)` | function | definer | postgres | volatile | search_path="" | service_role, postgres | service_role | writes |
 | `public.submit_resolution(link_token text, submission uuid, submitter uuid, title text, google_doc_id text, file_...)` | function | definer | postgres | volatile | search_path="" | service_role, postgres | service_role | writes |
@@ -126,11 +127,11 @@ Direct = `EXECUTE` and schema `USAGE` for at least one of anon / authenticated /
 | `private.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated | definer | direct DML |
 | `private.apply_procedure(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated | definer | direct DML |
 | `private.apply_staff_batch(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated | definer | direct DML |
-| `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated, service_role | invoker | via callee |
-| `public.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated, service_role | invoker | via callee |
-| `public.redeem_access_code(conf uuid, code text)` | authenticated, service_role | definer | direct DML |
-| `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | authenticated, service_role | definer | direct DML |
-| `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_at timestamp with ti...)` | authenticated, service_role | definer | direct DML |
+| `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated | invoker | via callee |
+| `public.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | authenticated | invoker | via callee |
+| `public.redeem_access_code(conf uuid, code text)` | authenticated | definer | direct DML |
+| `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | authenticated | definer | direct DML |
+| `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_at timestamp with ti...)` | authenticated | definer | direct DML |
 | `public.submit_amendment(link_token text, submission uuid, submitter uuid, resolution uuid, amendment_type text,...)` | service_role | definer | direct DML |
 | `public.submit_resolution(link_token text, submission uuid, submitter uuid, title text, google_doc_id text, file_...)` | service_role | definer | direct DML |
 
@@ -162,98 +163,63 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 ## Tables, views and sequences
 
-Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.
+Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER m=MAINTAIN; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.
 
 | Relation | Kind | Owner | RLS | Forced | Options | anon | authenticated | service_role | authenticator | postgres |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `private.access_credentials` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.access_grant_sources` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.access_redemption_attempts` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.amendment_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.mutation_receipts` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.resolution_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `public.amendment_links` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.amendments` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.attendance` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.audit_log` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.award_criteria` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.award_scores` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.committee_staff` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.committees` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.conference_session_slots` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.conference_staff` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.conferences` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.debate_states` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.delegates` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.document_comments` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.document_decisions` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.document_versions` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.documents` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.operational_changes` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.participation_adjustments` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.participation_corrections` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.participation_events` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.participation_history` | view | postgres | n/a | n/a | security_invoker=true | - | r | rawdDxt | - | rawdDxt |
-| `public.photo_acknowledgements` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.photo_list_epochs` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.photo_slots` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.poi_queue` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.resolution_links` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.schools` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.scoring_definitions` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.sessions` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.speaker_queue` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.speeches` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.staff` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.submission_links` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.timers` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.user_access` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
-| `public.votes` | table | postgres | yes | no | - | - | r | rawdDxt | - | rawdDxt |
+| `private.access_credentials` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.access_grant_sources` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.access_redemption_attempts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.amendment_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.mutation_receipts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.resolution_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `public.amendment_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.amendments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.attendance` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.audit_log` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.award_criteria` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.award_scores` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.committee_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.committees` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conference_session_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conference_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conferences` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.debate_states` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.delegates` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_comments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_decisions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_versions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.documents` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.operational_changes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_adjustments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_corrections` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_events` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_history` | view | postgres | n/a | n/a | security_invoker=true | - | r | - | - | rawdDxtm |
+| `public.photo_acknowledgements` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.photo_list_epochs` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.photo_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.poi_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.resolution_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.schools` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.scoring_definitions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.sessions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.speaker_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.speeches` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.submission_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.timers` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.user_access` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.votes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 
 ### Tables with RLS disabled (0)
 
 - none
 
-### Tables where a Data API role holds a mutating table privilege (36)
+### Tables where a Data API role holds a mutating table privilege (0)
 
 With RLS enabled these still need a permissive policy; with RLS disabled they are directly writable.
 
-- `public.amendment_links` (RLS on): service_role=rawdDxt
-- `public.amendments` (RLS on): service_role=rawdDxt
-- `public.attendance` (RLS on): service_role=rawdDxt
-- `public.audit_log` (RLS on): service_role=rawdDxt
-- `public.award_criteria` (RLS on): service_role=rawdDxt
-- `public.award_scores` (RLS on): service_role=rawdDxt
-- `public.committee_staff` (RLS on): service_role=rawdDxt
-- `public.committees` (RLS on): service_role=rawdDxt
-- `public.conference_session_slots` (RLS on): service_role=rawdDxt
-- `public.conference_staff` (RLS on): service_role=rawdDxt
-- `public.conferences` (RLS on): service_role=rawdDxt
-- `public.debate_states` (RLS on): service_role=rawdDxt
-- `public.delegates` (RLS on): service_role=rawdDxt
-- `public.document_comments` (RLS on): service_role=rawdDxt
-- `public.document_decisions` (RLS on): service_role=rawdDxt
-- `public.document_versions` (RLS on): service_role=rawdDxt
-- `public.documents` (RLS on): service_role=rawdDxt
-- `public.operational_changes` (RLS on): service_role=rawdDxt
-- `public.participation_adjustments` (RLS on): service_role=rawdDxt
-- `public.participation_corrections` (RLS on): service_role=rawdDxt
-- `public.participation_events` (RLS on): service_role=rawdDxt
-- `public.photo_acknowledgements` (RLS on): service_role=rawdDxt
-- `public.photo_list_epochs` (RLS on): service_role=rawdDxt
-- `public.photo_slots` (RLS on): service_role=rawdDxt
-- `public.poi_queue` (RLS on): service_role=rawdDxt
-- `public.resolution_links` (RLS on): service_role=rawdDxt
-- `public.schools` (RLS on): service_role=rawdDxt
-- `public.scoring_definitions` (RLS on): service_role=rawdDxt
-- `public.sessions` (RLS on): service_role=rawdDxt
-- `public.speaker_queue` (RLS on): service_role=rawdDxt
-- `public.speeches` (RLS on): service_role=rawdDxt
-- `public.staff` (RLS on): service_role=rawdDxt
-- `public.submission_links` (RLS on): service_role=rawdDxt
-- `public.timers` (RLS on): service_role=rawdDxt
-- `public.user_access` (RLS on): service_role=rawdDxt
-- `public.votes` (RLS on): service_role=rawdDxt
+- none
 
 Column-level privileges: none.
 
@@ -309,20 +275,5 @@ Column-level privileges: none.
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **12** of 56.
-
-| Function | supabase-model | bare |
-| --- | --- | --- |
-| `public.access_code_status(conf uuid)` | authenticated,service_role | authenticated |
-| `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_...)` | authenticated,service_role | authenticated |
-| `public.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_...)` | authenticated,service_role | authenticated |
-| `public.conference_snapshot(conf uuid)` | authenticated,service_role | authenticated |
-| `public.conference_state_snapshot(conf uuid)` | authenticated,service_role | authenticated |
-| `public.executive_snapshot(conf uuid)` | authenticated,service_role | authenticated |
-| `public.executive_state_snapshot(conf uuid)` | authenticated,service_role | authenticated |
-| `public.operations_snapshot(conf uuid)` | authenticated,service_role | authenticated |
-| `public.redeem_access_code(conf uuid, code text)` | authenticated,service_role | authenticated |
-| `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | authenticated,service_role | authenticated |
-| `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_...)` | authenticated,service_role | authenticated |
-| `public.staff_batch_snapshot(conf uuid, include_amendments boolean)` | authenticated,service_role | authenticated |
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 56.
 

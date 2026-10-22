@@ -13,15 +13,20 @@ import {createHash,randomUUID} from 'node:crypto';
 import {readFileSync,readdirSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {evaluatePolicy} from './policy.mjs';
 
 const here=dirname(fileURLToPath(import.meta.url));
 const root=resolve(here,'../..');
-const base=process.env.TEST_POSTGRES_URL;
-if(!base)throw new Error('Set TEST_POSTGRES_URL to a loopback PostgreSQL 17 URL');
-const url=new URL(base);
-if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw new Error('Refusing a non-loopback PostgreSQL server');
+function connection():URL{
+ const base=process.env.TEST_POSTGRES_URL;
+ if(!base)throw new Error('Set TEST_POSTGRES_URL to a loopback PostgreSQL 17 URL');
+ const url=new URL(base);
+ if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw new Error('Refusing a non-loopback PostgreSQL server');
+ return url;
+}
 
-function psql(db:string,sql:string,file?:string):string{
+export function psql(db:string,sql:string,file?:string):string{
+ const url=connection();
  const args=['-X','-q','-At','-v','ON_ERROR_STOP=1',...(file?['-f',file]:[])];
  const r=spawnSync(process.env.PSQL_BIN??'psql',args,{input:file?undefined:sql,encoding:'utf8',maxBuffer:256*1024*1024,
   env:{...process.env,PGHOST:url.hostname.replace(/^\[|\]$/g,''),PGPORT:url.port||'5432',PGUSER:decodeURIComponent(url.username),PGPASSWORD:decodeURIComponent(url.password),PGDATABASE:db}});
@@ -38,7 +43,7 @@ interface Fn{schema:string;name:string;args:string;result:string;kind:string;sec
  usage:Record<string,boolean>;exec:Record<string,boolean>;publicExec:boolean}
 interface Rel{schema:string;name:string;kind:string;owner:string;rls:boolean;forceRls:boolean;options:string;aclRaw:string;privs:Record<string,string[]>}
 interface Policy{table:string;name:string;cmd:string;roles:string;permissive:boolean;using:string;check:string}
-interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
+export interface Mode{fns:Fn[];rels:Rel[];colAcl:{table:string;column:string;acl:string;privs:Record<string,string[]>}[];policies:Policy[];defaults:{owner:string;schema:string;type:string;acl:string}[];
  schemas:{name:string;owner:string;acl:string;usage:Record<string,boolean>;create:Record<string,boolean>}[];roleAttrs:{name:string;super:boolean;login:boolean;inherit:boolean;bypassrls:boolean;memberOf:string}[];
  customRoles:string[];version:string;probe:Probe}
 interface Probe{lines:string[]}
@@ -46,7 +51,7 @@ interface Probe{lines:string[]}
 const roleList=ROLES.map(r=>`'${r}'`).join(',');
 const roleObj=(expr:(r:string)=>string)=>`json_build_object(${ROLES.map(r=>`'${r}',${expr(r)}`).join(',')})`;
 
-function collect(db:string):Omit<Mode,'probe'>{
+export function collect(db:string):Omit<Mode,'probe'>{
  const fns=json<Fn[]>(db,`select coalesce(json_agg(x order by x."schema",x."name",x."args"),'[]') from (
   select n.nspname "schema",p.proname "name",pg_get_function_identity_arguments(p.oid) "args",pg_get_function_result(p.oid) "result",p.prokind "kind",
    case when p.prosecdef then 'definer' else 'invoker' end "security",pg_get_userbyid(p.proowner) "owner",
@@ -60,7 +65,7 @@ function collect(db:string):Omit<Mode,'probe'>{
   where n.nspname in ${FILTER_SCHEMAS} and p.prokind in ('f','p')
    and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')) x;`);
  const privSql=(kind:'t'|'s')=>kind==='t'
-  ?`array(select pr from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) pr where has_table_privilege(%R%,c.oid,pr))`
+  ?`array(select pr from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) pr where has_table_privilege(%R%,c.oid,pr))`
   :`array(select pr from unnest(array['USAGE','SELECT','UPDATE']) pr where has_sequence_privilege(%R%,c.oid,pr))`;
  const rels=json<Rel[]>(db,`select coalesce(json_agg(x order by x."schema",x."name"),'[]') from (
   select n.nspname "schema",c.relname "name",c.relkind "kind",pg_get_userbyid(c.relowner) "owner",c.relrowsecurity "rls",c.relforcerowsecurity "forceRls",
@@ -70,7 +75,8 @@ function collect(db:string):Omit<Mode,'probe'>{
   where n.nspname in ${FILTER_SCHEMAS} and c.relkind in ('r','p','v','m','S','f')
    and not exists(select 1 from pg_depend d where d.objid=c.oid and d.deptype in ('e','i') )) x;`);
  const colAcl=json<Mode['colAcl']>(db,`select coalesce(json_agg(x order by x."table",x."column"),'[]') from (
-  select n.nspname||'.'||c.relname "table",a.attname "column",array_to_string(a.attacl,',') "acl"
+  select n.nspname||'.'||c.relname "table",a.attname "column",array_to_string(a.attacl,',') "acl",
+   json_build_object(${DATA_API.map(r=>`'${r}',array(select pr from unnest(array['SELECT','INSERT','UPDATE','REFERENCES']) pr where has_column_privilege('${r}',c.oid,a.attnum,pr))`).join(',')}) "privs"
   from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
   where a.attacl is not null and not a.attisdropped and n.nspname in ${FILTER_SCHEMAS}) x;`);
  const policies=json<Policy[]>(db,`select coalesce(json_agg(x order by x."table",x."name"),'[]') from (
@@ -106,7 +112,7 @@ function a13Probe(db:string,bare:boolean):Probe{
   lines.push(`${label}: ${Object.entries(r).map(([k,v])=>`${k}=${v?'yes':'no'}`).join(' ')}`);
  };
  psql(db,`create function public.a13_probe() returns int language sql as $$select 1$$;`);
- who('1. new function created by the migration owner, nothing revoked');
+ who('1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants)');
  psql(db,`revoke execute on function public.a13_probe() from public,anon,authenticated,service_role;`);
  who('2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role');
  psql(db,`create or replace function public.a13_probe() returns int language sql as $$select 2$$;`);
@@ -127,13 +133,21 @@ function a13Probe(db:string,bare:boolean):Probe{
  return {lines};
 }
 
-function run(label:'supabase-model'|'bare'){
+/** Creates a disposable database, applies the baseline bootstrap and every migration, returns its name. The caller drops it. */
+export function build(label:'supabase-model'|'bare'):string{
  const db=`munos_inv_${randomUUID().replaceAll('-','')}`;
  psql('postgres',`create database ${db};`);
  try{
   psql(db,'',join(here,label==='bare'?'bootstrap-bare.sql':'bootstrap-supabase-model.sql'));
   const dir=join(root,'supabase/migrations');
   for(const f of readdirSync(dir).filter(n=>n.endsWith('.sql')).sort())psql(db,'',join(dir,f));
+  return db;
+ }catch(e){psql('postgres',`drop database if exists ${db};`);throw e;}
+}
+
+function run(label:'supabase-model'|'bare'){
+ const db=build(label);
+ try{
   const mode=collect(db);
   const probe=a13Probe(db,label==='bare');
   return {...mode,probe} as Mode;
@@ -179,7 +193,7 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
   `Generator: \`scripts/isolation-inventory/inventory.mts\`. Baseline: **${label}**. ${m.version}, disposable local database replayed from empty.`,
   `Migrations replayed: ${files.length} files, combined SHA-256 \`${hash.slice(0,16)}\`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.`,'',
   label==='supabase-model'
-   ?'**This is a model.** Roles and default privileges are reconstructed from documented Supabase behaviour (`scripts/isolation-inventory/bootstrap-supabase-model.sql`); the hosted project was not read. Re-run the same queries on the hosted project during the preproduction phase (ISOLATION_DESIGN T1/A13) before relying on any row.'
+   ?'**This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.'
    :'**Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.','',
   'Scope: functions and relations in schemas `public` and `private` (the only schemas the migrations create or own), policies on those schemas plus `storage.objects`. Extension and Supabase-internal objects are excluded.','');
  out.push('## Roles and schemas','','| Role | superuser | login | inherit | bypassrls | member of |','| --- | --- | --- | --- | --- | --- |');
@@ -231,8 +245,8 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
  void exposed;
 
  // Relations
- const privCol=(r:Rel,role:string)=>r.privs[role].map(p=>p==='SELECT'?'r':p==='INSERT'?'a':p==='UPDATE'?'w':p==='DELETE'?'d':p==='TRUNCATE'?'D':p==='REFERENCES'?'x':p==='TRIGGER'?'t':p==='USAGE'?'U':p).join('')||'-';
- out.push('## Tables, views and sequences','','Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.','');
+ const privCol=(r:Rel,role:string)=>r.privs[role].map(p=>p==='SELECT'?'r':p==='INSERT'?'a':p==='UPDATE'?'w':p==='DELETE'?'d':p==='TRUNCATE'?'D':p==='REFERENCES'?'x':p==='TRIGGER'?'t':p==='MAINTAIN'?'m':p==='USAGE'?'U':p).join('')||'-';
+ out.push('## Tables, views and sequences','','Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER m=MAINTAIN; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.','');
  const kindName:Record<string,string>={r:'table',p:'partitioned table',v:'view',m:'materialized view',S:'sequence',f:'foreign table'};
  out.push('| Relation | Kind | Owner | RLS | Forced | Options | '+ROLES.join(' | ')+' |','| --- | --- | --- | --- | --- | --- | '+ROLES.map(()=>'---').join(' | ')+' |');
  for(const r of m.rels)out.push(`| \`${r.schema}.${r.name}\` | ${kindName[r.kind]} | ${r.owner} | ${['S','v','m'].includes(r.kind)?'n/a':r.rls?'yes':'NO'} | ${['S','v','m'].includes(r.kind)?'n/a':r.forceRls?'yes':'no'} | ${r.options||'-'} | ${ROLES.map(role=>privCol(r,role)).join(' | ')} |`);
@@ -263,24 +277,50 @@ function render(label:string,m:Mode,hash:string,files:string[],other?:Mode){
  return out.join('\n')+'\n';
 }
 
+/** The model as committed in docs/generated/isolation-t1-inventory.json (function bodies dropped). */
+export const stable=(m:Mode)=>({...m,fns:m.fns.map(({src,...rest})=>{void src;return rest;})});
+
+/** Roles are cluster-wide and the bootstrap only creates missing ones. A cluster that already holds anon/authenticated/service_role
+ *  with other attributes (for example after the PostgreSQL tests ran on it) would make the inventory differ for reasons that are not
+ *  the migrations, so fail with that explanation instead of a misleading STALE. CI runs this on a fresh cluster before the tests. */
+function assertCleanRoles(){
+ const want:Record<string,string>={anon:'f|f|f|f',authenticated:'f|f|f|f',service_role:'f|f|f|t',authenticator:'t|f|f|f',supabase_admin:'t|t|t|f'};
+ const have=psql('postgres',`select rolname||'='||rolcanlogin::text||'|'||rolsuper::text||'|'||rolinherit::text||'|'||rolbypassrls::text from pg_roles where rolname in ('anon','authenticated','service_role','authenticator','supabase_admin') order by 1;`).split('\n').filter(Boolean);
+ const flag=(s:string)=>s.replaceAll('true','t').replaceAll('false','f');
+ for(const line of have){
+  const [name,attrs]=line.split('=');
+  const [login,sup,inherit,bypass]=flag(attrs).split('|');
+  const got=`${login}|${sup}|${inherit}|${bypass}`;
+  if(got!==want[name])throw new Error(`Role ${name} already exists in this cluster with attributes login|super|inherit|bypassrls=${got} (model: ${want[name]}). Use a fresh PostgreSQL cluster (the inventory output depends on cluster-wide roles).`);
+ }
+}
+
+function main(){
+assertCleanRoles();
 const files=readdirSync(join(root,'supabase/migrations')).filter(n=>n.endsWith('.sql')).sort();
 const hash=createHash('sha256').update(files.map(f=>readFileSync(join(root,'supabase/migrations',f))).join('\n--\n')).digest('hex');
 const model=run('supabase-model');
 const bare=run('bare');
 const md=render('supabase-model',model,hash,files,bare);
 const bareMd=render('bare',bare,hash,files);
-const stable=(m:Mode)=>({...m,fns:m.fns.map(({src,...rest})=>{void src;return rest;})});
 const jsonOut=JSON.stringify({generator:'scripts/isolation-inventory/inventory.mts',migrations:files,migrationsSha256:hash,'supabase-model':stable(model),bare:stable(bare)},null,1)+'\n';
 
 const outDir=join(root,'docs/generated');
 const targets:[string,string][]=[['isolation-t1-inventory.md',md],['isolation-t1-inventory-bare.md',bareMd],['isolation-t1-inventory.json',jsonOut]];
+// Policy (policy.mts) runs on the hosted-calibrated model in every mode: regenerating the files never makes a breach acceptable.
+const violations=evaluatePolicy(model);
+let bad=false;
 if(process.argv.includes('--check')){
- let bad=false;
- for(const [name,body] of targets){const p=join(outDir,name);if(!existsSync(p)||readFileSync(p,'utf8')!==body){console.error(`STALE: docs/generated/${name}`);bad=true;}}
- if(bad)process.exit(1);
- console.log('docs/generated is up to date');
+ for(const [name,body] of targets){const p=join(outDir,name);if(!existsSync(p)||readFileSync(p,'utf8')!==body){console.error(`STALE: docs/generated/${name} differs from the migrations in this tree. Run: npm run grants:regenerate (then review the diff).`);bad=true;}}
+ if(!bad)console.log('docs/generated is up to date');
 }else{
  mkdirSync(outDir,{recursive:true});
  for(const [name,body] of targets)writeFileSync(join(outDir,name),body);
  console.log(`wrote ${targets.map(t=>t[0]).join(', ')}; ${model.fns.length} functions, ${model.rels.length} relations, ${model.policies.length} policies`);
 }
+for(const v of violations){console.error(`POLICY: ${v}`);bad=true;}
+if(!violations.length)console.log('privilege policy: no violations');
+if(bad)process.exit(1);
+}
+
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main();

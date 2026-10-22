@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 27 files, combined SHA-256 `ba870aa1059d8871`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 28 files, combined SHA-256 `cb8f098500ef5785`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -11,14 +11,14 @@ Scope: functions and relations in schemas `public` and `private` (the only schem
 
 | Role | superuser | login | inherit | bypassrls | member of |
 | --- | --- | --- | --- | --- | --- |
-| anon | false | false | true | false | - |
-| authenticated | false | false | true | false | - |
+| anon | false | false | false | false | - |
+| authenticated | false | false | false | false | - |
 | authenticator | false | true | false | false | anon,authenticated,service_role |
 | postgres | true | true | true | true | anon,authenticated,service_role |
-| service_role | false | false | true | false | - |
+| service_role | false | false | false | true | - |
 | supabase_admin | true | true | true | false | - |
 
-Custom roles created by the migrations or the bootstrap beyond the list above: gw_owner, lifecycle_operator, lifecycle_owner, proto_agent, proto_nobody.
+Custom roles created by the migrations or the bootstrap beyond the list above: none.
 
 | Schema | owner | USAGE: anon / authenticated / service_role / authenticator / postgres | CREATE: anon / authenticated / service_role / authenticator / postgres |
 | --- | --- | --- | --- |
@@ -30,7 +30,9 @@ Custom roles created by the migrations or the bootstrap beyond the list above: g
 
 ## Default privileges (pg_default_acl)
 
-None. New objects get only the PostgreSQL defaults (owner full, functions executable by PUBLIC).
+| Created by | Schema | Object type | ACL granted to new objects |
+| --- | --- | --- | --- |
+| postgres | (global) | functions | `postgres=X/postgres` |
 
 PostgreSQL grants `EXECUTE` to `PUBLIC` on every new function unless a default privilege revokes it. `PUBLIC` is therefore listed separately below.
 
@@ -38,11 +40,11 @@ PostgreSQL grants `EXECUTE` to `PUBLIC` on every new function unless a default p
 
 Executed in the disposable database after the inventory was read:
 
-- 1. new function created by the migration owner, nothing revoked: PUBLIC=yes anon=yes authenticated=yes service_role=yes
+- 1. new function created by the migration owner, nothing revoked (the chain includes migration 20261022090000_privilege_hardening, which revokes the default EXECUTE grants): PUBLIC=no anon=no authenticated=no service_role=no
 - 2. after explicit REVOKE EXECUTE from PUBLIC, anon, authenticated, service_role: PUBLIC=no anon=no authenticated=no service_role=no
 - 3. after CREATE OR REPLACE (a later migration that redefines the body): PUBLIC=no anon=no authenticated=no service_role=no
-- 4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=yes anon=yes authenticated=yes service_role=yes
-- 5. new overload a13_probe(int) next to the revoked one: anon=yes authenticated=yes service_role=yes
+- 4. after DROP FUNCTION + CREATE FUNCTION (a later migration that recreates it): PUBLIC=no anon=no authenticated=no service_role=no
+- 5. new overload a13_probe(int) next to the revoked one: anon=no authenticated=no service_role=no
 
 ## Functions
 
@@ -155,53 +157,53 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 ## Tables, views and sequences
 
-Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.
+Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t=TRIGGER m=MAINTAIN; sequences: U=USAGE r=SELECT w=UPDATE. Effective privileges (including PUBLIC and role membership) from `has_table_privilege` / `has_sequence_privilege`.
 
 | Relation | Kind | Owner | RLS | Forced | Options | anon | authenticated | service_role | authenticator | postgres |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `private.access_credentials` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.access_grant_sources` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.access_redemption_attempts` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.amendment_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.mutation_receipts` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `private.resolution_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxt |
-| `public.amendment_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.amendments` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.attendance` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.audit_log` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.award_criteria` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.award_scores` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.committee_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.committees` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.conference_session_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.conference_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.conferences` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.debate_states` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.delegates` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.document_comments` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.document_decisions` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.document_versions` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.documents` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.operational_changes` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.participation_adjustments` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.participation_corrections` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.participation_events` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.participation_history` | view | postgres | n/a | n/a | security_invoker=true | - | r | - | - | rawdDxt |
-| `public.photo_acknowledgements` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.photo_list_epochs` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.photo_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.poi_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.resolution_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.schools` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.scoring_definitions` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.sessions` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.speaker_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.speeches` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.submission_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.timers` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.user_access` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
-| `public.votes` | table | postgres | yes | no | - | - | r | - | - | rawdDxt |
+| `private.access_credentials` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.access_grant_sources` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.access_redemption_attempts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.amendment_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.mutation_receipts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.resolution_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `public.amendment_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.amendments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.attendance` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.audit_log` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.award_criteria` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.award_scores` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.committee_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.committees` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conference_session_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conference_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.conferences` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.debate_states` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.delegates` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_comments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_decisions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.document_versions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.documents` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.operational_changes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_adjustments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_corrections` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_events` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.participation_history` | view | postgres | n/a | n/a | security_invoker=true | - | r | - | - | rawdDxtm |
+| `public.photo_acknowledgements` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.photo_list_epochs` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.photo_slots` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.poi_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.resolution_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.schools` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.scoring_definitions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.sessions` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.speaker_queue` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.speeches` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.submission_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.timers` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.user_access` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.votes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 
 ### Tables with RLS disabled (0)
 
