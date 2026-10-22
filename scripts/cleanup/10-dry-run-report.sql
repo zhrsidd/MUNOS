@@ -6,6 +6,7 @@ select 'MUNOS_CLEANUP_JSON ' || jsonb_build_object(
   'label', (select v from cleanup_state where k = 'label'),
   'token', (select v from cleanup_state where k = 'digest'),
   'conferences', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'name', name, 'venue', venue) order by id) from cleanup_targets), '[]'),
+  'absent_ids', coalesce((select jsonb_agg(i order by i) from unnest(string_to_array((select v from cleanup_state where k = 'ids'), ',')) i where i::uuid not in (select id from cleanup_targets)), '[]'),
   'tables', (select jsonb_agg(jsonb_build_object('seq', seq, 'table', tbl, 'kind', kind, 'rows', n, 'exact', exact, 'fingerprint', fp) order by seq) from cleanup_counts),
   'total_rows_deleted_if_executed', (select coalesce(sum(n), 0) from cleanup_counts where kind = 'delete'),
   'storage', jsonb_build_object(

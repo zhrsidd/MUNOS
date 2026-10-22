@@ -72,19 +72,24 @@ export async function buildScript(sqlDir: string, p: RunParams): Promise<string>
   if (!p.ids.length || !p.ids.every((v) => UUID.test(v))) throw Error("invalid ids");
   if (!p.protectedIds.length || !p.protectedIds.every((v) => UUID.test(v))) throw Error("invalid protected ids");
   if (p.mode === "execute" && !(p.token && TOKEN.test(p.token))) throw Error("execute needs a 64-hex confirmation token");
+  const settings: Record<string, string> = { mode: p.mode, label: p.label, ids: p.ids.join(","), protected: p.protectedIds.join(",") };
+  if (p.token) settings.token = p.token;
+  return assemble(sqlDir, settings, p.mode);
+}
+
+/** The transaction around the SQL parts, from raw settings. Tests use this to prove the SQL refuses on its own, without this file's validation. */
+export async function assemble(sqlDir: string, settings: Record<string, string>, mode: Mode): Promise<string> {
   const sql = async (name: string) => readFile(join(sqlDir, name), "utf8");
-  const settings = [["mode", p.mode], ["label", p.label], ["ids", p.ids.join(",")], ["protected", p.protectedIds.join(",")], ...(p.token ? [["token", p.token]] : [])];
-  const set = `select ${settings.map(([k, v]) => `set_config('munos_cleanup.${k}', ${q(v)}, true)`).join(", ")};`;
-  const head = "begin;"; // a dry run turns itself read only in 00-prepare.sql, after its temp tables exist
-  const lock = "set local lock_timeout = '5s';";
-  if (p.mode === "dry-run") return [head, lock, set, await sql("00-prepare.sql"), await sql("10-dry-run-report.sql"), "rollback;"].join("\n");
-  return [head, lock, set, await sql("00-prepare.sql"), await sql("20-execute.sql"), "commit;"].join("\n");
+  const set = `select ${Object.entries(settings).map(([k, v]) => `set_config('munos_cleanup.${k}', ${q(v)}, true)`).join(", ")};`;
+  // A dry run turns itself read only in 00-prepare.sql, after its temp tables exist, and always ends in rollback.
+  const parts = mode === "dry-run" ? [await sql("10-dry-run-report.sql"), "rollback;"] : [await sql("20-execute.sql"), "commit;"];
+  return ["begin;", "set local lock_timeout = '5s';", set, await sql("00-prepare.sql"), ...parts].join("\n");
 }
 
 export interface TableRow { seq: number; table: string; kind: string; rows?: number; expected?: number; affected?: number; exact?: boolean; fingerprint?: string }
 export interface Report {
   kind: "dry-run" | "execute"; status: "ready" | "nothing_to_delete" | "deleted"; label: string; token: string; executed_at?: string;
-  conferences: { id: string; name: string; venue: string }[]; tables: TableRow[];
+  conferences: { id: string; name: string; venue: string }[]; absent_ids: string[]; tables: TableRow[];
   total_rows_deleted_if_executed?: number; total_rows_deleted?: number;
   storage: { document_version_keys: string[]; bucket_objects: { bucket: string; key: string }[]; note?: string };
   auth_user_candidates: string[]; auth_users_kept_because_referenced_elsewhere?: number;

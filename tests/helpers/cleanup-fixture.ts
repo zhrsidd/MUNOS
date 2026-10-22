@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 export const uid=(tag:string,n:string|number)=>{const h=createHash('sha256').update(`${tag}:${n}`).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`;};
 const q=(s:string)=>`'${s.replaceAll("'","''")}'`;
 const doc=(tag:string,n:number)=>`${tag}`.replace(/[^A-Za-z0-9]/g,'').padEnd(8,'x')+createHash('sha256').update(`${tag}${n}`).digest('hex').slice(0,24);
-export interface FixtureOptions{name:string;venue?:string;sharedUser?:string;features?:Record<string,unknown>;withActive?:boolean;storage?:boolean}
+export interface FixtureOptions{name:string;venue?:string;sharedUser?:string;features?:Record<string,unknown>;active?:'grant'|'credential'|'submission link'|'amendment link';expiredUnrevoked?:boolean;storage?:boolean}
 /** The ids used by the fixture, so tests can name them. */
 export const fixtureIds=(tag:string)=>({conference:uid(tag,'conference'),committee:uid(tag,'committee-a'),committee2:uid(tag,'committee-b'),session:uid(tag,'session'),userChair:uid(tag,'user-chair'),userExec:uid(tag,'user-exec'),userDevice:uid(tag,'user-device')});
 export function populateSql(tag:string,o:FixtureOptions){
@@ -60,6 +60,11 @@ insert into public.audit_log(id,conference_id,committee_id,"actorId",action,"ent
 insert into public.operational_changes(id,conference_id,committee_id,topic,mutation_id) values (${u('opchange')},${C},${u('committee-a')},'chair',${u('mutation-2')});
 ${o.storage?`insert into storage.buckets(id,name,public) values ('resolutions','resolutions',false) on conflict do nothing;
 insert into storage.objects(bucket_id,name) values ('resolutions',${q(`${ids.conference}/${ids.committee}/${uid(tag,'doc')}/resolution.pdf`)}),('resolutions',${q(`${ids.conference}/${ids.committee}/${uid(tag,'doc')}/orphan.pdf`)});`:''}
-${o.withActive?`insert into public.user_access(id,conference_id,user_id,role,committee_id,expires_at) values (${u('ua-live')},${C},${u('user-device')},'chair',${u('committee-a')},now()+interval '1 hour');`:''}
+${o.active==='grant'?`insert into public.user_access(id,conference_id,user_id,role,committee_id,expires_at) values (${u('ua-live')},${C},${u('user-device')},'chair',${u('committee-a')},now()+interval '1 hour');`:''}
+${o.active==='credential'?`insert into private.access_credentials(id,conference_id,committee_id,role,credential_hash,expires_at) values (${u('cred-live')},${C},${u('committee-a')},'chair',${q(createHash('sha256').update(tag+'live').digest('hex'))},now()+interval '1 hour');`:''}
+${o.active==='submission link'?`insert into public.submission_links(id,conference_id,committee_id,token,share_with) values (${u('sublink-live')},${C},${u('committee-a')},${q(doc(tag,6))},'everyone');`:''}
+${o.active==='amendment link'?`insert into public.amendment_links(id,conference_id,committee_id,token) values (${u('amdlink-live')},${C},${u('committee-a')},${q(doc(tag,7))});`:''}
+${o.expiredUnrevoked?`insert into public.user_access(id,conference_id,user_id,role,committee_id,expires_at) values (${u('ua-expired')},${C},${u('user-device')},'observer',null,now()-interval '1 hour');
+insert into private.access_credentials(id,conference_id,committee_id,role,credential_hash,expires_at) values (${u('cred-expired')},${C},null,'logistics',${q(createHash('sha256').update(tag+'expired').digest('hex'))},now()-interval '1 hour');`:''}
 `;
 }

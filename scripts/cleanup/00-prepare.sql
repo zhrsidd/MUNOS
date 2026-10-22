@@ -177,9 +177,11 @@ begin
   end if;
 
   -- 10. Auth users only the target conferences reference (candidates for a SEPARATE, listed Auth-admin step; never deleted here).
-  for r in select format('%I.%I', ns.nspname, c.relname) as tbl, a.attname as col
+  -- Every foreign key to auth.users, plus the one column that names a user without a key (a redemption attempt's device user).
+  for r in select format('%I.%I', ns.nspname, c.relname) as tbl, a.attname::text as col
              from pg_constraint k join pg_class c on c.oid = k.conrelid join pg_namespace ns on ns.oid = c.relnamespace join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
-            where k.contype = 'f' and k.confrelid = to_regclass('auth.users') and array_length(k.conkey, 1) = 1 and ns.nspname in ('public', 'private') loop
+            where k.contype = 'f' and k.confrelid = to_regclass('auth.users') and array_length(k.conkey, 1) = 1 and ns.nspname in ('public', 'private')
+           union select 'private.access_redemption_attempts', 'user_id' loop
     for fp in select scope from cleanup_rules where tbl = r.tbl and kind = 'delete' loop
       execute format('insert into cleanup_auth select distinct t.%I from %s t where (%s) and t.%I is not null on conflict do nothing', r.col, r.tbl, fp, r.col);
       execute format('insert into cleanup_auth_other select distinct t.%I from %s t where not (%s) and t.%I is not null on conflict do nothing', r.col, r.tbl, fp, r.col);
@@ -195,6 +197,6 @@ begin
   for r in select * from cleanup_counts order by seq loop canon := canon || 'table=' || r.seq || '|' || r.tbl || '|' || r.kind || '|' || r.n || '|' || r.fp || E'\n'; end loop;
   canon := canon || 'storage=' || (select count(*) from cleanup_storage) || '|' || (select coalesce(md5(string_agg(source || ':' || key, ',' order by source, key)), '') from cleanup_storage) || E'\n'
     || 'auth=' || (select count(*) from cleanup_auth) || '|' || (select coalesce(md5(string_agg(user_id::text, ',' order by user_id)), '') from cleanup_auth) || E'\n';
-  insert into cleanup_state values ('mode', v_mode), ('label', v_label), ('digest', encode(sha256(convert_to(canon, 'UTF8')), 'hex'));
+  insert into cleanup_state values ('mode', v_mode), ('label', v_label), ('ids', array_to_string(v_ids, ',')), ('digest', encode(sha256(convert_to(canon, 'UTF8')), 'hex'));
 end
 $prepare$;
