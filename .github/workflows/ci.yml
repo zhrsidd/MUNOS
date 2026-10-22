@@ -37,6 +37,13 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # Permission drift (HD4): replays every migration on the PostgreSQL 17 above, fails if docs/generated no longer matches
+      # (new function, table, view, default ACL or any privilege change) or if the privilege policy is breached
+      # (scripts/isolation-inventory/policy-allowlist.json). Loopback only; creates and drops its own databases.
+      - name: Check grants drift
+        run: npm run check:grants
+        env:
+          TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5433/postgres
       - run: npm test
         env:
           TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5433/postgres

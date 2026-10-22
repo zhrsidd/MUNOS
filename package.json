@@ -11,6 +11,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:database": "tsx --test tests/database.test.ts",
     "test:offline": "tsx --test tests/offline.test.ts",
+    "check:grants": "tsx scripts/isolation-inventory/inventory.mts --check",
+    "grants:regenerate": "tsx scripts/isolation-inventory/inventory.mts",
     "test:remote": "tsx scripts/remote-workflow.mts",
     "test:load": "tsx scripts/load-test.mts",
     "seed:generate": "tsx scripts/generate-seed.mts",

@@ -30,7 +30,7 @@
   "20261021140000_sequential_chair_numbering.sql",
   "20261022090000_privilege_hardening.sql"
  ],
- "migrationsSha256": "771c24ae609c63fcabd267a8ae9867840799e309660e27b42e5fef65d92a3061",
+ "migrationsSha256": "cb8f098500ef5785e001e4f30bc131db0a6429673edafb7b92c9558af5347c4f",
  "supabase-model": {
   "fns": [
    {
