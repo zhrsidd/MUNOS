@@ -65,7 +65,7 @@ Vercel Preview for every branch/PR **and for `main`**; Production only from the 
 
 ## Infrastructure lifecycle
 
-One hosted Supabase project moves through Development, Final rehearsal, Cutover and Production; no second hosted project or paid branch without owner approval. After promotion, cloud agents have no live database access, destructive tests run on local disposable Postgres, and PHESMUN production is denied everywhere. The lifecycle gates (production lock, registry, production-only write gateway, revocation proof) are required but **not yet implemented**: see [docs/INFRASTRUCTURE_LIFECYCLE.md](docs/INFRASTRUCTURE_LIFECYCLE.md) and [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md).
+One hosted Supabase project moves through Development, Final rehearsal, Cutover and Production; no second hosted project or paid branch without owner approval. After promotion, cloud agents have no live database access, destructive tests run on local disposable Postgres, and PHESMUN production is denied everywhere. The lifecycle controls (production lock, registry, revocation proof) remain unresolved. The owner approved the direct RPC write path for this conference and deferred the gateway and signed attestation on 26 October 2026 ([scope and limits](docs/RELEASE_SCOPE_2026-10-26.md)); this is not Production approval. Original requirements and current gates: see [docs/INFRASTRUCTURE_LIFECYCLE.md](docs/INFRASTRUCTURE_LIFECYCLE.md) and [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md).
 
 ## Deferred
 
