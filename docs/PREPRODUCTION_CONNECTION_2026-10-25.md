@@ -62,12 +62,20 @@ Using the app's real redeemStaffCode and SupabaseTransport against the allowed f
 
 ## Outstanding verification and release gates
 
-The owner completed the Vercel team authorization. Authenticated fetches of the immutable deployment's root and /api/health now return HTTP 200. Health identifies the exact reviewed commit 3e282f75faea255c998e3b4e4dbc4d4ccb8ba127, the dedicated branch and Preview environment; its Supabase check reports ok. The deployed browser reaches the staff access-code form through the connector's existing, expiring deployment share link. Deployment protection remains enabled.
+The owner completed the Vercel team authorization. Authenticated fetches of the immutable deployment's root and /api/health now return HTTP 200. Health identifies the exact reviewed commit 3e282f75faea255c998e3b4e4dbc4d4ccb8ba127, the dedicated branch and Preview environment; its Supabase check reports ok. The deployed browser reaches the staff access-code form through the connector's existing, expiring deployment share link. The served client bundle also contains the expected project ref and selected synthetic conference id. Deployment protection remains enabled.
 
-No server secret was installed, so public QR routes and server database/Storage health probes remain unavailable. Staff data flow was verified through the real client/transport, not through the deployed browser UI. Browser reload/offline/two-device conflict behavior, hosted revocation of sessions/tokens, public submission flow, load/capacity and formal release acceptance remain separate gates.
+No server secret was installed, so public QR routes and server database/Storage health probes remain unavailable. Staff data flow was verified through the real client/transport. Authenticated browser navigation remains unverified: the browser automation masks password values, so the automated sign-in attempt did not use the saved code and was rejected. The browser was returned to the signed-out form; this is not evidence that the saved code is invalid. Browser reload/offline/two-device conflict behavior, hosted revocation of sessions/tokens, public submission flow, load/capacity and formal release acceptance remain separate gates.
 
 Production is still demo on commit `542e7052b75b1bb4d8fa842add2d8ddd1f9fd2a6`. This checkpoint is not Production promotion or conference readiness approval.
 
 ## Retirement before cutover
 
 Stop branch-connected builds; remove branch-scoped settings; delete this immutable connected deployment and its branch alias; revoke synthetic credentials/device grants; inventory any later connected deployment separately. Changing variables alone does not disconnect an immutable deployment. If a server key is installed later, record it and rotate it at cutover. Do not execute destructive cleanup without its separate guarded run approval.
+
+## Staff access layout follow-up
+
+Owner-requested alignment fix [#72](https://github.com/zhrsidd/MUNOS/pull/72) was merged as `e90686bc6cc10fe6818eb5f6c54e5650f36f9413`. Its tree equals tested head `10c4b4ed76ed3f8d389359a147969e815560afaf`. Exact-head [CI](https://github.com/zhrsidd/MUNOS/actions/runs/40192990093) passed. Local typecheck, lint, standard Turbopack build and all 823 tests passed (zero fail/skip/TODO) with disposable PostgreSQL 17 / UTF-8.
+
+The standalone access card avoids inherited panel margins. Real browser checks cover 1280 px (identical measured content left edges, no horizontal overflow), plus actual app frames at 320 and 390 px, and input-to-submit keyboard focus. No access-control or data contract logic changed. The temporary frame harness was removed.
+
+The dedicated connected branch was fast-forwarded to the verified merge. Its new immutable deployment is `dpl_7XxtobS1AYLP4gdTtD4GriuWACAw`, https://munos-bf56arr56-dcmun.vercel.app (automatic Preview, API target null). It retains the same branch-scoped synthetic target and must also be retired before cutover. The original immutable deployment above remains a separately connected surface until retirement. The deployment is Ready. Its health returns HTTP 200 with exact merge commit e90686b, Preview environment and Supabase ok (418 ms). The deployed browser confirms the corrected form and identical content left edges, with no horizontal overflow. An unauthenticated request returns 302 to Vercel SSO. Both Production aliases were independently rechecked and still identify demo commit 542e705. The temporary verification share links were revoked after inspection; normal Vercel team sign-in remains required.
