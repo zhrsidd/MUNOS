@@ -3528,3 +3528,43 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
   gap: 0 var(--space-4);
   margin: var(--space-2) 0 var(--space-3);
 }
+
+/* Access is a standalone form: shared .panel child margins would offset its headings and controls. */
+.staff-access-page {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+.staff-access-card {
+  width: 100%;
+  max-width: 460px;
+  min-width: 0;
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+}
+.staff-access-heading {
+  display: grid;
+  gap: var(--space-3);
+}
+.staff-access-heading .eyebrow { margin: 0; }
+.staff-access-heading h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.staff-access-form {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.staff-access-form input { width: 100%; }
+.staff-access-card > .small { margin-top: var(--space-5); }
+@media (max-width: 560px) {
+  .staff-access-page { padding: var(--space-4); }
+  .staff-access-card { padding: var(--space-5); }
+}
