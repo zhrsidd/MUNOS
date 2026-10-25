@@ -62,7 +62,7 @@ Using the app's real redeemStaffCode and SupabaseTransport against the allowed f
 
 ## Outstanding verification and release gates
 
-Protected deployment fetch/browser verification is blocked by the Vercel connection's team authorization (403 at read_protection_bypass). A single-use team-consent link was requested from the owner. Do not weaken deployment protection to bypass this.
+The owner completed the Vercel team authorization. Authenticated fetches of the immutable deployment's root and /api/health now return HTTP 200. Health identifies the exact reviewed commit 3e282f75faea255c998e3b4e4dbc4d4ccb8ba127, the dedicated branch and Preview environment; its Supabase check reports ok. The deployed browser reaches the staff access-code form through the connector's existing, expiring deployment share link. Deployment protection remains enabled.
 
 No server secret was installed, so public QR routes and server database/Storage health probes remain unavailable. Staff data flow was verified through the real client/transport, not through the deployed browser UI. Browser reload/offline/two-device conflict behavior, hosted revocation of sessions/tokens, public submission flow, load/capacity and formal release acceptance remain separate gates.
 
