@@ -1,9 +1,11 @@
+import './helpers/no-network.mjs';
+import {testRegistry,TEST_PROJECT_REF} from './helpers/lifecycle-registry.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assertToolTarget,checkProductionTarget,checkToolTarget,NEVER_SUPABASE_REFS,parseRefs,PHESMUN_PRODUCTION_REF,supabaseRef,targetConfig,targetProblem} from '../lib/platform/target-guard';
+import {assertToolTarget,checkProductionTarget,checkToolTarget,checkRegisteredToolTarget,NEVER_SUPABASE_REFS,parseRefs,PHESMUN_PRODUCTION_REF,supabaseRef,targetConfig,targetProblem} from '../lib/platform/target-guard';
 import {probe} from '../lib/platform/health-probe';
 
-const PROD='prodprodprodprodprod';const STAGE='stagestagestagestage';const DEV='devdevdevdevdevdevde';const OTHER='otherotherotherother1';
+const PROD='prodprodprodprodprod';const STAGE='testtesttesttesttest';const DEV='devdevdevdevdevdevde';const OTHER='otherotherotherother1';
 const url=(ref:string)=>`https://${ref}.supabase.co`;
 
 test('hosted URL parsing refuses credentials, ports, http, wrong hosts and malformed refs',()=>{
@@ -67,7 +69,7 @@ test('targetProblem: PHESMUN production is always refused; Vercel Production mus
  assert.match(targetProblem(url(PROD),{VERCEL_ENV:'preview',EXPECTED_SUPABASE_REF:PROD})!,/preview deployment refused: .*production project/);
  assert.match(targetProblem(url(DEV),{VERCEL_ENV:'preview'})!,/not listed/,'no allow-list: refused');
  assert.equal(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE}),null);
- assert.equal(targetProblem(url(DEV),{VERCEL_ENV:'development',DEVELOPMENT_SUPABASE_REFS:DEV}),null);
+ assert.equal(targetProblem(url(STAGE),{VERCEL_ENV:'development',DEVELOPMENT_SUPABASE_REFS:STAGE}),null);
  assert.match(targetProblem(url('unlistedunlistedunli'),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE})!,/not listed/);
  assert.match(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE,EXPECTED_SUPABASE_REF:STAGE})!,/one role/,'contradictory roles refused');
  // After cutover the ref leaves every allow-list, so a new Preview against it cannot build or reach it.
@@ -103,4 +105,17 @@ test('public QR backends refuse a project the deployment may not use',async()=>{
  }
  const allowed={...base,NEXT_PUBLIC_SUPABASE_URL:url(STAGE),VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE};
  assert.ok(submissionBackend(allowed));assert.ok(amendmentBackend(allowed));
+});
+
+
+test('a production registry record refuses stale process allow-lists; synthetic tests remain independent of real promotion',()=>{
+ const live=testRegistry.projects.kllhswucdhqqywnzxado;
+ const prior=live.phase;
+ try{
+  live.phase='production';
+  assert.equal(checkRegisteredToolTarget(url('kllhswucdhqqywnzxado'),{STAGING_SUPABASE_REFS:'kllhswucdhqqywnzxado'}).ok,false);
+  assert.equal(assertToolTarget(url(TEST_PROJECT_REF),{STAGING_SUPABASE_REFS:TEST_PROJECT_REF}),TEST_PROJECT_REF);
+  testRegistry.projects[TEST_PROJECT_REF].phase='production';
+  assert.equal(checkRegisteredToolTarget(url(TEST_PROJECT_REF),{STAGING_SUPABASE_REFS:TEST_PROJECT_REF}).ok,false);
+ }finally{live.phase=prior;testRegistry.projects[TEST_PROJECT_REF].phase='preproduction';}
 });

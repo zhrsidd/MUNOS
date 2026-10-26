@@ -14,6 +14,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {DeliveryLog, allowedRequest, checkBaseOrigin, checkBundles, checkHealthIdentity, pointsOf, stateDigest} from './delivery-audit.mjs';
+import {waitForSpeechFinish} from './speech-finish.mjs';
+import {project} from '../../lib/sync/repository';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HOSTED = (process.env.REHEARSAL_MODE || 'demo').toLowerCase() === 'hosted';
@@ -248,11 +250,15 @@ class Device {
     if (double) await next.dblclick(); else await next.click();
     const score = page.getByRole('button', {name: new RegExp(`^Record ${country} speech for \\d+ points$`)}).first();
     await score.waitFor({state: 'visible', timeout: 15_000});
+    const started = project(await this.checkpoint());
+    const speech = speechesIn(started, scope(started).sessionId).find(s => s.state !== 'finished');
+    assert.ok(speech, 'the recognized speech must be in the durable device checkpoint');
     const points = Number(/for (\d+) points/.exec(await score.getAttribute('aria-label'))[1]);
     if (double) await score.dblclick(); else await score.click();
     await page.getByText('Speech recorded', {exact: true}).waitFor({timeout: 15_000});
     await page.getByRole('button', {name: /^Finish · return floor to Chair/}).click();
-    await page.getByRole('button', {name: /^Next speaker · /}).or(page.getByText(/No delegates waiting/)).first().waitFor({timeout: 15_000});
+    // An empty queue is also shown DURING a speech. Require the actual floor heading and persisted finished state instead.
+    await waitForSpeechFinish(page, async () => project(await this.checkpoint()), speech.id);
     return {country, points};
   }
   async participation(country, category, points) {
@@ -278,7 +284,7 @@ class Device {
     return Object.fromEntries(rows);
   }
 }
-/** Let an in-flight sync read finish: an action recorded while one is running waits for the next poll (see the doc, finding 2). */
+/** Let the baseline read finish before measuring request retries and idempotency. The in-flight-read race has its own tests. */
 async function settle(device) {
   await device.stripIs(/^(All changes synced|Demo · saved in this browser)$/, 30_000);
   await new Promise(resolve => setTimeout(resolve, 4000));
@@ -598,10 +604,18 @@ async function runScenarios() {
     const speeches0 = speechesIn(before, ctx.sessionId).length;
     const speechEvents0 = before.events.filter(e => e.sessionId === ctx.sessionId && e.categoryId === 'speech').length;
     await A.at('/chair');
-    // The debate console only offers "Next speaker" when someone is queued (S2 consumed the queue in hosted mode).
-    if (!(await A.page.getByRole('button', {name: /^Next speaker · /}).isVisible().catch(() => false))) await A.queueAdd(ctx.dQ.country);
+    // Exercise finishing the ONLY queued speech: the queue's "No delegates waiting" text also exists while that speech is
+    // still active, so it must never be mistaken for a committed return of the floor. Only this fixture session is touched.
+    const queued = A.page.locator('ol[aria-label="open speaker queue"] li');
+    while (await queued.count()) {
+      const count = await queued.count();
+      await queued.first().getByRole('button', {name: /^Remove .* from open speaker queue$/}).click();
+      await eventually('the queued delegate to be removed durably', async () => (await queued.count()) === count - 1);
+    }
+    await A.queueAdd(ctx.dQ.country);
     // A fast double tap on Next speaker and on the speech score must start ONE speech and record ONE score.
     const spoke = await A.speech({double: true});
+    await A.at('/chair/participation'); // Immediately hard-navigate: the speech helper must already have waited for durability.
     await check('double-tap: one speech started, one speech score recorded', async () => {
       if (HOSTED) await A.drained();
       const state = await authoritative(A);
@@ -735,12 +749,7 @@ async function runScenarios() {
         await eventually('the refusal notice', async () => /Another tab updated this item/.test(await tab2.locator('.toast').innerText()));
       });
       await check('demo: the stored value is still the newer one', async () => assert.equal(attendanceOf(await A.base(), dg.id, ctx.sessionId), aWants));
-      // KNOWN, BENIGN (observed, product code frozen): DurableStore.update() aborts its IndexedDB transaction when the stale-tab
-      // check throws, and the aborted `tx.done` promise is never awaited, so the browser reports one unhandled AbortError. The
-      // refusal itself is handled and shown above. Any OTHER page error still fails the run (S9).
-      const aborts = A.errors.filter(e => e.startsWith('S7:') && /AbortError/.test(e));
-      A.errors = A.errors.filter(e => !aborts.includes(e));
-      if (aborts.length) log(`  NOTE ${aborts.length} unhandled AbortError from the aborted stale-tab transaction (known, benign; see docs/OFFLINE_REHEARSAL_AUTOMATED.md)`);
+      await check('demo: the handled stale-tab refusal causes no uncaught page errors', async () => assert.deepEqual(A.errors, []));
       await tab2.close();
     }
     await hostedCheck('A converges to the conference value', async () => {
@@ -782,9 +791,14 @@ async function runScenarios() {
     });
     await check('the on-screen points leaderboard equals the points derived from the stored events (points counted once)', async () => {
       for (const d of [A, B]) {
-        const state = await d.base();
-        const shown = await d.leaderboard();
-        for (const dg of scope(state).delegates) assert.equal(shown[dg.country], pointsOf(state, dg.id), `${d.name} ${dg.country}`);
+        // Navigation can refresh a stale device. Compare its live DOM and checkpoint AFTER that refresh, allowing the
+        // render/read to settle without navigating again or accepting any points discrepancy.
+        await d.at('/chair');
+        await eventually(`${d.name} leaderboard and current checkpoint to agree`, async () => {
+          const shown = await d.leaderboard();
+          const state = await d.base();
+          for (const dg of scope(state).delegates) assert.equal(shown[dg.country], pointsOf(state, dg.id), `${d.name} ${dg.country}`);
+        }, {timeout: SYNC_TIMEOUT});
       }
     });
     await hostedCheck('both devices and the server hold the same state (attendance, events, points, votes, queue, speeches)', async () => {

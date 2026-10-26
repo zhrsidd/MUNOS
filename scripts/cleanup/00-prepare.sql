@@ -124,11 +124,16 @@ begin
     raise exception 'REFUSED: role % can neither bypass row-level security nor is a superuser, so counts would be unreliable', current_user using errcode = 'MR001';
   end if;
 
-  -- 4. Schema drift: every base table in public and private must have a rule, and no rule may name a missing table.
+  -- Owner SQL is not protected by API RLS: check the phase inside this transaction before persistent work.
+  perform private.lock_lifecycle();
+  if not private.lifecycle_allows(true) then raise exception 'REFUSED: cleanup requires preproduction lifecycle' using errcode='MR001'; end if;
+
+  -- 4. Schema drift: every conference table needs a rule. The singleton project lifecycle is retained, never deleted.
+  -- No other unscoped/private table is exempt. No rule may name a missing table.
   select string_agg(x.name, ', ' order by x.name) into msg from (
     select format('%I.%I', ns.nspname, c.relname) as name from pg_class c join pg_namespace ns on ns.oid = c.relnamespace
      where c.relkind in ('r', 'p') and not c.relispartition and ns.nspname in ('public', 'private')) x
-   where x.name not in (select tbl from cleanup_rules);
+   where x.name <> 'private.project_lifecycle' and x.name not in (select tbl from cleanup_rules);
   if msg is not null then raise exception 'REFUSED: tables without a cleanup rule (schema drift; update scripts/cleanup/00-prepare.sql after review): %', msg using errcode = 'MR001'; end if;
   select string_agg(distinct tbl, ', ') into msg from cleanup_rules where to_regclass(tbl) is null;
   if msg is not null then raise exception 'REFUSED: cleanup rules name tables that do not exist: %', msg using errcode = 'MR001'; end if;

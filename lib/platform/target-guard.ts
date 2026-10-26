@@ -1,3 +1,4 @@
+import lifecycleRegistry from '../../config/project-lifecycle.json';
 // Target-identity guard. It decides which Supabase project a build, the health probe or an operator tool may talk to, and it
 // fails CLOSED: a missing, malformed or contradictory configuration refuses; it never falls back to a permissive default.
 // It never logs or returns secret values, and error text names project refs only (they are public in the URL).
@@ -92,9 +93,20 @@ export function checkToolTarget(url: string | undefined, env: Env): TargetCheck 
   return { ok: true, ref: target.ref };
 }
 
+/** Owner-reviewed, unsigned source record. Environment allow-lists cannot override production or an unknown ref.
+ * Old checkouts are not fresh authority: the database marker and test-purpose denial remain required at runtime. */
+export function checkRegisteredToolTarget(url: string | undefined, env: Env): TargetCheck {
+  const result=checkToolTarget(url,env);
+  if(!result.ok)return result;
+  const project=(lifecycleRegistry.projects as Record<string,{phase:string}>)[result.ref];
+  if(lifecycleRegistry.version!==1||!project||!['preproduction','rehearsal'].includes(project.phase))
+    return refuse(result.ref,`${result.ref} is production or unknown in the owner-controlled lifecycle record`);
+  return result;
+}
+
 /** For operator scripts: throws before any connection is made. Returns the verified project ref. */
 export function assertToolTarget(url: string | undefined, env: Env = process.env): string {
-  const result = checkToolTarget(url, env);
+  const result = checkRegisteredToolTarget(url, env);
   if (!result.ok) throw Error(`Target guard refused: ${result.reason}. Nothing was contacted.`);
   return result.ref;
 }
@@ -113,7 +125,7 @@ export function targetProblem(url: string | undefined, env: Env): string | null 
     const result = checkProductionTarget(url, env);
     if (!result.ok) return result.reason;
   } else if (env.VERCEL_ENV) {
-    const result = checkToolTarget(url, env);
+    const result = checkRegisteredToolTarget(url, env);
     if (!result.ok) return `${env.VERCEL_ENV} deployment refused: ${result.reason}`;
   }
   return null;

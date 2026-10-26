@@ -1,3 +1,5 @@
+> Current checkpoint: [26 October pre-cutover verification](PRECUTOVER_VERIFICATION_2026-10-26.md), including the applied lifecycle migration, connected Preview, public QR smoke and 39-assertion hosted offline run. Production remains demo.
+
 # Current DCMUN verification — 26 October 2026
 
 The current preproduction project is `kllhswucdhqqywnzxado`, still synthetic-only. Current evidence: [protected connection and migration record](PREPRODUCTION_CONNECTION_2026-10-25.md), [hosted grant/session/Realtime checks](HOSTED_ACCESS_VERIFICATION_2026-10-26.md), and [owner-approved direct RPC scope](RELEASE_SCOPE_2026-10-26.md). Production remains demo; these records do not approve cutover or capacity.

@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from '../preproduction-phase.mts';
 // Hosted-mode support for scripts/rehearsal/offline-multi-device.mjs: preflight guards, a read-only Executive view of the
 // server state, and a helper that mints role codes through the app's own code (lib/access-codes), like smoke-project.mts.
 //
@@ -52,6 +53,7 @@ const device = (config: HostedConfig) => createClient(config.url, config.key, {a
 
 /** Network preflight: redeem the Executive code, then refuse unless this is an isolated, labelled TEMPORARY test conference. */
 export async function preflight(config: HostedConfig = readConfig()): Promise<HostedPreflight> {
+  await assertPreproductionPhase(config.url,config.key,process.env);
   const exec = device(config);
   assert.equal(await redeemStaffCode(exec, config.conferenceId, config.execCode), 'ok', 'Executive code was not accepted for this conference');
   const execId = (await exec.auth.getSession()).data.session!.user.id;

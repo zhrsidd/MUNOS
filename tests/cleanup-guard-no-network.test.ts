@@ -12,7 +12,7 @@ const repo=resolve('.');
 const tsx=join(repo,'node_modules/.bin/tsx');
 const preload=join(repo,'tests/helpers/no-network.mjs');
 const script='scripts/cleanup-synthetic.mts';
-const REF='abcdefghijklmnopqrst';
+const REF='testtesttesttesttest';
 const OTHER_REF='tsrqponmlkjihgfedcba';
 const PHESMUN='gglltljhdpkfjnyjmnif';
 const PROTECTED='0331ceb6-3fa8-4731-92cb-2b4c0316d0cb';
@@ -146,7 +146,7 @@ test('positive control: --execute with the token and recorded approvals reaches 
   const r=await run(dir,[...dry(SYNTHETIC),...exec]);
   assert.equal(r.code,0,r.stderr);
   assert.ok(await exists(join(dir,'psql-started')));
-  assert.match(r.stdout,/EXECUTED against abcdefghijklmnopqrst: deleted/);assert.match(r.stdout,/NOT deleted/);
+  assert.match(r.stdout,/EXECUTED against testtesttesttesttest: deleted/);assert.match(r.stdout,/NOT deleted/);
   const [name]=await readdir(join(dir,'.test-sessions/cleanup'));
   const audit=JSON.parse(await readFile(join(dir,'.test-sessions/cleanup',name,'execute-audit.json'),'utf8'));
   assert.equal(audit.operator.backup_evidence,'PITR snapshot recorded in evidence/01');assert.equal(audit.operator.owner_approval,'owner message 2026-11-02');

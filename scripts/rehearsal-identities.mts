@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 // Prepares the rehearsal identity pool for a REALISTIC MULTI-COMMITTEE rehearsal (DEVELOPMENT project only).
 //   npx tsx scripts/rehearsal-identities.mts --chairs 14 [--pace-seconds 20] [--dir .test-sessions/rehearsal]
 //        [--out .test-sessions/rehearsal-multi-identities.json]
@@ -24,6 +25,7 @@ try {
   out = checkPoolDir(value("--out") ?? ".test-sessions/rehearsal-multi-identities.json");
 } catch (e) { console.error((e as Error).message); process.exit(2); }
 const pace = Math.max(DEFAULT_PACE_SECONDS, Number(value("--pace-seconds") ?? DEFAULT_PACE_SECONDS)) * 1000;
+await assertPreproductionPhase(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{...env,...process.env});
 const client = () => createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const exists = (path: string) => access(path).then(() => true, () => false);
 const dir = plan.entries[0].path.slice(0, plan.entries[0].path.lastIndexOf("/"));
@@ -32,6 +34,7 @@ let created = 0, refreshed = 0, skipped = 0;
 for (const entry of plan.entries) {
   if (await exists(entry.path)) {
     const saved = JSON.parse(await readFile(entry.path, "utf8"));
+    await assertPreproductionPhase(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{...env,...process.env});
     const { data, error } = await client().auth.refreshSession({ refresh_token: saved.refresh_token });
     if (error || !data.session) { console.error(`Could not refresh ${entry.label} (${entry.path}): ${error?.message}. Move the file aside to create a new identity.`); process.exit(1); }
     await writeFile(entry.path, JSON.stringify(data.session), { mode: 0o600 });
@@ -40,6 +43,7 @@ for (const entry of plan.entries) {
   }
   if (created >= MAX_NEW_SIGN_INS_PER_RUN) { skipped++; continue; }
   if (created > 0) await new Promise((r) => setTimeout(r, pace)); // conservative pacing between anonymous sign-ins
+  await assertPreproductionPhase(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{...env,...process.env});
   const { data, error } = await client().auth.signInAnonymously();
   if (error || !data.session) { console.error(`Anonymous sign-in failed for ${entry.label}: ${error?.message}. Stop and retry later; do not loop.`); process.exit(1); }
   await writeFile(entry.path, JSON.stringify(data.session), { mode: 0o600 });

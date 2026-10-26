@@ -6,7 +6,14 @@
   "public.submit_amendment(link_token text, submission uuid, submitter uuid, resolution uuid, amendment_type text, clause text, wording text)",
   "public.submit_resolution(link_token text, submission uuid, submitter uuid, title text, google_doc_id text, file_name text, storage_key text, file_sha256 text, file_size integer)"
  ],
- "authenticatedTablePrivileges": ["SELECT"],
- "viewsWithoutRls": ["public.participation_history"],
- "defaultAclGrantees": []
+ "authenticatedTablePrivileges": [
+  "SELECT"
+ ],
+ "viewsWithoutRls": [
+  "public.participation_history"
+ ],
+ "defaultAclGrantees": [],
+ "anonExecute": [
+  "public.preproduction_status()"
+ ]
 }

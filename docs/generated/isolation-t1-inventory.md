@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 28 files, combined SHA-256 `cb8f098500ef5785`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 29 files, combined SHA-256 `83aed5a42ade25ba`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -54,7 +54,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-56 functions (49 callable, 7 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+61 functions (53 callable, 8 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -70,8 +70,12 @@ Executed in the disposable database after the inventory was read:
 | `private.decision_history(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.document_round()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.document_submitter_countries(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.guard_lifecycle_transition()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.has_access(conf uuid, committee uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.lifecycle_allows(test_only boolean)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.lifecycle_new_test_only()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.link_decision_comment()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
+| `private.lock_lifecycle()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.materialize_new_committee_slots()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.next_resolution_code(conf uuid, committee uuid)` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.ops_photo_ack(conf uuid, cid uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
@@ -107,6 +111,7 @@ Executed in the disposable database after the inventory was read:
 | `public.executive_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.executive_state_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.operations_snapshot(conf uuid)` | function | invoker | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `public.preproduction_status()` | function | definer | postgres | stable | search_path="" | anon, authenticated, postgres | anon, authenticated | reads/none |
 | `public.redeem_access_code(conf uuid, code text)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
 | `public.revoke_access_code(conf uuid, credential uuid, revoke_devices boolean)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
 | `public.rotate_access_code(conf uuid, requested_role conference_role, committee uuid, expires_at timestamp with ti...)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
@@ -145,7 +150,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 - none
 
-### `private` functions callable by a Data API role (11)
+### `private` functions callable by a Data API role (12)
 
 `private` is not an exposed PostgREST schema (hosted exposure is assumption A3), so these are reachable only from SQL, policies and other functions, but the role privileges below are what a SQL-level caller would have.
 
@@ -157,6 +162,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 - `private.decision_history(conf uuid)`: authenticated (reads/none)
 - `private.document_submitter_countries(conf uuid)`: authenticated (reads/none)
 - `private.has_access(conf uuid, committee uuid, roles conference_role[])`: authenticated (reads/none)
+- `private.lifecycle_allows(test_only boolean)`: authenticated (reads/none)
 - `private.permitted(grants jsonb, conf uuid, committee uuid, roles conference_role[])`: authenticated (reads/none)
 - `private.photo_chairs(conf uuid)`: authenticated (reads/none)
 - `private.uuid_or_null(value text)`: authenticated (reads/none)
@@ -172,6 +178,7 @@ Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t
 | `private.access_redemption_attempts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
 | `private.amendment_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
 | `private.mutation_receipts` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
+| `private.project_lifecycle` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
 | `private.resolution_submissions` | table | postgres | yes | no | - | - | - | - | - | rawdDxtm |
 | `public.amendment_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.amendments` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
@@ -235,7 +242,7 @@ Column-level privileges: none.
 | `private.amendment_submissions` | no_browser_access | ALL | anon,authenticated | yes | false | false |
 | `private.mutation_receipts` | no_browser_access | ALL | anon,authenticated | yes | false | false |
 | `private.resolution_submissions` | no_browser_access | ALL | anon,authenticated | yes | false | false |
-| `public.amendment_links` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]) | - |
+| `public.amendment_links` | read_authorized | SELECT | authenticated | yes | (private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])) | - |
 | `public.amendments` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]) | - |
 | `public.attendance` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.audit_log` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role]) | - |
@@ -267,13 +274,13 @@ Column-level privileges: none.
 | `public.speaker_queue` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.speeches` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) | - |
 | `public.staff` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role]) | - |
-| `public.submission_links` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]) | - |
+| `public.submission_links` | read_authorized | SELECT | authenticated | yes | (private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])) | - |
 | `public.timers` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
-| `public.user_access` | read_authorized | SELECT | authenticated | yes | ((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now())) | - |
+| `public.user_access` | read_authorized | SELECT | authenticated | yes | ((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()) AND private.lifecycle_allows(test_only)) | - |
 | `public.votes` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `storage.objects` | resolutions_staff_read | SELECT | authenticated | yes | ((bucket_id = 'resolutions'::text) AND (EXISTS ( SELECT 1 FROM document_versions v WHERE ((v."storageKey" = objects.name) AND private.has_access(v.conference... | - |
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 56.
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 61.
 

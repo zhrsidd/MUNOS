@@ -33,7 +33,7 @@ The application transport now requests the same readiness option. It adds no wri
 ## Still outstanding
 
 - Production remains demo. The approved [direct RPC scope](RELEASE_SCOPE_2026-10-26.md) does not promote the database or close other lifecycle gates.
-- The newly issued JWTs expired about an hour after issuance. The configured maximum and the cutover token wait-out must still be recorded; this observation is not a maximum-lifetime proof or a fresh authorization after expiry.
+- The newly issued JWTs expired about an hour after issuance. The owner subsequently confirmed the dashboard setting is 3,600 seconds and accepted a cutover wait-out; see [the recorded decision](RELEASE_SCOPE_2026-10-26.md#token-wait-out-and-load-window--owner-confirmations). This observation alone was not a maximum-lifetime proof or a fresh authorization after expiry. The actual revocation/last-issuance time and expiry of any older, longer-lived tokens still need recording at cutover.
 - Hosted expiry and the remaining roles/RPCs, legacy key invalidation, public QR HTTP, full browser offline/restart/two-device conflict rehearsal and the Small-compute capacity gate remain separate.
 - No migrations, schema changes, synthetic-data deletion, compute upgrade, Production deployment, version or tag occurred in this run.
 

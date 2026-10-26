@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 import {createClient} from '@supabase/supabase-js';
 import nextEnv from '@next/env';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -12,6 +13,7 @@ const ref=assertToolTarget(url);
 const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const path=process.env.STAFF_SESSION_FILE ?? '.test-sessions/development.json';
 const saved=JSON.parse(await readFile(path,'utf8')); // Existing identity required; NEVER sign up here.
+await assertPreproductionPhase(url,key,process.env);
 const auth=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
 const renewed=await auth.auth.refreshSession({refresh_token:saved.refresh_token});assert.ifError(renewed.error);const session=renewed.data.session!;
 await writeFile(path,JSON.stringify(session),{mode:0o600});

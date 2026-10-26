@@ -47,8 +47,9 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
 - **S5 Retry.** Hosted: request 1 is aborted before the server, request 2 reaches the server but its response is lost, request 3
   passes; the action stays queued, the same mutation is retried, the server shows one effect. Demo: `/api/health` is aborted;
   System health reports it and a save made during the failure is applied exactly once.
-- **S6 Idempotency.** A double-tap on Next speaker and on the speech score starts one speech and records one score; a reload
-  replays nothing; no duplicate ids. **H** the identical request (same mutation uuid) is delivered to the server twice and
+- **S6 Idempotency.** With exactly one queued delegate, a double-tap on Next speaker and on the speech score starts one speech
+  and records one score. Finish waits for the actual Chair heading and that speech's finished state projected from the durable
+  checkpoint, then immediately hard-navigates; a reload replays nothing; no duplicate ids. **H** the identical request (same mutation uuid) is delivered to the server twice and
   applied once (+2, not +4).
 - **S7 Stale conflict.** **H** A is offline and edits delegate X's attendance, with a participation action queued behind it. B edits
   X online. A reconnects: the strip says `Review needed`; the change is retained and flagged, did not overwrite B, work behind it
@@ -57,8 +58,8 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
   participation arrives exactly once; A converges to B's value. Demo: two tabs of one device (BroadcastChannel muted in one): the
   stale save is refused with "Another tab updated this item" and the newer value is kept.
 - **S8 System health.** Retry is harmless, Export gives valid JSON of the device checkpoint, no conflict panel without a conflict.
-- **S9 Final consistency.** Empty outboxes; no duplicate event/vote/queue/speech ids; the on-screen leaderboard equals the points
-  derived from the stored events (points counted once); no uncaught page errors. **H** A, B and the server hold the same
+- **S9 Final consistency.** Empty outboxes; no duplicate event/vote/queue/speech ids; after navigating to Debate, a bounded check
+  requires the live leaderboard to equal points derived from the current device checkpoint (points counted once); no uncaught page errors. **H** A, B and the server hold the same
   attendance, events, points, votes, queue and speeches, and both strips say `All changes synced`. Demo: the two devices differ,
   which documents that devices converge only through a server.
 
@@ -67,11 +68,28 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
 Outbox contents and strip counts while offline, drain on reconnect, retry of aborted/lost requests, server-side idempotency and
 receipts, PT409 conflicts, Review/Retry/Discard recovery, cross-device convergence and server-state equality.
 
-### Known finding (benign, product code untouched)
+### Stale-tab rejection
 
-When the stale-tab check rejects a save, `DurableStore.update()` aborts its IndexedDB transaction and the aborted `tx.done`
-promise is unhandled, so the browser logs one `AbortError`. The refusal itself is handled. The script tolerates exactly this in
-S7 (demo) and prints a NOTE; any other page error fails the run.
+When the stale-tab check rejects a save, `DurableStore.update()` aborts its IndexedDB transaction and awaits the rejected
+transaction promise before returning the original save error. S7 requires the refusal explanation, the newer stored value and
+zero uncaught page errors. It does not suppress `AbortError` or any other browser error.
+
+### Speech completion before rehearsal navigation
+
+An empty speaker queue is shown while its last delegate is speaking. The former helper used that copy as its completion
+signal after clicking Finish, then could hard-navigate with `page.goto()` before the local IndexedDB save committed. That
+is different from the application's normal client navigation and does not show a lost, acknowledged save.
+
+The helper now waits for the exact **The floor is with the Chair** heading and the same speech ID in state `finished` in
+`project(checkpoint)`. Projection matters while offline: the authoritative base can still show a speaking row, with its finish
+durably queued in the outbox. The seven-action S2 count, S4 zero-active-speech assertion and zero-page-error checks stay intact.
+S6 prepares one queued delegate and hard-navigates immediately after completion so the empty-queue case stays covered.
+
+A local-only browser reproduction held a competing IndexedDB writer for 1.5 seconds without changing its data. The old wait
+returned too early and S6 failed with an unfinished speech after navigation; the corrected wait passed S0–S9, **30 assertions,
+7 hosted-only skips, zero page errors**, under the same delay. Three focused regressions cover the heading, the exact durable
+speech ID, failure when completion is missing, and offline outbox projection. The competing-writer injection is a local probe,
+not a fault injected into hosted data. Re-run the hosted rehearsal with the corrected harness before calling that gate passed.
 
 ## Hosted mode (orchestrator only)
 
@@ -135,10 +153,9 @@ proves a mismatched origin aborts with no network and without printing codes.
   position, speech state/classification, event points/category/speech, POIs, debate mode), excluding only timestamps. Negative
   self-tests prove it detects For->Against, reversed queue, finished->speaking, attendance and points changes.
 
-**Unverified in hosted mode:** the 21 October hosted run below predates the deployment binding, the origin guard, the host-bound
-fault routes, the S5/S6 evidence capture and the value-level digest. Those hosted-only paths (bundle verification against a real
-deployment, `route.fulfill` with a captured body, digest equality on real snapshots) have only been exercised by the self-tests and
-demo mode; re-run hosted mode on a re-provisioned temporary conference to validate them.
+The 21 October hosted run below predates the deployment binding, origin guard, host-bound fault routes, S5/S6 evidence capture
+and value-level digest. The failed 26 October reruns recorded below exercised the newer paths but do not establish a complete
+pass. A separate successful run with the corrected driver is still required for the current hosted gate.
 
 ## Hosted run record (21 October 2026)
 
@@ -154,14 +171,39 @@ Script defects found and fixed during the first hosted runs (not product defects
 3. The debate console offers "Next speaker" only when someone is queued; S6 queues a delegate when needed.
 4. Route rules are removed in `finally`, so a failed scenario cannot leak a fault rule into the next one.
 
-### Product finding (not fixed; product code frozen)
+### Historical product finding (fixed in the repository; hosted latency check outstanding)
 
-**An action recorded while the device's sync read is in flight is not sent until the next automatic poll.**
-`DurableRepository.execute()` calls `flush()`, which returns immediately while another flush is running (`this.flushing`). If
-that flush is already past its batch step (the opening or idle snapshot read), nothing re-checks the outbox when it finishes;
-`schedule()` then waits `pollDelay` (60 s without Realtime, 120 s with, +-20%). Measured by the S10 probe: open
+**The 21 October run found that an action recorded during an in-flight sync read waited for the next automatic poll.**
+`DurableRepository.execute()` called `flush()`, which returned immediately while another flush was running (`this.flushing`). If
+that flush was already past its batch step (the opening or idle snapshot read), nothing rechecked the outbox when it finished;
+`schedule()` then waited `pollDelay` (60 s without Realtime, 120 s with, +-20%). Measured by the S10 probe: open
 `/chair/participation`, record points at once, no focus or online event: the action sat in the outbox for **127 s**, then sent and
-applied once. Nothing is lost or duplicated, and focus, going online or a later action sends it sooner, but a Chair who records
-during the opening read can see "Saved on this device" for up to about 2.4 minutes. Suggested fix (needs the sync owner and
-independent review): when a flush finishes, if the outbox has unsent work, flush again. S5 and S6 call `settle()` first so they
-test retry and idempotency rather than this race.
+applied once. The current repository rechecks sendable work after a successful flush; `tests/sync-flush-recheck.test.ts`
+covers opening, idle and confirmation reads, failure backoff, conflict blocking, disposal and batch limits. The historical
+127-second measurement is not a current measurement. Re-run S10 on the current hosted build to measure the improvement there.
+S5 and S6 still call `settle()` first so they test retry and idempotency separately.
+
+## Local demo verification (26 October 2026)
+
+An isolated checkout of baseline `5911d03`, with a fresh dependency install and no hosted environment file, was built with
+`next build --webpack` and exercised in headless Chrome through the repository's Playwright rehearsal. The initial run
+reproduced the formerly tolerated stale-tab `AbortError`. After awaiting the rejected IndexedDB transaction and removing that
+exception from the rehearsal, **S0–S9 passed: 30 assertions, 7 hosted-only assertions skipped, zero uncaught page errors**.
+Both new storage regression tests fail on the original code and pass with the fix. The four existing relevant suites plus
+those regressions pass **29 tests, zero skips**; typecheck and targeted lint pass.
+
+This verifies local storage, offline shell reload, displayed attendance and points, double-tap protection, stale-tab rejection
+and recovery export in demo mode. Demo has no transport or outbox: this run does not verify hosted RPC delivery, receipts,
+server-side conflict recovery, cross-device convergence or conference-scale readiness. The hosted-only checks above remain open.
+
+## Hosted rerun status (26 October 2026)
+
+The first current hosted run failed S2–S4 and S6 because the driver navigated before the speech finish was durably saved.
+Its failed report remains failed. After that fixture speech was finished through a normal Chair action and the completion
+wait above was corrected, the second run passed S2–S6 but failed S9: it compared B's old checkpoint total (10) with a freshly
+navigated leaderboard total (11), after S7's queued point had arrived. The driver had read the checkpoint before navigation.
+
+S9 now navigates first and compares the live DOM with the current checkpoint until both agree within the bounded sync timeout.
+Exact points, duplicate-ID checks and the subsequent A/B/server value-level digest checks remain required. The second report
+also remains failed; a third separate hosted run is required to establish a complete pass. Those two runs used application
+commit `4db21e590696fc8a5152507551568927ef06a030`; the second used driver `1e421e8`. They do not establish production approval.

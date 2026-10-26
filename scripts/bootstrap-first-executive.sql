@@ -17,6 +17,7 @@
 --      transaction-local setting that disappears at commit, and nothing is written to audit_log.
 --   3. Do NOT save this query with the result, screenshot the result, or paste the code in chat.
 --
+-- Production only: use a separately reviewed short-lived TEST credential in preproduction.
 -- Safety:
 --   * Refuses to run if the conference does not exist, if ANY unrevoked Executive credential
 --     already exists for it (it never replaces one; the database's one-active-scope index enforces
@@ -34,6 +35,10 @@ declare
   raw text;
   formatted text;
 begin
+  perform private.lock_lifecycle();
+  if (select phase from private.project_lifecycle where singleton) <> 'production' then
+    raise exception 'Production Executive bootstrap requires the production lifecycle marker';
+  end if;
   if conf is null or valid_for is null then
     raise exception 'Bootstrap settings missing: run the whole script at once in one transaction.';
   end if;
@@ -56,8 +61,8 @@ begin
   formatted := substr(raw,1,4)||'-'||substr(raw,5,4)||'-'||substr(raw,9,4)||'-'||
                substr(raw,13,4)||'-'||substr(raw,17,4)||'-'||substr(raw,21,4);
 
-  insert into private.access_credentials (conference_id, committee_id, role, credential_hash, expires_at, created_by)
-  values (conf, null, 'admin', encode(sha256(convert_to(raw, 'UTF8')), 'hex'), now() + valid_for, null);
+  insert into private.access_credentials (conference_id, committee_id, role, credential_hash, expires_at, created_by, test_only)
+  values (conf, null, 'admin', encode(sha256(convert_to(raw, 'UTF8')), 'hex'), now() + valid_for, null, false);
 
   perform set_config('munos.bootstrap_code', formatted, true);  -- transaction-local; gone at commit
 end $$;

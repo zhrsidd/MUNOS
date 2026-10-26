@@ -22,7 +22,13 @@ export class DurableStore {
       await tx.store.put(next);
       await tx.done;
       return next;
-    } catch (error) { try { tx.abort(); } catch {} throw error; }
+    } catch (error) {
+      try { tx.abort(); } catch {}
+      // A rejected save has two promises: its request and the transaction. Consume the abort too, while preserving the
+      // original save error for the caller; otherwise a handled stale-tab refusal emits an unhandled AbortError.
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
   }
   async readPreferences(key: string) { return (await this.open()).get("preferences", key); }
   async savePreferences(key: string, values: Record<string,string>) {

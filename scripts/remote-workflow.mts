@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
-import {clientFor,ids,ref,session} from './remote-context.mts';
+import {clientFor,ids,ref,session,verifyPhase} from './remote-context.mts';
 import {SupabaseTransport} from '../lib/supabase/repository';
 import {fingerprint} from '../lib/sync/repository';
 import type {Command} from '../lib/commands';
 import type {Role} from '../lib/domain';
 import type {Mutation} from '../lib/sync/store';
+await verifyPhase();
 const transport=new SupabaseTransport(clientFor(),ids.conference,session.user.id);
 const marks:string[]=[];
 async function send(command:Command,role:Role='chair'){

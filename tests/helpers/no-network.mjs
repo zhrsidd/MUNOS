@@ -1,3 +1,4 @@
+import './lifecycle-registry.mjs';
 // Preload for child-process tests: records and blocks every network attempt (fetch, sockets, DNS) and prints "NETWORK <what>" to stderr.
 import net from 'node:net';
 import dns from 'node:dns';

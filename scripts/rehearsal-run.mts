@@ -73,6 +73,7 @@ const context = await import("./remote-context.mts").catch((e: Error) => {
 });
 const { clientFor, session, ref } = context;
 { const synthetic = checkFixtureConference(fixture.conference, { ...context.env, ...process.env }); if (!synthetic.ok) { console.error(`Refused: ${synthetic.reason}`); process.exit(2); } }
+await context.verifyPhase();
 // Network starts here: everything above (app URL shape, fixture, Supabase project guard, synthetic-conference guard) is local.
 // The deployment's own /api/health may contact the database, Auth and Storage, so it runs only after every local guard passed.
 const health = await appFetch(`${base}/api/health`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);

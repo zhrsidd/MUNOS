@@ -18,7 +18,7 @@ async function load(){
  return {d,rules,q};
 }
 type Q=Awaited<ReturnType<typeof load>>['q'];
-const tablesOf=(q:Q)=>q<{tbl:string;scoped:boolean}>(`select format('%I.%I',n.nspname,c.relname) tbl, exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attname='conference_id' and not a.attisdropped) scoped from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind in('r','p') and not c.relispartition and n.nspname in('public','private') order by 1`);
+const tablesOf=(q:Q)=>q<{tbl:string;scoped:boolean}>(`select format('%I.%I',n.nspname,c.relname) tbl, exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attname='conference_id' and not a.attisdropped) scoped from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind in('r','p') and not c.relispartition and n.nspname in('public','private') and not (n.nspname='private' and c.relname='project_lifecycle') order by 1`);
 /** Tables the live schema has that no delete rule covers, and rules naming tables the schema lacks. */
 async function uncovered(q:Q,rules:Rule[]){
  const live=await tablesOf(q);const ruled=new Set(rules.map(r=>r.tbl));
@@ -88,3 +88,5 @@ test('the coverage check fails when a new conference-scoped table is added witho
   assert.deepEqual(r.missing,['public.timers_renamed']);assert.deepEqual(r.stale,['public.timers']);
  }finally{await d.db.close();}
 });
+
+test('the only retained project metadata table has no conference foreign key',async()=>{const d=await freshDatabase();try{assert.equal((await d.query("select * from private.project_lifecycle")).length,1);assert.equal((await d.query("select 1 from pg_constraint where conrelid='private.project_lifecycle'::regclass and contype='f'")).length,0);}finally{await d.db.close();}});

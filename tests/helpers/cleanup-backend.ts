@@ -48,7 +48,7 @@ export interface TableSnapshot{n:number;h:string}
 const fp=(table:string,where='true')=>`select count(*)::int n, coalesce(md5(string_agg(md5(t::text),',' order by md5(t::text))),'') h from ${table} t where ${where}`;
 /** Every base table in public and private, as a count and content hash of the rows belonging to one conference. Independent of the cleanup rules: scoped by the catalog's own conference_id columns. */
 export async function snapshot(b:Backend,conference:string):Promise<Record<string,TableSnapshot>>{
- const tables=await b.rows<{tbl:string;has:boolean}>(`select format('%I.%I',n.nspname,c.relname) tbl, exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attname='conference_id' and not a.attisdropped) has from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname in('public','private') order by 1`);
+ const tables=await b.rows<{tbl:string;has:boolean}>(`select format('%I.%I',n.nspname,c.relname) tbl, exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attname='conference_id' and not a.attisdropped) has from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname in('public','private') and not (n.nspname='private' and c.relname='project_lifecycle') order by 1`);
  const out:Record<string,TableSnapshot>={};
  for(const {tbl:t,has} of tables){
   let where:string;
@@ -63,5 +63,5 @@ export async function snapshot(b:Backend,conference:string):Promise<Record<strin
 }
 /** Rows outside the conference-scoped tables that the cleanup must never touch. */
 export async function globalSnapshot(b:Backend){
- return {authUsers:(await b.rows<TableSnapshot>(fp('auth.users')))[0],storage:(await b.rows<TableSnapshot>(fp('storage.objects')))[0],buckets:(await b.rows<TableSnapshot>(fp('storage.buckets')))[0]};
+ return {lifecycle:(await b.rows<TableSnapshot>(fp('private.project_lifecycle')))[0],authUsers:(await b.rows<TableSnapshot>(fp('auth.users')))[0],storage:(await b.rows<TableSnapshot>(fp('storage.objects')))[0],buckets:(await b.rows<TableSnapshot>(fp('storage.buckets')))[0]};
 }
