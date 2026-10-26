@@ -278,7 +278,7 @@ class Device {
     return Object.fromEntries(rows);
   }
 }
-/** Let an in-flight sync read finish: an action recorded while one is running waits for the next poll (see the doc, finding 2). */
+/** Let the baseline read finish before measuring request retries and idempotency. The in-flight-read race has its own tests. */
 async function settle(device) {
   await device.stripIs(/^(All changes synced|Demo · saved in this browser)$/, 30_000);
   await new Promise(resolve => setTimeout(resolve, 4000));
@@ -735,12 +735,7 @@ async function runScenarios() {
         await eventually('the refusal notice', async () => /Another tab updated this item/.test(await tab2.locator('.toast').innerText()));
       });
       await check('demo: the stored value is still the newer one', async () => assert.equal(attendanceOf(await A.base(), dg.id, ctx.sessionId), aWants));
-      // KNOWN, BENIGN (observed, product code frozen): DurableStore.update() aborts its IndexedDB transaction when the stale-tab
-      // check throws, and the aborted `tx.done` promise is never awaited, so the browser reports one unhandled AbortError. The
-      // refusal itself is handled and shown above. Any OTHER page error still fails the run (S9).
-      const aborts = A.errors.filter(e => e.startsWith('S7:') && /AbortError/.test(e));
-      A.errors = A.errors.filter(e => !aborts.includes(e));
-      if (aborts.length) log(`  NOTE ${aborts.length} unhandled AbortError from the aborted stale-tab transaction (known, benign; see docs/OFFLINE_REHEARSAL_AUTOMATED.md)`);
+      await check('demo: the handled stale-tab refusal causes no uncaught page errors', async () => assert.deepEqual(A.errors, []));
       await tab2.close();
     }
     await hostedCheck('A converges to the conference value', async () => {

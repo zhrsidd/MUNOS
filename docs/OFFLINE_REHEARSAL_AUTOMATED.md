@@ -67,11 +67,11 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
 Outbox contents and strip counts while offline, drain on reconnect, retry of aborted/lost requests, server-side idempotency and
 receipts, PT409 conflicts, Review/Retry/Discard recovery, cross-device convergence and server-state equality.
 
-### Known finding (benign, product code untouched)
+### Stale-tab rejection
 
-When the stale-tab check rejects a save, `DurableStore.update()` aborts its IndexedDB transaction and the aborted `tx.done`
-promise is unhandled, so the browser logs one `AbortError`. The refusal itself is handled. The script tolerates exactly this in
-S7 (demo) and prints a NOTE; any other page error fails the run.
+When the stale-tab check rejects a save, `DurableStore.update()` aborts its IndexedDB transaction and awaits the rejected
+transaction promise before returning the original save error. S7 requires the refusal explanation, the newer stored value and
+zero uncaught page errors. It does not suppress `AbortError` or any other browser error.
 
 ## Hosted mode (orchestrator only)
 
@@ -154,14 +154,27 @@ Script defects found and fixed during the first hosted runs (not product defects
 3. The debate console offers "Next speaker" only when someone is queued; S6 queues a delegate when needed.
 4. Route rules are removed in `finally`, so a failed scenario cannot leak a fault rule into the next one.
 
-### Product finding (not fixed; product code frozen)
+### Historical product finding (fixed in the repository; hosted latency check outstanding)
 
-**An action recorded while the device's sync read is in flight is not sent until the next automatic poll.**
-`DurableRepository.execute()` calls `flush()`, which returns immediately while another flush is running (`this.flushing`). If
-that flush is already past its batch step (the opening or idle snapshot read), nothing re-checks the outbox when it finishes;
-`schedule()` then waits `pollDelay` (60 s without Realtime, 120 s with, +-20%). Measured by the S10 probe: open
+**The 21 October run found that an action recorded during an in-flight sync read waited for the next automatic poll.**
+`DurableRepository.execute()` called `flush()`, which returned immediately while another flush was running (`this.flushing`). If
+that flush was already past its batch step (the opening or idle snapshot read), nothing rechecked the outbox when it finished;
+`schedule()` then waited `pollDelay` (60 s without Realtime, 120 s with, +-20%). Measured by the S10 probe: open
 `/chair/participation`, record points at once, no focus or online event: the action sat in the outbox for **127 s**, then sent and
-applied once. Nothing is lost or duplicated, and focus, going online or a later action sends it sooner, but a Chair who records
-during the opening read can see "Saved on this device" for up to about 2.4 minutes. Suggested fix (needs the sync owner and
-independent review): when a flush finishes, if the outbox has unsent work, flush again. S5 and S6 call `settle()` first so they
-test retry and idempotency rather than this race.
+applied once. The current repository rechecks sendable work after a successful flush; `tests/sync-flush-recheck.test.ts`
+covers opening, idle and confirmation reads, failure backoff, conflict blocking, disposal and batch limits. The historical
+127-second measurement is not a current measurement. Re-run S10 on the current hosted build to measure the improvement there.
+S5 and S6 still call `settle()` first so they test retry and idempotency separately.
+
+## Local demo verification (26 October 2026)
+
+An isolated checkout of baseline `5911d03`, with a fresh dependency install and no hosted environment file, was built with
+`next build --webpack` and exercised in headless Chrome through the repository's Playwright rehearsal. The initial run
+reproduced the formerly tolerated stale-tab `AbortError`. After awaiting the rejected IndexedDB transaction and removing that
+exception from the rehearsal, **S0–S9 passed: 30 assertions, 7 hosted-only assertions skipped, zero uncaught page errors**.
+Both new storage regression tests fail on the original code and pass with the fix. The four existing relevant suites plus
+those regressions pass **29 tests, zero skips**; typecheck and targeted lint pass.
+
+This verifies local storage, offline shell reload, displayed attendance and points, double-tap protection, stale-tab rejection
+and recovery export in demo mode. Demo has no transport or outbox: this run does not verify hosted RPC delivery, receipts,
+server-side conflict recovery, cross-device convergence or conference-scale readiness. The hosted-only checks above remain open.
