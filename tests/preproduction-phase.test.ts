@@ -1,7 +1,8 @@
+import './helpers/no-network.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assertPreproductionPhase} from '../scripts/preproduction-phase.mjs';
-const ref='kllhswucdhqqywnzxado',url=`https://${ref}.supabase.co`,env={STAGING_SUPABASE_REFS:ref};
+const ref='testtesttesttesttest',url=`https://${ref}.supabase.co`,env={STAGING_SUPABASE_REFS:ref};
 test('phase guard checks the committed target before any network and accepts only fresh matching preproduction metadata',async()=>{
  let calls=0;let payload:unknown={projectRef:ref,phase:'preproduction',revision:1,canTest:true};
  const fetcher=(async(input,init)=>{calls++;assert.equal(String(input),`${url}/rest/v1/rpc/preproduction_status`);assert.equal(init?.cache,'no-store');assert.equal(init?.redirect,'error');assert.ok(!JSON.stringify(init).includes('Bearer'));return Response.json(payload);}) as typeof fetch;

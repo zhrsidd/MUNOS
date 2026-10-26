@@ -1,3 +1,4 @@
+import './helpers/no-network.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { publicQrPlan, assertPublicQrLinks, newPublicQrReport, verifyPublicQr, type PublicQrFixture } from '../scripts/verification/public-qr';
@@ -5,7 +6,7 @@ import { POST as submit } from '../app/api/submissions/route';
 import { POST as amend } from '../app/api/amendments/route';
 import type { LinkInfo } from '../lib/submissions/rules';
 import type { AmendmentLinkInfo } from '../lib/amendments/rules';
-const ref = 'kllhswucdhqqywnzxado', prod = 'prodprodprodprodprod';
+const ref = 'testtesttesttesttest', prod = 'prodprodprodprodprod';
 const conf = '63000000-0000-4000-8000-000000000001', committee = '63000000-0000-4000-8000-000000000002', submitter = '63000000-0000-4000-8000-000000000003', resolution = '63000000-0000-4000-8000-000000000004';
 const fixture: PublicQrFixture = { version: 1, purpose: 'synthetic-public-qr', projectRef: ref, conferenceId: conf, appOrigin: 'http://localhost:4319', resolution: { token: 'R'.repeat(32), committeeId: committee, submitterId: submitter }, amendment: { token: 'A'.repeat(32), committeeId: committee, submitterId: submitter, resolutionId: resolution } };
 const env = { NEXT_PUBLIC_SUPABASE_URL: `https://${ref}.supabase.co`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key', NEXT_PUBLIC_DATA_BACKEND: 'supabase', NEXT_PUBLIC_CONFERENCE_ID: resolution, STAGING_SUPABASE_REFS: ref, EXPECTED_SUPABASE_REF: prod, SUPABASE_SECRET_KEY: 'test-server-key-never-public', QR_VERIFICATION_APP_ORIGINS: fixture.appOrigin };
@@ -129,7 +130,7 @@ test('CLI preflight makes only a private ignored artifact, refuses overwrite and
   try {
     const fixturePath = join(dir, 'fixture.json'), reportPath = join(dir, 'preflight.json');
     await writeFile(fixturePath, JSON.stringify(fixture), { mode: 0o600 });
-    const args = ['--import', 'tsx', 'scripts/verify-submission-http.mts', '--base-url', fixture.appOrigin, '--conference-id', conf, '--fixture', fixturePath, '--output', reportPath, '--preflight'];
+    const args = ['--import', resolve('tests/helpers/no-network.mjs'), '--import', 'tsx', 'scripts/verify-submission-http.mts', '--base-url', fixture.appOrigin, '--conference-id', conf, '--fixture', fixturePath, '--output', reportPath, '--preflight'];
     const run = (argv = args) => spawnSync(process.execPath, argv, { cwd: process.cwd(), encoding: 'utf8', env: { ...process.env, ...env, VERCEL_ENV: '', PROTECTED_CONFERENCE_IDS: '', PRODUCTION_APP_ORIGINS: '' }, timeout: 10_000 });
     const first = run(); assert.equal(first.status, 0, first.stderr);
     const raw = await readFile(reportPath, 'utf8'), saved = JSON.parse(raw);
