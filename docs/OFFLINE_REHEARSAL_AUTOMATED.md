@@ -58,8 +58,8 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
   participation arrives exactly once; A converges to B's value. Demo: two tabs of one device (BroadcastChannel muted in one): the
   stale save is refused with "Another tab updated this item" and the newer value is kept.
 - **S8 System health.** Retry is harmless, Export gives valid JSON of the device checkpoint, no conflict panel without a conflict.
-- **S9 Final consistency.** Empty outboxes; no duplicate event/vote/queue/speech ids; the on-screen leaderboard equals the points
-  derived from the stored events (points counted once); no uncaught page errors. **H** A, B and the server hold the same
+- **S9 Final consistency.** Empty outboxes; no duplicate event/vote/queue/speech ids; after navigating to Debate, a bounded check
+  requires the live leaderboard to equal points derived from the current device checkpoint (points counted once); no uncaught page errors. **H** A, B and the server hold the same
   attendance, events, points, votes, queue and speeches, and both strips say `All changes synced`. Demo: the two devices differ,
   which documents that devices converge only through a server.
 
@@ -153,10 +153,9 @@ proves a mismatched origin aborts with no network and without printing codes.
   position, speech state/classification, event points/category/speech, POIs, debate mode), excluding only timestamps. Negative
   self-tests prove it detects For->Against, reversed queue, finished->speaking, attendance and points changes.
 
-**Unverified in hosted mode:** the 21 October hosted run below predates the deployment binding, the origin guard, the host-bound
-fault routes, the S5/S6 evidence capture and the value-level digest. Those hosted-only paths (bundle verification against a real
-deployment, `route.fulfill` with a captured body, digest equality on real snapshots) have only been exercised by the self-tests and
-demo mode; re-run hosted mode on a re-provisioned temporary conference to validate them.
+The 21 October hosted run below predates the deployment binding, origin guard, host-bound fault routes, S5/S6 evidence capture
+and value-level digest. The failed 26 October reruns recorded below exercised the newer paths but do not establish a complete
+pass. A separate successful run with the corrected driver is still required for the current hosted gate.
 
 ## Hosted run record (21 October 2026)
 
@@ -196,3 +195,15 @@ those regressions pass **29 tests, zero skips**; typecheck and targeted lint pas
 This verifies local storage, offline shell reload, displayed attendance and points, double-tap protection, stale-tab rejection
 and recovery export in demo mode. Demo has no transport or outbox: this run does not verify hosted RPC delivery, receipts,
 server-side conflict recovery, cross-device convergence or conference-scale readiness. The hosted-only checks above remain open.
+
+## Hosted rerun status (26 October 2026)
+
+The first current hosted run failed S2–S4 and S6 because the driver navigated before the speech finish was durably saved.
+Its failed report remains failed. After that fixture speech was finished through a normal Chair action and the completion
+wait above was corrected, the second run passed S2–S6 but failed S9: it compared B's old checkpoint total (10) with a freshly
+navigated leaderboard total (11), after S7's queued point had arrived. The driver had read the checkpoint before navigation.
+
+S9 now navigates first and compares the live DOM with the current checkpoint until both agree within the bounded sync timeout.
+Exact points, duplicate-ID checks and the subsequent A/B/server value-level digest checks remain required. The second report
+also remains failed; a third separate hosted run is required to establish a complete pass. Those two runs used application
+commit `4db21e590696fc8a5152507551568927ef06a030`; the second used driver `1e421e8`. They do not establish production approval.

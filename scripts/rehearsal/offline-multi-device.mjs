@@ -791,9 +791,14 @@ async function runScenarios() {
     });
     await check('the on-screen points leaderboard equals the points derived from the stored events (points counted once)', async () => {
       for (const d of [A, B]) {
-        const state = await d.base();
-        const shown = await d.leaderboard();
-        for (const dg of scope(state).delegates) assert.equal(shown[dg.country], pointsOf(state, dg.id), `${d.name} ${dg.country}`);
+        // Navigation can refresh a stale device. Compare its live DOM and checkpoint AFTER that refresh, allowing the
+        // render/read to settle without navigating again or accepting any points discrepancy.
+        await d.at('/chair');
+        await eventually(`${d.name} leaderboard and current checkpoint to agree`, async () => {
+          const shown = await d.leaderboard();
+          const state = await d.base();
+          for (const dg of scope(state).delegates) assert.equal(shown[dg.country], pointsOf(state, dg.id), `${d.name} ${dg.country}`);
+        }, {timeout: SYNC_TIMEOUT});
       }
     });
     await hostedCheck('both devices and the server hold the same state (attendance, events, points, votes, queue, speeches)', async () => {
