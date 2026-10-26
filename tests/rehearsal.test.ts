@@ -226,3 +226,33 @@ test('estimate: the PR #10 window materially reduces Executive Chair-triggered r
  assert.equal(after.byRole.approval,before.byRole.approval);assert.equal(after.byRole.admins,before.byRole.admins);
  assert.equal(after.executive.realtimeEvents,before.executive.realtimeEvents,'same events delivered; only coalescing differs');
 });
+
+test('DCMUN profile covers the reported 92 devices and adds only Chair headroom at 110',()=>{
+ const count=(n:number)=>assignStaffRoles(n,'dcmun-2026').reduce<Record<string,number>>((r,role)=>{r[role]=(r[role]??0)+1;return r;},{});
+ assert.deepEqual(count(92),{chair:57,approval:20,admins:10,executive:5});
+ assert.deepEqual(count(110),{chair:75,approval:20,admins:10,executive:5});
+ for(const n of [1,10,25,50,80,92,110,200]){
+  const roles=assignStaffRoles(n,'dcmun-2026');assert.equal(roles.length,n);assert.equal(roles[0],'chair');
+  assert.ok(roles.every((r,i)=>r==='chair'||roles.slice(i).every(x=>x!=='chair')),'Chairs stay first for committee/floor allocation');
+ }
+ assert.equal(assignStaffRoles(110).filter(r=>r==='approval').length,11,'legacy comparison remains explicit and reproducible');
+});
+
+test('DCMUN 110-device profile preserves the public burst and all 19 Chair floors',()=>{
+ const options={staff:110,staffProfile:'dcmun-2026' as const,delegates:150,committees:19,minutes:30,startWindowSeconds:150,delegateWindowSeconds:120,submitFraction:0.08};
+ const users=buildScenario(options);assert.deepEqual(users,buildScenario(options));
+ const result=summarize(users,30);
+ assert.deepEqual(result.roles,{chair:75,approval:20,admins:10,executive:5,delegate:150});
+ assert.deepEqual(result.delegatePublicForm,{pageLoads:150,submissions:16,authSessions:0});
+ assert.equal(users.filter(u=>u.floor).length,19);
+ assert.equal(new Set(users.filter(u=>u.floor).map(u=>u.committee)).size,19);
+ for(const user of users){let previous=-Infinity;for(const s of user.steps.filter(s=>!s.periodic)){assert.ok(s.at-previous>=HUMAN_FLOOR_SECONDS*1000);previous=s.at;}}
+});
+
+test('conference gate rejects the old Approval population, missing roles and inconsistent device totals',async()=>{
+ const {conferenceGateProfile}=await import('../scripts/rehearsal/readiness');
+ const valid={staffStages:[110],minutes:30,committees:19,delegates:150,submissionsPerStage:[16],staffRolesPerStage:[{chair:75,approval:20,admins:10,executive:5}]};
+ assert.equal(conferenceGateProfile(valid).eligible,true);
+ const bad=[undefined,[],[{chair:77,approval:11,admins:11,executive:11}],[{chair:75,approval:19,admins:11,executive:5}],[{chair:76,approval:20,admins:10,executive:4}],[{chair:75,approval:20,admins:9,executive:6}],[{chair:75,approval:20,admins:10,executive:6}]];
+ for(const staffRolesPerStage of bad)assert.equal(conferenceGateProfile({...valid,staffRolesPerStage}).eligible,false);
+});

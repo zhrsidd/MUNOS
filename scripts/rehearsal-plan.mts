@@ -8,20 +8,21 @@
 // The scenario still prints configured populations/public submissions for local preflight.
 import { checkUsers } from "./rehearsal/guard";
 import { estimate } from "./rehearsal/estimate";
-import { buildScenario, HUMAN_FLOOR_SECONDS, summarize, type RealtimeModel } from "./rehearsal/scenario";
+import { buildScenario, HUMAN_FLOOR_SECONDS, parseStaffProfile, summarize, type RealtimeModel } from "./rehearsal/scenario";
 const args = process.argv.slice(2);
 const raw = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const num = (flag: string, fallback: number) => Number(raw(flag) ?? fallback);
+const staffProfile = parseStaffProfile(args.includes('--staff-profile') ? raw('--staff-profile') ?? '' : undefined);
 const staff = num("--staff", 50), delegates = num("--delegates", 0), minutes = num("--minutes", 10);
 for (const [label, n] of [["staff", staff], ["delegates", delegates]] as const) {
   const guard = checkUsers(n === 0 && label === "delegates" ? 1 : n);
   if (!guard.ok) { console.error(`${label}: ${guard.reason}`); process.exit(2); }
 }
-const scenario = buildScenario({ staff, delegates, minutes, committees: num("--committees", 14), startWindowSeconds: num("--start-window", 150), delegateWindowSeconds: num("--delegate-window", 120), submitFraction: num("--submit-fraction", 0.3) });
+const scenario = buildScenario({ staff, staffProfile, delegates, minutes, committees: num("--committees", 14), startWindowSeconds: num("--start-window", 150), delegateWindowSeconds: num("--delegate-window", 120), submitFraction: num("--submit-fraction", 0.3) });
 const models: RealtimeModel[] = (raw("--realtime") ?? "both") === "both" ? ["current", "topic-aware"] : [raw("--realtime") as RealtimeModel];
 const estimates = [];
 for (const readMs of (raw("--read-ms") ?? "600,7000").split(",").map(Number))
   for (const model of models)
     for (const executiveChairWindowMs of model === "topic-aware" ? (raw("--executive-chair-window") ?? "0,2000").split(",").map(Number) : [0])
       estimates.push(await estimate(scenario, { minutes, readMs, sendMs: num("--send-ms", 300), model, executiveChairWindowMs }));
-console.log(JSON.stringify({ dryRun: true, modelStatus: "HISTORICAL COMPARISON ONLY; no current H3 rate prediction. Live runner uses actual DurableRepository.", staff, delegates, minutes, humanFloorSeconds: HUMAN_FLOOR_SECONDS, ...summarize(scenario, minutes), clientModelEstimates: estimates }, null, 2));
+console.log(JSON.stringify({ dryRun: true, modelStatus: "HISTORICAL COMPARISON ONLY; no current H3 rate prediction. Live runner uses actual DurableRepository.", staff, staffProfile, delegates, minutes, humanFloorSeconds: HUMAN_FLOOR_SECONDS, ...summarize(scenario, minutes), clientModelEstimates: estimates }, null, 2));

@@ -14,7 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { checkAppUrl, checkFixtureConference, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
-import { TOPIC_OF, buildScenario, type Action, type RealtimeModel, type SimUser, type Topic } from "./rehearsal/scenario";
+import { TOPIC_OF, buildScenario, parseStaffProfile, summarize, type Action, type RealtimeModel, type SimUser, type StaffRole, type Topic } from "./rehearsal/scenario";
 import { ActualClient, commandCommittee, deliverChange, boundedFetch, ownsWorkItem, reviewableDocument } from "./rehearsal/actual-client";
 import { SUBMISSION_TOKEN } from "../lib/submissions/rules";
 import {activeLane,laneEntries,nextSpeaker} from '../lib/procedure/view';
@@ -23,7 +23,7 @@ import type { Transport } from "../lib/sync/repository";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
 import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type IdentityFile, type StaffRoleKey } from "./rehearsal/identities";
-import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, capacityGateLabel, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, observedWorkVerdict, assertSubmissionBinding, conferenceGateProfile, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
+import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, capacityGateLabel, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, observedWorkVerdict, assertSubmissionBinding, conferenceGateProfile, rampVerdict, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -36,6 +36,9 @@ const wireFetch = boundedFetch(fetch);
 const appFetch = (url: string, init: RequestInit = {}) => wireFetch(url, { ...init, redirect: 'error', headers: { ...(init.headers as Record<string, string>), ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}) } });
 const stages = (value("--stages") ?? value("--staff") ?? "10").split(",").map(Number);
 for (const n of stages) { const g = checkUsers(n); if (!g.ok) { console.error(g.reason); process.exit(2); } }
+let staffProfile: ReturnType<typeof parseStaffProfile>;
+try { staffProfile = parseStaffProfile(args.includes('--staff-profile') ? value('--staff-profile') ?? '' : undefined); }
+catch (e) { console.error(`Refused: ${(e as Error).message}`); process.exit(2); }
 const delegateCount = Number(value("--delegates") ?? 0);
 if (delegateCount && !checkUsers(delegateCount).ok) { console.error(checkUsers(delegateCount).reason); process.exit(2); }
 const minutes = Number(value("--minutes") ?? 5);
@@ -60,7 +63,12 @@ const simulatedCommittees = rawIdentities && !isMultiCommittee(rawIdentities) ? 
 const submitFraction = submitToken ? Number(value("--submit-fraction") ?? DOCUMENTED_SUBMIT_FRACTION) : 0;
 for(const flag of ['--start-window','--delegate-window']){const raw=value(flag);if(raw!==undefined&&(!Number.isFinite(Number(raw))||Number(raw)<0)){console.error(`Refused: ${flag} must be a non-negative finite number.`);process.exit(2);}}
 if(!Number.isFinite(submitFraction)||submitFraction<0||submitFraction>1){console.error('Refused: --submit-fraction must be between 0 and 1.');process.exit(2);}
-const scenarioFor = (staff: number) => buildScenario({ staff, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction });
+const scenarioFor = (staff: number) => buildScenario({ staff, staffProfile, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction });
+const staffRolesPerStage = stages.map(n => {
+  const roles = summarize(scenarioFor(n), minutes).roles;
+  return Object.fromEntries((['chair','approval','admins','executive'] as const).map(role=>[role,roles[role]??0])) as Record<StaffRole,number>;
+});
+console.log(JSON.stringify({staffProfile, staffRolesPerStage}));
 // One resolution link: stay below its designed 20 accepted submissions / 10 min. Never plan an intentional 429.
 for (const n of stages) {
   const plan = checkSingleLinkSubmissions(scenarioFor(n), Boolean(submitToken));
@@ -317,7 +325,7 @@ for (const users of stages) {
   const readiness = assessReadiness({ mode, committees: fixture.committees.slice(0, simulatedCommittees), chairTraffic: [...observedChairDevices.values()] });
   readinessByStage.push(readiness);
   const work = observedWorkVerdict({ expectedDevices:staffUsers.length,openedDevices:openedDevices.size, expectedRoles: [...new Set(staffUsers.map(u => u.role))], reads: observedReads, writes: observedWrites,
-    expectedChairCommittees: fixture.committees.map(c => c.id), observedChairCommittees: [...new Set([...observedChairDevices.values()].map(t => t.committeeId))],
+    expectedChairCommittees: [...new Set(chairTraffic.map(c => c.committeeId))], observedChairCommittees: [...new Set([...observedChairDevices.values()].map(t => t.committeeId))],
     pending: pendingAtClose, conflicts: conflictsAtClose, unconfirmed: unconfirmedAtClose, closeTimedOut,localRefusals:[...devices.values()].reduce((n,d)=>n+d.client.stats.localRefusals,0),
     expectedActions: ['speechScore','poiRecognize','poiScore','sendToApproval','approve','print'].filter(a => scenario.some(u => u.steps.some(s => s.action === a))), actions: observedActions,
     expectedPages: delegateCount, completedPages: observedPublic.pages, expectedSubmissions: plannedSubmissions(scenario), createdSubmissions: observedPublic.creates });
@@ -341,8 +349,10 @@ for (const id of acknowledged) {
 const overall = report(samples);
 // Readiness needs EVERY stage to be a realistic multi-committee run; the worst stage decides the label.
 const readiness = readinessByStage.find((r) => !r.qualifiesForReadiness) ?? readinessByStage[readinessByStage.length - 1];
-const metricVerdict = readinessVerdict(evaluate(overall, duplicates, lost), readiness);
+const metrics = evaluate(overall, duplicates, lost);
+const metricVerdict = readinessVerdict(metrics, readiness);
 const workChecks = stageReports.flatMap((s, i) => s.work.checks.map(c => ({ ...c, check: `stage ${i + 1}: ${c.check}` })));
+const diagnosticVerdict = rampVerdict(metrics, workChecks, mode);
 const verdict = { ...metricVerdict, pass: metricVerdict.pass && workChecks.every(c => c.pass), checks: [...metricVerdict.checks, ...workChecks] };
 const distinctAuthIdentities = scoped ? new Set([...chairIdentities.filter((_, i) => !mapping || mapping.includes(i)).map((c) => c.userId), ...(["approval", "admins", "executive"] as const).map((r) => identities[r]!.userId)]).size : 1;
 const note = mode === "realistic-multi-committee"
@@ -352,13 +362,13 @@ const note = mode === "realistic-multi-committee"
     : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Historical comparison only — NOT A READINESS RUN.";
 const peakStaff = Math.max(...stages);
 const capacityGate = capacityGateLabel(peakStaff);
-const conferenceGate={...conferenceGateProfile({staffStages:stages,minutes,committees:simulatedCommittees,delegates:delegateCount,submissionsPerStage:stages.map(n=>plannedSubmissions(scenarioFor(n)))}),pass:false};
+const conferenceGate={...conferenceGateProfile({staffStages:stages,minutes,committees:simulatedCommittees,delegates:delegateCount,submissionsPerStage:stages.map(n=>plannedSubmissions(scenarioFor(n))),staffRolesPerStage}),pass:false};
 conferenceGate.pass=conferenceGate.eligible&&verdict.pass;
 const publicForm = { delegates: delegateCount, singleLink: Boolean(submitToken), submissionsPlannedPerStage: Object.fromEntries(stages.map((n) => [n, plannedSubmissions(scenarioFor(n))])), maxSingleLinkSubmissions: MAX_SINGLE_LINK_SUBMISSIONS, note: "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately." };
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: conferenceGate.eligible?verdict.label:"RAMP / DIAGNOSTIC ONLY", readiness, conferenceGate, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, staffProfile, staffRolesPerStage, identityMode: mode, readinessLabel: conferenceGate.eligible?verdict.label:"RAMP / DIAGNOSTIC ONLY", readiness, conferenceGate, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, diagnosticVerdict, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });
 console.log(JSON.stringify(result, null, 2));
 console.log(`Full report (with samples): ${file}`);
-if (!verdict.pass) process.exitCode = 1;
+if (!(conferenceGate.eligible ? conferenceGate.pass : diagnosticVerdict.pass)) process.exitCode = 1;
