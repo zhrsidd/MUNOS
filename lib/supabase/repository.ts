@@ -75,7 +75,8 @@ export class SupabaseTransport implements Transport {
   const startChannels=()=>{
    if(cancelled)return;
    for(const [i,filter] of scopes.entries()){
-    const channel=this.client.channel(`operations:${this.conferenceId}:${this.actorId}:${i}`)
+    // A socket join can precede logical replication readiness; wait for the actual table subscription.
+    const channel=this.client.channel(`operations:${this.conferenceId}:${this.actorId}:${i}`,{config:{postgres_changes_options:{wait:true}}})
      .on('postgres_changes',{event:'INSERT',schema:'public',table:'operational_changes',filter},payload=>{
       // These roles consume document/configuration changes, not Chair-only activity.
       // Unknown or broader grants keep all notifications; this is not authorization.

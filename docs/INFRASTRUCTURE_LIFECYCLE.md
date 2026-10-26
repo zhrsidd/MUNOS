@@ -8,6 +8,8 @@ This decision supersedes instructions to create separate hosted development/stag
 
 These are **required changes and acceptance gates**, not claims that the current target guard, deployment pipeline or production access isolation already implements them. Do not cut over until they are independently verified. No infrastructure or repository code is modified by this handoff update.
 
+**26 October scope decision:** the owner approved direct RPC writes for this conference, deferring the production-only gateway and signed attestation. [Decision and limits](RELEASE_SCOPE_2026-10-26.md). These original requirements remain documented below; gateway denial is deferred rather than verified. The other unresolved lifecycle controls and release gates remain open.
+
 ## Lifecycle and allowed use
 
 | Phase | Hosted project | Allowed data and tools | Vercel |

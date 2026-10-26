@@ -1,3 +1,11 @@
+# Current DCMUN verification — 26 October 2026
+
+The current preproduction project is `kllhswucdhqqywnzxado`, still synthetic-only. Current evidence: [protected connection and migration record](PREPRODUCTION_CONNECTION_2026-10-25.md), [hosted grant/session/Realtime checks](HOSTED_ACCESS_VERIFICATION_2026-10-26.md), and [owner-approved direct RPC scope](RELEASE_SCOPE_2026-10-26.md). Production remains demo; these records do not approve cutover or capacity.
+
+The following October 6 record is historical evidence from a different, deleted development project. Its tests and public HTTP results do not satisfy the current DCMUN release gates.
+
+---
+
 # Development verification — 6 October 2026
 
 This records evidence, not production approval. Only development project `opmydpozhdgkpcnjwpqb` was used; no production project exists. See [integration review and handoff](INTEGRATION_REVIEW.md) for outstanding gates.

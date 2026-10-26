@@ -1,0 +1,101 @@
+{
+  "runId": "18e32474-dae8-4c03-b51a-4fcd447aee97",
+  "startedAt": "2026-10-25T23:43:04.930Z",
+  "completedAt": "2026-10-25T23:43:57.128Z",
+  "project": "kllhswucdhqqywnzxado",
+  "conference": "0331ceb6-3fa8-4731-92cb-2b4c0316d0cb",
+  "cases": {
+    "baseline": {
+      "snapshot": true,
+      "tableRead": true,
+      "write": true,
+      "bothRealtime": true
+    },
+    "signedOutSession": {
+      "snapshotAccepted": true,
+      "writeAccepted": true,
+      "errorCode": null,
+      "refreshDenied": true,
+      "pinnedRealtimeStillReceives": true
+    },
+    "revokedGrant": {
+      "snapshotDenied": true,
+      "tableRows": 0,
+      "freshWrite": "42501",
+      "acceptedReplayAcknowledged": true,
+      "changedReplay": "22023",
+      "realtime": {
+        "controlReceived": 3,
+        "probeReceived": 0,
+        "probeStatus": "SUBSCRIBED",
+        "quietWindowMs": 5000
+      }
+    }
+  },
+  "realtimeSystems": [
+    {
+      "who": "probe",
+      "at": "2026-10-25T23:43:06.467Z",
+      "extension": "postgres_changes",
+      "status": "ok",
+      "message": "Subscribed to PostgreSQL"
+    },
+    {
+      "who": "control",
+      "at": "2026-10-25T23:43:06.467Z",
+      "extension": "postgres_changes",
+      "status": "ok",
+      "message": "Subscribed to PostgreSQL"
+    }
+  ],
+  "clientSource": "a086e42adf58fc9f689fdf5be2aa3231c4810a59 with probe-only postgres_changes_options.wait=true",
+  "probeSourceSha256": "37f0e34f158e861bff13a64dc466934cfe16e981edaf1c0b730f229d2b4a2323",
+  "independentSql": {
+    "acceptedSchoolRows": 1,
+    "acceptedReceipts": 1,
+    "deniedOrChangedSchoolRows": 0,
+    "allFourProbeAndControlGrantsRevoked": true,
+    "remainingProbeAndControlAuthSessions": 0
+  },
+  "firstAttempt": {
+    "runId": "bda1543a-7243-4dff-a783-b84ac6857a5c",
+    "failedAt": "fresh Realtime baseline: neither channel received within 12 seconds",
+    "acceptedSchoolRows": 1,
+    "acceptedReceipts": 1,
+    "notificationRows": 1,
+    "serverLog": "Tenant initialization and replication stream startup overlapped the first save. A startup/readiness gap is plausible; the save was not lost."
+  },
+  "limits": [
+    "One synthetic Executive role only; not an every-role/every-RPC hosted matrix.",
+    "Realtime denial is a bounded observation with three positive control events and a five-second quiet window.",
+    "Observed newly-issued JWTs expire about one hour after test start; this does not prove the configured maximum or invalidate all older tokens.",
+    "No public QR HTTP path, capacity/load, full browser offline conflict rehearsal, lifecycle promotion or release approval."
+  ],
+  "numberingRollback": {
+    "result": "DRYRUN_OK",
+    "checks": [
+      "owner-only helper and empty search path",
+      "Chair 01/02/03 plus replay",
+      "public SQL boundary 04/replayed",
+      "legacy hex ignored",
+      "99/100/101 boundary"
+    ],
+    "unchangedBeforeAfter": true,
+    "counts": {
+      "conferences": 3,
+      "committees": 3,
+      "documents": 3,
+      "delegates": 10,
+      "users": 93,
+      "grants": 83,
+      "receipts": 176,
+      "notifications": 181,
+      "ledger": 28
+    },
+    "functionMd5s": [
+      "bb653a4a248a747f796c6537587997c2",
+      "7059bc67d9f89fd8aa26359ecbe6b963",
+      "fdf59b4fe80821e91bd10d2fb4242c7c"
+    ]
+  }
+}

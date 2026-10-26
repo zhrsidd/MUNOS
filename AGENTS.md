@@ -29,7 +29,7 @@ reviewed, tested change.
    (`lib/platform/target-guard.ts`). Production builds must target exactly `EXPECTED_SUPABASE_REF`. Do not point
    load tests, rehearsals or scripts at anything not listed as staging or development. The lifecycle gates
    (production lock, owner-controlled registry, production-only write gateway, revocation proof) are required
-   but **not yet implemented**; see [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md). Do not change
+   but **not yet implemented**. For this conference the owner approved the direct RPC path and deferred the gateway and signed attestation on 26 October 2026; other unresolved lifecycle controls remain open. See [the scope decision](docs/RELEASE_SCOPE_2026-10-26.md) and [docs/V1_RELEASE_CHECKLIST.md](docs/V1_RELEASE_CHECKLIST.md). Do not change
    Vercel production configuration without the owner's approval.
 2. **Secrets.** Never commit secrets, session tokens, service keys or generated build output. Never print
    credentials in logs, tests, docs or chat. Keep server-only keys out of client bundles.
