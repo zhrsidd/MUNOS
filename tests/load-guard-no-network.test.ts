@@ -72,3 +72,23 @@ test('positive control: the network blocker is live, and rehearsal-run reaches o
   assert.deepEqual(attempts(r.stderr),['NETWORK fetch https://testtesttesttesttest.supabase.co/rest/v1/rpc/preproduction_status']);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('unknown or missing staff-profile value refuses before any network request',async()=>{
+ for(const profileArgs of [['--staff-profile','typo'],['--staff-profile']]){
+  const dir=await workdir(SYNTHETIC);
+  try{
+   const r=await run(dir,'scripts/rehearsal-run.mts',['--app','http://localhost:3999',...profileArgs]);
+   assert.equal(r.code,2);assert.match(r.stderr,/staff-profile must be legacy or dcmun-2026/);assert.deepEqual(attempts(r.stderr),[]);
+  }finally{await rm(dir,{recursive:true,force:true});}
+ }
+});
+
+test('real runner preflight reports the selected 110-device DCMUN role mix before lifecycle lookup',async()=>{
+ const dir=await workdir(SYNTHETIC);
+ try{
+  const r=await run(dir,'scripts/rehearsal-run.mts',['--app','http://localhost:3999','--staff','110','--staff-profile','dcmun-2026']);
+  const preflight=JSON.parse(r.stdout.split('\n').find(l=>l.startsWith('{'))!);
+  assert.deepEqual(preflight,{staffProfile:'dcmun-2026',staffRolesPerStage:[{chair:75,approval:20,admins:10,executive:5}]});
+  assert.deepEqual(attempts(r.stderr),['NETWORK fetch https://testtesttesttesttest.supabase.co/rest/v1/rpc/preproduction_status']);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

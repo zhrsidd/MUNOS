@@ -7,7 +7,7 @@
 // shared-row contention: every Chair write took the same committees row lock. It is kept for historical comparison
 // only and can never produce a readiness PASS.
 import type { ChairIdentity, Identity, IdentityMode } from "./identities";
-import type { SimUser } from "./scenario";
+import { DCMUN_STAFF_MAXIMA, type SimUser, type StaffRole } from "./scenario";
 export interface RunCommittee { id: string; session: string; code: string }
 export type RunMode = IdentityMode | "worst-case-superuser";
 export interface ChairAssignment { committee: RunCommittee; identity: Identity; chairIndex: number | null }
@@ -136,13 +136,19 @@ export function observedWorkVerdict(o: {
     { check: 'every configured staff device completed a successful snapshot', pass: o.expectedDevices>0 && o.openedDevices===o.expectedDevices },
     { check: 'at least one successful snapshot per configured role', pass: o.expectedRoles.length > 0 && o.expectedRoles.every(r => (o.reads[r] ?? 0) > 0) },
     { check: 'at least one accepted mutation per configured writing role', pass: o.expectedRoles.filter(r => r !== 'executive').length > 0 && o.expectedRoles.filter(r => r !== 'executive').every(r => (o.writes[r] ?? 0) > 0) },
-    { check: 'accepted Chair traffic in every fixture committee', pass: o.expectedChairCommittees.length > 0 && o.expectedChairCommittees.every(c => o.observedChairCommittees.includes(c)) },
+    { check: 'accepted Chair traffic matches every configured committee', pass: o.expectedChairCommittees.length > 0 && o.expectedChairCommittees.every(c => o.observedChairCommittees.includes(c)) && o.observedChairCommittees.every(c => o.expectedChairCommittees.includes(c)) },
     { check: 'zero pending, conflicting or unconfirmed actions at a settled close', pass: !o.closeTimedOut && o.pending === 0 && o.conflicts === 0 && o.unconfirmed === 0 },
     { check: 'no scripted intent was rejected locally', pass: (o.localRefusals??0)===0 },
     { check: 'declared critical operations were observed', pass: (o.expectedActions ?? []).every(a => (o.actions?.[a] ?? 0) > 0) },
     { check: 'every configured public page and submission completed successfully', pass: (o.completedPages ?? 0) === (o.expectedPages ?? 0) && (o.createdSubmissions ?? 0) === (o.expectedSubmissions ?? 0) },
   ];
   return { pass: checks.every(c => c.pass), checks };
+}
+
+/** Warm-ups may cover fewer committees; they still require real scoped identities, metrics and all configured work. */
+export function rampVerdict(metrics: {checks:{check:string;pass:boolean}[]}, workChecks:{check:string;pass:boolean}[], mode:RunMode) {
+  const checks=[...metrics.checks,...workChecks,{check:'role-scoped multi-committee fixture',pass:mode==='realistic-multi-committee'}];
+  return {label:'RAMP / DIAGNOSTIC ONLY' as const,pass:checks.every(c=>c.pass),checks};
 }
 
 /** Validate the public bearer link through the fixture Executive's authorized snapshot, without printing it. */
@@ -152,11 +158,16 @@ export function assertSubmissionBinding(links: { token: string; committeeId: str
 }
 
 /** Passing a small diagnostic is not the approved 110-device conference capacity gate. */
-export function conferenceGateProfile(o:{staffStages:number[];minutes:number;committees:number;delegates:number;submissionsPerStage:number[]}) {
+export function conferenceGateProfile(o:{staffStages:number[];minutes:number;committees:number;delegates:number;submissionsPerStage:number[];staffRolesPerStage?:Record<StaffRole,number>[]}) {
+ const mixes=o.staffRolesPerStage??[];
  const checks=[
   {check:'every capacity stage has at least 110 staff devices',pass:o.staffStages.length>0&&o.staffStages.every(n=>n>=110)},
   {check:'at least 30 minutes across 19 real committees',pass:o.minutes>=30&&o.committees===19},
   {check:'at least 150 public page loads and 16 planned creates per stage',pass:o.delegates>=150&&o.submissionsPerStage.length===o.staffStages.length&&o.submissionsPerStage.every(n=>n>=16)},
+  {check:'every capacity stage covers 57 Chairs, 20 Approval, 10 printing/Admins and 5 Executives',pass:
+    mixes.length===o.staffStages.length && mixes.every((mix,i)=>
+      Object.values(mix).reduce((sum,n)=>sum+n,0)===o.staffStages[i] &&
+      (Object.keys(DCMUN_STAFF_MAXIMA) as StaffRole[]).every(role=>Number.isInteger(mix[role])&&mix[role]>=DCMUN_STAFF_MAXIMA[role]))},
  ];
  return {eligible:checks.every(c=>c.pass),checks};
 }

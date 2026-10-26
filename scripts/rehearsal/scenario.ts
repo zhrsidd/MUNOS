@@ -11,6 +11,14 @@
 // speeches started from the queue, scored, optional POIs, then finished. One Chair device per committee
 // holds the floor (speeches/POIs/reorder); the others take roll call, add to queues and watch.
 export type StaffRole = "chair" | "approval" | "admins" | "executive";
+export type StaffProfile = "legacy" | "dcmun-2026";
+/** Owner-reported concurrent device maxima; extra capacity devices are Chairs. */
+export const DCMUN_STAFF_MAXIMA: Record<StaffRole, number> = { chair: 57, approval: 20, admins: 10, executive: 5 };
+export function parseStaffProfile(raw?: string): StaffProfile {
+  if (raw === undefined || raw === "legacy") return "legacy";
+  if (raw === "dcmun-2026") return raw;
+  throw Error("--staff-profile must be legacy or dcmun-2026.");
+}
 export type Role = StaffRole | "delegate";
 export type Action =
   | "open" | "read" | "refocus" | "health"
@@ -24,6 +32,7 @@ export interface SimUser { id: number; role: Role; committee: number; floor?: bo
 export interface ScenarioOptions {
   /** Simulated staff devices (Chairs, Approval, Admins, Executive). */
   staff: number;
+  staffProfile?: StaffProfile;
   /** Simulated delegates using only the public QR submission page. */
   delegates?: number;
   minutes: number;
@@ -89,9 +98,15 @@ function rng(seed: number) {
   let s = seed >>> 0 || 1;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
 }
-export function assignStaffRoles(staff: number): StaffRole[] {
+export function assignStaffRoles(staff: number, profile: StaffProfile = "legacy"): StaffRole[] {
+  parseStaffProfile(profile);
   const support: StaffRole[] = [];
-  for (const role of ["approval", "admins", "executive"] as const) for (let i = 0; i < Math.round(staff * STAFF_MIX[role]); i++) support.push(role);
+  for (const role of ["approval", "admins", "executive"] as const) {
+    const count = profile === "dcmun-2026"
+      ? Math.round(Math.min(staff / 92, 1) * DCMUN_STAFF_MAXIMA[role])
+      : Math.round(staff * STAFF_MIX[role]);
+    for (let i = 0; i < count; i++) support.push(role);
+  }
   const kept = support.slice(0, Math.max(0, staff - 1)); // always at least one Chair
   return [...Array<StaffRole>(staff - kept.length).fill("chair"), ...kept];
 }
@@ -102,7 +117,7 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
   const committees = Math.max(1, o.committees);
   const between = (min: number, max: number) => (min + random() * (max - min)) * 1000;
   const pick = <T,>(weighted: [T, number][]) => { let r = random() * weighted.reduce((n, [, w]) => n + w, 0); for (const [v, w] of weighted) if ((r -= w) <= 0) return v; return weighted[0][0]; };
-  const staff: SimUser[] = assignStaffRoles(o.staff).map((role, id) => {
+  const staff: SimUser[] = assignStaffRoles(o.staff, o.staffProfile).map((role, id) => {
     const start = Math.floor(random() * window);
     const steps: Step[] = [{ at: start, action: "open" }];
     const committee = id % committees;

@@ -8,6 +8,10 @@ Related: [INFRASTRUCTURE_LIFECYCLE.md](INFRASTRUCTURE_LIFECYCLE.md), [ISOLATION_
 
 **Status markers used on every statement of substance:** **Verified** = read in the repository or computed by running local, no-network code on 21 October 2026 (re-do it if the commit changes). **Proposed** = a recommendation for the owner to accept, change or reject. **Untested** = depends on hosted behaviour, a dashboard value, a person or a script path nobody has run; do not rely on it.
 
+## Owner window and current staff profile — 26 October 2026
+
+The owner supplied **31 October, 4–6**; this packet interprets that as **16:00–18:00 Asia/Qatar (13:00–15:00 UTC)**. See [the dated run card](LOAD_WINDOW_2026-10-31.md). The reported maximum is **57 Chairs + 20 Approval + 10 printing/Admins + 5 Executives = 92 devices**. The full 110-device test uses **75/20/10/5**, adding 18 Chair devices as headroom. It does not lower the 110-device gate. Use explicit **`--staff-profile dcmun-2026`**; the historical default mix remains available for comparison but cannot clear the current role-coverage gate. The generated report and preflight print the selected profile and counts.
+
 ## Current runner correction — 26 October 2026
 
 **This section supersedes the older model and rate claims in this packet and LOAD_TEST_PLAN.md.** The live runner now uses the actual shipping `DurableRepository` and `DurableStore`, backed by a distinct Node in-memory IndexedDB database per simulated device. It no longer copies the old sync algorithm. Core owns normalization, optimistic intent, MAX_BATCH confirmation, acknowledgement retention, overload backoff, passive coalescing and successful-flush queue rechecks. No production core/schema contract changed for this correction.
@@ -17,9 +21,9 @@ Related: [INFRASTRUCTURE_LIFECYCLE.md](INFRASTRUCTURE_LIFECYCLE.md), [ISOLATION_
 - Network requests are measured around the actual transport. Refresh source is honestly `actual-core`; private internal trigger attribution is not inferred. The report records actual snapshot RPC names/counts, client request concurrency, local refusals, configured distribution and observed accepted work.
 - Every real HTTP request has a 30-second abort deadline; device closure has a separate 30-second bound. A closure timeout fails the report instead of hanging or claiming a drained device.
 - Configured public traffic requires a well-formed real submission token. Before delegate traffic, the fixture Executive snapshot must bind that token to the selected fixture committee. Page responses must be HTTP 200 and contain the actual submission form. All configured page loads and fresh submission creates must succeed; a small global error percentage cannot hide an entirely broken public path.
-- A stage cannot pass merely because identities were assigned. It needs successful snapshots for every configured role, at least one accepted mutation for each configured writing role (Chair/Approval/printing), accepted Chair mutations in every fixture committee, zero pending/conflicting/unconfirmed work after a settled closure, and accepted scoring/POI/approval/printing operations when scheduled. POI scoring latency is included in the write-p95 check. Existing latency/error/exactly-once checks still apply. These are minimum non-vacuity checks, not proof that every scheduled action executed. Small ramps remain informational and may intentionally lack all 19 committees.
+- A stage cannot pass merely because identities were assigned. It needs successful snapshots for every configured role, at least one accepted mutation for each configured writing role (Chair/Approval/printing), accepted Chair mutations in every configured Chair committee (all 19 for H3), zero pending/conflicting/unconfirmed work after a settled closure, and accepted scoring/POI/approval/printing operations when scheduled. POI scoring latency is included in the write-p95 check. Existing latency/error/exactly-once checks still apply. These are minimum non-vacuity checks, not proof that every scheduled action executed. Small ramps remain informational and may intentionally lack all 19 committees.
 - Conflicts remain in the actual outbox; the old simulated automatic-dismissal assumption is removed. An unresolved conflict fails the stage rather than silently discarding intent or claiming a drained device. All go/no-go and dashboard STOP decisions remain manual.
-- Shipping timers are device-local and generate no RPC. Current POI recognition and scoring are separate commands, three seconds apart in the human scenario. The extra command does not consume the scenario RNG, preserving the approved public population/burst: **110 staff (77/11/11/11), 19 committees, 150 page loads and 16 submissions at fraction 0.08**.
+- Shipping timers are device-local and generate no RPC. Current POI recognition and scoring are separate commands, three seconds apart in the human scenario. The extra command does not consume the scenario RNG, preserving the approved public population/burst: **110 staff (75/20/10/5), 19 committees, 150 page loads and 16 submissions at fraction 0.08**.
 - `scripts/rehearsal/client-model.ts`, `estimate.ts` and `rehearsal:plan` rate estimates are **HISTORICAL COMPARISON ONLY**. Old 600 ms/2.5 s refresh counts, writes/minute and derived Small-load rates are not current predictions or H3 acceptance evidence. The live actual-core report measures rates; do not approve a workload using the old table's request counts. The scenario counts scheduled human steps, not guaranteed accepted writes.
 
 Fresh generated fixtures now set each normal current session and seed Present attendance plus Draft, Review, Approved and In Debate workflow documents. For 19 committees/420 delegates this adds 420 attendance rows and 76 documents, each with one version and canonical synthetic working-document link. All rows are explicitly synthetic; no Google document is created or fetched. This changes the starting payload from the older empty-workflow fixture, so payload size and traffic must be remeasured. Generated SQL was replayed against all local migrations, including the current allowance → recognize → score POI contract. No hosted fixture was applied for this change.
@@ -28,7 +32,7 @@ Chair roll-call/queue candidates are partitioned across same-committee devices, 
 
 Every configured staff device must complete a successful snapshot. Missing declared operations, incomplete public page/create counts, rejected local intent, unresolved conflicts, pending/unconfirmed work or a close timeout fail the work checks. Real conflicts are retained, never silently discarded; stop/review the report and use a fresh reviewed rerun rather than forcing an automatic dismissal. A failure due to unresolved intent is not by itself proof of inadequate compute. Review actual accepted rates and sample counts as well as the percentile thresholds.
 
-`conferenceGate` separately checks the approved full profile: every stage at least 110 devices, 30 minutes, 19 committees, at least 150 page loads and 16 planned submissions. Its `pass` requires both that profile and the operational verdict. Smaller/shorter runs are labelled **RAMP / DIAGNOSTIC ONLY** and cannot clear the conference gate. Numeric durations/windows/fractions are validated before network; the runner caps one invocation at 60 minutes and the drain at 600 seconds. App redirects are refused.
+`conferenceGate` separately checks the approved full profile: every stage at least 110 devices, 30 minutes, 19 committees, at least 150 page loads and 16 planned submissions, plus role counts covering the reported 57/20/10/5 maxima. Missing counts, the old 77/11/11/11 mix or inconsistent totals fail the gate. Its `pass` requires both that profile and the operational verdict. Smaller/shorter runs are labelled **RAMP / DIAGNOSTIC ONLY** and cannot clear the conference gate. Numeric durations/windows/fractions are validated before network; the runner caps one invocation at 60 minutes and the drain at 600 seconds. App redirects are refused.
 
 The exact live code candidate and deployment SHA must be recorded and reviewed before the 31 October run. No hosted load, upgrade or spending was performed to make this correction. P3 uses `checkRegisteredToolTarget`; network-entry tools reach it through `assertToolTarget`, then require fresh `preproduction_status` before enrollment or synthetic work. Pure fixture/scenario generation remains local and makes no phase lookup.
 
@@ -70,7 +74,7 @@ All items are operator checks recorded in the run sheet (section 9). Items marke
 | P7 | `supabase/fixture-ids.json` exists and `.test-sessions/development.json` exists (every hosted script imports `scripts/remote-context.mts`, which reads both). Create the session file with `npx tsx scripts/prepare-session.mts` (one anonymous sign-in; counts against the hourly limit) | `ls supabase/fixture-ids.json .test-sessions/development.json` | Both present. **The plan's step list does not mention `prepare-session`; the scripts need it** | Verified (code: `remote-context.mts`, `prepare-session.mts`); run Untested |
 | P8 | **Small compute confirmed in the dashboard** (Organisation, Billing: plan Pro; Project, Settings, Compute and Disk: size Small, disk size) with a dated screenshot. If it still says Micro, only L0 and S0 may run, and only with approval; the final gate may not | Dashboard (the connector cannot read it: checklist 1.2) | "Small" visible; recorded | Untested |
 | P9 | **PITR and backups:** scheduled daily backup exists and the last one succeeded; PITR state (on/off, retention) recorded. Decide **before real data**, not for the load run, but record the state so a restore is possible if a fixture step misbehaves | Dashboard, Database, Backups | State recorded; owner decision noted (checklist 1.2.4-1.2.6) | Untested |
-| P10 | Supabase Auth anonymous sign-in rate limit value (default 30 per IP per hour; confirm), and the network the run is made from | Dashboard, Authentication, Rate limits | Value recorded | Untested |
+| P10 | Supabase Auth anonymous sign-in rate limit value (owner reports 30 per IP per hour on 26 October; recheck before enrollment), and the network the run is made from | Dashboard, Authentication, Rate limits | Value recorded | Untested |
 | P11 | Preview deployment of a **named commit**, `/api/health` shows `environment` of `preview`, and (for the public-form part) its `SUPABASE_SECRET_KEY` points at this project. **Which build it is matters:** see section 11 | Vercel dashboard; open `<preview>/api/health` in a browser | Commit SHA recorded; environment not `production` | Untested |
 | P12 | If the Preview is protected, `VERCEL_AUTOMATION_BYPASS_SECRET` is set **in the operator's shell only** (the runner reads it from the environment and sends it as `x-vercel-protection-bypass`) | `printenv` not required; never print or write it | Set in shell, in no file | Verified (code) |
 | P13 | Baseline fingerprint of the original conference (the SQL in [LOAD_TEST_PLAN.md](LOAD_TEST_PLAN.md) "Isolation checks the operator performs", read-only, SQL editor) and Advisors (performance and security) recorded | SQL editor by the technical contact | Saved in the evidence folder | Proposed |
@@ -137,16 +141,16 @@ export B=".test-sessions/fixtures/<conference-B-uuid>"
 
 | Stage | Command (from the repository root) | Duration | What the printed report will say ([Verified] from `readiness.ts` and `guard.ts`) |
 | --- | --- | --- | --- |
-| **S0** (10 staff) | `npm run rehearsal:run -- --app $PREVIEW --identities $A/identities.json --fixture $A/fixture.json --staff 10 --minutes 5` | 5 min + drain up to 120 s | `NOT A READINESS RUN` (Chair traffic in 7 of 19 committees); capacity text "BELOW the 50-staff comparison (smoke / warm-up only)". Cannot PASS |
+| **S0** (10 staff) | `npm run rehearsal:run -- --app $PREVIEW --identities $A/identities.json --fixture $A/fixture.json --staff-profile dcmun-2026 --staff 10 --minutes 5` | 5 min + drain up to 120 s | `NOT A READINESS RUN` (Chair traffic in 6 of 19 committees); capacity text "BELOW the 50-staff comparison (smoke / warm-up only)". May pass diagnostics only |
 | **R1** (25) | same with `--staff 25 --minutes 5` | 5 + drain | `NOT A READINESS RUN` (16 of 19 committees); "BELOW the 50-staff comparison" |
 | **R2** (50) | same with `--staff 50 --minutes 5` | 5 + drain | `READINESS RUN` structurally (19 committees); "BELOW the current 110-device gate"; does not count toward the gate |
 | **R3** (80) | same with `--staff 80 --minutes 5` | 5 + drain | As R2 |
 
-Configured staff mixes are S0 7/1/1/1, R1 16/3/3/3, R2 35/5/5/5, R3 56/8/8/8 (Chair/Approval/printing/Executive). Prior write and snapshot-RPC estimates were produced by the historical copied client and have been withdrawn as current predictions. Actual accepted work, local refusals and snapshot RPCs are measured by the live actual-core runner.
+Configured DCMUN staff mixes are S0 6/2/1/1, R1 16/5/3/1, R2 31/11/5/3, R3 50/17/9/4 (Chair/Approval/printing/Executive). Prior write and snapshot-RPC estimates were produced by the historical copied client and have been withdrawn as current predictions. Actual accepted work, local refusals and snapshot RPCs are measured by the live actual-core runner.
 
 ### 4.1 Go/no-go checkpoint (after EVERY stage, before the next)
 
-The decider writes **GO** or **NO-GO** with the UTC time in the run sheet. Go only if every row is clean. A NO-GO ends the ramp; never skip to a larger stage and never start the next stage on the same fixture after a stop condition (section 7).
+The decider writes **GO** or **NO-GO** with the UTC time in the run sheet. S0–R3 require `diagnosticVerdict.pass=true` plus every operator threshold; their expected incomplete capacity/distribution labels are informational. H3 requires `conferenceGate.pass=true` and the operator thresholds. Never interpret a diagnostic pass or exit 0 as conference readiness. A NO-GO ends the ramp; never skip to a larger stage and never start the next stage on the same fixture after a stop condition (section 7).
 
 | # | Checkpoint | Who | Threshold for GO | Source |
 | --- | --- | --- | --- | --- |
@@ -156,7 +160,7 @@ The decider writes **GO** or **NO-GO** with the UTC time in the run sheet. Go on
 | C4 | Runner: worst per-action write p95 | Runner | <= 1,500 ms | Runner verdict |
 | C5 | Runner: worst per-action read p95 | Runner | <= 2,500 ms | Runner verdict |
 | C6 | Runner: actual outboxes fully settled | Runner, read by operator | `pendingAtClose`, `conflictsAtClose`, `unconfirmedAtClose` all 0 | Actual-core report/verdict |
-| C6a | Configured versus observed traffic | Runner, independent reviewer | Successful reads per role, accepted writes per writing role, accepted Chair work in every fixture committee | `observed`, `configuredReadiness`, `readiness`, `work` fields; capacity acceptance requires H3 coverage |
+| C6a | Configured versus observed traffic | Runner, independent reviewer | Successful read on every configured device, accepted writes per writing role, accepted Chair work in every committee assigned to that stage; H3 covers all 19 | `observed`, `configuredReadiness`, `readiness`, `work`, `diagnosticVerdict` fields; capacity acceptance requires H3 coverage |
 | C7 | Operator: 5xx, `PGRST003`, `40001`, `57014` in the run window | Watcher | 0 unexplained | Supabase API and Postgres logs |
 | C8 | Operator: Postgres CPU | Watcher | average < 70 %, no 5-minute window > 85 % | Observability |
 | C9 | Operator: connections | Watcher | peak < 75 % of the plan limit (Small: 90 direct, per the plan's cited public docs, re-check) | Observability |
@@ -165,7 +169,7 @@ The decider writes **GO** or **NO-GO** with the UTC time in the run sheet. Go on
 | C12 | Vercel: 5xx or timeouts on `/api/*`, `/api/health` | Watcher | 0 | Vercel Logs |
 | C13 | **Settle two minutes (manual, timed by the decider):** connections idle, CPU and IO near baseline, no `PGRST003` or `40001` | Decider | back to baseline within 2 min; if not, one further 3 min, else **stop** | Observability, logs |
 
-The runner enforces C1-C6a, including observed work and settled outboxes, **once, at the end**. The separate `conferenceGate` combines the full-profile requirements with that operational verdict. C7-C13 remain operator checks. The readiness label of S0-R3 is not part of go/no-go. Planned time for S0-R3 with reviews and settles is about 50 minutes ([Proposed], plan).
+The runner enforces C1-C6a, including observed work and settled outboxes, **once, at the end**. The separate `conferenceGate` combines the full-profile requirements with that operational verdict. C7-C13 remain operator checks. For warm-ups, work is checked against every configured Chair committee, including rejection of unexpected committee traffic; full readiness still checks all 19 and remains false for partial ramps. The separate diagnostic verdict governs their CLI exit status. A full-profile run exits on `conferenceGate.pass`. Planned time for S0-R3 with reviews and settles is about 50 minutes ([Proposed], plan).
 
 ## 5. Stage H3: the final gate (110 staff, 19 committees, 30 minutes)
 
@@ -173,13 +177,13 @@ Fixture B, fresh. **Counts as the gate only if all of these hold:** `conferenceG
 
 ```bash
 npm run rehearsal:run -- --app $PREVIEW --identities $B/identities.json --fixture $B/fixture.json \
-  --staff 110 --minutes 30 --delegates 150 --delegate-window 120 \
+  --staff-profile dcmun-2026 --staff 110 --minutes 30 --delegates 150 --delegate-window 120 \
   --submit-token "$SUBMIT_TOKEN" --submit-committee GA1 --submit-fraction 0.08
 ```
 
 ### 5.1 What actually executes ([Verified] by `npm run rehearsal:plan` and `buildScenario` run locally on this commit)
 
-* 110 staff: 77 Chair, 11 Approval, 11 printing/Admin and 11 Executive devices, across 19 committees. Scheduled human steps are not guaranteed writes. Accepted writes and snapshot RPC counts/rates come from the actual-core report; the former copied-client write/rate estimates are withdrawn.
+* 110 staff: 75 Chair, 20 Approval, 10 printing/Admin and 5 Executive devices, across 19 committees. Scheduled human steps are not guaranteed writes. Accepted writes and snapshot RPC counts/rates come from the actual-core report; the former copied-client write/rate estimates are withdrawn.
 * **Public form: 150 page loads, uniformly inside the first 120 s of the run** (last load at 119.8 s in the seeded scenario), plus **16 resolution submissions** at `--submit-fraction 0.08`, each 30-180 s after its own page load, i.e. **between 57 s and 282 s into the run** (computed 57.3 s to 282.5 s). All 16 land inside one 10-minute window on one link (designed limit 20 per 10 minutes; the runner refuses a plan above 18).
 * **Public traffic starts with the run, not later**, so it overlaps the staff start burst (all 110 devices open within a 150 s start window). A delayed burst is not available without new reviewed tooling ([Verified], plan).
 * Before any request the runner prints `Stage 110 staff: 150 public page loads, 16 resolution submissions planned on one link (max 18).` **The operator confirms the printed submission count is exactly 16 and stops if it differs** (the count depends on seed, minutes, delegates, fraction, staff and committee count). At the default fraction 0.10 it would print 18; at 0.05, 10 ([Verified] in the plan; 0.08 reproduced here).
@@ -213,10 +217,10 @@ H4 (vote-closing spike) and H5 (recovery observation) follow H3 only if approved
 ## 6. Check configured populations locally before approval (no network)
 
 ```bash
-npx tsx -e "import {buildScenario,summarize} from './scripts/rehearsal/scenario'; console.log(JSON.stringify(summarize(buildScenario({staff:110,delegates:150,committees:19,minutes:30,startWindowSeconds:150,delegateWindowSeconds:120,submitFraction:0.08}),30),null,2))"
+npx tsx -e "import {buildScenario,summarize} from './scripts/rehearsal/scenario'; console.log(JSON.stringify(summarize(buildScenario({staff:110,staffProfile:'dcmun-2026',delegates:150,committees:19,minutes:30,startWindowSeconds:150,delegateWindowSeconds:120,submitFraction:0.08}),30),null,2))"
 ```
 
-Expect roles 77/11/11/11, 150 public page loads and **16 planned public submissions**. Staff step counts are an upper bound with local timer steps and precondition-dependent skips; they are not actual RPC predictions. The older `legacyHarnessModel` output is explicitly historical. `npm run rehearsal:plan` additionally runs the historical copied-client estimator and labels it accordingly; do not reuse those numbers as current H3 forecasts. Actual-core local regression tests must pass before any hosted run.
+Expect roles 75/20/10/5, 150 public page loads and **16 planned public submissions**. Staff step counts are an upper bound with local timer steps and precondition-dependent skips; they are not actual RPC predictions. The older `legacyHarnessModel` output is explicitly historical. `npm run rehearsal:plan` additionally runs the historical copied-client estimator and labels it accordingly; do not reuse those numbers as current H3 forecasts. Actual-core local regression tests must pass before any hosted run.
 
 ## 7. Stop conditions (all manual; the runner has no auto-abort)
 
@@ -245,7 +249,7 @@ Record the exact run window in UTC (stage start printed by the runner, end from 
 
 ### 8.1 Runner-computed (client side; the file `.test-sessions/rehearsal-<time>.json`) [Verified]
 
-Per action: requests, ok, conflicts (PT409 / 409), rate-limited, errors, p50/p95/p99; read and write percentiles per role; page-load timings and submission outcomes; triggers attempted and dropped; refreshes by source; snapshot RPCs sent (`snapshotRpcsByName`); drain seconds and `pendingAtClose`; exactly-once result (duplicates, lost); `READINESS RUN` label and Chair/committee coverage; capacity-gate text; the app build identity from `/api/health` and the Supabase project ref.
+Per action: requests, ok, conflicts (PT409 / 409), rate-limited, errors, p50/p95/p99; read and write percentiles per role; page-load timings and submission outcomes; triggers attempted and dropped; refreshes by source; snapshot RPCs sent (`snapshotRpcsByName`); selected `staffProfile`/`staffRolesPerStage`; distinct diagnostic/full-gate verdicts; drain seconds and `pendingAtClose`; exactly-once result (duplicates, lost); `READINESS RUN` label and Chair/committee coverage; capacity-gate text; the app build identity from `/api/health` and the Supabase project ref.
 
 ### 8.2 Operator-observed (server side; NOT computed by the runner) [Proposed]
 
@@ -293,7 +297,7 @@ Run sheet template (one per stage):
 - Fixture conference id (A or B):      Protected ids differ? yes/no      NEXT_PUBLIC_CONFERENCE_ID set? yes
 - Command line run (paste, with the token replaced by $SUBMIT_TOKEN):
 - Printed submissions line (H3: must read 16):
-- Runner verdict and label:      Capacity text:      Exit code:
+- Runner diagnostic verdict:      conferenceGate.pass:      Readiness label / capacity text:      Exit code:
 - Runner checks C1-C6a: dup __ lost __ error % __ 429 __ worst write p95 __ worst read p95 __ pending __ conflicts __ unconfirmed __
 - Observed reads/writes by role: __ ; accepted Chair committees/identities: __ ; configured versus observed coverage differences: __
 - Client implementation: actual DurableRepository; Realtime delivery simulated (real-channel evidence separate): __

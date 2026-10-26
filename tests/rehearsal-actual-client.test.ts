@@ -173,7 +173,23 @@ test('record ownership partitions Chair roll call and document review without ov
 
 test('the conference gate cannot be claimed by a short/small run or a missing public workload',async()=>{
  const {conferenceGateProfile}=await import('../scripts/rehearsal/readiness');
- const full={staffStages:[110],minutes:30,committees:19,delegates:150,submissionsPerStage:[16]};
+ const full={staffStages:[110],minutes:30,committees:19,delegates:150,submissionsPerStage:[16],staffRolesPerStage:[{chair:75,approval:20,admins:10,executive:5}]};
  assert.equal(conferenceGateProfile(full).eligible,true);
  for(const patch of [{minutes:5},{staffStages:[50]},{committees:14},{delegates:0},{submissionsPerStage:[0]},{staffStages:[25,110],submissionsPerStage:[16,16]}])assert.equal(conferenceGateProfile({...full,...patch}).eligible,false);
+});
+
+test('healthy partial-committee warm-ups can pass diagnostics without passing readiness',async()=>{
+ const {assessReadiness,readinessVerdict,rampVerdict,observedWorkVerdict}=await import('../scripts/rehearsal/readiness');
+ const metrics={pass:true,checks:[{check:'latency',pass:true}]};
+ const traffic=[{committeeId:'a',committeeCode:'GA1',identity:'one'}];
+ const readiness=assessReadiness({mode:'realistic-multi-committee',committees:[{id:'a',session:'sa',code:'GA1'},{id:'b',session:'sb',code:'WHO'}],chairTraffic:traffic});
+ const options={expectedDevices:1,openedDevices:1,expectedRoles:['chair'],reads:{chair:1},writes:{chair:1},expectedChairCommittees:['a'],observedChairCommittees:['a'],pending:0,conflicts:0,unconfirmed:0};
+ const work=observedWorkVerdict(options);
+ assert.equal(work.pass,true);
+ assert.equal(rampVerdict(metrics,work.checks,'realistic-multi-committee').pass,true);
+ assert.equal(readinessVerdict(metrics,readiness).pass,false,'a healthy partial ramp cannot become readiness evidence');
+ for(const patch of [{observedChairCommittees:[]},{observedChairCommittees:['a','b']},{conflicts:1},{unconfirmed:1},{pending:1}])
+  assert.equal(rampVerdict(metrics,observedWorkVerdict({...options,...patch}).checks,'realistic-multi-committee').pass,false);
+ assert.equal(rampVerdict({checks:[{check:'latency',pass:false}]},work.checks,'realistic-multi-committee').pass,false);
+ assert.equal(rampVerdict(metrics,work.checks,'legacy-single-committee').pass,false);
 });
