@@ -130,3 +130,14 @@ export function boundedFetch(fetcher: typeof fetch, timeoutMs = 30_000): typeof 
     return fetcher(input, { ...init, signal: previous ? AbortSignal.any([previous, timeout]) : timeout });
   };
 }
+
+/** Operators divide work rather than intentionally editing the same record simultaneously. */
+export function ownsWorkItem(id: string, user: Pick<SimUser,'id'|'role'>, peers: SimUser[]) {
+  const rolePeers=peers.filter(p=>p.role===user.role);
+  if(!rolePeers.length)return false;
+  let hash=0;for(const char of id)hash=(hash*31+char.charCodeAt(0))>>>0;
+  return rolePeers[hash%rolePeers.length].id===user.id;
+}
+export function reviewableDocument(data: ConferenceData | null, owns: (id:string)=>boolean = () => true) {
+  return data?.documents.find(d=>(d.status==='Submitted'||d.status==='Review')&&owns(d.id));
+}

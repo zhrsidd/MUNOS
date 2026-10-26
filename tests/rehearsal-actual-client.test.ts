@@ -58,12 +58,12 @@ test('close does not dismiss conflicts or claim pending work was drained', async
   await client.store.update(key, () => ({ key, base: createSeed(), pending: [mutation()], savedAt: new Date(0).toISOString() }));
   await client.open(); await until(() => client.conflicts === 1); await client.close();
   assert.equal(client.pending, 1); assert.equal(client.conflicts, 1);
-  assert.equal(observedWorkVerdict({ expectedRoles: ['chair'], reads: { chair: 1 }, writes: { chair: 1 }, expectedChairCommittees: ['ga1'], observedChairCommittees: ['ga1'], pending: client.pending, conflicts: client.conflicts, unconfirmed: client.unconfirmed }).pass, false);
+  assert.equal(observedWorkVerdict({ expectedDevices:1,openedDevices:1,expectedRoles: ['chair'], reads: { chair: 1 }, writes: { chair: 1 }, expectedChairCommittees: ['ga1'], observedChairCommittees: ['ga1'], pending: client.pending, conflicts: client.conflicts, unconfirmed: client.unconfirmed }).pass, false);
 });
 test('observed-work gate refuses empty traffic, missing role/committee and any unsettled intent', () => {
-  const valid = { expectedRoles: ['chair','approval','admins','executive'], reads: { chair: 1, approval: 1, admins: 1, executive: 1 }, writes: { chair: 1, approval: 1, admins: 1 }, expectedChairCommittees: ['a','b'], observedChairCommittees: ['a','b'], pending: 0, conflicts: 0, unconfirmed: 0 };
+  const valid = { expectedDevices:4,openedDevices:4,expectedRoles: ['chair','approval','admins','executive'], reads: { chair: 1, approval: 1, admins: 1, executive: 1 }, writes: { chair: 1, approval: 1, admins: 1 }, expectedChairCommittees: ['a','b'], observedChairCommittees: ['a','b'], pending: 0, conflicts: 0, unconfirmed: 0 };
   assert.equal(observedWorkVerdict(valid).pass, true);
-  const patches: Partial<Parameters<typeof observedWorkVerdict>[0]>[] = [{ reads: {} }, { writes: {} }, { writes: { chair: 1, approval: 1 } }, { observedChairCommittees: ['a'] }, { pending: 1 }, { conflicts: 1 }, { unconfirmed: 1 }];
+  const patches: Partial<Parameters<typeof observedWorkVerdict>[0]>[] = [{ openedDevices: 3 },{ reads: {} }, { writes: {} }, { writes: { chair: 1, approval: 1 } }, { observedChairCommittees: ['a'] }, { pending: 1 }, { conflicts: 1 }, { unconfirmed: 1 },{localRefusals:1}];
   for (const patch of patches) assert.equal(observedWorkVerdict({ ...valid, ...patch }).pass, false);
 });
 test('public create notifications fan out to the actual committee and support roles; document review scope comes from the document', () => {
@@ -88,7 +88,7 @@ test('bounded wire fetch aborts an unresponsive request without real network', a
   finally { clearTimeout(keepAlive); }
 });
 test('declared scoring, public workload and close timeout cannot pass vacuously', () => {
-  const base = { expectedRoles: ['chair'], reads: { chair: 1 }, writes: { chair: 1 }, expectedChairCommittees: ['a'], observedChairCommittees: ['a'], pending: 0, conflicts: 0, unconfirmed: 0 };
+  const base = { expectedDevices:1,openedDevices:1,expectedRoles: ['chair'], reads: { chair: 1 }, writes: { chair: 1 }, expectedChairCommittees: ['a'], observedChairCommittees: ['a'], pending: 0, conflicts: 0, unconfirmed: 0 };
   assert.equal(observedWorkVerdict({ ...base, expectedActions: ['speechScore','poiScore'], actions: { speechScore: 1 } }).pass, false);
   assert.equal(observedWorkVerdict({ ...base, expectedPages: 150, completedPages: 149 }).pass, false);
   assert.equal(observedWorkVerdict({ ...base, expectedSubmissions: 16, createdSubmissions: 0 }).pass, false);
@@ -127,6 +127,17 @@ test('synthetic fixture SQL replays with valid sessions, workflow documents and 
     assert.ok((await snapshot()).poiQueue![0].recognizedAt);
     await send({type:'poiScore',sessionId:c.session,speechId:speech.id,entryId:entry.id,points:2});
     assert.equal((await snapshot()).events.filter(e=>e.categoryId==='poi').length,1);
+    const draft=fixture.workflowDocuments.find(d=>d.status==='Draft')!;
+    await send({type:'document',id:draft.id,status:'Submitted'});
+    await as(users[1]);
+    const {reviewableDocument}=await import('../scripts/rehearsal/actual-client');
+    assert.ok(reviewableDocument(await snapshot()),'both Submitted and seeded Review are actionable');
+    const decide=async(id:string,status:'Approved'|'Printed',role:'approval'|'logistics')=>{const data=await snapshot();const command={type:'document' as const,id,status};await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[conf,crypto.randomUUID(),JSON.stringify(command),role,fingerprint(data,command),new Date().toISOString()]);};
+    await decide(draft.id,'Approved','approval');
+    await decide(fixture.workflowDocuments.find(d=>d.status==='Review')!.id,'Approved','approval');
+    await as(users[2]);await decide(draft.id,'Printed','logistics');
+    assert.equal((await snapshot()).documents.find(d=>d.id===draft.id)?.status,'Printed');
+
   } finally { await db.close(); }
 });
 
@@ -149,4 +160,20 @@ test('public workload token must bind to the selected fixture committee without 
   for (const links of [undefined, [], [{ token, committeeId: 'b' }], [{ token: 'other', committeeId: 'a' }]]) {
     assert.throws(() => assertSubmissionBinding(links, token, 'a'), error => error instanceof Error && !error.message.includes(token));
   }
+});
+
+
+test('record ownership partitions Chair roll call and document review without overlapping actors',async()=>{
+ const {ownsWorkItem,reviewableDocument}=await import('../scripts/rehearsal/actual-client');
+ const users=Array.from({length:3},(_,id)=>({id,role:'approval',committee:0,start:0,steps:[]})) as SimUser[];
+ for(let n=0;n<50;n++)assert.equal(users.filter(u=>ownsWorkItem(`document-${n}`,u,users)).length,1);
+ const data=createSeed();data.documents=[{...data.documents[0],status:'Review'}];
+ assert.equal(reviewableDocument(data)?.status,'Review');assert.equal(reviewableDocument(data,()=>false),undefined);
+});
+
+test('the conference gate cannot be claimed by a short/small run or a missing public workload',async()=>{
+ const {conferenceGateProfile}=await import('../scripts/rehearsal/readiness');
+ const full={staffStages:[110],minutes:30,committees:19,delegates:150,submissionsPerStage:[16]};
+ assert.equal(conferenceGateProfile(full).eligible,true);
+ for(const patch of [{minutes:5},{staffStages:[50]},{committees:14},{delegates:0},{submissionsPerStage:[0]},{staffStages:[25,110],submissionsPerStage:[16,16]}])assert.equal(conferenceGateProfile({...full,...patch}).eligible,false);
 });

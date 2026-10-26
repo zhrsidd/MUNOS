@@ -81,8 +81,8 @@ insert into public.documents(id,conference_id,committee_id,"sessionId","submitte
 ${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.session)},${q(d.submitter)},${q(d.code)},'Synthetic load-test document',${q(d.status)})`).join(",\n")};
 insert into public.document_versions(id,conference_id,committee_id,"documentId",number,"fileName",text) values
 ${workflowDocuments.map(d=>` (${q(d.version)},${q(conference)},${q(d.committee)},${q(d.id)},1,'Google Doc','Synthetic registration only; no Google document was created or fetched.')`).join(",\n")};
-insert into public.resolution_links(document_id,conference_id,committee_id,working_doc_id) values
-${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.googleDocId)})`).join(",\n")};
+insert into public.resolution_links(document_id,conference_id,committee_id,working_doc_id,approval_copy_doc_id,access) values
+${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.googleDocId)},${q(d.googleDocId+"_copy")},'ok')`).join(",\n")};
 insert into public.scoring_definitions(conference_id,code,label,values) values(${q(conference)},'speech','Speech',array[1,2,3]);
 insert into public.user_access(conference_id,user_id,role,committee_id,expires_at,test_only) values
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};

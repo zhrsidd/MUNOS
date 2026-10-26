@@ -15,14 +15,15 @@ import { createClient } from '@supabase/supabase-js';
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { checkAppUrl, checkFixtureConference, checkHealthEnvironment, checkUsers } from "./rehearsal/guard";
 import { TOPIC_OF, buildScenario, type Action, type RealtimeModel, type SimUser, type Topic } from "./rehearsal/scenario";
-import { ActualClient, commandCommittee, deliverChange, boundedFetch } from "./rehearsal/actual-client";
+import { ActualClient, commandCommittee, deliverChange, boundedFetch, ownsWorkItem, reviewableDocument } from "./rehearsal/actual-client";
 import { SUBMISSION_TOKEN } from "../lib/submissions/rules";
+import {activeLane,laneEntries,nextSpeaker} from '../lib/procedure/view';
 import { createSeed } from "../lib/seed";
 import type { Transport } from "../lib/sync/repository";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
 import { countSnapshotRpcs, type RpcCounter } from "./rehearsal/rpc-counter";
 import { isMultiCommittee, loadIdentities, resolveChairMapping, type ChairIdentity, type Identity, type IdentityFile, type StaffRoleKey } from "./rehearsal/identities";
-import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, capacityGateLabel, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, observedWorkVerdict, assertSubmissionBinding, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
+import { DOCUMENTED_SUBMIT_FRACTION, MAX_SINGLE_LINK_SUBMISSIONS, assessReadiness, capacityGateLabel, assignChair, checkSingleLinkSubmissions, plannedSubmissions, readinessVerdict, observedWorkVerdict, assertSubmissionBinding, conferenceGateProfile, type ChairAssignment, type ChairTraffic, type RunMode } from "./rehearsal/readiness";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
 const app = value("--app");
@@ -32,18 +33,21 @@ const base = app!.replace(/\/$/, "");
 // Protected Preview deployments: Vercel "Protection Bypass for Automation" secret, from the environment only.
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const wireFetch = boundedFetch(fetch);
-const appFetch = (url: string, init: RequestInit = {}) => wireFetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}) } });
+const appFetch = (url: string, init: RequestInit = {}) => wireFetch(url, { ...init, redirect: 'error', headers: { ...(init.headers as Record<string, string>), ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}) } });
 const stages = (value("--stages") ?? value("--staff") ?? "10").split(",").map(Number);
 for (const n of stages) { const g = checkUsers(n); if (!g.ok) { console.error(g.reason); process.exit(2); } }
 const delegateCount = Number(value("--delegates") ?? 0);
 if (delegateCount && !checkUsers(delegateCount).ok) { console.error(checkUsers(delegateCount).reason); process.exit(2); }
 const minutes = Number(value("--minutes") ?? 5);
-if (value("--client-reads")) { console.error("--client-reads was removed: every device now runs the production client model (scripts/rehearsal/client-model.ts)."); process.exit(2); }
+if (value("--client-reads")) { console.error("--client-reads was removed: every device now runs the production client model (scripts/rehearsal/actual-client.ts)."); process.exit(2); }
+if(!Number.isFinite(minutes)||minutes<=0||minutes>60){console.error('Refused: --minutes must be greater than zero and at most 60.');process.exit(2);}
 const realtimeModel = (value("--realtime") ?? "topic-aware") as RealtimeModel;
 if (!["topic-aware", "current"].includes(realtimeModel)) { console.error("--realtime must be topic-aware or current"); process.exit(2); }
 const drainMs = Number(value("--drain-seconds") ?? 120) * 1000;
 // Core PR #10: an Executive/Admin-only device coalesces 'chair' events into a fixed window (0 = plain 350 ms debounce).
+if(!Number.isFinite(drainMs)||drainMs<0||drainMs>600_000){console.error('Refused: --drain-seconds must be between 0 and 600.');process.exit(2);}
 const executiveChairWindowMs = realtimeModel === "topic-aware" ? Number(value("--executive-chair-window") ?? 2000) : 0;
+if(!Number.isFinite(executiveChairWindowMs)||executiveChairWindowMs<0||executiveChairWindowMs>60_000){console.error('Refused: --executive-chair-window must be between 0 and 60000 ms.');process.exit(2);}
 const fixtureFile = value("--fixture") ?? ".test-sessions/load-fixtures.json";
 const submitToken = value("--submit-token");
 if (delegateCount && (!submitToken || !SUBMISSION_TOKEN.test(submitToken))) { console.error('Public-form workload requires a valid --submit-token; an invalid fake QR page is never readiness traffic.'); process.exit(2); }
@@ -54,6 +58,8 @@ const rawIdentities = identitiesFile ? JSON.parse(await readFile(identitiesFile,
 // Legacy single-Chair files simulate committees as floor sessions; every other mode uses the fixture's real committees.
 const simulatedCommittees = rawIdentities && !isMultiCommittee(rawIdentities) ? rawIdentities.chair.sessions.length : fixture.committees.length;
 const submitFraction = submitToken ? Number(value("--submit-fraction") ?? DOCUMENTED_SUBMIT_FRACTION) : 0;
+for(const flag of ['--start-window','--delegate-window']){const raw=value(flag);if(raw!==undefined&&(!Number.isFinite(Number(raw))||Number(raw)<0)){console.error(`Refused: ${flag} must be a non-negative finite number.`);process.exit(2);}}
+if(!Number.isFinite(submitFraction)||submitFraction<0||submitFraction>1){console.error('Refused: --submit-fraction must be between 0 and 1.');process.exit(2);}
 const scenarioFor = (staff: number) => buildScenario({ staff, delegates: delegateCount, minutes, committees: simulatedCommittees, startWindowSeconds: Number(value("--start-window") ?? 150), delegateWindowSeconds: Number(value("--delegate-window") ?? 120), submitFraction });
 // One resolution link: stay below its designed 20 accepted submissions / 10 min. Never plan an intentional 429.
 for (const n of stages) {
@@ -121,7 +127,7 @@ if (delegateCount && submitToken) {
 }
 
 const samples: Sample[] = [];
-const acknowledged = new Set<string>(); // speechScore / poiRecognize mutation ids the server accepted
+const acknowledged = new Set<string>(); // speechScore / poiScore mutation ids the server accepted
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 const classify = (e: unknown): Sample["outcome"] => {
   if (e instanceof ConflictError) return "conflict";
@@ -165,6 +171,7 @@ const REALTIME_DELIVERY_MS = 100; // explicitly simulated commit → notificatio
 let devices = new Map<SimUser, Device>();
 let stageSnapshotRpcs: Record<string, number> = {};
 let observedReads: Record<string, number> = {}, observedWrites: Record<string, number> = {};
+let openedDevices=new Set<number>();
 let observedActions: Record<string, number> = {}, observedPublic = { pages: 0, creates: 0 };
 let observedChairDevices = new Map<number, ChairTraffic>();
 const broadcast = (event: { topic: Topic; committee: number }) => {
@@ -186,6 +193,7 @@ function makeDevice(user: SimUser): Device {
       const before = counter.snapshot; let data!: Data;
       await measure('refresh', async () => { data = await transport.read(); }, user.role, 'actual-core', () => counter.snapshot - before);
       observedReads[user.role] = (observedReads[user.role] ?? 0) + 1;
+      openedDevices.add(user.id);
       return data;
     },
     send: async m => {
@@ -223,13 +231,14 @@ async function simulate(user: SimUser, t0: number) {
   const send = async (action: Action, command: Command, retry?: boolean, as = role) => {
     if (!device.data) return;
     try { await device.client.execute(command, as as import('../lib/domain').Role, { action, retry }); }
-    catch { samples.push({ action: `${action} (local refusal)`, role: user.role, ms: 0, outcome: 'conflict' }); }
+    catch { samples.push({ action: `${action} (local refusal)`, role: user.role, ms: 0, outcome: 'error' }); }
   };
   const d = () => device.data;
   const sid = committee.session;
   const present = () => (d()?.attendance ?? []).filter((a) => a.sessionId === sid && a.status !== "Absent").map((a) => a.delegateId);
   const active = () => d()?.speeches?.find((s) => s.sessionId === sid && s.state !== "finished");
-  const mine = () => d()?.delegates.filter((x) => x.committeeId === committee.id) ?? [];
+  const owns = (id:string) => ownsWorkItem(id,user,[...devices.keys()]);
+  const myDelegates = () => (d()?.delegates.filter(x=>x.committeeId===committee.id&&ownsWorkItem(x.id,user,[...devices.keys()].filter(p=>p.committee===user.committee)))??[]);
   for (const step of user.steps) {
     await sleep(t0 + step.at - Date.now());
     const data = d();
@@ -245,23 +254,26 @@ async function simulate(user: SimUser, t0: number) {
       case "health": await timed("health", async () => { const r = await appFetch(`${base}/api/health`); if (r.status >= 500) throw Error(`HTTP ${r.status}`); }); break;
       // Legacy floors share ONE committee row, so only floor 0 may set its current session there.
       case "currentSession": if (legacy && user.committee > 0) break; await send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
-      case "attendance": { const delegate = mine()[cursor % Math.max(1, mine().length)]; if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
+      case "attendance": { const delegate = myDelegates()[cursor % Math.max(1, myDelegates().length)]; if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
       case "queueAdd": {
-        const lane = (["open", "for", "against"] as const)[cursor % 3];
+        const lane = data ? activeLane(data,sid) : "open";
         const queued = new Set(data?.queue.filter((q) => q.sessionId === sid && (q.lane ?? "open") === lane).map((q) => q.delegateId));
-        const delegate = here.find((id) => !queued.has(id));
+        const delegate = myDelegates().map(d=>d.id).find((id) => here.includes(id)&&!queued.has(id));
         if (delegate) await send("queueAdd", { type: "queueAdd", sessionId: sid, delegateId: delegate, lane }, step.retry);
         break;
       }
       case "queueOrder": {
-        const ids = (data?.queue ?? []).filter((q) => q.sessionId === sid && (q.lane ?? "open") === "open").sort((a, b) => a.position - b.position).map((q) => q.id);
-        if (ids.length > 1) await send("queueOrder", { type: "queueOrder", sessionId: sid, lane: "open", ids: [...ids.slice(1), ids[0]] }, step.retry);
+        const lane=data?activeLane(data,sid):"open";
+        const ids = data?laneEntries(data,sid,lane).map(q=>q.id):[];
+        if (ids.length > 1) await send("queueOrder", { type: "queueOrder", sessionId: sid, lane, ids: [...ids.slice(1), ids[0]] }, step.retry);
         break;
       }
       case "speechStart": {
         if (active() || !anyPresent) break;
-        const entry = (data?.queue ?? []).filter((q) => q.sessionId === sid && here.includes(q.delegateId)).sort((a, b) => a.position - b.position)[0];
-        const classification = entry?.lane === "for" ? "For" : entry?.lane === "against" ? "Against" : "Other";
+        const entry = data ? nextSpeaker(data,sid) : undefined;
+        if(entry&&!here.includes(entry.delegateId))break;
+        const lane=data?activeLane(data,sid):"open";
+        const classification = lane === "for" ? "For" : lane === "against" ? "Against" : "Other";
         await send("speechStart", { type: "speechStart", sessionId: sid, delegateId: entry?.delegateId ?? anyPresent, resolutionId: null, classification, ...(entry ? { entryId: entry.id } : {}) }, step.retry);
         break;
       }
@@ -274,8 +286,8 @@ async function simulate(user: SimUser, t0: number) {
       case "timer": break; // Shipping timer is device-local: no mutation or notification.
       case "photoAck": { const slot = data?.photoSlots?.find((s) => s.enabled); if (slot) await send("photoAck", { type: "photoAck", committeeId: committee.id, slotId: slot.id, stage: "warning", revision: slot.revision }, step.retry); break; }
       case "sendToApproval": { const doc = data?.documents.find((x) => x.committeeId === committee.id && x.status === "Draft"); if (doc) await send("sendToApproval", { type: "document", id: doc.id, status: "Submitted" }, step.retry); break; }
-      case "approve": { const doc = data?.documents.find((x) => x.status === "Submitted"); if (doc) await send("approve", { type: "document", id: doc.id, status: "Approved" }, step.retry, "approval"); break; }
-      case "print": { const doc = data?.documents.find((x) => x.status === "Approved"); if (doc) await send("print", { type: "document", id: doc.id, status: "Printed" }, step.retry, "logistics"); break; }
+      case "approve": { const doc = reviewableDocument(data,owns); if (doc) await send("approve", { type: "document", id: doc.id, status: "Approved" }, step.retry, "approval"); break; }
+      case "print": { const doc = data?.documents.find((x) => x.status === "Approved"&&owns(x.id)); if (doc) await send("print", { type: "document", id: doc.id, status: "Printed" }, step.retry, "logistics"); break; }
     }
   }
 }
@@ -286,7 +298,7 @@ for (const users of stages) {
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref}, realtime model ${realtimeModel})…`);
   const staffUsers = scenario.filter((u) => u.role !== "delegate");
-  stageSnapshotRpcs = {}; observedReads = {}; observedWrites = {}; observedChairDevices = new Map(); observedActions = {}; observedPublic = { pages: 0, creates: 0 };
+  stageSnapshotRpcs = {}; observedReads = {}; observedWrites = {}; openedDevices=new Set(); observedChairDevices = new Map(); observedActions = {}; observedPublic = { pages: 0, creates: 0 };
   devices = new Map(staffUsers.map((user) => [user, makeDevice(user)]));
   // Real committee distribution of this stage's Chair devices (committee row + Chair Auth identity actually used).
   const chairTraffic: ChairTraffic[] = staffUsers.filter((u) => u.role === "chair").map((u) => { const a = chairOf(u); return { committeeId: a.committee.id, committeeCode: a.committee.code, identity: a.identity.userId }; });
@@ -304,12 +316,12 @@ for (const users of stages) {
   const unconfirmedAtClose = [...devices.values()].reduce((n, d) => n + d.client.unconfirmed, 0);
   const readiness = assessReadiness({ mode, committees: fixture.committees.slice(0, simulatedCommittees), chairTraffic: [...observedChairDevices.values()] });
   readinessByStage.push(readiness);
-  const work = observedWorkVerdict({ expectedRoles: [...new Set(staffUsers.map(u => u.role))], reads: observedReads, writes: observedWrites,
+  const work = observedWorkVerdict({ expectedDevices:staffUsers.length,openedDevices:openedDevices.size, expectedRoles: [...new Set(staffUsers.map(u => u.role))], reads: observedReads, writes: observedWrites,
     expectedChairCommittees: fixture.committees.map(c => c.id), observedChairCommittees: [...new Set([...observedChairDevices.values()].map(t => t.committeeId))],
-    pending: pendingAtClose, conflicts: conflictsAtClose, unconfirmed: unconfirmedAtClose, closeTimedOut,
+    pending: pendingAtClose, conflicts: conflictsAtClose, unconfirmed: unconfirmedAtClose, closeTimedOut,localRefusals:[...devices.values()].reduce((n,d)=>n+d.client.stats.localRefusals,0),
     expectedActions: ['speechScore','poiRecognize','poiScore','sendToApproval','approve','print'].filter(a => scenario.some(u => u.steps.some(s => s.action === a))), actions: observedActions,
     expectedPages: delegateCount, completedPages: observedPublic.pages, expectedSubmissions: plannedSubmissions(scenario), createdSubmissions: observedPublic.creates });
-  stageReports.push({ staff: users, delegates: delegateCount, configuredReadiness, readiness, observed: { reads: observedReads, writes: observedWrites, actions: observedActions, publicForm: observedPublic }, work,
+  stageReports.push({ staff: users, delegates: delegateCount, configuredReadiness, readiness, observed: { openedDevices:openedDevices.size, reads: observedReads, writes: observedWrites, actions: observedActions, publicForm: observedPublic }, work,
     drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose, conflictsAtClose, unconfirmedAtClose, closeTimedOut,
     snapshotRpcsByName: stageSnapshotRpcs,
     clientModel: { implementation: 'actual DurableRepository + DurableStore, isolated fake IndexedDB', realtimeDelivery: 'simulated; no real channels', sourceAttribution: 'actual-core; internal trigger attribution is not inferred',
@@ -340,8 +352,10 @@ const note = mode === "realistic-multi-committee"
     : "WORST CASE: every simulated device shares one identity holding Chair grants for every committee plus Approval, Logistics and Admin, so each read returns the admin-sized snapshot. Historical comparison only — NOT A READINESS RUN.";
 const peakStaff = Math.max(...stages);
 const capacityGate = capacityGateLabel(peakStaff);
+const conferenceGate={...conferenceGateProfile({staffStages:stages,minutes,committees:simulatedCommittees,delegates:delegateCount,submissionsPerStage:stages.map(n=>plannedSubmissions(scenarioFor(n)))}),pass:false};
+conferenceGate.pass=conferenceGate.eligible&&verdict.pass;
 const publicForm = { delegates: delegateCount, singleLink: Boolean(submitToken), submissionsPlannedPerStage: Object.fromEntries(stages.map((n) => [n, plannedSubmissions(scenarioFor(n))])), maxSingleLinkSubmissions: MAX_SINGLE_LINK_SUBMISSIONS, note: "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately." };
-const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: verdict.label, readiness, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
+const result = { date: new Date().toISOString(), app: base, appBuild: health.app, supabaseProject: ref, identityMode: mode, readinessLabel: conferenceGate.eligible?verdict.label:"RAMP / DIAGNOSTIC ONLY", readiness, conferenceGate, distinctAuthIdentities, note, capacityGate, publicForm, minutes, stages: stageReports, realtimeModel, clientModel: "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)", exactlyOnce: { acknowledgedScoring: acknowledged.size, duplicates, lost }, verdict };
 await mkdir(".test-sessions", { recursive: true, mode: 0o700 });
 const file = `.test-sessions/rehearsal-${result.date.replace(/[:.]/g, "-")}.json`;
 await writeFile(file, JSON.stringify({ ...result, samples }, null, 2), { mode: 0o600 });
