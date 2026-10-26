@@ -44,7 +44,7 @@ export function buildFixture(o: FixtureOptions) {
   });
   const school = derivedUuid(`${conference}:school`);
   const q = (s: string) => `'${s.replaceAll("'", "''")}'`;
-  const grant = (user: string, role: string, committee: string | null) => ` (${q(conference)},${q(user)},'${role}',${committee ? q(committee) : "null"},now()+interval '${o.grantHours} hours')`;
+  const grant = (user: string, role: string, committee: string | null) => ` (${q(conference)},${q(user)},'${role}',${committee ? q(committee) : "null"},now()+interval '${o.grantHours} hours',true)`;
   const label = multi ? `LOAD TEST · multi-committee · ${o.committees} committees` : `LOAD TEST · LEGACY single-committee floors · ${o.committees} committees`;
   const sessionRows = [
     ...committees.map((c) => ` (${q(c.session)},${q(conference)},${q(c.id)},'Simulation',now(),'active')`),
@@ -52,6 +52,10 @@ export function buildFixture(o: FixtureOptions) {
   ];
   const sql = `-- Fresh synthetic rehearsal conference (DEVELOPMENT project only). Mode: ${multi ? "multi-committee (readiness)" : "LEGACY single-committee floors (NOT a readiness fixture)"}.
 begin;
+select private.lock_lifecycle();
+do $phase$begin
+ if not private.lifecycle_allows(true) then raise exception 'Synthetic fixture refused: lifecycle is not preproduction'; end if;
+end $phase$;
 insert into public.conferences(id,name,venue,date) values(${q(conference)},${q(label)},'Development only',current_date);
 insert into public.schools(id,conference_id,name) values(${q(school)},${q(conference)},'Load test school');
 insert into public.committees(id,conference_id,code,name,room) values
@@ -61,7 +65,7 @@ ${sessionRows.join(",\n")};
 insert into public.delegates(id,conference_id,committee_id,"schoolId",country,name,email) values
 ${delegates.map((d, i) => ` (${q(d.id)},${q(conference)},${q(d.committee)},${q(school)},'Country ${i}','Simulated delegate ${i}','load${i}@example.com')`).join(",\n")};
 insert into public.scoring_definitions(conference_id,code,label,values) values(${q(conference)},'speech','Speech',array[1,2,3]);
-insert into public.user_access(conference_id,user_id,role,committee_id,expires_at) values
+insert into public.user_access(conference_id,user_id,role,committee_id,expires_at,test_only) values
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};
 commit;
 `;
@@ -76,6 +80,10 @@ export function cleanupSql(conference: string) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(conference)) throw Error("cleanupSql needs a conference UUID");
   return `-- Revoke all access to the LOAD TEST conference ${conference} (and only that conference). Deletes nothing.
 begin;
+select private.lock_lifecycle();
+do $phase$begin
+ if not private.lifecycle_allows(true) then raise exception 'Synthetic fixture refused: lifecycle is not preproduction'; end if;
+end $phase$;
 update public.user_access set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
 update public.submission_links set revoked_at=now() where conference_id='${conference}' and revoked_at is null;
 update public.amendment_links set revoked_at=now() where conference_id='${conference}' and revoked_at is null;

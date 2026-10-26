@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 import {createClient} from '@supabase/supabase-js';
 import {readFile} from 'node:fs/promises';
 import {assertToolTarget} from '../lib/platform/target-guard';
@@ -7,3 +8,5 @@ export const ref=assertToolTarget(env.NEXT_PUBLIC_SUPABASE_URL,{...env,...proces
 export const ids=JSON.parse(await readFile('supabase/fixture-ids.json','utf8'));
 export const session=JSON.parse(await readFile('.test-sessions/development.json','utf8'));
 export function clientFor(token=session.access_token){return createClient(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{global:{headers:{Authorization:`Bearer ${token}`}},accessToken:async()=>token,auth:{persistSession:false,autoRefreshToken:false}});}
+
+export const verifyPhase=()=>assertPreproductionPhase(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{...env,...process.env});

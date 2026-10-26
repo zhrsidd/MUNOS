@@ -1,3 +1,4 @@
+import {verifyPhase} from './remote-context.mts';
 // Development guard is enforced by remote-context. Never substitute production URLs.
 import {readFile,writeFile} from 'node:fs/promises';
 import {clientFor,session,ref,env} from './remote-context.mts';
@@ -9,6 +10,7 @@ import type {Role} from '../lib/domain';
 const fixture=JSON.parse(await readFile('.test-sessions/load-fixtures.json','utf8')) as {conference:string;delegates:{id:string;committee:string;session:string}[]};
 const fixtureCheck=checkFixtureConference(fixture.conference,{...env,...process.env});if(!fixtureCheck.ok)throw Error(`Refused: ${fixtureCheck.reason}`);
 const concurrency=Number(process.env.LOAD_CLIENTS||150);if(concurrency<1||concurrency>200)throw Error('Use 1–200 clients');
+await verifyPhase();
 const timings:Record<string,number[]>={};const errors:{phase:string;message:string}[]=[];
 let disconnects=0,connections=0,reconnections=0;
 async function measure<T>(phase:string,op:()=>Promise<T>):Promise<T>{const start=performance.now();try{return await op();}catch(e){errors.push({phase,message:e instanceof Error?e.message:JSON.stringify(e)});throw e;}finally{(timings[phase]??=[]).push(performance.now()-start);}}

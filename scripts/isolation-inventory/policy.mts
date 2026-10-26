@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 export interface PolicyFn{schema:string;name:string;args:string;security:string;config:string;exec:Record<string,boolean>;publicExec:boolean}
 export interface PolicyRel{schema:string;name:string;kind:string;rls:boolean;privs:Record<string,string[]>}
 export interface PolicyModel{fns:PolicyFn[];rels:PolicyRel[];colAcl:{table:string;column:string;privs:Record<string,string[]>}[];defaults:{owner:string;schema:string;type:string;acl:string}[]}
-export interface Allow{serviceRoleExecute:string[];authenticatedTablePrivileges:string[];viewsWithoutRls:string[];defaultAclGrantees:string[]}
+export interface Allow{anonExecute:string[];serviceRoleExecute:string[];authenticatedTablePrivileges:string[];viewsWithoutRls:string[];defaultAclGrantees:string[]}
 
 export const loadAllow=():Allow=>JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)),'policy-allowlist.json'),'utf8')) as Allow;
 export const fnKey=(f:{schema:string;name:string;args:string})=>`${f.schema}.${f.name}(${f.args})`;
@@ -17,13 +17,15 @@ export const fnKey=(f:{schema:string;name:string;args:string})=>`${f.schema}.${f
 export function evaluatePolicy(m:PolicyModel,allow:Allow=loadAllow()):string[]{
  const v:string[]=[];
  const svc=new Set(allow.serviceRoleExecute);
+ const anon=new Set(allow.anonExecute);
  for(const f of m.fns){
   const k=fnKey(f);
   if(f.publicExec)v.push(`function ${k}: EXECUTE held by PUBLIC`);
-  if(f.exec.anon)v.push(`function ${k}: EXECUTE held by anon`);
+  if(f.exec.anon&&!anon.has(k))v.push(`function ${k}: EXECUTE held by anon`);
   if(f.exec.service_role&&!svc.has(k))v.push(`function ${k}: EXECUTE held by service_role but not in serviceRoleExecute`);
   if(f.security==='definer'&&!/(^|, )search_path=/.test(f.config))v.push(`function ${k}: SECURITY DEFINER without a pinned search_path`);
  }
+ for(const k of anon)if(!m.fns.some(f=>fnKey(f)===k&&f.exec.anon))v.push(`allow-list entry ${k} is not a function anon can execute (stale allow-list)`);
  const have=new Set(m.fns.filter(f=>f.exec.service_role).map(fnKey));
  for(const k of svc)if(!have.has(k))v.push(`allow-list entry ${k} is not a function service_role can execute (stale allow-list)`);
  const authOk=new Set(allow.authenticatedTablePrivileges);

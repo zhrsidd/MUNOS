@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 import { mkdir, open, readFile, realpath } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import nextEnv from '@next/env';
@@ -46,6 +47,7 @@ try {
         } catch { throw new QrVerificationError('Optional staff session file is invalid or expires within two minutes. This verifier never signs in or refreshes sessions.'); }
       }
     }
+    await assertPreproductionPhase(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,process.env);
     await verifyPublicQr(plan, process.env, report, staff);
     await artifact.writeFile(JSON.stringify(report, null, 2) + '\n');
     console.log('Public QR verification passed. Read the ignored JSON artifact for checks, created synthetic rows and limits.');

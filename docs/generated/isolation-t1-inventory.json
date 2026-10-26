@@ -28,9 +28,10 @@
   "20261021120000_print_copies.sql",
   "20261021130000_identity_projection.sql",
   "20261021140000_sequential_chair_numbering.sql",
-  "20261022090000_privilege_hardening.sql"
+  "20261022090000_privilege_hardening.sql",
+  "20261026003647_lifecycle_controls.sql"
  ],
- "migrationsSha256": "cb8f098500ef5785e001e4f30bc131db0a6429673edafb7b92c9558af5347c4f",
+ "migrationsSha256": "83aed5a42ade25ba996ceccc95dce66dd2c30b9732398a297b8ddae029b38ab0",
  "supabase-model": {
   "fns": [
    {
@@ -395,6 +396,36 @@
    },
    {
     "schema": "private",
+    "name": "guard_lifecycle_transition",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "has_access",
     "args": "conf uuid, committee uuid, roles conference_role[]",
     "result": "boolean",
@@ -425,6 +456,66 @@
    },
    {
     "schema": "private",
+    "name": "lifecycle_allows",
+    "args": "test_only boolean",
+    "result": "boolean",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "lifecycle_new_test_only",
+    "args": "",
+    "result": "boolean",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "link_decision_comment",
     "args": "",
     "result": "trigger",
@@ -435,6 +526,36 @@
     "config": "search_path=\"\"",
     "lang": "plpgsql",
     "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "lock_lifecycle",
+    "args": "",
+    "result": "void",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
     "usage": {
@@ -1505,6 +1626,36 @@
    },
    {
     "schema": "public",
+    "name": "preproduction_status",
+    "args": "",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,anon=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": true,
+     "authenticator": true,
+     "postgres": true
+    },
+    "exec": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "public",
     "name": "redeem_access_code",
     "args": "conf uuid, code text",
     "result": "jsonb",
@@ -1828,6 +1979,32 @@
     "forceRls": false,
     "options": "",
     "aclRaw": "",
+    "privs": {
+     "anon": [],
+     "authenticated": [],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "private",
+    "name": "project_lifecycle",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres",
     "privs": {
      "anon": [],
      "authenticated": [],
@@ -2970,7 +3147,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
     "check": ""
    },
    {
@@ -3258,7 +3435,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
     "check": ""
    },
    {
@@ -3276,7 +3453,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()))",
+    "using": "((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()) AND private.lifecycle_allows(test_only))",
     "check": ""
    },
    {
@@ -3848,6 +4025,36 @@
    },
    {
     "schema": "private",
+    "name": "guard_lifecycle_transition",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "has_access",
     "args": "conf uuid, committee uuid, roles conference_role[]",
     "result": "boolean",
@@ -3878,6 +4085,66 @@
    },
    {
     "schema": "private",
+    "name": "lifecycle_allows",
+    "args": "test_only boolean",
+    "result": "boolean",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "lifecycle_new_test_only",
+    "args": "",
+    "result": "boolean",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "link_decision_comment",
     "args": "",
     "result": "trigger",
@@ -3888,6 +4155,36 @@
     "config": "search_path=\"\"",
     "lang": "plpgsql",
     "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "lock_lifecycle",
+    "args": "",
+    "result": "void",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
     "usage": {
@@ -4958,6 +5255,36 @@
    },
    {
     "schema": "public",
+    "name": "preproduction_status",
+    "args": "",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,anon=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": true,
+     "authenticator": true,
+     "postgres": true
+    },
+    "exec": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "public",
     "name": "redeem_access_code",
     "args": "conf uuid, code text",
     "result": "jsonb",
@@ -5281,6 +5608,32 @@
     "forceRls": false,
     "options": "",
     "aclRaw": "",
+    "privs": {
+     "anon": [],
+     "authenticated": [],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "private",
+    "name": "project_lifecycle",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres",
     "privs": {
      "anon": [],
      "authenticated": [],
@@ -6423,7 +6776,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
     "check": ""
    },
    {
@@ -6711,7 +7064,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
     "check": ""
    },
    {
@@ -6729,7 +7082,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()))",
+    "using": "((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()) AND private.lifecycle_allows(test_only))",
     "check": ""
    },
    {

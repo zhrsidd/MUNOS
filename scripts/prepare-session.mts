@@ -1,8 +1,10 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 import {createClient} from '@supabase/supabase-js';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {assertToolTarget} from '../lib/platform/target-guard';
 const env=Object.fromEntries((await readFile('.env.local','utf8')).split('\n').filter(l=>l.includes('=')).map(l=>[l.slice(0,l.indexOf('=')),l.slice(l.indexOf('=')+1)]));
 const ref=assertToolTarget(env.NEXT_PUBLIC_SUPABASE_URL,{...env,...process.env});
+await assertPreproductionPhase(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{...env,...process.env});
 const client=createClient(env.NEXT_PUBLIC_SUPABASE_URL,env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 await mkdir('.test-sessions',{recursive:true,mode:0o700});
 let saved;

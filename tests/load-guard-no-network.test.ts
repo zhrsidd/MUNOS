@@ -10,7 +10,7 @@ import {join,resolve} from 'node:path';
 const repo=resolve('.');
 const tsx=join(repo,'node_modules/.bin/tsx');
 const preload=join(repo,'tests/helpers/no-network.mjs');
-const REF='abcdefghijklmnopqrst';
+const REF='kllhswucdhqqywnzxado';
 const PROTECTED='0331ceb6-3fa8-4731-92cb-2b4c0316d0cb';
 const SYNTHETIC='8f5f0b28-17e6-4e91-998d-41556d4afa28';
 
@@ -64,11 +64,11 @@ for(const [script,args] of scripts){
  });
 }
 
-test('positive control: the network blocker is live, and rehearsal-run reaches /api/health only after the guards pass',async()=>{
+test('positive control: the network blocker is live, and rehearsal-run reaches only lifecycle metadata after the local guards pass',async()=>{
  const dir=await workdir(SYNTHETIC);
  try{
   const r=await run(dir,'scripts/rehearsal-run.mts',['--app','http://localhost:3999']);
   assert.notEqual(r.code,0);
-  assert.deepEqual(attempts(r.stderr),['NETWORK fetch http://localhost:3999/api/health']);
+  assert.deepEqual(attempts(r.stderr),['NETWORK fetch https://kllhswucdhqqywnzxado.supabase.co/rest/v1/rpc/preproduction_status']);
  }finally{await rm(dir,{recursive:true,force:true});}
 });

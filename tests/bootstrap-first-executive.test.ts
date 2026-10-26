@@ -21,6 +21,8 @@ test('first-Executive bootstrap stores only a digest, redeems normally and is re
  const {db,ids,query,as,asOwner}=await freshDatabase();
  try{
   await asOwner();
+  await assert.rejects(async()=>db.exec(await script(ids.conference)),/requires the production lifecycle/);
+  await db.exec("update public.submission_links set revoked_at=now(); update public.amendment_links set revoked_at=now(); update private.project_lifecycle set phase='production';");
   const auditBefore=(await query<{n:number}>('select count(*)::int n from public.audit_log'))[0].n;
   const results=await db.exec(await script(ids.conference));
   const shown=results.at(-1)!.rows[0] as {executive_bootstrap_code_shown_once:string;credential_id:string};

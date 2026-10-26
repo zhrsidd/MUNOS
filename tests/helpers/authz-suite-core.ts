@@ -71,18 +71,18 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
   assertNone('functions missing from the inventory (regenerate docs/generated and review)', Object.keys(live).filter(k => !inventoried.has(k)));
  });
 
- await t.test('hosted audit 2026-10-22: anon none; authenticated on apply_*/access-code/snapshot RPCs and 11 private functions; service_role only on the 4 submission functions', () => {
+ await t.test('hosted-audit baseline plus reviewed lifecycle delta: one anon metadata RPC, two additional authenticated helpers, service_role unchanged', () => {
   const problems: string[] = [];
   for (const [key, got] of Object.entries(live)) {
    const name = nameOf(key);
-   if (got.anon) problems.push(`${key}: anon has EXECUTE`);
+   if (got.anon !== (name==='public.preproduction_status')) problems.push(`${key}: unexpected anon EXECUTE=${got.anon}`);
    if (got.public) problems.push(`${key}: PUBLIC has EXECUTE`);
-   if (got.authenticated !== HOSTED_AUDIT.authenticated.has(name)) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
+   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows'].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
    if (got.service_role !== HOSTED_AUDIT.serviceRole.has(name)) problems.push(`${key}: service_role=${got.service_role}, audit says ${HOSTED_AUDIT.serviceRole.has(name)}`);
   }
   assertNone('privilege matrix vs hosted audit', problems);
   assert.equal(HOSTED_AUDIT.authenticated.size, 23);
-  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 23, 'every audited authenticated function exists exactly once');
+  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25, 'the audited baseline plus two lifecycle functions exists exactly once');
   assert.equal(Object.keys(live).filter(k => live[k].service_role).length, 4);
  });
 

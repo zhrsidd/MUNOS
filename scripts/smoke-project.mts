@@ -1,3 +1,4 @@
+import {assertPreproductionPhase} from './preproduction-phase.mts';
 // Controlled smoke test of a DCMUN project in its development role, through the app's own client code
 // (lib/access-codes and SupabaseTransport). Creates only clearly labelled TEST records in the test conference.
 // Inputs (environment, never printed): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
@@ -18,6 +19,7 @@ import type {Role} from '../lib/domain';
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,conf=process.env.NEXT_PUBLIC_CONFERENCE_ID!;
 const ref=assertToolTarget(url);
 assert.ok(key&&conf&&process.env.SMOKE_EXECUTIVE_CODE,'Publishable key, conference id and SMOKE_EXECUTIVE_CODE are required');
+await assertPreproductionPhase(url,key,process.env);
 const device=()=>createClient(url!,key,{auth:{persistSession:false,autoRefreshToken:false}});
 const userId=async(c:SupabaseClient)=>(await c.auth.getSession()).data.session!.user.id;
 const marks:string[]=[];const pass=(m:string)=>{marks.push(m);console.log('PASS',m);};

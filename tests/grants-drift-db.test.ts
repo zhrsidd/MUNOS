@@ -45,6 +45,7 @@ test('policy: the allow-lists name exactly the four submission/link-info functio
  assert.deepEqual(allow.authenticatedTablePrivileges,['SELECT']);
  assert.deepEqual(allow.viewsWithoutRls,['public.participation_history']);
  assert.deepEqual(allow.defaultAclGrantees,[]);
+ assert.deepEqual(allow.anonExecute,['public.preproduction_status()'],'only fixed non-sensitive lifecycle metadata is callable before Auth enrollment');
 });
 
 const url=process.env.TEST_POSTGRES_URL;

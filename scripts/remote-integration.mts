@@ -1,3 +1,4 @@
+import {verifyPhase} from './remote-context.mts';
 import {randomUUID,createHash} from 'node:crypto';
 import {writeFile,readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -6,6 +7,7 @@ import {SupabaseTransport} from '../lib/supabase/repository';
 import {fingerprint} from '../lib/sync/repository';
 import type {Command} from '../lib/commands';
 import type {Role} from '../lib/domain';
+await verifyPhase();
 const client=clientFor(),transport=new SupabaseTransport(client,ids.conference,session.user.id);
 const fixtureFile='.test-sessions/integration.json';
 const uuid=(id:string)=>{const h=createHash('sha256').update('conference-os-development:'+id).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;};

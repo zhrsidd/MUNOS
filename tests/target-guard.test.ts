@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {assertToolTarget,checkProductionTarget,checkToolTarget,NEVER_SUPABASE_REFS,parseRefs,PHESMUN_PRODUCTION_REF,supabaseRef,targetConfig,targetProblem} from '../lib/platform/target-guard';
 import {probe} from '../lib/platform/health-probe';
 
-const PROD='prodprodprodprodprod';const STAGE='stagestagestagestage';const DEV='devdevdevdevdevdevde';const OTHER='otherotherotherother1';
+const PROD='prodprodprodprodprod';const STAGE='kllhswucdhqqywnzxado';const DEV='devdevdevdevdevdevde';const OTHER='otherotherotherother1';
 const url=(ref:string)=>`https://${ref}.supabase.co`;
 
 test('hosted URL parsing refuses credentials, ports, http, wrong hosts and malformed refs',()=>{
@@ -67,7 +67,7 @@ test('targetProblem: PHESMUN production is always refused; Vercel Production mus
  assert.match(targetProblem(url(PROD),{VERCEL_ENV:'preview',EXPECTED_SUPABASE_REF:PROD})!,/preview deployment refused: .*production project/);
  assert.match(targetProblem(url(DEV),{VERCEL_ENV:'preview'})!,/not listed/,'no allow-list: refused');
  assert.equal(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE}),null);
- assert.equal(targetProblem(url(DEV),{VERCEL_ENV:'development',DEVELOPMENT_SUPABASE_REFS:DEV}),null);
+ assert.equal(targetProblem(url(STAGE),{VERCEL_ENV:'development',DEVELOPMENT_SUPABASE_REFS:STAGE}),null);
  assert.match(targetProblem(url('unlistedunlistedunli'),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE})!,/not listed/);
  assert.match(targetProblem(url(STAGE),{VERCEL_ENV:'preview',STAGING_SUPABASE_REFS:STAGE,EXPECTED_SUPABASE_REF:STAGE})!,/one role/,'contradictory roles refused');
  // After cutover the ref leaves every allow-list, so a new Preview against it cannot build or reach it.

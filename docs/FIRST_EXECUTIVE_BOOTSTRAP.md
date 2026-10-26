@@ -1,8 +1,10 @@
-# First Executive on a new project — one-time bootstrap
+# First production Executive — one-time human bootstrap
 
 **Who:** the technical lead (database access to the target Supabase project) and the person who will be the first Executive, together. **When:** once per new conference project (Production setup, release checklist section 2). **Time:** 10 minutes.
 
 ## Why this is needed
+
+The current script is **production-only** and requires the reviewed database lifecycle marker to be `production`. It explicitly creates a non-test credential. Run it only through the authorized human cutover after test access retirement, the token wait-out and the other release gates. A preproduction test bootstrap is a separate short-lived test credential; do not demote the marker or use this script to create one.
 
 Staff access codes are issued in the app by an Executive (Executive → **Access codes**). A brand-new project has no Executive, so the first one cannot be issued from the app. The bootstrap creates **one short-lived Executive access code directly in the database**. It uses exactly the format, hashing and table that the app's own code management uses. Everything after that goes through the normal app:
 

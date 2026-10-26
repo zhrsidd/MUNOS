@@ -5,7 +5,7 @@ import { POST as submit } from '../app/api/submissions/route';
 import { POST as amend } from '../app/api/amendments/route';
 import type { LinkInfo } from '../lib/submissions/rules';
 import type { AmendmentLinkInfo } from '../lib/amendments/rules';
-const ref = 'stagestagestagestage', prod = 'prodprodprodprodprod';
+const ref = 'kllhswucdhqqywnzxado', prod = 'prodprodprodprodprod';
 const conf = '63000000-0000-4000-8000-000000000001', committee = '63000000-0000-4000-8000-000000000002', submitter = '63000000-0000-4000-8000-000000000003', resolution = '63000000-0000-4000-8000-000000000004';
 const fixture: PublicQrFixture = { version: 1, purpose: 'synthetic-public-qr', projectRef: ref, conferenceId: conf, appOrigin: 'http://localhost:4319', resolution: { token: 'R'.repeat(32), committeeId: committee, submitterId: submitter }, amendment: { token: 'A'.repeat(32), committeeId: committee, submitterId: submitter, resolutionId: resolution } };
 const env = { NEXT_PUBLIC_SUPABASE_URL: `https://${ref}.supabase.co`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key', NEXT_PUBLIC_DATA_BACKEND: 'supabase', NEXT_PUBLIC_CONFERENCE_ID: resolution, STAGING_SUPABASE_REFS: ref, EXPECTED_SUPABASE_REF: prod, SUPABASE_SECRET_KEY: 'test-server-key-never-public', QR_VERIFICATION_APP_ORIGINS: fixture.appOrigin };

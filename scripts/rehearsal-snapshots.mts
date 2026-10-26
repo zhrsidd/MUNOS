@@ -11,11 +11,12 @@ import { loadIdentities } from "./rehearsal/identities";
 import { checkFixtureConference } from "./rehearsal/guard";
 const args = process.argv.slice(2);
 const value = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
-const { env, session, ref } = await import("./remote-context.mts");
+const { env, session, ref, verifyPhase } = await import("./remote-context.mts");
 const fixture = JSON.parse(await readFile(value("--fixture") ?? ".test-sessions/load-fixtures.json", "utf8")) as { conference: string; committees?: { id: string; code: string }[] };
 { const synthetic = checkFixtureConference(fixture.conference, { ...env, ...process.env }); if (!synthetic.ok) { console.error(`Refused: ${synthetic.reason}`); process.exit(2); } }
 const file = value("--identities");
 if (!file) { console.error("Pass --identities <file> (see docs/STAGING_REHEARSAL.md)."); process.exit(2); }
+await verifyPhase();
 const { identities, chairs, mode } = await loadIdentities(file, env);
 const reads = Number(value("--reads") ?? 20);
 // Each Chair identity is scoped to ONE committee, so its payload is that committee's. --all-chairs probes every
