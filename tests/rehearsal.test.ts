@@ -73,7 +73,7 @@ test('metrics: percentiles, outcome classes and readiness verdict',()=>{
  assert.equal(evaluate(report([{action:'read',ms:1,outcome:'rate_limited'}]),0,0).pass,false,'rate limits fail');
 });
 
-// ---- Production client model (mirrors lib/sync/repository.ts DurableRepository) ----------------------------------
+// ---- Historical comparison model (not shipping DurableRepository) ----------------------------------
 type Item={name:string};
 function client(clock:VirtualClock,o:{readMs?:number;sendMs?:number;failReads?:number}={}){
  const log:string[]=[];let fail=o.failReads??0;let inFlight=0,maxInFlight=0;
@@ -83,7 +83,7 @@ function client(clock:VirtualClock,o:{readMs?:number;sendMs?:number;failReads?:n
  return {c,log,max:()=>maxInFlight};
 }
 const at=(clock:VirtualClock,ms:number,fn:()=>void)=>clock.setTimeout(fn,ms);
-test('client model: a trigger while a flush is running is dropped, not queued (no dirty flag, no follow-up)',async()=>{
+test('historical client model: a trigger while a flush is running is dropped, not queued (no dirty flag, no follow-up)',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log,max}=client(clock);
  c.open();                                      // read 0–1000
  at(clock,100,()=>c.focus());                   // dropped
@@ -95,7 +95,7 @@ test('client model: a trigger while a flush is running is dropped, not queued (n
  assert.deepEqual(log,['0 read:open','61000 read:periodic']);
  assert.equal(max(),1,'never two full refreshes at once on one device');
 });
-test('client model: a write recorded during an empty-outbox refresh waits for the next trigger (as production does)',async()=>{
+test('historical client model: a write recorded during an empty-outbox refresh waits for the next trigger (historical behavior)',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
  c.open();                                      // recovery read 0–1000 (empty outbox)
  at(clock,500,()=>c.execute({name:'A'}));       // flush() returns immediately: still pending
@@ -106,7 +106,7 @@ test('client model: a write recorded during an empty-outbox refresh waits for th
  assert.deepEqual(log,['0 read:open','40350 send:A','40650 read:postWrite'],'read-back only: no extra final read after an acknowledged write');
  assert.equal(c.pending,0);
 });
-test('client model: writes recorded while the send loop runs are sent by that loop (send + read-back per item, no final read)',async()=>{
+test('historical client model: writes recorded while the send loop runs are sent by that loop (send + read-back per item, no final read)',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
  c.execute({name:'A'});                         // send 0–300, read 300–1300
  at(clock,100,()=>c.execute({name:'B'}));       // trigger dropped, but the running loop picks B up
@@ -114,12 +114,12 @@ test('client model: writes recorded while the send loop runs are sent by that lo
  assert.deepEqual(log,['0 send:A','300 read:postWrite','1300 send:B','1600 read:postWrite']);
  assert.equal(c.stats.reads.postWrite,2,'one read-back per acknowledged item');assert.equal(c.stats.dropped.postWrite,1);
 });
-test('client model: failed refresh backs off exponentially, then returns to the 60 s recovery timer',async()=>{
+test('historical client model: failed refresh backs off exponentially, then returns to the 60 s recovery timer',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock,{failReads:1});
  c.open();await clock.run(70_000);
  assert.deepEqual(log.slice(0,3),['0 read:open','3000 read:periodic','64000 read:periodic'],'retry 2 s after the failed flush ended, then 60 s');
 });
-test('client model: Realtime notifications use a trailing 350 ms debounce that resets on every event',async()=>{
+test('historical client model: Realtime notifications use a trailing 350 ms debounce that resets on every event',async()=>{
  const clock=new VirtualClock(()=>0);const {c,log}=client(clock);
  for(const t of [0,200,400])at(clock,t,()=>c.notify());
  await clock.run(5_000);

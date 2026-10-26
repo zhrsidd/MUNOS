@@ -15,7 +15,7 @@ export type Role = StaffRole | "delegate";
 export type Action =
   | "open" | "read" | "refocus" | "health"
   | "currentSession" | "attendance" | "queueAdd" | "queueOrder"
-  | "speechStart" | "speechScore" | "poiAllowance" | "poiAdd" | "poiRecognize" | "speechFinish"
+  | "speechStart" | "speechScore" | "poiAllowance" | "poiAdd" | "poiRecognize" | "poiScore" | "speechFinish"
   | "timer" | "photoAck" | "sendToApproval" | "approve" | "print"
   | "submitPage" | "submit";
 /** periodic: the app's own recovery refresh (modelled by the client timer at run time, not as a human step). */
@@ -61,7 +61,7 @@ export const WRITER_READS_PER_WRITE = 3;
 export type Topic = "chair" | "documents" | "configuration";
 export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
   currentSession: "chair", attendance: "chair", queueAdd: "chair", queueOrder: "chair",
-  speechStart: "chair", speechScore: "chair", poiAllowance: "chair", poiAdd: "chair", poiRecognize: "chair", speechFinish: "chair",
+  speechStart: "chair", speechScore: "chair", poiAllowance: "chair", poiAdd: "chair", poiRecognize: "chair", poiScore: "chair", speechFinish: "chair",
   photoAck: "chair", timer: null,
   sendToApproval: "documents", approve: "documents", print: "documents", submit: "documents",
 };
@@ -135,6 +135,10 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
     else while (push(between(45, 90), pick<Action>([["read", 60], ["health", 40]])));
     // Every staff device also does the app's periodic recovery flush (~60 s, jittered).
     for (let r = start + 60_000; r < end; r += 60_000 + random() * 1000) steps.push({ at: r, action: "read", periodic: true });
+    // Separate current-UI POI scoring, at the human floor after recognition. Do not consume extra RNG here:
+    // the approved public burst remains stable when staff command decomposition changes.
+    for (const step of steps.filter(s => s.action === 'poiRecognize')) if (step.at + HUMAN_FLOOR_SECONDS * 1000 < end)
+      steps.push({ at: step.at + HUMAN_FLOOR_SECONDS * 1000, action: 'poiScore', retry: step.retry });
     steps.sort((a, b) => a.at - b.at);
     return { id, role, committee, floor: floor || undefined, start, steps };
   });

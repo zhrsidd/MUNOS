@@ -4,8 +4,8 @@
 //                             [--read-ms 600,7000] [--send-ms 300] [--realtime topic-aware|current|both]
 //                             [--executive-chair-window 0,2000]
 // Staff = Chairs, Approval, Admins, Executive (Conference OS users). Delegates = public QR form only.
-// The refresh estimate runs the same one-in-flight client model as the live harness on a virtual clock, at each
-// assumed full-refresh latency (refresh counts depend on latency because triggers that arrive mid-flush are dropped).
+// The refresh estimate preserves a HISTORICAL comparison model; it is not a current live-run prediction.
+// The scenario still prints configured populations/public submissions for local preflight.
 import { checkUsers } from "./rehearsal/guard";
 import { estimate } from "./rehearsal/estimate";
 import { buildScenario, HUMAN_FLOOR_SECONDS, summarize, type RealtimeModel } from "./rehearsal/scenario";
@@ -24,4 +24,4 @@ for (const readMs of (raw("--read-ms") ?? "600,7000").split(",").map(Number))
   for (const model of models)
     for (const executiveChairWindowMs of model === "topic-aware" ? (raw("--executive-chair-window") ?? "0,2000").split(",").map(Number) : [0])
       estimates.push(await estimate(scenario, { minutes, readMs, sendMs: num("--send-ms", 300), model, executiveChairWindowMs }));
-console.log(JSON.stringify({ dryRun: true, staff, delegates, minutes, humanFloorSeconds: HUMAN_FLOOR_SECONDS, ...summarize(scenario, minutes), clientModelEstimates: estimates }, null, 2));
+console.log(JSON.stringify({ dryRun: true, modelStatus: "HISTORICAL COMPARISON ONLY; no current H3 rate prediction. Live runner uses actual DurableRepository.", staff, delegates, minutes, humanFloorSeconds: HUMAN_FLOOR_SECONDS, ...summarize(scenario, minutes), clientModelEstimates: estimates }, null, 2));

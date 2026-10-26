@@ -1,34 +1,7 @@
-// A faithful model of the production client's sync loop (lib/sync/repository.ts → DurableRepository), used by the
-// live rehearsal harness and by the deterministic estimator. It deliberately mirrors production, including its
-// limitations; it is not a smarter client.
-//
-// Mirrored behaviour (production reference in brackets):
-//  * One flush in flight per device. Any trigger while `flushing` is true returns immediately and is NOT queued
-//    or replayed — no dirty flag, no follow-up refresh. [flush(): `if (!this.transport || this.flushing) return;`]
-//  * Triggers: initial open [ready() → flush()], a write [execute() → flush()], a Realtime notification
-//    [transport.subscribe(this.retry) debounced 350 ms, reset on every event; Executive-only Chair events use PR #10's
-//    fixed 2 s window — see notify()], window focus [addEventListener("focus",
-//    this.retry)], and the recovery timer [schedule() after every flush].
-//  * Flush body (PR #9): for each pending item in order — send, then one full read-back, then the item is removed.
-//    The final full read runs only when no read-back happened in this flush (empty-outbox recovery/poll) or a
-//    conflict still blocks the head of the outbox. [sync(): while(item) { send; read; readBackCompleted=true } ;
-//    if(!readBackCompleted || item) read]. Under this model's conflict-dismissal assumption (below) the head is never
-//    left blocked, so the final read reduces to "only if nothing was read back".
-//  * A write recorded while a flush is running is NOT sent by a new flush (the trigger is dropped). It is sent only if
-//    the running flush is still inside its send loop when it re-reads the outbox; otherwise it waits for the next
-//    trigger (Realtime, focus or the recovery timer). [item=this.checkpoint?.pending[0] after each read]
-//  * Recovery timer: re-armed after every flush ends: 60 s (+0–1 s jitter) when healthy, exponential backoff
-//    min(60 s, 2^attempts s) after a failure. [schedule()]
-//  * A failed send or read keeps the item at the head of the outbox; the next flush re-sends the SAME mutation id.
-//
-// Not modelled: the Realtime (re)connect retry and the browser "online" event. Both call retry() as the app opens or
-// reconnects, which coincides with the opening flush (and would be dropped by the one-in-flight guard); no network
-// loss is simulated during a rehearsal stage.
-//
-// One modelling assumption (human, not client): production marks a conflicting item and stops sending later items
-// until a person reviews it in System health. The model assumes the Chair dismisses the conflict before their next
-// action (the item is dropped and counted), so one conflict does not silently stall a simulated device for the rest
-// of the run.
+// HISTORICAL estimator model only. This preserves older comparisons and does NOT describe shipping sync behavior.
+// The live runner uses actual-client.ts and the shipping DurableRepository. Never use this model or its rate
+// predictions as current H3 readiness evidence: it predates batching, ack retention, passive coalescing and rechecks.
+// Conflicts here are discarded as an old human-action assumption; the live actual-core adapter retains them.
 export type RefreshSource = "open" | "postWrite" | "realtime" | "periodic" | "refocus";
 export const REFRESH_SOURCES: RefreshSource[] = ["open", "postWrite", "realtime", "periodic", "refocus"];
 export const REALTIME_DEBOUNCE_MS = 350;

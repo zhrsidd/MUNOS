@@ -121,3 +121,29 @@ export function capacityGateLabel(peakStaff: number) {
   if (peakStaff >= 50) return "BELOW the current 110-device gate (historical 50-staff C2 comparison / ramp step)";
   return "BELOW the 50-staff comparison (smoke / warm-up only)";
 }
+
+/** Configured assignments are insufficient: require observed successful work and a completely settled core outbox. */
+export function observedWorkVerdict(o: {
+  expectedRoles: string[]; reads: Record<string, number>; writes: Record<string, number>;
+  expectedChairCommittees: string[]; observedChairCommittees: string[];
+  pending: number; conflicts: number; unconfirmed: number;
+  closeTimedOut?: boolean;
+  expectedActions?: string[]; actions?: Record<string, number>;
+  expectedPages?: number; completedPages?: number; expectedSubmissions?: number; createdSubmissions?: number;
+}) {
+  const checks = [
+    { check: 'at least one successful snapshot per configured role', pass: o.expectedRoles.length > 0 && o.expectedRoles.every(r => (o.reads[r] ?? 0) > 0) },
+    { check: 'at least one accepted mutation per configured writing role', pass: o.expectedRoles.filter(r => r !== 'executive').length > 0 && o.expectedRoles.filter(r => r !== 'executive').every(r => (o.writes[r] ?? 0) > 0) },
+    { check: 'accepted Chair traffic in every fixture committee', pass: o.expectedChairCommittees.length > 0 && o.expectedChairCommittees.every(c => o.observedChairCommittees.includes(c)) },
+    { check: 'zero pending, conflicting or unconfirmed actions at a settled close', pass: !o.closeTimedOut && o.pending === 0 && o.conflicts === 0 && o.unconfirmed === 0 },
+    { check: 'declared critical operations were observed', pass: (o.expectedActions ?? []).every(a => (o.actions?.[a] ?? 0) > 0) },
+    { check: 'every configured public page and submission completed successfully', pass: (o.completedPages ?? 0) === (o.expectedPages ?? 0) && (o.createdSubmissions ?? 0) === (o.expectedSubmissions ?? 0) },
+  ];
+  return { pass: checks.every(c => c.pass), checks };
+}
+
+/** Validate the public bearer link through the fixture Executive's authorized snapshot, without printing it. */
+export function assertSubmissionBinding(links: { token: string; committeeId: string }[] | undefined, token: string, committeeId: string) {
+  if (!links?.some(link => link.token === token && link.committeeId === committeeId))
+    throw Error('Submission token is not bound to the selected synthetic fixture committee. No delegate traffic was started.');
+}

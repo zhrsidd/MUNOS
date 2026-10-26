@@ -42,6 +42,15 @@ export function buildFixture(o: FixtureOptions) {
     const c = committees[i % o.committees];
     return { id: derivedUuid(`${conference}:delegate:${i}`), committee: c.id, session: c.session };
   });
+  if (multi && o.delegates < o.committees) throw Error('Readiness fixture needs at least one delegate per committee.');
+  const workflowDocuments = committees.flatMap(c => {
+    const submitter = delegates.find(d => d.committee === c.id);
+    return !submitter ? [] : ['Draft','Review','Approved','In Debate'].map((status, index) => ({
+      id: derivedUuid(`${conference}:document:${c.id}:${index}`), version: derivedUuid(`${conference}:version:${c.id}:${index}`),
+      committee: c.id, session: c.session, submitter: submitter.id, status, code: `${c.code} / SYN-${index + 1}`,
+      googleDocId: `synthetic_${derivedUuid(`${conference}:doc-link:${c.id}:${index}`).replaceAll('-','')}`,
+    }));
+  });
   const school = derivedUuid(`${conference}:school`);
   const q = (s: string) => `'${s.replaceAll("'", "''")}'`;
   const grant = (user: string, role: string, committee: string | null) => ` (${q(conference)},${q(user)},'${role}',${committee ? q(committee) : "null"},now()+interval '${o.grantHours} hours',true)`;
@@ -64,12 +73,22 @@ insert into public.sessions(id,conference_id,committee_id,name,"startsAt",state)
 ${sessionRows.join(",\n")};
 insert into public.delegates(id,conference_id,committee_id,"schoolId",country,name,email) values
 ${delegates.map((d, i) => ` (${q(d.id)},${q(conference)},${q(d.committee)},${q(school)},'Country ${i}','Simulated delegate ${i}','load${i}@example.com')`).join(",\n")};
+-- Current session and valid synthetic workflow states are prerequisites, not events invented by the load runner.
+update public.committees set "currentSessionId"=s.id from public.sessions s where committees.id=s.committee_id and s.conference_id=${q(conference)} and s.id in (${committees.map(c=>q(c.session)).join(',')});
+insert into public.attendance(conference_id,committee_id,"sessionId","delegateId",status) values
+${delegates.map(d=>` (${q(conference)},${q(d.committee)},${q(d.session)},${q(d.id)},'Present')`).join(",\n")};
+insert into public.documents(id,conference_id,committee_id,"sessionId","submitterId",code,title,status) values
+${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.session)},${q(d.submitter)},${q(d.code)},'Synthetic load-test document',${q(d.status)})`).join(",\n")};
+insert into public.document_versions(id,conference_id,committee_id,"documentId",number,"fileName",text) values
+${workflowDocuments.map(d=>` (${q(d.version)},${q(conference)},${q(d.committee)},${q(d.id)},1,'Google Doc','Synthetic registration only; no Google document was created or fetched.')`).join(",\n")};
+insert into public.resolution_links(document_id,conference_id,committee_id,working_doc_id) values
+${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.googleDocId)})`).join(",\n")};
 insert into public.scoring_definitions(conference_id,code,label,values) values(${q(conference)},'speech','Speech',array[1,2,3]);
 insert into public.user_access(conference_id,user_id,role,committee_id,expires_at,test_only) values
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};
 commit;
 `;
-  return { conference, cleanup: cleanupSql(conference), mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
+  return { conference, workflowDocuments, cleanup: cleanupSql(conference), mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
 }
 /**
  * Safe cleanup for ONE fixture conference: revokes every grant and link scoped to that conference id and nothing else.
