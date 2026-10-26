@@ -47,8 +47,9 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
 - **S5 Retry.** Hosted: request 1 is aborted before the server, request 2 reaches the server but its response is lost, request 3
   passes; the action stays queued, the same mutation is retried, the server shows one effect. Demo: `/api/health` is aborted;
   System health reports it and a save made during the failure is applied exactly once.
-- **S6 Idempotency.** A double-tap on Next speaker and on the speech score starts one speech and records one score; a reload
-  replays nothing; no duplicate ids. **H** the identical request (same mutation uuid) is delivered to the server twice and
+- **S6 Idempotency.** With exactly one queued delegate, a double-tap on Next speaker and on the speech score starts one speech
+  and records one score. Finish waits for the actual Chair heading and that speech's finished state projected from the durable
+  checkpoint, then immediately hard-navigates; a reload replays nothing; no duplicate ids. **H** the identical request (same mutation uuid) is delivered to the server twice and
   applied once (+2, not +4).
 - **S7 Stale conflict.** **H** A is offline and edits delegate X's attendance, with a participation action queued behind it. B edits
   X online. A reconnects: the strip says `Review needed`; the change is retained and flagged, did not overwrite B, work behind it
@@ -72,6 +73,23 @@ receipts, PT409 conflicts, Review/Retry/Discard recovery, cross-device convergen
 When the stale-tab check rejects a save, `DurableStore.update()` aborts its IndexedDB transaction and awaits the rejected
 transaction promise before returning the original save error. S7 requires the refusal explanation, the newer stored value and
 zero uncaught page errors. It does not suppress `AbortError` or any other browser error.
+
+### Speech completion before rehearsal navigation
+
+An empty speaker queue is shown while its last delegate is speaking. The former helper used that copy as its completion
+signal after clicking Finish, then could hard-navigate with `page.goto()` before the local IndexedDB save committed. That
+is different from the application's normal client navigation and does not show a lost, acknowledged save.
+
+The helper now waits for the exact **The floor is with the Chair** heading and the same speech ID in state `finished` in
+`project(checkpoint)`. Projection matters while offline: the authoritative base can still show a speaking row, with its finish
+durably queued in the outbox. The seven-action S2 count, S4 zero-active-speech assertion and zero-page-error checks stay intact.
+S6 prepares one queued delegate and hard-navigates immediately after completion so the empty-queue case stays covered.
+
+A local-only browser reproduction held a competing IndexedDB writer for 1.5 seconds without changing its data. The old wait
+returned too early and S6 failed with an unfinished speech after navigation; the corrected wait passed S0–S9, **30 assertions,
+7 hosted-only skips, zero page errors**, under the same delay. Three focused regressions cover the heading, the exact durable
+speech ID, failure when completion is missing, and offline outbox projection. The competing-writer injection is a local probe,
+not a fault injected into hosted data. Re-run the hosted rehearsal with the corrected harness before calling that gate passed.
 
 ## Hosted mode (orchestrator only)
 

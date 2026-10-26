@@ -14,6 +14,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {DeliveryLog, allowedRequest, checkBaseOrigin, checkBundles, checkHealthIdentity, pointsOf, stateDigest} from './delivery-audit.mjs';
+import {waitForSpeechFinish} from './speech-finish.mjs';
+import {project} from '../../lib/sync/repository';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HOSTED = (process.env.REHEARSAL_MODE || 'demo').toLowerCase() === 'hosted';
@@ -248,11 +250,15 @@ class Device {
     if (double) await next.dblclick(); else await next.click();
     const score = page.getByRole('button', {name: new RegExp(`^Record ${country} speech for \\d+ points$`)}).first();
     await score.waitFor({state: 'visible', timeout: 15_000});
+    const started = project(await this.checkpoint());
+    const speech = speechesIn(started, scope(started).sessionId).find(s => s.state !== 'finished');
+    assert.ok(speech, 'the recognized speech must be in the durable device checkpoint');
     const points = Number(/for (\d+) points/.exec(await score.getAttribute('aria-label'))[1]);
     if (double) await score.dblclick(); else await score.click();
     await page.getByText('Speech recorded', {exact: true}).waitFor({timeout: 15_000});
     await page.getByRole('button', {name: /^Finish · return floor to Chair/}).click();
-    await page.getByRole('button', {name: /^Next speaker · /}).or(page.getByText(/No delegates waiting/)).first().waitFor({timeout: 15_000});
+    // An empty queue is also shown DURING a speech. Require the actual floor heading and persisted finished state instead.
+    await waitForSpeechFinish(page, async () => project(await this.checkpoint()), speech.id);
     return {country, points};
   }
   async participation(country, category, points) {
@@ -598,10 +604,18 @@ async function runScenarios() {
     const speeches0 = speechesIn(before, ctx.sessionId).length;
     const speechEvents0 = before.events.filter(e => e.sessionId === ctx.sessionId && e.categoryId === 'speech').length;
     await A.at('/chair');
-    // The debate console only offers "Next speaker" when someone is queued (S2 consumed the queue in hosted mode).
-    if (!(await A.page.getByRole('button', {name: /^Next speaker · /}).isVisible().catch(() => false))) await A.queueAdd(ctx.dQ.country);
+    // Exercise finishing the ONLY queued speech: the queue's "No delegates waiting" text also exists while that speech is
+    // still active, so it must never be mistaken for a committed return of the floor. Only this fixture session is touched.
+    const queued = A.page.locator('ol[aria-label="open speaker queue"] li');
+    while (await queued.count()) {
+      const count = await queued.count();
+      await queued.first().getByRole('button', {name: /^Remove .* from open speaker queue$/}).click();
+      await eventually('the queued delegate to be removed durably', async () => (await queued.count()) === count - 1);
+    }
+    await A.queueAdd(ctx.dQ.country);
     // A fast double tap on Next speaker and on the speech score must start ONE speech and record ONE score.
     const spoke = await A.speech({double: true});
+    await A.at('/chair/participation'); // Immediately hard-navigate: the speech helper must already have waited for durability.
     await check('double-tap: one speech started, one speech score recorded', async () => {
       if (HOSTED) await A.drained();
       const state = await authoritative(A);
