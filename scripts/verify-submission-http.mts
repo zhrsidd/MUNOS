@@ -1,46 +1,62 @@
-import {createClient} from '@supabase/supabase-js';
-import {randomUUID} from 'node:crypto';
-import {readFile,writeFile} from 'node:fs/promises';
-import assert from 'node:assert/strict';
+import { mkdir, open, readFile, realpath } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import nextEnv from '@next/env';
-import {assertToolTarget} from '../lib/platform/target-guard';
+import { publicQrPlan, newPublicQrReport, verifyPublicQr, within, QrVerificationError, type StaffTokens } from './verification/public-qr';
+
+// No defaults for the app, fixture, conference or report. Run only before cutover with synthetic data.
+// See docs/PUBLIC_QR_VERIFICATION.md. Configuration is checked before any connection is constructed.
 nextEnv.loadEnvConfig(process.cwd());
-const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ref=assertToolTarget(url);
-assert.ok(process.env.SUPABASE_SECRET_KEY,'Server-only development key required');
-const server=createClient(url!,process.env.SUPABASE_SECRET_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
-const ids=JSON.parse(await readFile('supabase/fixture-ids.json','utf8'));
-const fixture=JSON.parse(await readFile('.test-sessions/integration.json','utf8'));
-const link={token:fixture.token};
-const lookup=await server.rpc('submission_link_info',{link_token:link.token});assert.ifError(lookup.error);assert.ok(lookup.data);
-const origin='http://localhost:3001',results:Record<string,unknown>={project:ref,checkedAt:new Date().toISOString()};
-const page=await fetch(`${origin}/submit/${link.token}`);assert.equal(page.status,200);
-const html=await page.text();assert.ok(html.includes('I have made sure the Chairs can edit this document.'));assert.ok(!html.includes(process.env.SUPABASE_SECRET_KEY!));results.page=true;
-const submission=randomUUID(),googleDoc=`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`;
-async function post(values:Record<string,string>={},file?:Blob){
- const form=new FormData();
- for(const [k,v]of Object.entries({token:link!.token,submissionId:submission,submitterId:ids.france,...(!file?{googleDoc}:{}),...values}))form.set(k,v);
- if(file)form.set('file',file,'rehearsal.pdf');
- const r=await fetch(`${origin}/api/submissions`,{method:'POST',body:form});
- assert.equal(r.headers.get('set-cookie'),null,'Delegate HTTP must not issue an auth cookie');
- return {status:r.status,body:await r.json()};
-}
-const first=await post();assert.equal(first.status,201);assert.equal(first.body.status,'created');results.created=first.body.code;
-const retries=await Promise.all([post(),post(),post()]);assert.ok(retries.every(r=>r.status===200&&r.body.status==='replayed'&&r.body.code===first.body.code));results.concurrentRetriesExactlyOnce=true;
-const duplicate=await post({submissionId:randomUUID()});assert.equal(duplicate.body.status,'duplicate');assert.equal(duplicate.body.code,first.body.code);results.duplicateSource=true;
-// The form has no title; an old client's valid title is still accepted (and forwarded so its retries match), and an absent one is fine.
-// A different Google Doc is the changed payload.
-const legacy=await post({submissionId:randomUUID(),title:'Legacy client title',googleDoc:`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`});assert.equal(legacy.status,201);results.legacyTitleAccepted=true;
-const changed=await post({googleDoc:`https://docs.google.com/document/d/rehearsal_${randomUUID().replaceAll('-','')}/edit`});assert.equal(changed.status,409);assert.equal(changed.body.error,'idempotency_conflict');results.changedRetryDenied=true;
-const invalid=await post({submissionId:randomUUID(),googleDoc:'https://example.com/not-a-doc'});assert.equal(invalid.status,400);results.invalidHostDenied=true;
-const foreign=await post({submissionId:randomUUID(),submitterId:randomUUID()});assert.equal(foreign.status,400);results.invalidSubmitterDenied=true;
-const invalidToken=await post({token:randomUUID().replaceAll('-',''),submissionId:randomUUID()});assert.equal(invalidToken.status,404);results.invalidTokenDenied=true;
-// Google Docs only: a file is refused, alone or with a valid link.
-const pdf=new Blob([`%PDF-1.4\n% Development-only Docs-only refusal check ${randomUUID()}\n%%EOF\n`],{type:'application/pdf'});
-for(const values of [{submissionId:randomUUID()},{submissionId:randomUUID(),googleDoc}]){
- const refused=await post(values,pdf);assert.equal(refused.status,400);assert.equal(refused.body.error,'docs_only');
-}
-results.fileRefused=true;
-await writeFile('.test-sessions/http-browser.json',JSON.stringify({url:`${origin}/submit/${link.token}`,googleDoc,submission}),{mode:0o600});
-await writeFile('docs/submission-http-results.json',JSON.stringify(results,null,2)+'\n');
-console.log(JSON.stringify(results,null,2));
+const value = (key: string) => {
+  const matches = process.argv.slice(2).filter(x => x === key).length;
+  if (matches !== 1) throw new QrVerificationError(`Supply ${key} exactly once.`);
+  const result = process.argv[process.argv.indexOf(key) + 1];
+  if (!result || result.startsWith('--')) throw new QrVerificationError(`Supply a value for ${key}.`);
+  return result;
+};
+let report: ReturnType<typeof newPublicQrReport> | undefined;
+let artifact: Awaited<ReturnType<typeof open>> | undefined;
+try {
+  const known = new Set(['--base-url', '--conference-id', '--fixture', '--output', '--preflight']);
+  for (const argument of process.argv.slice(2)) if (argument.startsWith('--') && !known.has(argument)) throw new QrVerificationError('Unknown public QR verifier option.');
+  let fixture: unknown;
+  try { fixture = JSON.parse(await readFile(value('--fixture'), 'utf8')); } catch { throw new QrVerificationError('Cannot read the supplied JSON fixture.'); }
+  const plan = publicQrPlan(fixture, { baseUrl: value('--base-url'), conferenceId: value('--conference-id'), output: value('--output') }, process.env);
+  // Refuse symlink escapes as well as lexical ../ escapes. Open exclusively so no tracked or previous result is overwritten.
+  await mkdir(dirname(plan.output), { recursive: true, mode: 0o700 });
+  const actualParent = await realpath(dirname(plan.output));
+  const cwd = await realpath(process.cwd());
+  if (!['artifacts', '.test-sessions'].some(dir => actualParent === resolve(cwd, dir) || within(resolve(cwd, dir), actualParent))) throw new QrVerificationError('Artifact directory escapes the ignored output roots.');
+  artifact = await open(plan.output, 'wx', 0o600);
+  report = newPublicQrReport(plan);
+  if (process.argv.includes('--preflight')) {
+    report.limits.push('Preflight only: no connections, link lookups, pages or submissions were attempted.');
+    await artifact.writeFile(JSON.stringify({ ...report, status: 'preflight-only' }, null, 2) + '\n');
+    console.log('Public QR preflight passed. No requests were made; ignored artifact written.');
+  } else {
+    if (!process.env.SUPABASE_SECRET_KEY) throw new QrVerificationError('Server-only key must be supplied through an ignored local environment.');
+    let staff: StaffTokens | undefined;
+    if (plan.fixture.staff) {
+      staff = {} as StaffTokens;
+      for (const role of ['chair', 'approval', 'logistics'] as const) {
+        try {
+          const saved = JSON.parse(await readFile(plan.fixture.staff[role], 'utf8'));
+          if (typeof saved.access_token !== 'string' || !saved.access_token) throw new QrVerificationError('missing token');
+          if (typeof saved.expires_at !== 'number' || saved.expires_at * 1000 < Date.now() + 120_000) throw new QrVerificationError('expired');
+          staff[role] = saved.access_token;
+        } catch { throw new QrVerificationError('Optional staff session file is invalid or expires within two minutes. This verifier never signs in or refreshes sessions.'); }
+      }
+    }
+    await verifyPublicQr(plan, process.env, report, staff);
+    await artifact.writeFile(JSON.stringify(report, null, 2) + '\n');
+    console.log('Public QR verification passed. Read the ignored JSON artifact for checks, created synthetic rows and limits.');
+  }
+} catch (error) {
+  // Never stringify backend errors, request bodies, sessions, links or keys. Error text is deliberately omitted.
+  if (artifact && report) {
+    report.status = 'failed'; report.failedCheck = error instanceof QrVerificationError ? error.message : 'Unexpected verification failure; inspect the last completed check locally.';
+    report.completedAt = new Date().toISOString();
+    await artifact.writeFile(JSON.stringify(report, null, 2) + '\n');
+  }
+  console.error(error instanceof QrVerificationError ? error.message : 'Unexpected verification failure. Check the ignored report; do not mark the hosted gate verified.');
+  process.exitCode = 1;
+} finally { await artifact?.close(); }
