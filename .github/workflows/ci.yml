@@ -36,6 +36,8 @@ jobs:
           pg_isready --host 127.0.0.1 --port 5433
       - run: npm ci
       - run: npm run typecheck
+      - name: Check rehearsal entrypoints
+        run: npm run typecheck:rehearsal
       - run: npm run lint
       # Permission drift (HD4): replays every migration on the PostgreSQL 17 above, fails if docs/generated no longer matches
       # (new function, table, view, default ACL or any privilege change) or if the privilege policy is breached

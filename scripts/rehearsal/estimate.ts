@@ -1,5 +1,5 @@
-// Deterministic, network-free estimate of how many full refreshes the scenario causes, by running the SAME client
-// model as the live harness (client-model.ts) on a virtual clock with fixed latencies. Upper bound on writes: every
+// HISTORICAL, network-free comparison only: the old client model on a virtual clock.
+// This is NOT the current actual-core live runner and provides no current H3 rate prediction. Upper bound on writes: every
 // scheduled write step is assumed to produce a write (the live run skips some when its precondition is not met).
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./client-model";
 import { READS, TOPIC_OF, recipients, type RealtimeModel, type SimUser, type Step } from "./scenario";

@@ -27,6 +27,12 @@ Items are grouped into **phases that depend only on earlier phases**. Public rea
 
 Baseline: `origin/main` = `b123ae6` (PR #56, docs only), whose code is the `542e705` release candidate. `package.json` version is `0.2.0`. No git tag exists.
 
+## 26 October evidence update
+
+[The current verification record](PRECUTOVER_VERIFICATION_2026-10-26.md) supersedes older dated assertions below where it provides newer evidence. There are now **29 committed/applied preproduction migrations**, including the lifecycle controls; all 61 project function bodies matched local replay. Public resolution/amendment HTTP tests and Storage health passed against the current hosted project using the local production build. The corrected offline browser run passed **39 assertions** with independent Chrome contexts and real hosted services. Fixture access was revoked afterward.
+
+The load tooling now uses the shipping durable client and checks observed coverage, retained conflicts, settled outboxes and the full conference profile. Its local PostgreSQL 17 suite passed **861 tests, zero failures/skips**, plus typechecks, lint, grants and build. No hosted load has run. Real devices/venue networking, real Google sharing, final lifecycle/role/scoring/voting checks not covered by that evidence, backups/rollback, release approval and all formal cutover steps remain open. Production remains demo; the connected site is a protected Preview. Do not interpret older **OUTSTANDING** rows as proof that these dated checks were never run, or this update as closure of their broader manual gates.
+
 ## Release blockers (summary)
 
 Each blocker lists only earlier phases or earlier items as its prerequisites. Nothing here depends on sign-off.
@@ -35,7 +41,7 @@ Each blocker lists only earlier phases or earlier items as its prerequisites. No
 | --- | --- | --- |
 | B1 | Supabase plan (Pro), compute (Small) and backups/PITR are unverified. The record says Micro compute and an unconfirmed plan. | 1.2 |
 | B2 | **Lifecycle controls require hosted verification and cutover evidence.** Minimal register, marker, test-purpose barrier and tool preflight are implemented and locally reviewed; see [LIFECYCLE_CONTROLS.md](LIFECYCLE_CONTROLS.md). Gateway/signed attestation are deferred by the owner. Do not infer cutover readiness from local tests. | 1.4 |
-| B3 | The public submission server routes have never been run against the current project with the server-only key. | 1.5 |
+| B3 | Current public HTTP smoke passed on 26 October; mobile-data QR access, real Google sharing and remaining rate-limit/link-replacement checks are still open. | 1.5, 1.9 |
 | B4 | No real-device offline rehearsal on the current project. | 1.7 |
 | B5 | The 110-device / 19-committee readiness run (STAGING_REHEARSAL C2) has not been run. This is the capacity gate in `AGENTS.md`. | 1.8 |
 | B6 | The synthetic lifecycle, QR, scoring, voting and offline write smoke has not been run on the final candidate, and must be finished and cleaned up **before** promotion. | 1.9 |
@@ -194,7 +200,7 @@ Gate (`AGENTS.md`): **110 devices across 19 real committees on Pro / Small**, pr
 | # | Item | Status | Action |
 | --- | --- | --- | --- |
 | 1.8.1 | This same project upgraded Micro to Small (no new project), the actual configuration recorded, **before** the readiness run. [LC evidence 5] | **NOT VERIFIABLE FROM THE REPO** | Owner confirms Pro and Small in the dashboard (1.2.1, 1.2.2). Do not run the load phases on Micro. |
-| 1.8.2 | Harness supports the 19-committee / 110-device shape. | **OUTSTANDING** | Docs and the `rehearsal-run.mts` header still show 14 committees and 50/100 staff. Claude checks `rehearsal-fixture.mts`, `rehearsal-identities.mts` (25 anonymous sign-ins per run, one per 20 s: run the day before) and `rehearsal-run.mts`, with Codex review. A change is a code change needing owner approval. |
+| 1.8.2 | Harness supports the 19-committee / 110-device shape. | **LOCALLY VERIFIED — hosted run outstanding** | Corrected actual-client runner and seeded workflow fixtures independently reviewed on 26 October; 861 tests passed. Full profile requires 110 staff, 19 committees, 30 minutes, 150 public page loads and at least 16 planned creates, plus operational success. See [the operator packet](LOAD_TEST_EXECUTION_PACKET.md). |
 | 1.8.3 | Preparation and run. | **OUTSTANDING** | `npm run rehearsal:identities`, `npx tsx scripts/rehearsal-fixture.mts ...`, `npm run rehearsal:plan` (dry run), `npm run rehearsal:run -- --app <preview-url> --identities ... --fixture ...`. The app URL must be a `*.vercel.app` deployment or localhost; protected Previews need the automation bypass secret. Owner approves running. Fresh synthetic fixture per run. |
 | 1.8.4 | `READINESS RUN` passes: error rate under 1% (conflicts excluded); write p95 at most 1.5 s; read p95 at most 2.5 s; zero unexplained 5xx, `PGRST003`, `40001` loops, statement timeouts, lost or duplicate writes, rate-limit responses; delegate page p95 at most 2 s with no Auth activity; at most 18 real submissions per link. | **OUTSTANDING** | Attach harness report plus Supabase Logs/Observability and Vercel Logs for the run window. |
 | 1.8.5 | Burst start of prepared devices GREEN within 3 minutes; fresh code entry from one NAT at N = 10, 25, 40 (Phase D). | **OUTSTANDING** | Ideally on venue Wi-Fi; feeds 1.2.8. |

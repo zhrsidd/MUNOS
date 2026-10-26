@@ -84,14 +84,16 @@ test('Chair scope is enforced by RLS: committee 3\'s identity writes its own com
   const mine=await snapshot();
   assert.ok(mine.delegates.length>0&&mine.delegates.every(d=>d.committeeId===c3.id),'Chair 3 reads only committee 3 delegates');
   const mutate=async(command:Record<string,unknown>)=>query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[conference,crypto.randomUUID(),command,'chair',fingerprint(await snapshot(),command as never),new Date().toISOString()]);
-  await mutate({type:'attendance',delegateId:d3,sessionId:c3.session,status:'Present'});
+  await mutate({type:'attendance',delegateId:d3,sessionId:c3.session,status:'Present & Voting'});
   const denied=(e:unknown)=>(e as {code?:string}).code==='42501';
-  await assert.rejects(()=>mutate({type:'attendance',delegateId:d4,sessionId:c4.session,status:'Present'}),denied,'Chair 3 cannot write committee 4 (42501)');
+  await assert.rejects(()=>mutate({type:'attendance',delegateId:d4,sessionId:c4.session,status:'Present & Voting'}),denied,'Chair 3 cannot write committee 4 (42501)');
   await assert.rejects(()=>mutate({type:'currentSession',committeeId:c4.id,sessionId:c4.session}),denied,'Chair 3 cannot set committee 4\'s current session (42501)');
   await as(chairUsers[4]);
   assert.ok((await snapshot()).delegates.every(d=>d.committeeId===c4.id),'Chair 4 reads only committee 4');
   await asOwner();
-  assert.equal((await query<{n:number}>("select count(*)::int n from public.attendance where conference_id=$1",[conference]))[0].n,1,'only the in-scope write landed');
+  assert.equal((await query<{n:number}>("select count(*)::int n from public.attendance where conference_id=$1",[conference]))[0].n,f.delegates.length,'the complete seeded roll call is preserved');
+  assert.equal((await query<{n:number}>("select count(*)::int n from public.attendance where conference_id=$1 and status='Present & Voting'",[conference]))[0].n,1,'only the in-scope status change landed');
+  assert.equal((await query<{status:string}>("select status from public.attendance where \"delegateId\"=$1",[d4]))[0].status,'Present','the other committee remains unchanged');
  }finally{await db.close();}
 });
 
