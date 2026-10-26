@@ -1,0 +1,203 @@
+{
+  "date": "2026-10-26",
+  "appCommit": "4db21e590696fc8a5152507551568927ef06a030",
+  "harnessCommit": "5c1b29b",
+  "projectRef": "kllhswucdhqqywnzxado",
+  "databasePhase": "preproduction",
+  "migrationCount": 29,
+  "migrationVersion": "20261026003647",
+  "migrationSourceSha256": "d5cad3dba472bb77f623d9ee5296218de0b19afbfe24ab40fc2a9eb41c4a9d9d",
+  "ciRun": 40251649398,
+  "localFullSuite": {
+    "passed": 841,
+    "failed": 0,
+    "skipped": 0
+  },
+  "preview": {
+    "status": "ok",
+    "checkedAt": "2026-10-26T08:15:30.380Z",
+    "app": {
+      "version": "0.2.0",
+      "commit": "4db21e590696fc8a5152507551568927ef06a030",
+      "shortCommit": "4db21e5",
+      "branch": "codex/preproduction-connected",
+      "environment": "preview",
+      "deploymentId": "dpl_EQboPWUsbX4MfMGYYxekPJ8p1JPu",
+      "builtAt": "2026-10-26T08:12:57.801Z"
+    },
+    "checks": {
+      "supabase": {
+        "status": "ok",
+        "latencyMs": 623
+      },
+      "database": {
+        "status": "ok",
+        "latencyMs": 659
+      },
+      "storage": {
+        "status": "ok",
+        "latencyMs": 404
+      }
+    }
+  },
+  "browser": {
+    "mode": "hosted",
+    "startedAt": "2026-10-26T08:16:53.860Z",
+    "finishedAt": "2026-10-26T08:17:48.529Z",
+    "passedAssertions": 39,
+    "skippedHostedOnly": 0,
+    "scenarios": [
+      {
+        "id": "S0",
+        "title": "Open two independent Chair devices and prepare the fixture",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S1",
+        "title": "Devices are independent contexts",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S2",
+        "title": "Offline: queued attendance, speaker queue, speech score, participation points and a vote",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S3",
+        "title": "Reload while offline with queued work (the IndexedDB outbox survives)",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S4",
+        "title": "Reconnect and automatic drain",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S5",
+        "title": "Retry behaviour under flaky or aborted requests",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S6",
+        "title": "Idempotency: one Chair action, one effect",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S7",
+        "title": "Stale conflict: an offline edit of an item another device changed",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S8",
+        "title": "System health: recovery tools are present and safe",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S9",
+        "title": "Final consistency",
+        "status": "pass",
+        "note": ""
+      },
+      {
+        "id": "S10",
+        "title": "Probe: action recorded during an in-flight sync read",
+        "status": "pass",
+        "note": ""
+      }
+    ]
+  },
+  "publicQr": {
+    "projectRef": "kllhswucdhqqywnzxado",
+    "conferenceId": "a410008d-8d79-478c-9a08-341952f6af0a",
+    "appOrigin": "http://127.0.0.1:4319",
+    "startedAt": "2026-10-26T07:56:03.720Z",
+    "status": "passed",
+    "checks": [
+      "authoritative-link-conference-committee-submitters-and-open-resolution",
+      "app-health-nonproduction-build-and-optional-pinned-commit",
+      "resolution-and-amendment-pages-no-auth-cookie-or-server-key",
+      "resolution-create-concurrent-replay-source-deduplication-changed-payload-conflict-and-legacy-title",
+      "resolution-invalid-doc-submitter-token-cross-link-and-docs-only-refusals",
+      "amendment-create-concurrent-replay-deduplication-conflicts-and-scope-refusals"
+    ],
+    "created": {
+      "resolutionCodes": [
+        "TST / 02",
+        "TST / 03"
+      ],
+      "amendmentIds": [
+        "a1901ee3-2468-4cd8-9970-72b083e64750"
+      ]
+    },
+    "limits": [
+      "Synthetic Google Doc IDs test registration only; actual document existence, sharing and Chair edit access are NOT verified.",
+      "No new PDF or file upload is performed. Historical attachment readability is not verified.",
+      "This smoke does not prove rate limits, link rotation, venue offline behavior or 110-device readiness.",
+      "The supplied app-origin binding is operator-approved configuration; the public health endpoint does not attest its backend identity.",
+      "Staff document/link visibility was not run: no optional role-scoped sessions supplied."
+    ],
+    "appBuild": {
+      "environment": "local-build",
+      "commit": "4db21e590696fc8a5152507551568927ef06a030"
+    },
+    "completedAt": "2026-10-26T07:56:06.409Z"
+  },
+  "roleVisibility": [
+    {
+      "status": "passed",
+      "conference": "a410008d-8d79-478c-9a08-341952f6af0a",
+      "results": [
+        {
+          "role": "approval",
+          "drafts": 0,
+          "grantClass": "test",
+          "snapshotRead": true
+        },
+        {
+          "role": "logistics",
+          "drafts": 0,
+          "grantClass": "test",
+          "snapshotRead": true
+        }
+      ],
+      "scope": "Approval and Logistics cannot read synthetic Drafts; each has only its own role; snapshots read on hosted preproduction"
+    },
+    {
+      "status": "passed",
+      "conference": "a410008d-8d79-478c-9a08-341952f6af0a",
+      "drafts": 2,
+      "onlyOwnCommittee": true,
+      "grantClass": "test",
+      "finishedPreviousHarnessSpeech": [
+        {
+          "speech": "4d29b3fa-cf6e-40ed-b182-000000000001",
+          "mutation": "9dece9b2-5f8e-4f59-8789-94d92811b8bb"
+        }
+      ]
+    }
+  ],
+  "temporaryFixtureRetirement": {
+    "activeGrants": 0,
+    "activeCodes": 0,
+    "activeQrLinks": 0,
+    "dataDeleted": false
+  },
+  "production": {
+    "backend": "local-demo",
+    "commit": "542e7052b75b1bb4d8fa842add2d8ddd1f9fd2a6",
+    "deploymentId": "dpl_3WvVFTc6A5CdAr5LmyDe8Gyk7Xad"
+  },
+  "loadWindow": "2026-10-31",
+  "hostedLoadRun": false,
+  "paidUpgradePerformed": false,
+  "cutoverPerformed": false
+}

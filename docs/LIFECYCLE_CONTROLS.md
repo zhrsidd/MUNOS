@@ -33,3 +33,7 @@ Verify after application: exact migration source/ledger; anonymous metadata and 
 5. The human operator bootstraps the first production Executive, configures/promotes the exact verified Production app, checks it view-only and opens real-data entry only after release approval. Cloud agents have no hosted access after promotion. No automatic demotion or reopening is provided.
 
 The load window remains **31 October**. No paid upgrade or full hosted workload is authorized earlier by this implementation. Full conference readiness, physical-device offline behavior, Google document access, actual load/Realtime fanout and hosted restoration evidence remain separate gates.
+
+## Hosted preproduction checkpoint
+
+The exact reviewed migration was applied on 26 October, with the ledger reconciled to 29 committed versions only after exact source equality. The marker remains preproduction, revision 1. Live phase/permission/three-role/public QR and 39-assertion offline results are recorded in [PRECUTOVER_VERIFICATION_2026-10-26.md](PRECUTOVER_VERIFICATION_2026-10-26.md). Production-state/race proofs remain local; no hosted promotion occurred. Cutover credential, key, Preview and connector retirement is still outstanding.
