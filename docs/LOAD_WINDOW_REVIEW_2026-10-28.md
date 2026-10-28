@@ -87,4 +87,4 @@ Card line 39 ("evidence review and fixture retirement") versus line 62 (destruct
 
 ## 5. Test and tooling results
 
-See the final report of this task; local results are not repeated here.
+On this branch (origin/main `d2e9e0c` plus the new files): `tsc --noEmit`, `tsc -p tsconfig.rehearsal.json` and `eslint .` clean. `npm test` without a database server: 800 tests, 742 pass, 0 fail, 58 skipped (PostgreSQL-only). With a local disposable PostgreSQL 17.5 (`TEST_POSTGRES_URL`, loopback, run as a non-root user): 873 tests, 873 pass, 0 fail, 0 skipped. The server was stopped afterwards.
