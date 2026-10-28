@@ -12,7 +12,8 @@
     "scripts/rehearsal-run.mts",
     "scripts/rehearsal-plan.mts",
     "scripts/rehearsal-fixture.mts",
-    "scripts/rehearsal-identities.mts"
+    "scripts/rehearsal-identities.mts",
+    "scripts/load-evidence-check.mts"
   ],
   "exclude": [
     "node_modules"
