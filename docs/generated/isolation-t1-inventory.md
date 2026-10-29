@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 31 files, combined SHA-256 `182e605862347fde`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 32 files, combined SHA-256 `1eb706e0a93177d2`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -54,7 +54,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-84 functions (75 callable, 9 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+87 functions (77 callable, 10 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -76,6 +76,7 @@ Executed in the disposable database after the inventory was read:
 | `private.final_label(table_name text, rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.guard_lifecycle_transition()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.has_access(conf uuid, committee uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.label_record()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.lifecycle_allows(test_only boolean)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.lifecycle_new_test_only()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.link_decision_comment()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
@@ -120,8 +121,10 @@ Executed in the disposable database after the inventory was read:
 | `private.session_version_at(versions jsonb, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_versions_for(conf uuid, committee uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_windows(sessions jsonb, lead_minutes integer, grace_minutes integer, day_close jsonb, tz text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.set_mutation_context(conf uuid, mutation uuid, client_time timestamp with time zone, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.set_print_copies()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.submitter_country(conf uuid, committee uuid, delegate uuid)` | function | definer | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.time_confidence(conf uuid, device uuid, client_time timestamp with time zone, received timestamp with t...)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.uuid_or_null(value text)` | function | invoker | postgres | immutable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.valid_flag(value text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.veto_delegates(rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
@@ -326,5 +329,5 @@ Column-level privileges: none.
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 84.
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 87.
 

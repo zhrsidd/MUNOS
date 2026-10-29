@@ -31,9 +31,10 @@
   "20261022090000_privilege_hardening.sql",
   "20261026003647_lifecycle_controls.sql",
   "20261029100000_session_window.sql",
-  "20261029110000_session_schedule.sql"
+  "20261029110000_session_schedule.sql",
+  "20261030090000_record_labelling.sql"
  ],
- "migrationsSha256": "182e605862347fdec2dcb76354fdc257748f1eb5e5e96682cd900c534ea41ca1",
+ "migrationsSha256": "1eb706e0a93177d210a682a17adf6acc465ef711864dc76940af1c19da2becbf",
  "supabase-model": {
   "fns": [
    {
@@ -570,6 +571,36 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "label_record",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -1898,6 +1929,36 @@
    },
    {
     "schema": "private",
+    "name": "set_mutation_context",
+    "args": "conf uuid, mutation uuid, client_time timestamp with time zone, command jsonb",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "set_print_copies",
     "args": "",
     "result": "trigger",
@@ -1937,6 +1998,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "time_confidence",
+    "args": "conf uuid, device uuid, client_time timestamp with time zone, received timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -5293,6 +5384,36 @@
    },
    {
     "schema": "private",
+    "name": "label_record",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "lifecycle_allows",
     "args": "test_only boolean",
     "result": "boolean",
@@ -6613,6 +6734,36 @@
    },
    {
     "schema": "private",
+    "name": "set_mutation_context",
+    "args": "conf uuid, mutation uuid, client_time timestamp with time zone, command jsonb",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "set_print_copies",
     "args": "",
     "result": "trigger",
@@ -6652,6 +6803,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "time_confidence",
+    "args": "conf uuid, device uuid, client_time timestamp with time zone, received timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
