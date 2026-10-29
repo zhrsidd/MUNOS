@@ -13,8 +13,9 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    whether findings remain. When it finds nothing, it reacts with a thumbs-up instead of approving. So a clean head is
    read from that summary state, never from a single comment or reaction.
 2. **`claude-review-repair.yml` (Claude repair).** After a Codex review on the current head that leaves unresolved Codex
-   threads, Claude fixes what is actionable, commits with `fix(review):` (at most three such commits per PR), resolves the
-   threads it fixed, and requests a fresh Codex review with `@codex review`, once per new head.
+   threads, Claude edits files to fix what is actionable and resolves the threads it fixed. Claude cannot push. A separate
+   job checks the changed files, makes one `fix(review):` commit (at most three per PR), pushes it, and requests a fresh
+   Codex review with `@codex review`, once per new head. See "Write safety for repairs" below.
 3. **`codex-reviewed-automerge.yml` (gate).** Enables squash auto-merge only when **all** of these hold:
    - the head branch is in this repository, the base is `main`, and the PR is not a draft;
    - Codex's summary is `completed` for the current head, with no findings and no unresolved findings;
@@ -39,6 +40,8 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    workflow token; classic protection can only be read with administration access, which this design avoids.
    - Require the status checks **`verify`** (from `ci.yml`) and **`codex-review-gate`** (published by the gate; add it
      by name once the first gate run has reported it). The gate refuses to merge if either is missing.
+   - Require **only** those two checks. Cloudflare Pages and Workers Builds serve the separate `munos.pages.dev` preview and
+     are intentionally not required merge checks.
    - Require pull requests before merging; block force pushes and deletions.
    - Add no bypass actors for automation.
    - Optional: require one human approval if the owner wants a person to approve every merge. The gate does not depend
@@ -51,11 +54,57 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
      docs before relying on it. The value is never printed in logs or documents. Remove any older `ANTHROPIC_API_KEY`
      secret once this one works, since the workflow no longer reads it.
    - `CLAUDE_AUTOMATION_TOKEN`: a fine-grained personal access token limited to `zhrsidd/MUNOS` with Contents, Pull requests
-     and Issues set to read and write. It pushes repair commits, which trigger CI, and posts `@codex review`, which Codex
-     acts on. Keep its scope minimal and never give it access to other repositories.
+     and Issues set to read and write. Only the `push` job uses it: it pushes the checked repair commit, which triggers CI,
+     and posts `@codex review`, which Codex acts on. The job that runs Claude never sees it. Keep its scope minimal and
+     never give it access to other repositories.
 5. **Workflow token:** the gate reads `repos/{repo}/rules/branches/main` with the workflow's `GITHUB_TOKEN`. If that call
    returns 403, the gate fails closed and the run fails. Fix the repository's token permissions. Do not weaken the gate.
    This read has not been verified against the live API from the authoring environment.
+
+## Write safety for repairs
+
+Claude runs with a shell, so the safety of its edits cannot rest on instructions alone. The workflow keeps the push
+credential out of its reach and checks the result before anything is pushed. `CLAUDE.md` tells Claude the same rules, but
+the workflow enforces them even if Claude ignores `CLAUDE.md`.
+
+1. **`repair` job (runs Claude).** It holds only the workflow token, with `contents: read` (plus `pull-requests` and `issues`
+   write for comments and threads). The action is given that token explicitly, so it does not exchange for the
+   write-capable Claude App token. `CLAUDE_AUTOMATION_TOKEN` is never referenced in this job. Claude edits files only; the
+   job collects the edits as a patch and uploads it. `git push` and the action's file-commit tools are also disallowed, as
+   defence in depth.
+2. **`push` job (fresh runner).** It applies the patch to the reviewed commit and judges the result, not the patch headers.
+   It reads every changed path from `git diff --cached --raw -z --no-renames`, so a rename counts as a delete plus an add
+   and both paths are checked. It refuses the whole patch, with an `::error::` that names the path, on any of:
+   - a protected path (table below), compared case-insensitively;
+   - a symlink, a submodule, an executable file, or any file mode change;
+   - a patch over 2 MB, a patch that does not apply cleanly (including paths outside the repository), or a checkout that is
+     not the reviewed commit.
+3. **Push.** Only after that check passes, one step holds `CLAUDE_AUTOMATION_TOKEN`. The job itself makes the single
+   `fix(review):` commit, so Claude cannot choose the message that the three-repair cap counts. It confirms the branch is
+   still at the reviewed commit, then pushes without force, so a moved branch fails closed.
+
+Protected paths (the `protected()` function in the `push` job; keep this table and `CLAUDE.md` in step with it):
+
+| Path | Why |
+| --- | --- |
+| Any path with a segment starting with a dot: `.github/`, `.claude/`, `.mcp.json`, `.env*`, `.gitattributes`, `.gitignore` | Automation, agent configuration, secrets and git behaviour |
+| `CLAUDE.md`, `AGENTS.md` at any depth | The instructions that steer Claude and Codex |
+| `package.json`, `package-lock.json`, `vercel.json`, `next.config.*`, `eslint.config.*`, `tsconfig*.json`, `scripts/vercel-ignore-build.sh` | Dependencies, build, deploy and check configuration: supply chain, and the ability to weaken `verify` |
+| `supabase/`, `scripts/isolation-inventory/`, `lib/platform/target-guard.ts`, `config/project-lifecycle.json` | Schema, access control and production-target guards (the protected areas in `AGENTS.md`) |
+| `docs/AGENT_AUTOMATION.md` | This document |
+
+If a finding needs a change to one of these paths, Claude is told to change nothing and comment `NEEDS_DECISION:`. The
+owner decides.
+
+Residual risks:
+
+- The `repair` job's token can still write to pull requests and issues, so Claude could resolve a review thread without
+  fixing it or post a comment. The gate does not trust that: Codex must still clear the new head.
+- The check is path-based. It does not judge whether an allowed change is correct; Codex's review and `verify` do.
+- The workflow files themselves still come from the pull request head, as for any pull request (see the bootstrap trust
+  limits). Someone with write access can edit this guard in a PR, so changes under `.github/` need the owner's review.
+- Not proven live: that the action runs with the read-only token and the tool list in `claude_args`, and that it cannot push
+  with it. Run the acceptance test before relying on this.
 
 ## One-time bootstrap (before the gate is on main)
 
@@ -104,6 +153,13 @@ from editing the workflows, which is the trust model the rest of this document a
 - Offline (also run by `codex-review-gate-tests.yml` on any change to the automation):
   `bash .github/scripts/test/codex-review-gate.test.sh`. It runs 15 decision cases against a snapshot of PR #79 captured
   from the GitHub API on 2026-10-29, plus the shell wrapper through a fake `gh`, plus the pinned-identity checks.
+- Bootstrap staging: `bash .github/scripts/test/stage-gate.test.sh` and `bash .github/automation-tests/stage-step.test.sh`
+  (the second runs each workflow's real staging step).
+- Repair write safety: `bash .github/automation-tests/repair-push.test.sh` runs the `push` job's real check and push steps
+  against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
+  executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
+  go through. `bash .github/automation-tests/repair-invariants.test.sh` checks that the job running Claude holds no push
+  credential and that only the guarded step pushes.
 - Workflow syntax and expressions: `actionlint .github/workflows/*.yml`.
 
 ## Acceptance test (required before enabling for real work)
@@ -116,3 +172,8 @@ Use a disposable same-repository PR, not a production change.
 4. Enabling auto-merge, then pushing a new commit, must cancel auto-merge.
 5. A fourth repair request must post `NEEDS_DECISION` and stop.
 6. Confirm `main` and the hosted Supabase project were not changed by any run.
+7. Make a Codex finding that can only be fixed by editing a protected path, such as `.github/workflows/ci.yml`. The `push`
+   job must refuse the patch with an `::error::` naming the path, nothing may be pushed, and Claude should have commented
+   `NEEDS_DECISION:`.
+8. In the `repair` run, confirm Claude's own attempts to push (if any) fail, and that the action authenticates with
+   `CLAUDE_CODE_OAUTH_TOKEN` and the read-only workflow token.

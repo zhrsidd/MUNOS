@@ -1,6 +1,11 @@
 name: Claude review repair
 # Codex reviews with COMMENTED reviews whose inline threads carry findings, and may submit CHANGES_REQUESTED. Only the
 # pinned Codex App (numeric ID 199175422, a Bot) can start a repair, and the gate repeats that check on the current head.
+#
+# Write safety. Claude runs in the `repair` job with a read-only contents token and no push credential, so it cannot push
+# even if it ignores its instructions. The job only hands back a patch. The `push` job runs on a fresh runner, applies the
+# patch to the reviewed commit, refuses any change to a protected path, and is the only place the push token is used.
+# See CLAUDE.md and docs/AGENT_AUTOMATION.md for the protected-path list.
 on:
   pull_request_review:
     types: [submitted]
@@ -20,10 +25,13 @@ jobs:
     concurrency:
       group: claude-repair-${{ github.event.pull_request.number }}
       cancel-in-progress: false
+    # No contents: write and no secret that can push: this job runs Claude with a shell.
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
+    outputs:
+      has_patch: ${{ steps.patch.outputs.has_patch }}
     steps:
       # The gate comes from main once main has it. Before that, stage-gate.sh allows only the owner-pinned bootstrap PR at
       # its pinned tree (see docs/AGENT_AUTOMATION.md). Either way the gate never comes from an arbitrary pull request.
@@ -112,25 +120,168 @@ jobs:
         if: steps.cap.outcome == 'success'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.CLAUDE_AUTOMATION_TOKEN }}
+          # The workflow token is read-only for contents. Passing it explicitly also stops the action from exchanging for
+          # the Claude GitHub App token, which has write access. Claude therefore cannot push from this job.
+          github_token: ${{ github.token }}
           # Codex is a GitHub App, so the action rejects it unless its exact login is allowed. Nothing else is.
           allowed_bots: "chatgpt-codex-connector[bot]"
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(npm run typecheck),Bash(npm run lint),Bash(npm test:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh api graphql:*)"
+            --disallowedTools "Bash(git push:*),Bash(git remote:*),mcp__github_file_ops__commit_files,mcp__github_file_ops__delete_files"
           prompt: |
             Address only the unresolved findings from the latest Codex review on PR #${{ github.event.pull_request.number }}
             at commit ${{ github.event.review.commit_id }}. List them with the review threads on that pull request.
-            Follow AGENTS.md. Do not change anything under .github/, including the gate scripts and workflows: the gate
-            is pinned to a reviewed tree. Do not modify main, hosted Supabase, secrets, Vercel settings or any production
-            configuration, and do not run commands against a hosted database.
+            Follow AGENTS.md and the "Protected paths in automated review repairs" section of CLAUDE.md. Do not change
+            anything under .github/, CLAUDE.md, AGENTS.md or any other protected path: a separate job rejects the whole patch
+            if it touches one. Do not modify main, hosted Supabase, secrets, Vercel settings or any production configuration,
+            and do not run commands against a hosted database.
             For each finding, check it against the code. Fix it when it is actionable and in scope. Otherwise change nothing.
             Run `npm run typecheck`, `npm run lint` and `npm test`, plus any other check the change touches, and say in
             your summary which checks you could not run.
-            Commit with a subject starting `fix(review):`, push to the pull request branch, and resolve each thread you fixed.
-            Do not force-push. If a finding is ambiguous, unsafe or needs a product decision, leave its thread open and
-            comment on the pull request starting `NEEDS_DECISION:` with the reason.
+            Edit files only. Do not commit or push: the workflow turns your edits into a commit and publishes it after checking
+            them. Resolve each review thread you fixed. If a finding is ambiguous, unsafe, needs a product decision or needs a
+            change to a protected path, leave its thread open and comment on the pull request starting `NEEDS_DECISION:`
+            with the reason.
+
+      - name: Collect Claude's edits as a patch
+        id: patch
+        if: steps.cap.outcome == 'success'
+        env:
+          BASE: ${{ github.event.review.commit_id }}
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --binary --no-renames "$BASE" > "$RUNNER_TEMP/repair.patch"
+          if [ -s "$RUNNER_TEMP/repair.patch" ]; then
+            echo "has_patch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No edits were made; nothing to publish."
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Hand the patch to the push job
+        if: steps.patch.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-patch
+          path: ${{ runner.temp }}/repair.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  push:
+    needs: repair
+    if: needs.repair.result == 'success' && needs.repair.outputs.has_patch == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: claude-push-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: repair-patch
+          path: ${{ runner.temp }}/patch
+
+      # The patch is untrusted data. This step applies it to the reviewed commit and judges the result, not the patch headers.
+      # It holds no push credential. Keep the protected list in step with CLAUDE.md and docs/AGENT_AUTOMATION.md.
+      - name: Apply the patch and check every changed file
+        id: apply
+        env:
+          BASE: ${{ github.event.review.commit_id }}
+          PATCH: ${{ runner.temp }}/patch/repair.patch
+        run: |
+          set -euo pipefail
+          git config user.name "claude-review-repair"
+          git config user.email "claude-review-repair@users.noreply.github.com"
+          if [ "$(git rev-parse HEAD)" != "$BASE" ]; then
+            echo "::error::The checkout is not the reviewed commit; refusing." >&2
+            exit 1
+          fi
+          size=$(wc -c < "$PATCH")
+          if [ "$size" -gt 2000000 ]; then
+            echo "::error::The patch is $size bytes; refusing anything over 2000000." >&2
+            exit 1
+          fi
+          if ! git apply --index --binary "$PATCH"; then
+            echo "::error::The patch does not apply cleanly to the reviewed commit; refusing." >&2
+            exit 1
+          fi
+
+          # Paths are compared in lower case with a leading slash, so a dot segment is "/." and a basename is "/name".
+          protected() {
+            local p="/${1,,}"
+            case "$p" in
+              */.*|*/claude.md|*/agents.md) return 0 ;;
+              /supabase/*|/scripts/isolation-inventory/*|/scripts/vercel-ignore-build.sh) return 0 ;;
+              /vercel.json|/package.json|/package-lock.json|/next.config.*|/eslint.config.*|/tsconfig*.json) return 0 ;;
+              /lib/platform/target-guard.ts|/config/project-lifecycle.json|/docs/agent_automation.md) return 0 ;;
+            esac
+            return 1
+          }
+
+          # Raw, NUL-separated, no rename detection: a rename shows as a delete plus an add, so both paths are checked.
+          violations=0
+          entries=0
+          while IFS= read -r -d '' meta; do
+            IFS= read -r -d '' path
+            entries=$((entries + 1))
+            read -r srcmode dstmode _ _ status <<<"${meta#:}"
+            reason=""
+            case "$status" in A|M|D) ;; *) reason="unsupported change type $status" ;; esac
+            if [ "$status" != D ] && [ "$dstmode" != 100644 ]; then reason="symlink, submodule or executable file"; fi
+            if [ "$status" = M ] && [ "$srcmode" != "$dstmode" ]; then reason="file mode change"; fi
+            if protected "$path"; then reason="protected path"; fi
+            if [ -n "$reason" ]; then
+              printf -v shown '%q' "$path"
+              echo "::error::Refusing $shown ($reason)." >&2
+              violations=$((violations + 1))
+            fi
+          done < <(git diff --cached --raw -z --no-renames "$BASE")
+
+          if [ "$violations" -gt 0 ]; then
+            echo "::error::$violations change(s) refused; nothing was pushed." >&2
+            exit 1
+          fi
+          if [ "$entries" -eq 0 ]; then
+            echo "The patch changes nothing; not pushing."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -q -m "fix(review): apply the automated Codex review repair" \
+            -m "Every changed path was checked against the protected-path list before this commit was pushed."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The only step that holds the push token, and it runs only after the check above has passed.
+      - name: Push the checked repair
+        id: push
+        if: steps.apply.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CLAUDE_AUTOMATION_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.review.commit_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$HEAD_REF" ] || [ "$HEAD_REF" = main ]; then
+            echo "::error::Refusing to push to the branch '$HEAD_REF'." >&2
+            exit 1
+          fi
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_sha=$(git ls-remote "$remote" "refs/heads/$HEAD_REF" | cut -f1)
+          if [ "$remote_sha" != "$BASE" ]; then
+            echo "::error::The branch is at '$remote_sha', not the reviewed commit; nothing was pushed." >&2
+            exit 1
+          fi
+          git push "$remote" "HEAD:refs/heads/$HEAD_REF"
 
       # Codex does not re-review on its own after a push, so ask for one, once per new head.
       - name: Request a fresh Codex review of the repaired head
-        if: steps.cap.outcome == 'success'
+        if: steps.push.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.CLAUDE_AUTOMATION_TOKEN }}
           PR: ${{ github.event.pull_request.number }}

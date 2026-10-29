@@ -1,11 +1,12 @@
 name: Codex review gate tests
-# Offline checks for the Claude–Codex gate: decision logic, the shell wrapper against a fake gh, pinned identities and
-# the bootstrap staging rules.
+# Offline checks for the Claude–Codex gate: decision logic, the shell wrapper against a fake gh, pinned identities, the
+# bootstrap staging rules and the repair workflow's write safety (protected-path check and push invariants).
 on:
   pull_request:
     paths:
       - ".github/scripts/**"
       - ".github/automation-tests/**"
+      - "CLAUDE.md"
       - ".github/workflows/claude-review-repair.yml"
       - ".github/workflows/codex-reviewed-automerge.yml"
       - ".github/workflows/codex-review-gate-tests.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - ".github/scripts/**"
       - ".github/automation-tests/**"
+      - "CLAUDE.md"
       - ".github/workflows/claude-review-repair.yml"
       - ".github/workflows/codex-reviewed-automerge.yml"
       - ".github/workflows/codex-review-gate-tests.yml"
@@ -32,3 +34,5 @@ jobs:
           bash .github/scripts/test/codex-review-gate.test.sh
           bash .github/scripts/test/stage-gate.test.sh
           bash .github/automation-tests/stage-step.test.sh
+          bash .github/automation-tests/repair-push.test.sh
+          bash .github/automation-tests/repair-invariants.test.sh

@@ -12,6 +12,7 @@ workflows=("$repo/.github/workflows/claude-review-repair.yml" "$repo/.github/wor
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 failures=0
+cases=0
 
 # Writes the step's run block from a workflow to $2.
 extract_run() { # $1 workflow, $2 destination
@@ -40,7 +41,8 @@ make_head() { # $1 directory
 
 # Runs the step for one workflow in a fresh layout and checks the outcome.
 run_case() { # $1 name, $2 want ok|fail, $3 workflow index, $4 trusted has gate (yes|no), $5 pr env, $6 bootstrap pr, $7 bootstrap tree, $8 head mutator (or -)
-  local dir="$scratch/case-$RANDOM" run="$scratch/run-$RANDOM.sh" rc=0 out
+  cases=$((cases + 1))
+  local dir="$scratch/case-$cases" run="$scratch/run-$cases.sh" rc=0 out
   mkdir -p "$dir/trusted"
   if [ "$4" = yes ]; then
     mkdir -p "$dir/trusted/.github"
