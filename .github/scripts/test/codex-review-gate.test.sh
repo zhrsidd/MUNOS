@@ -75,6 +75,13 @@ check "reviewer's latest review requests changes" false false \
     | .reviews += [{id: 1, state: "CHANGES_REQUESTED", commit_id: $head, submitted_at: "2026-10-29T21:00:00Z",
         user: {login: "zhrsidd", id: 326150552, type: "User"}}]')"
 
+check "a comment-only follow-up does not clear a standing change request" false false \
+  "$(with_summary "$clean_code" | jq --arg head "$head" '.pr.draft = false | .threads |= map(.isResolved = true)
+    | .reviews += [{id: 1, state: "CHANGES_REQUESTED", commit_id: $head, submitted_at: "2026-10-29T21:00:00Z",
+        user: {login: "zhrsidd", id: 326150552, type: "User"}},
+      {id: 2, state: "COMMENTED", commit_id: $head, submitted_at: "2026-10-29T21:05:00Z",
+        user: {login: "zhrsidd", id: 326150552, type: "User"}}]')"
+
 check "Codex security review with unresolved findings on head blocks merge" false false \
   "$(with_summary "$clean_code" "{\"commit_sha\":\"$head\",\"status\":\"completed\",\"has_any_findings\":true,\"has_unresolved_findings\":true}" \
     | jq '.pr.draft = false | .threads |= map(.isResolved = true)')"

@@ -33,8 +33,10 @@ def summary_state:
 | [$in.threads[] | select(.isResolved | not)] as $open_threads
 | ([$open_threads[] | select(.first_comment_id as $c | any($codex_comments[]; . == $c))] | length) as $open_codex
 | ($open_threads | length) as $open_any
-| ([$in.reviews | group_by(.user.login) | .[] | sort_by(.submitted_at) | last
-    | select(.state == "CHANGES_REQUESTED")] | length) as $changes_requested
+# Comment-only reviews do not approve or dismiss a change request, so only decisive states set a reviewer's standing.
+| ([$in.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+    | group_by(.user.login) | map(sort_by(.submitted_at) | last | select(.state == "CHANGES_REQUESTED"))
+    | length) as $changes_requested
 | ([$in.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context]) as $checks
 | (any($checks[]; . == "verify") and any($checks[]; . == "codex-review-gate") and $in.branch_protected == true) as $verify_required
 | ($same_repo and $base_main and $open) as $targetable
