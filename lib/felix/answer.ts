@@ -53,9 +53,8 @@ export function situation(ctx: FelixContext): string {
   const count = (...statuses: string[]) => ctx.documents.filter(d => statuses.includes(d.status)).length;
   if (ctx.role === "chair" && ctx.chair) {
     const c = ctx.chair;
-    if (!c.sessionName) return `${c.committeeCode ?? "Your committee"}: no current session selected.`;
-    const roll = c.delegates === 0 ? "no delegates in this committee yet" : c.marked === 0 ? "roll call not started" : `roll call ${c.marked}/${c.delegates} marked, ${c.present} present`;
-    return `${c.committeeCode ?? "Your committee"} · ${c.sessionName}: ${roll}; ${c.speaking ? "a speaker has the floor" : "the floor is with the Chair"}${c.queued ? `; ${c.queued} queued to speak` : ""}${c.inDebate ? `; ${c.inDebate} is in debate` : ""}.`;
+    const roll = c.delegates === 0 ? "no delegates in this committee yet" : c.marked === 0 ? "no roll call yet" : `roll call ${c.present} of ${c.delegates} present`;
+    return `${c.committeeCode ?? "Your committee"}${c.sessionName ? ` · ${c.sessionName}` : ""}: ${roll}; ${c.speaking ? "a speaker has the floor" : "the floor is with the Chair"}${c.queued ? `; ${c.queued} queued to speak` : ""}${c.inDebate ? `; ${c.inDebate} is in debate` : ""}.`;
   }
   if (ctx.role === "approval") return `Review inbox: ${count("Submitted")} waiting to start review, ${count("Review")} in review.`;
   if (ctx.role === "logistics") return `Print queue: ${count("Approved")} approved resolution${count("Approved") === 1 ? "" : "s"} waiting to print.`;
