@@ -341,3 +341,57 @@ test('real PostgreSQL: roll calls follow the attendance boundary - Approval Pane
   await as(print);assert.equal((await db.query('select 1 from public.attendance')).rows.length,0);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a bulk change takes one instant - every version and every override ending share it, and resolving exactly then gives the schedule',async()=>{
+ const {db,ids,ops,at,sessionOf,S,query,asOwner}=await setup();
+ try{
+  const run=async(bulk:Record<string,unknown>)=>{
+   await ops(exec,{type:'scheduleVersion',reason:'All'});
+   for(const c of [ids.ga1,ids.who]){
+    await ops(exec,{type:'automationToggle',committeeId:c,enabled:false,reason:'Manual'});
+    await ops(exec,{type:'overrideSet',scope:'committee',committeeId:c,sessionId:await sessionOf(S.S5,c)});
+   }
+   await ops(exec,{type:'overrideSet',scope:'conference',slotId:S.S6});
+   await ops(exec,bulk);
+   await asOwner();
+   const latest=await query<{committee_id:string;t:string}>('select distinct on (committee_id) committee_id,effective_from t from public.schedule_version where reason=$1 order by committee_id,effective_from desc',['Bulk enable']);
+   const instants=new Set(latest.map(r=>new Date(r.t).getTime()));
+   assert.equal(latest.length,2,'GA1 and WHO were off, so only they changed state');
+   assert.equal(instants.size,1,'one effective_from for every committee in the bulk change');
+   const eff=[...instants][0];
+   const ends=await query<{t:string}>('select ended_at t from public.session_override_end',[]);
+   assert.ok(ends.length>=3);
+   assert.deepEqual([...new Set(ends.map(r=>new Date(r.t).getTime()))],[eff],'every override ends at that same instant');
+   for(const c of [ids.ga1,ids.who]){
+    assert.equal((await at(c,new Date(eff-1).toISOString())).source,'override','one millisecond earlier the manual override still applies');
+    assert.equal((await at(c,new Date(eff).toISOString())).source,'schedule','exactly at the instant the schedule applies');
+   }
+  };
+  await run({type:'automationToggle',enabled:true,reason:'Bulk enable'});
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: bulk schedule publication takes one instant for its versions and the override endings it causes',async()=>{
+ const {db,ids,ops,at,sessionOf,S,query,asOwner}=await setup();
+ try{
+  await ops(exec,{type:'scheduleVersion',reason:'All'});
+  for(const c of [ids.ga1,ids.who]){
+   await ops(exec,{type:'automationToggle',committeeId:c,enabled:false,reason:'Manual'});
+   await ops(exec,{type:'overrideSet',scope:'committee',committeeId:c,sessionId:await sessionOf(S.S5,c)});
+  }
+  await ops(exec,{type:'scheduleVersion',automationEnabled:true,reason:'Bulk publish'});
+  await asOwner();
+  const rows=await query<{committee_id:string;t:string}>(`select committee_id,effective_from t from public.schedule_version where reason='Bulk publish'`,[]);
+  assert.ok(rows.length>2);
+  const eff=new Set(rows.map(r=>new Date(r.t).getTime()));
+  assert.equal(eff.size,1,'one effective_from for every committee in the bulk publication');
+  const ends=await query<{t:string}>('select ended_at t from public.session_override_end',[]);
+  assert.equal(ends.length,2);
+  assert.deepEqual([...new Set(ends.map(r=>new Date(r.t).getTime()))],[...eff]);
+  const t=[...eff][0];
+  for(const c of [ids.ga1,ids.who]){
+   assert.equal((await at(c,new Date(t-1).toISOString())).source,'override');
+   assert.equal((await at(c,new Date(t).toISOString())).source,'schedule');
+  }
+ }finally{await db.close();}
+});

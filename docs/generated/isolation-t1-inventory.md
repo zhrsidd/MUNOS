@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 31 files, combined SHA-256 `3d919e8a23c8fee4`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 31 files, combined SHA-256 `182e605862347fde`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -81,7 +81,7 @@ Executed in the disposable database after the inventory was read:
 | `private.link_decision_comment()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.lock_lifecycle()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.materialize_new_committee_slots()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
-| `private.next_effective_from(cid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
+| `private.next_effective_from(conf uuid, target uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.next_resolution_code(conf uuid, committee uuid)` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.ops_automation_toggle(conf uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.ops_clock_confirm(conf uuid, actor uuid, new_id uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |

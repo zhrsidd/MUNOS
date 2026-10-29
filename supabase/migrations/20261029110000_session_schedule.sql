@@ -359,10 +359,13 @@ begin
   return out;
 end $$;
 
--- A new version's effective_from: server time at publish, strictly after the committee's previous version.
-create function private.next_effective_from(cid uuid) returns timestamptz
+-- The effective_from of one change: server time at publish, strictly after every previous version in scope. A bulk change (target
+-- null: every committee) takes ONE instant for all its versions and for the override endings it causes, so resolving exactly at that
+-- instant gives the same answer everywhere.
+create function private.next_effective_from(conf uuid, target uuid) returns timestamptz
 language sql volatile set search_path='' as $$
-  select greatest(date_trunc('milliseconds', clock_timestamp()), coalesce((select max(effective_from) + interval '1 millisecond' from public.schedule_version where committee_id = cid), '-infinity'::timestamptz))
+  select greatest(date_trunc('milliseconds', clock_timestamp()), coalesce((select max(effective_from) + interval '1 millisecond' from public.schedule_version
+                                                                            where conference_id = conf and (target is null or committee_id = target)), '-infinity'::timestamptz))
 $$;
 
 -- Enabling automation ends every manual override in scope at that moment, by appending end events (nothing is rewritten).
@@ -392,7 +395,7 @@ declare
   grace integer := coalesce((command->>'graceMinutes')::integer, 20);
   auto boolean := coalesce((command->>'automationEnabled')::boolean, true);
   why text := btrim(command->>'reason');
-  c uuid; snapshot jsonb; errors jsonb; eff timestamptz; latest timestamptz; affected uuid[] := '{}';
+  c uuid; snapshot jsonb; errors jsonb; eff timestamptz := private.next_effective_from(conf, target); affected uuid[] := '{}';
 begin
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
   if command ? 'slotLeads' and jsonb_typeof(command->'slotLeads') is distinct from 'object' then raise exception 'slotLeads must be an object' using errcode = '22023'; end if;
@@ -400,14 +403,12 @@ begin
     snapshot := private.ops_schedule_snapshot(conf, c, command->'slotLeads');
     errors := private.session_schedule_errors(snapshot, lead, grace);
     if jsonb_array_length(errors) > 0 then raise exception 'Schedule rejected: %', errors::text using errcode = '22023'; end if;
-    eff := private.next_effective_from(c);
     insert into public.schedule_version(conference_id, committee_id, effective_from, changed_by, reason, lead_minutes, grace_minutes, automation_enabled, sessions)
     values (conf, c, eff, actor, why, lead, grace, auto, snapshot);
-    latest := greatest(latest, eff);
     affected := affected || c;
   end loop;
   if target is not null and coalesce(array_length(affected, 1), 0) = 0 then raise exception 'Committee unavailable' using errcode = '22023'; end if;
-  if auto and latest is not null then perform private.end_overrides(conf, target, latest); end if;
+  if auto and coalesce(array_length(affected, 1), 0) > 0 then perform private.end_overrides(conf, target, eff); end if;
   return affected;
 end $$;
 
@@ -421,7 +422,7 @@ declare
   target uuid := private.uuid_or_null(command->>'committeeId');
   want boolean := (command->>'enabled')::boolean;
   why text := btrim(command->>'reason');
-  c uuid; prev public.schedule_version; eff timestamptz; latest timestamptz; affected uuid[] := '{}';
+  c uuid; prev public.schedule_version; eff timestamptz := private.next_effective_from(conf, target); affected uuid[] := '{}';
 begin
   if want is null then raise exception 'enabled must be true or false' using errcode = '22023'; end if;
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
@@ -433,14 +434,12 @@ begin
       continue;
     end if;
     continue when prev.automation_enabled = want;
-    eff := private.next_effective_from(c);
     insert into public.schedule_version(conference_id, committee_id, effective_from, changed_by, reason, lead_minutes, grace_minutes, automation_enabled, sessions)
     values (conf, c, eff, actor, why, prev.lead_minutes, prev.grace_minutes, want, prev.sessions);
-    latest := greatest(latest, eff);
     affected := affected || c;
   end loop;
   if want then
-    perform private.end_overrides(conf, target, coalesce(latest, date_trunc('milliseconds', clock_timestamp())));
+    perform private.end_overrides(conf, target, eff);
     -- Committees whose overrides ended without a new version still need their devices told.
     affected := affected || array(select id from public.committees where conference_id = conf and not archived and (target is null or id = target) and not id = any(affected));
   end if;
@@ -553,6 +552,6 @@ end $patch$;
 -- Internal helpers: no API-role EXECUTE (new functions have none by default; made explicit here).
 revoke all on function private.conference_time_zone(uuid), private.reject_append_only_change(), private.final_label(text, uuid),
   private.session_versions_for(uuid, uuid), private.session_overrides_for(uuid, uuid), private.committee_session_at(uuid, uuid, timestamptz),
-  private.ops_schedule_snapshot(uuid, uuid, jsonb), private.next_effective_from(uuid), private.end_overrides(uuid, uuid, timestamptz), private.ops_schedule_version(uuid, uuid, jsonb),
+  private.ops_schedule_snapshot(uuid, uuid, jsonb), private.next_effective_from(uuid, uuid), private.end_overrides(uuid, uuid, timestamptz), private.ops_schedule_version(uuid, uuid, jsonb),
   private.ops_automation_toggle(uuid, uuid, jsonb), private.ops_override_set(uuid, uuid, uuid, jsonb), private.ops_label_correction(uuid, uuid, uuid, jsonb),
   private.ops_clock_confirm(uuid, uuid, uuid, jsonb) from public, anon, authenticated, service_role;

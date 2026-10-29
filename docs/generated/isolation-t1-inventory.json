@@ -33,7 +33,7 @@
   "20261029100000_session_window.sql",
   "20261029110000_session_schedule.sql"
  ],
- "migrationsSha256": "3d919e8a23c8fee4d5f4a6f83f409b81fc42b1932cb44160022f53397c9f8b66",
+ "migrationsSha256": "182e605862347fdec2dcb76354fdc257748f1eb5e5e96682cd900c534ea41ca1",
  "supabase-model": {
   "fns": [
    {
@@ -729,7 +729,7 @@
    {
     "schema": "private",
     "name": "next_effective_from",
-    "args": "cid uuid",
+    "args": "conf uuid, target uuid",
     "result": "timestamp with time zone",
     "kind": "f",
     "security": "invoker",
@@ -5444,7 +5444,7 @@
    {
     "schema": "private",
     "name": "next_effective_from",
-    "args": "cid uuid",
+    "args": "conf uuid, target uuid",
     "result": "timestamp with time zone",
     "kind": "f",
     "security": "invoker",

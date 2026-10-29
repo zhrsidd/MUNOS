@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 31 files, combined SHA-256 `3d919e8a23c8fee4`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 31 files, combined SHA-256 `182e605862347fde`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -75,7 +75,7 @@ Executed in the disposable database after the inventory was read:
 | `private.link_decision_comment()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.lock_lifecycle()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.materialize_new_committee_slots()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
-| `private.next_effective_from(cid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
+| `private.next_effective_from(conf uuid, target uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.next_resolution_code(conf uuid, committee uuid)` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.ops_automation_toggle(conf uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.ops_clock_confirm(conf uuid, actor uuid, new_id uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
