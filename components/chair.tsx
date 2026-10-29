@@ -1,4 +1,5 @@
 "use client";
+import { atOrAfter, instant } from "@/lib/sessions/presence";
 import { AmendmentInbox } from "./amendments/inbox";
 import { PassedAmendmentHistory } from "./amendments/history";
 import {DebateConsole} from "./debate-console";
@@ -94,8 +95,8 @@ export function ChairScreen({
     (r) => r.committeeId === committeeId && r.status === "In Debate",
   );
   const events = data.events
-    .filter((e) => e.committeeId === committeeId && (!since || e.createdAt >= since) && !e.voidedAt)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .filter((e) => e.committeeId === committeeId && atOrAfter(e.createdAt, since) && !e.voidedAt)
+    .sort((a, b) => instant(b.createdAt) - instant(a.createdAt));
   const detail = delegates.find((d) => d.id === selected);
   const edit = data.events.find((e) => e.id === eventEdit);
   const voteList = data.votes.filter(
@@ -140,7 +141,7 @@ export function ChairScreen({
           <div className="metrics">
             <Metric value={contributionCount(events)} label="Contributions this session" />
             <Metric
-              value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && (!since || a.createdAt >= since)).reduce((m, a) => m + a.points, 0), 0)}
+              value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && atOrAfter(a.createdAt, since)).reduce((m, a) => m + a.points, 0), 0)}
               label="Points awarded this session (net)"
             />
             <Metric

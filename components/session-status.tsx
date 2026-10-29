@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useConference } from "@/lib/context";
 import { displayedResolution } from "@/lib/sessions/display";
-import { rollCallAt } from "@/lib/sessions/presence";
+import { atOrAfter, rollCallAt } from "@/lib/sessions/presence";
 import { zonedTime } from "@/lib/operations/time";
 
 /** The session the schedule gives this committee now (docs/SESSION_MODEL.md section 7), re-read every 30 seconds. Display only. */
@@ -31,7 +31,7 @@ export function RollCallPrompt({ committeeId }: { committeeId: string }) {
   const { resolution, session } = useCommitteeSession(committeeId);
   if (!session || !resolution?.windowStart) return null;
   const live = rollCallAt(data, committeeId);
-  if (live && live.effectiveAt >= resolution.windowStart) return null;
+  if (live && atOrAfter(live.effectiveAt, resolution.windowStart)) return null;
   return (
     <div className="callout small" role="status">
       <div>

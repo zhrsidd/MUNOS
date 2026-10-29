@@ -1,5 +1,6 @@
 import { countryKey, countrySearchNames } from "./countries";
 import type { Delegate, ParticipationEvent } from "./domain";
+import { atOrAfter } from "./sessions/presence";
 
 export type OpportunityCounts = Record<string, { speeches: number; pois: number }>;
 export type OpportunityKind = "speeches" | "pois";
@@ -11,7 +12,7 @@ export type OpportunityKind = "speeches" | "pois";
 export function sessionOpportunities(events: ParticipationEvent[], committeeId: string, since?: string | null): OpportunityCounts {
   const counts: OpportunityCounts = {};
   for (const event of events) {
-    if (event.committeeId !== committeeId || (since && event.createdAt < since) || event.voidedAt || !["speech", "poi"].includes(event.categoryId)) continue;
+    if (event.committeeId !== committeeId || (since && !atOrAfter(event.createdAt, since)) || event.voidedAt || !["speech", "poi"].includes(event.categoryId)) continue;
     const row = counts[event.delegateId] ??= { speeches: 0, pois: 0 };
     row[event.categoryId === "speech" ? "speeches" : "pois"]++;
   }

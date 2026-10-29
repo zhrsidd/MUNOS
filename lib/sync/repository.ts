@@ -6,7 +6,7 @@ import type { ConferenceData, Role } from "../domain";
 import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
 import { committeeOfCommand, displayedLabel } from "../sessions/display";
-import { isLive } from "../sessions/presence";
+import { isLive, withRollCallReference } from "../sessions/presence";
 import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
   actorId: string;
@@ -127,7 +127,8 @@ export class DurableRepository implements ConferenceRepository {
     if (!this.data) throw Error("Workspace is still loading.");
     // The single queue/apply boundary: normalise BEFORE the fingerprint, the local apply and the persisted outbox entry,
     // so the queued JSON, its replay and the server's idempotent retry are identical (a title-less create never reaches SQL).
-    const command = normalizeCommand(raw);
+    const stamped = new Date().toISOString();
+    const command = withRollCallReference(this.data, committeeOfCommand(this.data, raw), normalizeCommand(raw), stamped);
     if(!this.transport && serverOnlyCommandTypes.has(command.type)) throw Error("Schedule and review changes are made on the live conference database.");
     // A transaction commits before any optimistic state or successful-save message is visible.
     const mutation: Mutation={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:this.transport?.actorId ?? `${role}-demo`,role,command,expected:fingerprint(this.data,command),state:"pending"};

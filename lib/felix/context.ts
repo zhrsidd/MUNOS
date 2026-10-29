@@ -5,7 +5,7 @@ import { committeePhotoReminders, type PhotoStage } from "../operations/photo-re
 import { sentBack } from "../resolution-view";
 import { resolutionIdentities, resolutionLabel } from "../resolution-identity";
 import { displayedResolution } from "../sessions/display";
-import { isLive, rollCallAt } from "../sessions/presence";
+import { before, isLive, rollCallAt } from "../sessions/presence";
 
 /** A group photo that needs the Chair's attention right now (already derived by the Chair's photo banner rules). */
 export type FelixPhoto = { slotId: string; revision: number; stage: PhotoStage; school: string; location: string; minutesUntil: number; delegates: number };
@@ -92,7 +92,7 @@ export function felixContext(data: ConferenceData, role: Role, committeeId?: str
       delegates: delegates.length,
       marked: marks.length,
       present: marks.filter(a => a.status !== "Absent").length,
-      rollCallDue: !live || (!!session && !!schedule?.windowStart && live.effectiveAt < schedule.windowStart),
+      rollCallDue: !live || (!!session && !!schedule?.windowStart && before(live.effectiveAt, schedule.windowStart)),
       speaking: (data.speeches ?? []).some(s => isLive(s, id) && s.state !== "finished"),
       queued: data.queue.filter(q => isLive(q, id)).length,
       inDebate: inDebate && labelOf(inDebate).text,
