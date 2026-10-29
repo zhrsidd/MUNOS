@@ -22,7 +22,8 @@ export function parseStaffProfile(raw?: string): StaffProfile {
 export type Role = StaffRole | "delegate";
 export type Action =
   | "open" | "read" | "refocus" | "health"
-  | "currentSession" | "attendance" | "queueAdd" | "queueOrder"
+  /** draft: marking a delegate in a roll call draft on the device (no network); rollCall: committing the whole roll call. */
+  | "draft" | "rollCall" | "queueAdd" | "queueOrder"
   | "speechStart" | "speechScore" | "poiAllowance" | "poiAdd" | "poiRecognize" | "poiScore" | "speechFinish"
   | "timer" | "photoAck" | "sendToApproval" | "approve" | "print"
   | "submitPage" | "submit";
@@ -60,7 +61,7 @@ export const WRITER_READS_PER_WRITE = 3;
 // ---- Realtime topics -------------------------------------------------------------------------------------------
 // operational_changes.topic emitted by the server for each simulated write, from the function definitions:
 //  * private.apply_procedure (20261006023111_chair_procedure.sql): every procedure command → 'chair'.
-//  * private.apply_mutation (20261006073442_staff_chair_contacts.sql): default 'chair' (attendance, participation,
+//  * private.apply_mutation (20261006073442_staff_chair_contacts.sql, rekeyed 20261031090000): default 'chair' (rollCallCommit, participation,
 //    queue, vote …); document/version/newDocument → 'documents'; setup/staff commands → 'configuration';
 //    kind = 'timer' emits NOTHING (`if kind<>'timer' then insert …`).
 //  * private.apply_operations_mutation (20261006023108_operations_review_hardening.sql): photoAck → 'chair',
@@ -69,7 +70,7 @@ export const WRITER_READS_PER_WRITE = 3;
 // The committee_id of the event is the writer's committee (documents: the document's committee).
 export type Topic = "chair" | "documents" | "configuration";
 export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
-  currentSession: "chair", attendance: "chair", queueAdd: "chair", queueOrder: "chair",
+  rollCall: "chair", draft: null, queueAdd: "chair", queueOrder: "chair",
   speechStart: "chair", speechScore: "chair", poiAllowance: "chair", poiAdd: "chair", poiRecognize: "chair", poiScore: "chair", speechFinish: "chair",
   photoAck: "chair", timer: null,
   sendToApproval: "documents", approve: "documents", print: "documents", submit: "documents",
@@ -131,9 +132,11 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
       return true;
     };
     if (role === "chair") {
-      if (floor && !push(between(3, 6), "currentSession")) return { id, role, committee, floor, start, steps };
-      // Roll call at the start of the session: a handful of delegates, a few seconds apart.
-      for (let i = 0; i < 8 && push(between(3, 8), "attendance"); i++);
+      // Sessions follow the schedule: no Chair selects one. Steps keep the earlier timing and random stream (a draft is not a READ, so
+      // it draws the same retry number the session selection and attendance writes did), so the public burst stays stable.
+      if (floor && !push(between(3, 6), "draft")) return { id, role, committee, floor, start, steps };
+      // Roll call at the start of the session: delegates marked in a draft a few seconds apart, then ONE commit.
+      for (let i = 0; i < 8 && push(between(3, 8), i === 7 ? "rollCall" : "draft"); i++);
       if (floor) {
         // The floor: add speakers, call them from the queue, score, sometimes POIs, finish. Speeches last 30–90 s.
         let ok = true;
@@ -144,7 +147,7 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
           if (ok && random() < 0.4) ok = push(between(20, 40), "poiAllowance") && push(between(3, 10), "poiAdd") && push(between(10, 30), "poiRecognize");
           ok = ok && push(between(30, 60), "speechScore") && push(between(3, 8), "speechFinish");
         }
-      } else while (push(between(20, 60), pick<Action>([["queueAdd", 45], ["attendance", 20], ["refocus", 25], ["timer", 5], ["photoAck", 5]])));
+      } else while (push(between(20, 60), pick<Action>([["queueAdd", 45], ["draft", 18], ["rollCall", 2], ["refocus", 25], ["timer", 5], ["photoAck", 5]])));
     } else if (role === "approval") while (push(between(30, 90), pick<Action>([["read", 70], ["approve", 30]])));
     else if (role === "admins") while (push(between(45, 120), pick<Action>([["read", 70], ["print", 30]])));
     else while (push(between(45, 90), pick<Action>([["read", 60], ["health", 40]])));
