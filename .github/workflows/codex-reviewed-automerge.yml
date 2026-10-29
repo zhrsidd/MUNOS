@@ -1,0 +1,43 @@
+name: Codex reviewed auto-merge
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to re-evaluate
+        required: true
+        type: number
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved') &&
+      vars.CODEX_REVIEWER_LOGIN != ''
+    steps:
+      - name: Require current-head Codex approval and protected main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+          REVIEWER: ${{ vars.CODEX_REVIEWER_LOGIN }}
+        run: |
+          set -euo pipefail
+          branch=$(gh api "repos/$REPO/branches/main" --jq '.protected')
+          test "$branch" = true || { echo "main is not protected; refusing"; exit 1; }
+          gh api "repos/$REPO/branches/main/protection" >/dev/null || { echo "Cannot verify branch protection; refusing"; exit 1; }
+          data=$(gh api "repos/$REPO/pulls/$PR")
+          test "$(echo "$data" | jq -r '.base.ref')" = main
+          test "$(echo "$data" | jq -r '.head.repo.full_name')" = "$REPO"
+          test "$(echo "$data" | jq -r '.draft')" = false
+          sha=$(echo "$data" | jq -r '.head.sha')
+          test "$(echo "$data" | jq -r '.state')" = open
+          gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" > /tmp/reviews.json
+          jq -e --arg login "$REVIEWER" --arg sha "$sha" '
+            [.[] | select(.user.login == $login)] | last |
+            (.state == "APPROVED" and .commit_id == $sha)
+          ' /tmp/reviews.json >/dev/null || { echo "No current-head Codex approval"; exit 1; }
+          gh pr merge "$PR" --repo "$REPO" --auto --squash --delete-branch
