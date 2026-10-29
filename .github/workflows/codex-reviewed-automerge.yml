@@ -4,7 +4,8 @@ name: Codex reviewed auto-merge
 # cancels auto-merge. A comment or review alone never enables it.
 on:
   pull_request_review:
-    types: [submitted]
+    # dismissed: removing a blocking review must re-evaluate the head, or a stale failing status stays in place.
+    types: [submitted, dismissed]
   pull_request_review_comment:
     types: [created, edited, deleted]
   issue_comment:
