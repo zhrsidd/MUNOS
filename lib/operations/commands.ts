@@ -30,7 +30,19 @@ export type OperationsCommand =
   /** A Chair's school for group photos; null clears it. */
   | { type: "staffSchool"; staffId: string; schoolId: string | null }
   | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
-  | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string };
+  | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string }
+  /**
+   * Session schedule (docs/SESSION_MODEL.md 12.4). Executive only, applied by the database; the offline demo has no schedule data.
+   * committeeId absent means every active committee. Lead and grace are parameters (defaults 5 and 20, grace still proposed).
+   */
+  | { type: "scheduleVersion"; committeeId?: string; leadMinutes?: number; graceMinutes?: number; automationEnabled?: boolean; slotLeads?: Record<string, number>; reason: string }
+  | { type: "automationToggle"; committeeId?: string; enabled: boolean; reason: string }
+  /** Committee scope names one of its sessions; conference scope names a central slot and each committee resolves its own session in it. */
+  | { type: "overrideSet"; scope: "committee"; committeeId: string; sessionId: string }
+  | { type: "overrideSet"; scope: "conference"; slotId: string }
+  /** `label: null` corrects the record to "no session" (distinct from never corrected). */
+  | { type: "labelCorrection"; recordTable: string; recordId: string; label: string | null; reason: string }
+  | { type: "clockConfirm"; deviceId: string; offsetMs: number; reason: string };
 export interface PhotoSlotFields {
   schoolId: string;
   startsAt: string;
@@ -40,7 +52,7 @@ export interface PhotoSlotFields {
   enabled?: boolean;
   warnMinutes?: number;
 }
-export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool"] as const satisfies readonly OperationsCommand["type"][];
+export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool", "scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
   resolutionLink: ["chair", "admin"],
@@ -50,6 +62,11 @@ export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   photoAck: ["chair"],
   pointAdjustment: ["chair"],
   staffSchool: ["admin"],
+  scheduleVersion: ["admin"],
+  automationToggle: ["admin"],
+  overrideSet: ["admin"],
+  labelCorrection: ["admin"],
+  clockConfirm: ["admin"],
 };
 export const MAX_DEDUCTION = 20;
 export const REASON_MIN = 3;
@@ -194,6 +211,12 @@ export function applyOperationsCommand(
       }
       break;
     }
+    case "scheduleVersion":
+    case "automationToggle":
+    case "overrideSet":
+    case "labelCorrection":
+    case "clockConfirm":
+      throw Error("Schedule changes are made on the live conference database.");
     case "staffSchool": {
       const staff = d.staff.find((s) => s.id === c.staffId);
       if (!staff || staff.role !== "chair") throw Error("Choose a Chair.");

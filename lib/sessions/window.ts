@@ -51,8 +51,11 @@ export interface SessionOverride {
   id: string;
   scope: "committee" | "conference";
   committeeId?: string | null;
-  /** The label the override sets. Opaque here: a conference-scope override carries whatever label the Executive chose. */
-  sessionId: string;
+  /**
+   * The label the override sets, already resolved for this committee. A conference-scope override names a central slot; the caller
+   * maps it to the committee's own session in that slot, or null when the committee has none (then: no session, flagged).
+   */
+  sessionId: string | null;
   setAt: string;
   expiresAt?: string | null;
   endedAt?: string | null;
@@ -180,7 +183,7 @@ export function resolveSession(input: { versions: ScheduleSnapshot[]; overrides?
     .sort((a, b) => Number(b.scope === "committee") - Number(a.scope === "committee") || Date.parse(b.setAt) - Date.parse(a.setAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   if (active.length) {
     const o = active[0];
-    return { sessionId: o.sessionId, source: "override", flag: null, windowStart: null, windowEnd: null, nextSwitchAt: iso(overrideEnds(o, timeZone)) };
+    return { sessionId: o.sessionId, source: "override", flag: o.sessionId === null ? "no_session" : null, windowStart: null, windowEnd: null, nextSwitchAt: iso(overrideEnds(o, timeZone)) };
   }
   const version = versionInEffect(input.versions, input.at);
   if (!version || !version.automationEnabled) return { sessionId: null, source: "none", flag: "no_session", windowStart: null, windowEnd: null, nextSwitchAt: null };

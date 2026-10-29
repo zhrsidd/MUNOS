@@ -2240,6 +2240,52 @@
     "source": "none",
     "flag": "no_session"
    }
+  },
+  {
+   "name": "conference override mapped to a committee with no session in that slot: no session, flagged, schedule not used",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-16T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": true,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [
+    {
+     "id": "k1",
+     "scope": "conference",
+     "committeeId": null,
+     "sessionId": null,
+     "setAt": "2026-10-17T12:00:00+03:00",
+     "expiresAt": "2026-10-17T12:25:00+03:00",
+     "endedAt": null
+    }
+   ],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:10:00+03:00",
+   "expect": {
+    "sessionId": null,
+    "source": "override",
+    "flag": "no_session"
+   }
   }
  ],
  "overrideExpiryCases": [
