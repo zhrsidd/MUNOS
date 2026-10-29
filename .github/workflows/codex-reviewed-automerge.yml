@@ -35,7 +35,7 @@ jobs:
           test "$(echo "$data" | jq -r '.draft')" = false
           sha=$(echo "$data" | jq -r '.head.sha')
           test "$(echo "$data" | jq -r '.state')" = open
-          gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" > /tmp/reviews.json
+          gh api "repos/$REPO/pulls/$PR/reviews?per_page=100" > /tmp/reviews.json
           jq -e --arg login "$REVIEWER" --arg sha "$sha" '
             [.[] | select(.user.login == $login)] | last |
             (.state == "APPROVED" and .commit_id == $sha)
