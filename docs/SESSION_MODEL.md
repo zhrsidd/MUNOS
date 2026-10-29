@@ -1,6 +1,6 @@
 # Session model: sessions are a schedule that labels records (contract draft v3)
 
-**Status:** draft contract v3 with the owner-confirmed 5-minute lead (29 Oct 2026) and an implementation plan in §12, issued on the owner's instruction to implement from this document. Schema, RLS and sync changes still go through the review gates in `AGENTS.md`. Implementation has not started yet. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
+**Status:** draft contract v3 with the owner-confirmed 5-minute lead (29 Oct 2026) and an implementation plan in §12, issued on the owner's instruction to implement from this document. Schema, RLS and sync changes still go through the review gates in `AGENTS.md`. Implementation is in progress on branch `claude/session-model`: phase 1 (the pure window function) is done, see §12.13. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
 
 ## 1. Decisions and their provenance
 
@@ -297,3 +297,14 @@ Do the phases in this order. Each one must pass its tests before the next starts
 - The §3, §4 and §6 vectors pass in TypeScript and SQL, and the migration replays from empty.
 - The authorisation tests, the updated existing tests and the browser checks pass.
 - Anything not done is listed in §11 rather than left implicit.
+
+### 12.13 Implementation log
+
+**Phase 1: pure window function (done).** `lib/sessions/window.ts` (TypeScript) and `supabase/migrations/20261029100000_session_window.sql` (SQL, schema `private`, no API-role grants, no tables) implement the §3 window rule, publish validation, version-in-effect, override expiry and override/automation resolution. Both run the same vectors, `tests/fixtures/session-window-vectors.json`, in `tests/session-window.test.ts` and `tests/session-window-db.test.ts`. Lead and grace are parameters of the schedule version (defaults 5 and 20; the 20 is still proposed). Choices the document did not settle, recorded here and to be confirmed:
+
+- A lead that reaches back past local midnight is clamped to the start of the day: a window never crosses a day boundary.
+- A window that would be empty (an Executive close-day before the switch) is dropped. The previous window still ends at that switch, as the rule says.
+- The Executive close-day applies to the last session of the day only, as written in §3.
+- Override ties (same scope, same `set_at`) go to the higher id. Every override ends at the next local midnight after it was set.
+- A conference-scope override carries an opaque label (`sessionId`). Which label a conference-wide override sets for committees with different session ids is not defined in §3 and needs an owner decision before phase 2.
+- The "label differs from the device's" flag in the §3 worked case belongs to phase 3, where `displayed_label` exists. Phase 1 covers the assignment half of that vector.
