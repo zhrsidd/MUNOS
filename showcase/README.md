@@ -44,3 +44,7 @@ The site still carries staging `noindex, nofollow` metadata. Remove that tag in 
 ## Previous GitHub Pages preparation
 
 An earlier static snapshot was pushed to gh-pages. Pages activation was blocked by HTTP 403 and the site was never enabled. That branch is not the deployment source for Cloudflare and is not updated by this change.
+
+## Conference references
+
+The compact conference-history section names DCMUN XVIII and PHESMUN X as requested by the owner. Conference logos retain their original artwork/colours and identify their respective conferences. DCMUN seal copied unchanged from this repository's public/dcmun-logo.jpg. PHESMUN seal copied unchanged from zhrsidd/PHESMUNOS, public/phesmun-logo.png, main commit 73e337e62cecb870e906500cbe12779ec12c4c80. Copies are served locally from public/conferences; no GitHub authentication or hotlink is needed by visitors.

@@ -34,3 +34,7 @@
 - Added munos-symbol.svg and munos-logo.svg; replaced favicon.svg, munos-logo.png and both brand-sheet formats. The same canonical mark group is present once in every SVG, checked with XML comparison. All SVG artwork and lettering are vectors: no embedded raster images, gradients or font dependencies. PNGs exported directly from the final SVGs: logo 870×240 with transparency, brand sheet 1600×1000.
 - Header, footer and brand panel reference the new SVG lockup. Favicon URL versioned to refresh older browser-tab caches. Brand documentation and alternative text updated.
 - Four Playwright browser tests passed, including 320px mobile layout. Logo, favicon and brand PNGs visually inspected. Standalone build and vector/PNG consistency checks passed. Full application test-suite limitation remains as recorded above.
+
+## Conference references
+
+Added a compact “Conferences this was used at” section below the hero with DCMUN XVIII and PHESMUN X, as requested by the owner. Copied the DCMUN seal locally and retrieved PHESMUN's unmodified logo from zhrsidd/PHESMUNOS/public/phesmun-logo.png. Browser-verified both images decode and the section fits desktop and 320px mobile; screenshots inspected. Four existing browser tests, typecheck, lint and both builds passed. No conference application changes or new full-suite run; prior native Node/V8 test limitation remains above.

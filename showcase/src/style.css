@@ -37,3 +37,12 @@ body{background:var(--white)}a:focus-visible,button:focus-visible,[tabindex]:foc
 .wordmark{display:inline-flex;align-items:center}.brand-lockup{width:144px;height:auto;display:block}.logo-frame{padding-top:30px}.logo-frame>img{width:100%;padding:24px 30px 50px;aspect-ratio:3/1;object-fit:contain}.logo-frame>span{padding:16px 20px}
 @media(max-width:760px){.brand-lockup{width:112px}.logo-frame>img{padding:16px 20px 30px}.logo-frame{padding-top:16px}}
 @media(max-width:380px){.brand-lockup{width:92px}}
+
+/* A compact conference reference row; each conference retains its own identity. */
+.conference-history{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:center;gap:48px;padding:32px var(--space);background:var(--white);border-bottom:1px solid var(--line)}
+.conference-history h2{font-size:25px;line-height:1.2;letter-spacing:-.6px;margin:0}
+.conference-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;list-style:none;padding:0;margin:0}
+.conference-entry{display:flex;align-items:center;gap:20px;min-width:0;font-size:17px;font-weight:500;color:var(--ink)}
+.conference-entry img{display:block;flex:none;object-fit:contain;width:64px;height:64px}
+@media(max-width:900px){.conference-history{grid-template-columns:1fr;gap:24px}.conference-history h2{font-size:24px}.conference-history h2 br{display:none}}
+@media(max-width:480px){.conference-history{padding-top:28px;padding-bottom:28px}.conference-history h2{font-size:23px}.conference-list{gap:16px}.conference-entry{gap:12px;font-size:14px;line-height:1.4}.conference-entry img{width:48px;height:48px}}
