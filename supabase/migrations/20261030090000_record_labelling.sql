@@ -1,9 +1,9 @@
 -- Session model phase 3a (docs/SESSION_MODEL.md sections 2, 4, 6a and 12.5): the server labels every Record-class row at receipt and
 -- classifies the time it can trust. PROTECTED change (patches the three Chair write dispatchers; unapplied; needs independent review).
 --
--- LABELS ONLY. Nothing here holds, rejects or reorders an action: every command that was accepted before is accepted now, with the
--- same effects. Holding (section 4's acceptance table), held-behind ordering and the Executive approve / discard / bulk-approve
--- commands are phase 3b, once clients send a device id and clock offset.
+-- This file only LABELS: nothing here holds, rejects or reorders an action. The hold rules (section 4's acceptance table), held-behind
+-- ordering and the Executive approve / discard / bulk-approve commands are in 20261030100000_session_holds.sql and are inactive
+-- until the Executive switches enforcement on for the conference.
 --
 -- How it works: each dispatcher records a small per-transaction context (the mutation, its client time and the optional device block
 -- `command._device = {deviceId, deviceSeq, displayedLabel}`) before it does anything else. An AFTER trigger on each Record-class table
@@ -24,7 +24,11 @@ alter table private.conference_settings
 
 alter table public.record_label
   add column no_session boolean not null default false,
-  add column label_differs boolean not null default false;
+  add column label_differs boolean not null default false,
+  -- true when the device reported what it displayed, including "no session" (an explicit null); false for legacy clients that said nothing.
+  add column displayed_reported boolean not null default false,
+  -- set when the row was recorded by an Executive-approved held action (20261030100000), linking the record to its review.
+  add column held_action_id uuid references public.held_action(id);
 
 create function private.time_confidence(conf uuid, device uuid, client_time timestamptz, received timestamptz) returns text
 language plpgsql stable set search_path='' as $$
@@ -47,41 +51,58 @@ end $$;
 -- so a caller cannot pre-set it. API roles cannot write the labelled tables except through a dispatcher.
 create function private.set_mutation_context(conf uuid, mutation uuid, client_time timestamptz, command jsonb) returns void
 language plpgsql set search_path='' as $$
-declare dev jsonb := case when jsonb_typeof(command->'_device') = 'object' then command->'_device' else '{}'::jsonb end;
+declare
+  dev jsonb := case when jsonb_typeof(command->'_device') = 'object' then command->'_device' else '{}'::jsonb end;
+  approving boolean := coalesce(current_setting('munos.approving', true), '') = mutation::text;
+  held public.held_action;
 begin
+  -- An Executive-approved held action is re-run with its ORIGINAL receipt time, so its label does not depend on when it was approved.
+  if approving then select * into held from public.held_action where id = mutation; end if;
   perform set_config('munos.mutation_ctx', jsonb_build_object(
     'conference', conf, 'mutation', mutation,
-    'receivedAt', private.session_iso(date_trunc('milliseconds', clock_timestamp())),
+    'receivedAt', private.session_iso(coalesce(held.received_at, date_trunc('milliseconds', clock_timestamp()))),
+    'heldActionId', held.id,
+    'confirmedOffsetMs', case when held.id is not null then nullif(current_setting('munos.approval_offset', true), '')::bigint end,
     'clientTime', private.session_iso(client_time),
     'deviceId', private.uuid_or_null(dev->>'deviceId'),
     'deviceSeq', case when dev->>'deviceSeq' ~ '^[0-9]{1,15}$' then (dev->>'deviceSeq')::bigint end,
-    'displayedLabel', private.uuid_or_null(dev->>'displayedLabel'))::text, true);
+    'displayedLabel', private.uuid_or_null(dev->>'displayedLabel'),
+    'displayedReported', (dev ? 'displayedLabel') and (jsonb_typeof(dev->'displayedLabel') = 'null' or private.uuid_or_null(dev->>'displayedLabel') is not null))::text, true);
 end $$;
 
 create function private.label_record() returns trigger
 language plpgsql set search_path='' as $$
 declare
   ctx jsonb := nullif(current_setting('munos.mutation_ctx', true), '')::jsonb;
-  received timestamptz; client timestamptz; device uuid; displayed uuid; confidence text; acted timestamptz; res jsonb; assigned uuid; flag text;
+  received timestamptz; client timestamptz; device uuid; displayed uuid; reported boolean; held uuid; confirmed bigint; confidence text; acted timestamptz; res jsonb; assigned uuid; flag text;
 begin
   if ctx is null or (ctx->>'conference')::uuid is distinct from new.conference_id then return null; end if;
   received := private.session_ts(ctx->>'receivedAt');
   client := private.session_ts(ctx->>'clientTime');
   device := private.uuid_or_null(ctx->>'deviceId');
   displayed := private.uuid_or_null(ctx->>'displayedLabel');
-  if displayed is not null and not exists (select 1 from public.sessions where id = displayed and conference_id = new.conference_id and committee_id = new.committee_id) then displayed := null; end if;
+  reported := coalesce((ctx->>'displayedReported')::boolean, false);
+  -- A displayed label from another committee is not evidence about this one: dropped, and not reported.
+  if displayed is not null and not exists (select 1 from public.sessions where id = displayed and conference_id = new.conference_id and committee_id = new.committee_id) then displayed := null; reported := false; end if;
+  held := private.uuid_or_null(ctx->>'heldActionId');
+  confirmed := (ctx->>'confirmedOffsetMs')::bigint;
   confidence := private.time_confidence(new.conference_id, device, client, received);
   acted := case when confidence = 'trusted' then client else received end;
+  -- The Executive confirmed this device's clock error when approving: its device time, corrected by that error, is trusted.
+  if confirmed is not null and client is not null then confidence := 'trusted'; acted := client - confirmed * interval '1 millisecond'; end if;
   res := private.committee_session_at(new.conference_id, new.committee_id, acted);
   assigned := private.uuid_or_null(res->>'sessionId');
   flag := res->>'flag';
+  -- Published schedules are operational history, and sessions they name cannot be deleted (see 20261030100000); if one is ever
+  -- missing, the score must still be recorded, so the label degrades to "no session" rather than failing the foreign key.
+  if assigned is not null and not exists (select 1 from public.sessions where id = assigned) then assigned := null; flag := 'no_session'; end if;
   insert into public.record_label(record_table, record_id, conference_id, committee_id, displayed_label, assigned_label, outside_schedule, no_session,
-                                  label_differs, time_confidence, device_id, device_seq, assigned_at)
+                                  label_differs, displayed_reported, time_confidence, device_id, device_seq, assigned_at, held_action_id)
   values (tg_table_name, new.id, new.conference_id, new.committee_id, displayed, assigned, coalesce(flag = 'outside_schedule', false), coalesce(flag = 'no_session', false),
-          displayed is not null and displayed is distinct from assigned, confidence, device, (ctx->>'deviceSeq')::bigint, received)
+          reported and displayed is distinct from assigned, reported, confidence, device, (ctx->>'deviceSeq')::bigint, received, held)
   on conflict (record_table, record_id) do update set
     displayed_label = excluded.displayed_label, assigned_label = excluded.assigned_label, outside_schedule = excluded.outside_schedule,
-    no_session = excluded.no_session, label_differs = excluded.label_differs, time_confidence = excluded.time_confidence,
+    no_session = excluded.no_session, label_differs = excluded.label_differs, displayed_reported = excluded.displayed_reported, time_confidence = excluded.time_confidence, held_action_id = excluded.held_action_id,
     device_id = excluded.device_id, device_seq = excluded.device_seq, assigned_at = excluded.assigned_at;
   return null;
 end $$;

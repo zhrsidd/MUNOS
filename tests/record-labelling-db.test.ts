@@ -205,3 +205,21 @@ test('real PostgreSQL: automation off with no override, or no schedule at all, l
   assert.equal(r3.assigned_label,null);assert.equal(r3.no_session,true);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: an explicitly displayed "no session" is a reported label - a mismatch with the assignment is flagged; omitted metadata is not',async()=>{
+ const {db,ids,now,A,session,send,labelOf}=await setup();
+ try{
+  const mk=async(device?:Record<string,unknown>)=>{
+   const k=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,...(device?{_device:device}:{})},now);
+   return labelOf('participation_events',k.slice(0,24)+'000000000001');};
+  const explicit=await mk({deviceId:U(520),deviceSeq:1,displayedLabel:null});
+  assert.equal(explicit.assigned_label,await session(A));assert.equal(explicit.displayed_label,null);
+  assert.equal(explicit.displayed_reported,true);assert.equal(explicit.label_differs,true,'the device said "no session" while the server assigned one');
+  const omitted=await mk({deviceId:U(521),deviceSeq:1});
+  assert.equal(omitted.displayed_reported,false);assert.equal(omitted.label_differs,false,'legacy metadata says nothing');
+  const legacy=await mk();
+  assert.equal(legacy.displayed_reported,false);assert.equal(legacy.label_differs,false);
+  const same=await mk({displayedLabel:await session(A)});
+  assert.equal(same.displayed_reported,true);assert.equal(same.label_differs,false);
+ }finally{await db.close();}
+});

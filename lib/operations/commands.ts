@@ -42,7 +42,14 @@ export type OperationsCommand =
   | { type: "overrideSet"; scope: "conference"; slotId: string }
   /** `label: null` corrects the record to "no session" (distinct from never corrected). */
   | { type: "labelCorrection"; recordTable: string; recordId: string; label: string | null; reason: string }
-  | { type: "clockConfirm"; deviceId: string; offsetMs: number; reason: string };
+  | { type: "clockConfirm"; deviceId: string; offsetMs: number; reason: string }
+  /** One-way: after this, anything that arrives for that conference day is held. `day` defaults to today in the conference zone. */
+  | { type: "closeDay"; day?: string; reason: string }
+  /** Hold rules switch and tolerances; absent keys are unchanged. Enforcement is off until the Executive turns it on. */
+  | { type: "holdSettings"; enforce?: boolean; trustMinutes?: number; staleMinutes?: number }
+  | { type: "heldDecide"; heldId: string; decision: "approve" | "discard"; reason: string }
+  /** Approve a device's items held for its clock, after clockConfirm gave the confirmed error. */
+  | { type: "heldBulkApprove"; deviceId: string; reason: string };
 export interface PhotoSlotFields {
   schoolId: string;
   startsAt: string;
@@ -52,7 +59,7 @@ export interface PhotoSlotFields {
   enabled?: boolean;
   warnMinutes?: number;
 }
-export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool", "scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm"] as const satisfies readonly OperationsCommand["type"][];
+export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool", "scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm", "closeDay", "holdSettings", "heldDecide", "heldBulkApprove"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
   resolutionLink: ["chair", "admin"],
@@ -67,6 +74,10 @@ export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   overrideSet: ["admin"],
   labelCorrection: ["admin"],
   clockConfirm: ["admin"],
+  closeDay: ["admin"],
+  holdSettings: ["admin"],
+  heldDecide: ["admin"],
+  heldBulkApprove: ["admin"],
 };
 export const MAX_DEDUCTION = 20;
 export const REASON_MIN = 3;
@@ -216,6 +227,10 @@ export function applyOperationsCommand(
     case "overrideSet":
     case "labelCorrection":
     case "clockConfirm":
+    case "closeDay":
+    case "holdSettings":
+    case "heldDecide":
+    case "heldBulkApprove":
       throw Error("Schedule changes are made on the live conference database.");
     case "staffSchool": {
       const staff = d.staff.find((s) => s.id === c.staffId);

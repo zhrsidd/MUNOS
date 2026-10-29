@@ -203,6 +203,18 @@ export const COMMANDS: Cmd[] = [
  {id: 'clockConfirm', type: 'clockConfirm', router: 'operations', impl: 'operations', roles: admin, scope: null,
   pre: f => `insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) select ${q(f.confA)},${q(U(32))},${q(U(30))},'2026-11-05',1000 where not exists(select 1 from public.device_clock_sync where device_id=${q(U(32))});`,
   command: () => ({type: 'clockConfirm', deviceId: U(32), offsetMs: 1000, reason: 'Matrix'})},
+ // Session holds (docs/SESSION_MODEL.md 4 and 5): Executive only, conference-wide grant only.
+ {id: 'closeDay', type: 'closeDay', router: 'operations', impl: 'operations', roles: admin, scope: null,
+  command: () => ({type: 'closeDay', day: '2031-01-01', reason: 'Matrix'})},
+ {id: 'holdSettings', type: 'holdSettings', router: 'operations', impl: 'operations', roles: admin, scope: null,
+  command: () => ({type: 'holdSettings', enforce: true, trustMinutes: 3, staleMinutes: 6})},
+ {id: 'heldDecide', type: 'heldDecide', router: 'operations', impl: 'operations', roles: admin, scope: null,
+  pre: f => `insert into public.held_action(id,conference_id,committee_id,actor_id,requested_role,command,payload_hash,reason) values (${q(U(33))},${q(f.confA)},${q(f.committee.ga1)},${q(U(30))},'chair','{"type":"nothing"}','hash','uncertain_time') on conflict do nothing;`,
+  command: () => ({type: 'heldDecide', heldId: U(33), decision: 'discard', reason: 'Matrix'})},
+ {id: 'heldBulkApprove', type: 'heldBulkApprove', router: 'operations', impl: 'operations', roles: admin, scope: null,
+  pre: f => `insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) select ${q(f.confA)},${q(U(34))},${q(U(30))},'2026-11-05',1000 where not exists(select 1 from public.device_clock_sync where device_id=${q(U(34))});
+   insert into public.clock_confirmation(id,conference_id,device_id,offset_ms,reason,confirmed_by) values (${q(U(35))},${q(f.confA)},${q(U(34))},1000,'Matrix',${q(U(30))}) on conflict do nothing;`,
+  command: () => ({type: 'heldBulkApprove', deviceId: U(34), reason: 'Matrix'})},
  {id: 'pointAdjustment', type: 'pointAdjustment', router: 'operations', impl: 'operations', roles: chair, scope: 'ga1', representative: true,
   command: f => ({type: 'pointAdjustment', action: 'deduct', delegateId: f.france, sessionId: f.session, amount: 2, reason: 'Disrupted the session'})},
 ];

@@ -52,6 +52,7 @@ insert into public.label_correction(id,conference_id,committee_id,record_table,r
 insert into public.held_action(id,conference_id,committee_id,device_id,device_seq,actor_id,requested_role,command,payload_hash,reason) values (${u('held')},${C},${u('committee-a')},${u('device')},1,${u('user-chair')},'chair','{}','hash','uncertain_time');
 insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values (${C},${u('device')},${u('user-chair')},'2026-10-06',0);
 insert into public.clock_confirmation(id,conference_id,device_id,offset_ms,reason,confirmed_by) values (${u('cclock')},${C},${u('device')},0,'Fixture',${u('user-exec')});
+insert into public.conference_day_close(id,conference_id,conference_day,closed_at,closed_by,reason) values (${u('dayclose')},${C},'2026-10-06',now(),${u('user-exec')},'Fixture');
 insert into public.speaker_queue(id,conference_id,committee_id,"delegateId","sessionId","position") values (${u('queue')},${C},${u('committee-a')},${u('del-1')},${u('session')},1);
 insert into public.timers(id,conference_id,committee_id,"sessionId",duration,remaining) values (${u('timer')},${C},${u('committee-a')},${u('session')},60,60);
 insert into public.debate_states("sessionId",conference_id,committee_id) values (${u('session')},${C},${u('committee-a')});

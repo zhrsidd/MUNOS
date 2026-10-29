@@ -51,6 +51,8 @@ export const HOSTED_AUDIT = {
  ]),
  serviceRole: new Set(['public.submission_link_info', 'public.amendment_link_info', 'public.submit_resolution', 'public.submit_amendment']),
 };
+/** Reviewed session-model additions (docs/SESSION_MODEL.md): the device clock call and its private implementation, executable by signed-in users only. */
+const SESSION_MODEL_DELTA = ['public.record_device_clock', 'private.record_device_clock'];
 const nameOf = (key: string) => key.slice(0, key.indexOf('('));
 
 export async function privilegeSection(t: TestContext, {engine}: Ctx) {
@@ -71,18 +73,18 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
   assertNone('functions missing from the inventory (regenerate docs/generated and review)', Object.keys(live).filter(k => !inventoried.has(k)));
  });
 
- await t.test('hosted-audit baseline plus reviewed lifecycle delta: one anon metadata RPC, two additional authenticated helpers, service_role unchanged', () => {
+ await t.test('hosted-audit baseline plus reviewed lifecycle and session-model deltas: one anon metadata RPC, additional authenticated helpers, service_role unchanged', () => {
   const problems: string[] = [];
   for (const [key, got] of Object.entries(live)) {
    const name = nameOf(key);
    if (got.anon !== (name==='public.preproduction_status')) problems.push(`${key}: unexpected anon EXECUTE=${got.anon}`);
    if (got.public) problems.push(`${key}: PUBLIC has EXECUTE`);
-   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows'].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
+   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows',...SESSION_MODEL_DELTA].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
    if (got.service_role !== HOSTED_AUDIT.serviceRole.has(name)) problems.push(`${key}: service_role=${got.service_role}, audit says ${HOSTED_AUDIT.serviceRole.has(name)}`);
   }
   assertNone('privilege matrix vs hosted audit', problems);
   assert.equal(HOSTED_AUDIT.authenticated.size, 23);
-  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25, 'the audited baseline plus two lifecycle functions exists exactly once');
+  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25 + SESSION_MODEL_DELTA.length, 'the audited baseline, two lifecycle functions and the reviewed session-model delta exist exactly once');
   assert.equal(Object.keys(live).filter(k => live[k].service_role).length, 4);
  });
 
