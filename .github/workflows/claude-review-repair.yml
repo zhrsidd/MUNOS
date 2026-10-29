@@ -1,0 +1,52 @@
+name: Claude review repair
+on:
+  pull_request_review:
+    types: [submitted]
+permissions:
+  contents: read
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.review.state == 'changes_requested' &&
+      vars.CODEX_REVIEWER_LOGIN != '' &&
+      github.event.review.user.login == vars.CODEX_REVIEWER_LOGIN
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: claude-repair-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Confirm review targets current head and enforce retry cap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REVIEW_SHA: ${{ github.event.review.commit_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq '.head.sha')
+          test "$head" = "$REVIEW_SHA" || { echo "Stale review; skipping"; exit 1; }
+          count=$(gh api --paginate "repos/$REPO/pulls/$PR/commits?per_page=100" --jq '[.[] | select(.commit.message | startswith("fix(review):"))] | length' | awk '{s+=$1} END{print s+0}')
+          if [ "$count" -ge 3 ]; then
+            gh pr comment "$PR" --repo "$REPO" --body "NEEDS_DECISION: three automated review-repair commits reached. Manual intervention required."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.CLAUDE_AUTOMATION_TOKEN }}
+          prompt: |
+            Address only actionable findings in the latest Codex CHANGES_REQUESTED review on PR #${{ github.event.pull_request.number }}.
+            Follow AGENTS.md. Do not modify production branch, hosted databases, secrets or Vercel settings.
+            Run appropriate verification. Commit any fixes to this PR branch with subject prefix "fix(review):".
+            If findings are ambiguous, unsafe or require product decisions, comment NEEDS_DECISION instead of guessing.
