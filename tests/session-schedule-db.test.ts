@@ -329,7 +329,7 @@ test('real PostgreSQL: roll calls follow the attendance boundary - Approval Pane
   await asOwner();
   const del=(await db.query<{id:string}>('select id from public.delegates where committee_id=$1 limit 1',[ids.ga1])).rows[0].id;
   const rc=U(7000);
-  await db.query(`insert into public.roll_call(id,revision,conference_id,committee_id,state,observed_at,local_committed_at,server_committed_at,time_confidence,created_by) values($1,1,$2,$3,'committed',now(),now(),now(),'trusted',$4)`,[rc,ids.conference,ids.ga1,exec]);
+  await db.query(`insert into public.roll_call(id,revision,conference_id,committee_id,state,observed_at,local_committed_at,server_committed_at,time_confidence,effective_at,created_by) values($1,1,$2,$3,'committed',now(),now(),now(),'trusted',now(),$4)`,[rc,ids.conference,ids.ga1,exec]);
   await db.query(`insert into public.roll_call_row(roll_call_id,revision,conference_id,committee_id,delegate_id,status) values($1,1,$2,$3,$4,'Present & Voting')`,[rc,ids.conference,ids.ga1,del]);
   for(const [user,table,expected] of [[exec,'roll_call',1],[chair,'roll_call',1],[observer,'roll_call',1],[panel,'roll_call',0],[print,'roll_call',0],[other,'roll_call',0],
                                       [exec,'roll_call_row',1],[chair,'roll_call_row',1],[observer,'roll_call_row',1],[panel,'roll_call_row',0],[print,'roll_call_row',0],[other,'roll_call_row',0]] as const){
