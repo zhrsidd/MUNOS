@@ -94,3 +94,9 @@ test('resolve is history-stable: a later version and a later end event never cha
  assert.equal(after.sessionId,'S5');
  assert.equal(after.source,'override');
 });
+
+test('precision is the millisecond: sub-millisecond digits are dropped, as the SQL twin does',()=>{
+ assert.equal(Date.parse('2026-10-17T12:25:00.000900+03:00'),Date.parse('2026-10-17T12:25:00.000+03:00'));
+ const r=resolveSession({versions:vectors.resolveCases[0].versions,at:'2026-10-17T12:24:59.999999+03:00',timeZone:vectors.timeZone});
+ assert.equal(r.sessionId,'S5');
+});

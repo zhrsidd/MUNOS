@@ -308,3 +308,4 @@ Do the phases in this order. Each one must pass its tests before the next starts
 - Override ties (same scope, same `set_at`) go to the higher id. Every override ends at the next local midnight after it was set.
 - A conference-scope override carries an opaque label (`sessionId`). Which label a conference-wide override sets for committees with different session ids is not defined in §3 and needs an owner decision before phase 2.
 - The "label differs from the device's" flag in the §3 worked case belongs to phase 3, where `displayed_label` exists. Phase 1 covers the assignment half of that vector.
+- Precision is the millisecond. Every instant is truncated to the millisecond on entry in both implementations (JavaScript clocks stamp device actions; PostgreSQL keeps microseconds). A change published at 09:00:00.000900 takes effect at 09:00:00.000 everywhere. The shared vectors include fractional-second cases for windows, versions, overrides and expiry.

@@ -32,7 +32,7 @@
   "20261026003647_lifecycle_controls.sql",
   "20261029100000_session_window.sql"
  ],
- "migrationsSha256": "9cabfa616366fca3e11945aca63dc6ef5eaa1d1e0f9986468420a92396d6d857",
+ "migrationsSha256": "268ba0a6f22415d9dd6a4e096bb1040b47c4ca9e00c05492801e589ea8292a9c",
  "supabase-model": {
   "fns": [
    {
@@ -1237,6 +1237,36 @@
    },
    {
     "schema": "private",
+    "name": "session_ms",
+    "args": "ts timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "session_next_boundary",
     "args": "windows jsonb, at timestamp with time zone",
     "result": "timestamp with time zone",
@@ -1336,6 +1366,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ts",
+    "args": "value text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -5076,6 +5136,36 @@
    },
    {
     "schema": "private",
+    "name": "session_ms",
+    "args": "ts timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "session_next_boundary",
     "args": "windows jsonb, at timestamp with time zone",
     "result": "timestamp with time zone",
@@ -5175,6 +5265,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ts",
+    "args": "value text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",

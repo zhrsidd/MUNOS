@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 30 files, combined SHA-256 `9cabfa616366fca3`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 30 files, combined SHA-256 `268ba0a6f22415d9`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -48,7 +48,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-68 functions (60 callable, 8 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+70 functions (62 callable, 8 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -92,10 +92,12 @@ Executed in the disposable database after the inventory was read:
 | `private.scoring_problem(category text, vals integer[])` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.scoring_values(conf uuid, cid uuid, category text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_iso(ts timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.session_ms(ts timestamp with time zone)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.session_next_boundary(windows jsonb, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_override_expiry(versions jsonb, set_at timestamp with time zone, day_close jsonb, tz text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_resolve(versions jsonb, overrides jsonb, day_close jsonb, committee text, at timestamp with tim...)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_schedule_errors(sessions jsonb, lead_minutes integer, grace_minutes integer)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.session_ts(value text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_version_at(versions jsonb, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_windows(sessions jsonb, lead_minutes integer, grace_minutes integer, day_close jsonb, tz text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.set_print_copies()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | reads/none |

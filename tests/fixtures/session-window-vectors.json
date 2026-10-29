@@ -622,6 +622,33 @@
     "sessionId": "D2",
     "flag": null
    }
+  },
+  {
+   "name": "precision: 12:24:59.999999 truncates to .999 and is still S5",
+   "schedule": "sat17",
+   "at": "2026-10-17T12:24:59.999999+03:00",
+   "expect": {
+    "sessionId": "S5",
+    "flag": null
+   }
+  },
+  {
+   "name": "precision: 12:25:00.000900 truncates to 12:25:00.000 and is S6",
+   "schedule": "sat17",
+   "at": "2026-10-17T12:25:00.000900+03:00",
+   "expect": {
+    "sessionId": "S6",
+    "flag": null
+   }
+  },
+  {
+   "name": "precision: 17:04:59.999999 is the last millisecond of S7",
+   "schedule": "sat17",
+   "at": "2026-10-17T17:04:59.999999+03:00",
+   "expect": {
+    "sessionId": "S7",
+    "flag": null
+   }
   }
  ],
  "validation": [
@@ -1957,6 +1984,262 @@
    "dayClose": {
     "2026-10-17": "2026-10-17T16:50:00+03:00"
    }
+  },
+  {
+   "name": "precision: automation turned off at 12:30:00.000900 applies at 12:30:00.000",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": true,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    },
+    {
+     "effectiveFrom": "2026-10-17T12:30:00.000900+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": false,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:30:00.000+03:00",
+   "expect": {
+    "sessionId": null,
+    "source": "none",
+    "flag": "no_session"
+   }
+  },
+  {
+   "name": "precision: one millisecond earlier the older version still applies",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": true,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    },
+    {
+     "effectiveFrom": "2026-10-17T12:30:00.000900+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": false,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:29:59.999+03:00",
+   "expect": {
+    "sessionId": "S6",
+    "source": "schedule",
+    "flag": null
+   }
+  },
+  {
+   "name": "precision: override set at 12:00:00.000900 is active at 12:00:00.000",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": false,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [
+    {
+     "id": "c1",
+     "scope": "committee",
+     "committeeId": "ga1",
+     "sessionId": "S5",
+     "setAt": "2026-10-17T12:00:00.000900+03:00",
+     "expiresAt": null,
+     "endedAt": null
+    }
+   ],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:00:00.000+03:00",
+   "expect": {
+    "sessionId": "S5",
+    "source": "override",
+    "flag": null
+   }
+  },
+  {
+   "name": "precision: override expiring at 12:25:00.000900 has expired at 12:25:00.000",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": true,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [
+    {
+     "id": "c1",
+     "scope": "committee",
+     "committeeId": "ga1",
+     "sessionId": "S7",
+     "setAt": "2026-10-17T12:00:00+03:00",
+     "expiresAt": "2026-10-17T12:25:00.000900+03:00",
+     "endedAt": null
+    }
+   ],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:25:00.000+03:00",
+   "expect": {
+    "sessionId": "S6",
+    "source": "schedule",
+    "flag": null
+   }
+  },
+  {
+   "name": "precision: override ended at 12:30:00.000900 has ended at 12:30:00.000",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": false,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "overrides": [
+    {
+     "id": "c1",
+     "scope": "committee",
+     "committeeId": "ga1",
+     "sessionId": "S5",
+     "setAt": "2026-10-17T12:00:00+03:00",
+     "expiresAt": null,
+     "endedAt": "2026-10-17T12:30:00.000900+03:00"
+    }
+   ],
+   "committeeId": "ga1",
+   "at": "2026-10-17T12:30:00.000+03:00",
+   "expect": {
+    "sessionId": null,
+    "source": "none",
+    "flag": "no_session"
+   }
   }
  ],
  "overrideExpiryCases": [
@@ -2109,6 +2392,36 @@
    ],
    "setAt": "2026-10-17T12:00:00+03:00",
    "expect": null
+  },
+  {
+   "name": "precision: set at 12:00:00.000900 expires at the next switch",
+   "versions": [
+    {
+     "effectiveFrom": "2026-10-17T00:00:00+03:00",
+     "leadMinutes": 5,
+     "graceMinutes": 20,
+     "automationEnabled": true,
+     "sessions": [
+      {
+       "id": "S5",
+       "start": "2026-10-17T08:30:00+03:00",
+       "end": "2026-10-17T11:30:00+03:00"
+      },
+      {
+       "id": "S6",
+       "start": "2026-10-17T12:30:00+03:00",
+       "end": "2026-10-17T14:30:00+03:00"
+      },
+      {
+       "id": "S7",
+       "start": "2026-10-17T14:45:00+03:00",
+       "end": "2026-10-17T16:45:00+03:00"
+      }
+     ]
+    }
+   ],
+   "setAt": "2026-10-17T12:00:00.000900+03:00",
+   "expect": "2026-10-17T12:25:00+03:00"
   }
  ]
 }

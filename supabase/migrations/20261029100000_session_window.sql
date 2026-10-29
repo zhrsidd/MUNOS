@@ -19,6 +19,19 @@ language sql stable set search_path='' as $$
   select to_char(ts at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
 $$;
 
+-- Precision: every instant is truncated to the millisecond on entry, so this matches the JavaScript clock that stamps device
+-- actions and lib/sessions/window.ts (Date.parse drops sub-millisecond digits). A change published at 09:00:00.000900 therefore
+-- takes effect at 09:00:00.000 in both implementations.
+create or replace function private.session_ms(ts timestamptz) returns timestamptz
+language sql immutable set search_path='' as $$
+  select date_trunc('milliseconds', ts)
+$$;
+
+create or replace function private.session_ts(value text) returns timestamptz
+language sql stable set search_path='' as $$
+  select date_trunc('milliseconds', value::timestamptz)
+$$;
+
 -- Publish-time validation: a sorted array of error codes, empty when the schedule is valid.
 create or replace function private.session_schedule_errors(sessions jsonb, lead_minutes int, grace_minutes int) returns jsonb
 language plpgsql stable set search_path='' as $$
@@ -32,7 +45,7 @@ begin
     errs := array_append(errs, 'negative_lead'::text);
   end if;
   if grace_minutes < 0 then errs := array_append(errs, 'negative_grace'::text); end if;
-  for r in select (e->>'start')::timestamptz s, (e->>'end')::timestamptz f from jsonb_array_elements(sessions) e order by 1, 2 loop
+  for r in select private.session_ts(e->>'start') s, private.session_ts(e->>'end') f from jsonb_array_elements(sessions) e order by 1, 2 loop
     if not (r.s < r.f) then errs := array_append(errs, 'start_not_before_end'::text); end if;
     if prev_start is not null then
       if r.s = prev_start then errs := array_append(errs, 'identical_start'::text);
@@ -55,9 +68,9 @@ declare
 begin
   for r in
     with s as (
-      select e->>'id' id, (e->>'start')::timestamptz st, (e->>'end')::timestamptz en,
+      select e->>'id' id, private.session_ts(e->>'start') st, private.session_ts(e->>'end') en,
              coalesce((e->>'leadMinutes')::int, lead_minutes) ld,
-             ((e->>'start')::timestamptz at time zone tz)::date d
+             (private.session_ts(e->>'start') at time zone tz)::date d
         from jsonb_array_elements(sessions) e),
     b as (
       select s.*, (s.d::timestamp at time zone tz) day_start, ((s.d + 1)::timestamp at time zone tz) midnight,
@@ -68,7 +81,7 @@ begin
     w as (
       select sw.*, lead(sw_at) over (partition by d order by st) next_sw from sw)
     select id, sw_at,
-           coalesce(next_sw, least(en + grace_minutes * interval '1 minute', midnight, coalesce((day_close->>to_char(d, 'YYYY-MM-DD'))::timestamptz, 'infinity'::timestamptz))) end_at
+           coalesce(next_sw, least(en + grace_minutes * interval '1 minute', midnight, coalesce(private.session_ts(day_close->>to_char(d, 'YYYY-MM-DD')), 'infinity'::timestamptz))) end_at
       from w order by st
   loop
     if r.end_at > r.sw_at then
@@ -82,18 +95,18 @@ end $$;
 create or replace function private.session_version_at(versions jsonb, at timestamptz) returns jsonb
 language sql stable set search_path='' as $$
   select e from jsonb_array_elements(versions) with ordinality t(e, ord)
-   where (e->>'effectiveFrom')::timestamptz <= at
-   order by (e->>'effectiveFrom')::timestamptz desc, ord desc limit 1
+   where private.session_ts(e->>'effectiveFrom') <= private.session_ms(at)
+   order by private.session_ts(e->>'effectiveFrom') desc, ord desc limit 1
 $$;
 
 -- The next window edge strictly after `at`; null if none.
 create or replace function private.session_next_boundary(windows jsonb, at timestamptz) returns timestamptz
 language sql stable set search_path='' as $$
   select min(x) from (
-    select (w->>'start')::timestamptz x from jsonb_array_elements(windows) w
+    select private.session_ts(w->>'start') x from jsonb_array_elements(windows) w
     union all
-    select (w->>'end')::timestamptz from jsonb_array_elements(windows) w) q
-   where x > at
+    select private.session_ts(w->>'end') from jsonb_array_elements(windows) w) q
+   where x > private.session_ms(at)
 $$;
 
 -- The expiry stored when an override is created: the next scheduled switch under the version in effect, or null when
@@ -101,8 +114,10 @@ $$;
 create or replace function private.session_override_expiry(versions jsonb, set_at timestamptz, day_close jsonb default null, tz text default 'Asia/Qatar') returns timestamptz
 language plpgsql stable set search_path='' as $$
 declare
-  v jsonb := private.session_version_at(versions, set_at);
+  v jsonb;
 begin
+  set_at := private.session_ms(set_at);
+  v := private.session_version_at(versions, set_at);
   if v is null or not coalesce((v->>'automationEnabled')::boolean, false) then return null; end if;
   return private.session_next_boundary(private.session_windows(v->'sessions', (v->>'leadMinutes')::int, (v->>'graceMinutes')::int, day_close, tz), set_at);
 end $$;
@@ -119,11 +134,12 @@ declare
   hit jsonb;
   nxt timestamptz;
 begin
+  at := private.session_ms(at);
   select a.sid, a.ends_at into o
     from (
-      select e->>'id' id, e->>'scope' scope, e->>'sessionId' sid, (e->>'setAt')::timestamptz set_at,
-             least(coalesce((e->>'expiresAt')::timestamptz, 'infinity'::timestamptz), coalesce((e->>'endedAt')::timestamptz, 'infinity'::timestamptz),
-                   ((((e->>'setAt')::timestamptz at time zone tz)::date + 1)::timestamp at time zone tz)) ends_at,
+      select e->>'id' id, e->>'scope' scope, e->>'sessionId' sid, private.session_ts(e->>'setAt') set_at,
+             least(coalesce(private.session_ts(e->>'expiresAt'), 'infinity'::timestamptz), coalesce(private.session_ts(e->>'endedAt'), 'infinity'::timestamptz),
+                   (((private.session_ts(e->>'setAt') at time zone tz)::date + 1)::timestamp at time zone tz)) ends_at,
              (e->>'committeeId') cid
         from jsonb_array_elements(coalesce(overrides, '[]'::jsonb)) e) a
    where (a.scope = 'conference' or a.cid is not distinct from committee) and a.set_at <= at and at < a.ends_at
@@ -137,7 +153,7 @@ begin
     return jsonb_build_object('sessionId', null, 'source', 'none', 'flag', 'no_session', 'windowStart', null, 'windowEnd', null, 'nextSwitchAt', null);
   end if;
   wins := private.session_windows(v->'sessions', (v->>'leadMinutes')::int, (v->>'graceMinutes')::int, day_close, tz);
-  select w into hit from jsonb_array_elements(wins) w where (w->>'start')::timestamptz <= at and at < (w->>'end')::timestamptz limit 1;
+  select w into hit from jsonb_array_elements(wins) w where private.session_ts(w->>'start') <= at and at < private.session_ts(w->>'end') limit 1;
   nxt := private.session_next_boundary(wins, at);
   return jsonb_build_object(
     'sessionId', hit->>'sessionId',
