@@ -27,3 +27,10 @@
 
 - Final rendered-style check: zero generated gradient backgrounds; UN cyan field and dark contact ink match tokens; original logo decodes; small preview labels use reading ink. Brand PNG regenerated with embedded self-hosted fonts.
 - Browser test timing correction: reduced-motion preference changes dispatch asynchronously; the test now waits for running animations to reach zero instead of reading before the media-change event. Final 4/4 tests passed.
+
+## Minimal column-and-laurel identity
+
+- Owner rejected the letter-M concept and selected a simplified version of the familiar column-and-laurel icon. Final assets use three marine pillars under one lintel, a base and three-leaf cyan branches.
+- Added munos-symbol.svg and munos-logo.svg; replaced favicon.svg, munos-logo.png and both brand-sheet formats. The same canonical mark group is present once in every SVG, checked with XML comparison. All SVG artwork and lettering are vectors: no embedded raster images, gradients or font dependencies. PNGs exported directly from the final SVGs: logo 870×240 with transparency, brand sheet 1600×1000.
+- Header, footer and brand panel reference the new SVG lockup. Favicon URL versioned to refresh older browser-tab caches. Brand documentation and alternative text updated.
+- Four Playwright browser tests passed, including 320px mobile layout. Logo, favicon and brand PNGs visually inspected. Standalone build and vector/PNG consistency checks passed. Full application test-suite limitation remains as recorded above.

@@ -20,7 +20,10 @@ test('desktop visitor can explore workspaces and request a custom paid build', a
   await expect(page.locator('#people')).toContainText('John Paul Ribeiru');
   const brand = await page.request.get('/munos-brand-sheet.svg');
   expect(brand.ok()).toBeTruthy();
-  expect(await brand.text()).toContain('data:image/png;base64,');
+  const brandSvg = await brand.text();
+  expect(brandSvg).toContain('<svg');
+  expect(brandSvg).toContain('MUNOS');
+  expect(brandSvg).not.toContain('data:image/');
   await page.goto('/');
   await page.screenshot({ path: 'test-results/desktop.png', fullPage: true, animations: 'disabled' });
   expect(errors).toEqual([]);

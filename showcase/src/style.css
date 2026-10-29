@@ -33,3 +33,7 @@ body{background:var(--white)}a:focus-visible,button:focus-visible,[tabindex]:foc
 .mock-kicker,.mock-tabs,.country-code,.mock-footer{color:var(--muted)}
 .mock-tabs .selected{color:var(--action)}
 .contact-section a:focus-visible{outline-color:var(--ink)}
+/* The same vector lockup appears in the masthead, brand panel and footer. */
+.wordmark{display:inline-flex;align-items:center}.brand-lockup{width:144px;height:auto;display:block}.logo-frame{padding-top:30px}.logo-frame>img{width:100%;padding:24px 30px 50px;aspect-ratio:3/1;object-fit:contain}.logo-frame>span{padding:16px 20px}
+@media(max-width:760px){.brand-lockup{width:112px}.logo-frame>img{padding:16px 20px 30px}.logo-frame{padding-top:16px}}
+@media(max-width:380px){.brand-lockup{width:92px}}
