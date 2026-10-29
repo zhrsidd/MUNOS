@@ -16,7 +16,7 @@ The example defaults to an isolated local demo. For the hosted development datab
 
 - Remote normalized schema, strict RLS, explicit read grants and validated transactional command RPCs.
 - Explicit, shared current-session selection; independent open/for/against speaker queues, recognized POIs, Main/Co-Submitter speech flow, Divide the House and configurable Security Council veto rules.
-- Attendance per session; event-derived opportunities and quality points; configurable scoring; immutable participation corrections and document versions.
+- Roll calls per committee (presence is the live roll call; a ballot snapshots it when it opens); event-derived opportunities and quality points; configurable scoring; immutable participation corrections and document versions.
 - Resolution workflow around Google Docs: delegates register their Google Doc via a committee QR link, the Chair reviews it in Google Docs and submits it to Approval; review, approval, printing, debate, attendance-aware voting, configured majority outcome and audit records. Conference OS does not edit document text.
 - IndexedDB saves before optimistic rendering. Cloud writes use a durable mutation outbox with stable UUIDs, retry receipts and explicit revision conflicts.
 - Local countdown calculation; timer transitions alone are persisted. Realtime is limited to operational notifications; ordinary reads/writes and periodic recovery work independently.

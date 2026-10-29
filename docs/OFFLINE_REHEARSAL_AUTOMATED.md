@@ -34,14 +34,16 @@ the data mode).
 Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted only)`.
 
 - **S0 Setup.** Two contexts open `/chair/roll-call`; data mode is the expected one; the service worker controls both; five
-  delegates are present; both outboxes are empty and the strip is healthy.
-- **S1 Independence.** A records attendance durably in its own IndexedDB. Demo: B is unchanged (no server carries it). **H** B
+  delegates are present in the live roll call (A commits one if needed); the ballot on the resolution in debate is open (it
+  snapshots that roll call); both outboxes are empty and the strip is healthy. There is no session selector: live state is keyed
+  by committee (docs/SESSION_MODEL.md section 8).
+- **S1 Independence.** A commits a roll call durably in its own IndexedDB. Demo: B is unchanged (no server carries it). **H** B
   converges to A's change.
-- **S2 Offline queue.** `setOffline(true)` on A: the strip says Offline. Attendance, speaker-queue add, speech start/score/finish,
+- **S2 Offline queue.** `setOffline(true)` on A: the strip says Offline. A roll call, speaker-queue add, speech start/score/finish,
   participation points and a vote are all usable and shown at once. Demo: written to the device store, `Offline` strip. **H**
   exactly 7 mutations in the outbox (types checked), strip `Offline · 7 changes saved on this device`, nothing on the server, B unchanged.
 - **S3 Reload offline.** Reload with the network off: the cached shell loads, outbox ids and data are identical, the strip is
-  unchanged, the offline attendance choice is still selected, no page errors.
+  unchanged, the offline roll call is still shown as the current one, no page errors.
 - **S4 Reconnect.** Going online drains with no operator action; every action has taken effect exactly once (one speech, +2
   events, points +2, one vote, floor returned, no duplicate ids). **H** strip ends `All changes synced`; B converges to the server.
 - **S5 Retry.** Hosted: request 1 is aborted before the server, request 2 reaches the server but its response is lost, request 3
@@ -51,16 +53,17 @@ Lines marked **H** run only in hosted mode; demo prints them as `SKIP (hosted on
   and records one score. Finish waits for the actual Chair heading and that speech's finished state projected from the durable
   checkpoint, then immediately hard-navigates; a reload replays nothing; no duplicate ids. **H** the identical request (same mutation uuid) is delivered to the server twice and
   applied once (+2, not +4).
-- **S7 Stale conflict.** **H** A is offline and edits delegate X's attendance, with a participation action queued behind it. B edits
-  X online. A reconnects: the strip says `Review needed`; the change is retained and flagged, did not overwrite B, work behind it
-  stays queued and unsent; System health lists "Review saved attendance change" with the original action; Retry does not force
+- **S7 Stale conflict.** The item is delegate X's ballot (a roll call is committed whole and never edited in place, so it cannot
+  go stale). **H** A is offline and records X's vote, with a participation action queued behind it. B records X's vote
+  online. A reconnects: the strip says `Review needed`; the change is retained and flagged, did not overwrite B, work behind it
+  stays queued and unsent; System health lists "Review saved vote change" with the original action; Retry does not force
   it; Discard is disabled until Export (the JSON contains the action); Discard keeps the conference value and the queued
   participation arrives exactly once; A converges to B's value. Demo: two tabs of one device (BroadcastChannel muted in one): the
   stale save is refused with "Another tab updated this item" and the newer value is kept.
 - **S8 System health.** Retry is harmless, Export gives valid JSON of the device checkpoint, no conflict panel without a conflict.
 - **S9 Final consistency.** Empty outboxes; no duplicate event/vote/queue/speech ids; after navigating to Debate, a bounded check
   requires the live leaderboard to equal points derived from the current device checkpoint (points counted once); no uncaught page errors. **H** A, B and the server hold the same
-  attendance, events, points, votes, queue and speeches, and both strips say `All changes synced`. Demo: the two devices differ,
+  roll calls, events, points, votes, queue and speeches, and both strips say `All changes synced`. Demo: the two devices differ,
   which documents that devices converge only through a server.
 
 ### Hosted-only (cannot be exercised in demo mode)
@@ -94,8 +97,8 @@ not a fault injected into hosted data. Re-run the hosted rehearsal with the corr
 ## Hosted mode (orchestrator only)
 
 The orchestrator provisions an **isolated temporary conference** on a staging project: name or venue containing `TEST` or
-`temporary`; at most 5 committees; a committee (default code `TST`) with at least 5 delegates, a current session set, and one
-resolution In Debate (or set `REHEARSAL_SKIP_VOTES=1`). Never use an existing conference or its Executive code.
+`temporary`; at most 5 committees; a committee (default code `TST`) with at least 5 delegates and one resolution In Debate
+(or set `REHEARSAL_SKIP_VOTES=1`, which also skips S7). No current session is needed: Chairs no longer choose sessions. Never use an existing conference or its Executive code.
 
 Preflight (all before any browser; a refusal exits non-zero) in `scripts/rehearsal/offline-hosted.mts`: target ref must be a
 hosted project, never PHESMUN or the production ref, and **must be in `STAGING_SUPABASE_REFS`**;
@@ -149,7 +152,7 @@ proves a mismatched origin aborts with no network and without printing codes.
   mutation uuid and full payload must be identical (200 then 409 fails).
 - S5 captures the upstream reply of the attempt whose response is dropped: it must be an accepted commit, and all three attempts
   must carry the same mutation uuid and payload.
-- Convergence compares value-level, deterministically serialised rows (attendance status+revision, vote choice, queue
+- Convergence compares value-level, deterministically serialised rows (roll call id+revision with every row's status, vote choice, queue
   position, speech state/classification, event points/category/speech, POIs, debate mode), excluding only timestamps. Negative
   self-tests prove it detects For->Against, reversed queue, finished->speaking, attendance and points changes.
 
@@ -195,6 +198,13 @@ those regressions pass **29 tests, zero skips**; typecheck and targeted lint pas
 This verifies local storage, offline shell reload, displayed attendance and points, double-tap protection, stale-tab rejection
 and recovery export in demo mode. Demo has no transport or outbox: this run does not verify hosted RPC delivery, receipts,
 server-side conflict recovery, cross-device convergence or conference-scale readiness. The hosted-only checks above remain open.
+
+## Local demo verification after the committee rekey (29 October 2026, branch `claude/session-model`)
+
+The scenarios were rewritten for the session model: roll calls replace the attendance buttons, there is no session selector,
+S0 opens the ballot, and S7 conflicts on a ballot instead of an attendance row. A `next build --webpack` demo build in headless
+Chromium passed **S0–S9: 30 assertions, 7 hosted-only assertions skipped, zero uncaught page errors**. The hosted scenarios
+were updated but not run: the session-model migrations are unapplied and no hosted project was touched.
 
 ## Hosted rerun status (26 October 2026)
 
