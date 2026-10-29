@@ -38,3 +38,7 @@
 ## Conference references
 
 Added a compact “Conferences this was used at” section below the hero with DCMUN XVIII and PHESMUN X, as requested by the owner. Copied the DCMUN seal locally and retrieved PHESMUN's unmodified logo from zhrsidd/PHESMUNOS/public/phesmun-logo.png. Browser-verified both images decode and the section fits desktop and 320px mobile; screenshots inspected. Four existing browser tests, typecheck, lint and both builds passed. No conference application changes or new full-suite run; prior native Node/V8 test limitation remains above.
+
+## Social link preview
+
+The live Cloudflare project was confirmed as munos.pages.dev, deploying codex/munos-showcase from showcase/. LinkedInBot-style HTTP request returned 200 HTML with no Open Graph tags; /robots.txt returned the HTML SPA fallback. Added static canonical/Open Graph/Twitter tags, a publicly served 1200×630 PNG rendered from the current vector logo, and a plain-text crawl allowance. Retained existing staging noindex metadata. The crawler integration test failed before the fix (missing og:title) and passed after; all 5 browser/request tests pass. Preview image inspected. No Cloudflare security or conference application configuration changed. LinkedIn itself may need its cache refreshed through Post Inspector.

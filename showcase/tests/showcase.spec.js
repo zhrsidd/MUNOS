@@ -84,3 +84,21 @@ test('scroll storytelling highlights the resolution handoffs beneath executive o
   await expect(page.locator('html')).not.toHaveClass(/scroll-cinema/);
   await expect(page.locator('.workflow-pin')).toHaveCSS('position', 'static');
 });
+
+test('social crawlers receive static Open Graph metadata and a valid PNG preview', async ({ request }) => {
+  const response = await request.get('/', { headers: { 'User-Agent': 'LinkedInBot/1.0' } });
+  expect(response.ok()).toBeTruthy();
+  const html = await response.text();
+  expect(html).toContain('property="og:title"');
+  expect(html).toContain('property="og:description"');
+  expect(html).toContain('property="og:url" content="https://munos.pages.dev/"');
+  const imageUrl = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+  expect(imageUrl).toBe('https://munos.pages.dev/social-preview.png');
+  const image = await request.get(new URL(imageUrl).pathname);
+  expect(image.ok()).toBeTruthy();
+  expect(image.headers()['content-type']).toContain('image/png');
+  const png = await image.body();
+  expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(png.readUInt32BE(16)).toBe(1200);
+  expect(png.readUInt32BE(20)).toBe(630);
+});

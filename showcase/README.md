@@ -48,3 +48,9 @@ An earlier static snapshot was pushed to gh-pages. Pages activation was blocked 
 ## Conference references
 
 The compact conference-history section names DCMUN XVIII and PHESMUN X as requested by the owner. Conference logos retain their original artwork/colours and identify their respective conferences. DCMUN seal copied unchanged from this repository's public/dcmun-logo.jpg. PHESMUN seal copied unchanged from zhrsidd/PHESMUNOS, public/phesmun-logo.png, main commit 73e337e62cecb870e906500cbe12779ec12c4c80. Copies are served locally from public/conferences; no GitHub authentication or hotlink is needed by visitors.
+
+## Link previews
+
+Static Open Graph and Twitter Card tags in index.html point to https://munos.pages.dev/ and its public 1200×630 social-preview.png. Bots can read these tags without JavaScript or authentication. The generated PNG is committed, so deployment builds need no browser. To regenerate it after a logo update: install Chromium with `npx playwright install chromium`, then run `node scripts/render-social-image.mjs` from showcase/.
+
+If you add a custom domain, update canonical, og:url and the absolute Open Graph/Twitter image URLs together. Staging noindex metadata is independent of the robots.txt crawl allowance. After deployment, refresh LinkedIn's cached preview at https://www.linkedin.com/post-inspector/ and then add the link again.
