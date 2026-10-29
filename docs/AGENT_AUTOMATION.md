@@ -57,6 +57,35 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    returns 403, the gate fails closed and the run fails. Fix the repository's token permissions. Do not weaken the gate.
    This read has not been verified against the live API from the authoring environment.
 
+## One-time bootstrap (before the gate is on main)
+
+The workflows read the gate from `main`. Until this pull request merges, `main` has no gate, so both workflows fail closed.
+A bootstrap lets this pull request supply the gate from its own head, under three conditions, and only once:
+
+1. The repository variable `CODEX_GATE_BOOTSTRAP_PR` is set to the pull request number (`79`).
+2. The repository variable `CODEX_GATE_BOOTSTRAP_TREE` is set to the git tree of `.github/scripts` at the commit the
+   owner has reviewed. Any later change to the gate changes the tree, and the workflow refuses to run.
+3. `main` still lacks `.github/scripts/codex-review-gate.sh`. Once main carries the gate, the head path is unreachable.
+
+Verification steps for the owner, in order:
+
+1. Confirm the reviewed tree: `git rev-parse <reviewed-commit>:.github/scripts`. Set both variables under Settings →
+   Secrets and variables → Actions → Variables. Variables are not secrets, but the owner should still set them.
+2. Confirm the secrets exist: `CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_AUTOMATION_TOKEN`. The repair workflow reads only
+   these, and no workflow reads `ANTHROPIC_API_KEY`. A secret's value cannot be read back from the repository, so the
+   OAuth token is proven only by a repair run that authenticates.
+3. Confirm the `main` ruleset requires `verify` and `codex-review-gate`, and that auto-merge is enabled.
+4. Keep the pull request as a draft. Let the gate run on the head, and check that `evaluate` reports the gate
+   status without enabling auto-merge. Then check that the merge workflow still refuses while the PR is a draft.
+5. Do not mark the PR ready or merge it until steps 1–4 pass and the owner approves the merge.
+
+After this pull request merges, delete `CODEX_GATE_BOOTSTRAP_PR` and `CODEX_GATE_BOOTSTRAP_TREE`. The head path in
+`stage-gate.sh` then has no effect. Remove that path in a follow-up change so no bootstrap code remains.
+
+Trust limits of the bootstrap: the workflow files still come from the pull request head, as they do for any pull
+request. The pinned tree stops drift in the gate scripts after review. It does not stop someone with write access
+from editing the workflows, which is the trust model the rest of this document already assumes.
+
 ## Behaviour and limits
 
 - At most three `fix(review):` commits are created per PR. A fourth request posts `NEEDS_DECISION` and stops.

@@ -41,6 +41,8 @@ jobs:
        contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     steps:
       # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate.
+      # The gate comes from main once main has it. Before that, stage-gate.sh allows only the owner-pinned bootstrap PR at
+      # its pinned tree (see docs/AGENT_AUTOMATION.md). Either way the gate never comes from an arbitrary pull request.
       - name: Check out gate scripts from main
         uses: actions/checkout@v4
         with:
@@ -48,11 +50,24 @@ jobs:
           sparse-checkout: .github/scripts
           path: trusted
           persist-credentials: false
+      - name: Check out the pull request head for bootstrap staging only
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}/head
+          sparse-checkout: .github/scripts
+          path: head
+          persist-credentials: false
       - name: Stage gate scripts outside the workspace
+        env:
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          CODEX_GATE_BOOTSTRAP_PR: ${{ vars.CODEX_GATE_BOOTSTRAP_PR }}
+          CODEX_GATE_BOOTSTRAP_TREE: ${{ vars.CODEX_GATE_BOOTSTRAP_TREE }}
         run: |
           set -euo pipefail
-          cp -r trusted/.github/scripts "$RUNNER_TEMP/gate"
-          rm -rf trusted
+          stager=trusted/.github/scripts/stage-gate.sh
+          if [ ! -f "$stager" ]; then stager=head/.github/scripts/stage-gate.sh; fi
+          bash "$stager" trusted head "$PR" "$RUNNER_TEMP/gate"
+          rm -rf trusted head
 
       - name: Decide from Codex's structured state on the current head
         id: gate

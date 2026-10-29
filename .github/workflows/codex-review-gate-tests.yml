@@ -1,5 +1,6 @@
 name: Codex review gate tests
-# Offline checks for the Claude–Codex gate: decision logic, the shell wrapper against a fake gh, and pinned identities.
+# Offline checks for the Claude–Codex gate: decision logic, the shell wrapper against a fake gh, pinned identities and
+# the bootstrap staging rules.
 on:
   pull_request:
     paths:
@@ -25,4 +26,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Run gate tests
-        run: bash .github/scripts/test/codex-review-gate.test.sh
+        run: |
+          bash .github/scripts/test/codex-review-gate.test.sh
+          bash .github/scripts/test/stage-gate.test.sh

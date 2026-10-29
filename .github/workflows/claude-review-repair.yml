@@ -25,7 +25,8 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate.
+      # The gate comes from main once main has it. Before that, stage-gate.sh allows only the owner-pinned bootstrap PR at
+      # its pinned tree (see docs/AGENT_AUTOMATION.md). Either way the gate never comes from an arbitrary pull request.
       - name: Check out gate scripts from main
         uses: actions/checkout@v4
         with:
@@ -33,11 +34,24 @@ jobs:
           sparse-checkout: .github/scripts
           path: trusted
           persist-credentials: false
+      - name: Check out the pull request head for bootstrap staging only
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          sparse-checkout: .github/scripts
+          path: head
+          persist-credentials: false
       - name: Stage gate scripts outside the workspace
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          CODEX_GATE_BOOTSTRAP_PR: ${{ vars.CODEX_GATE_BOOTSTRAP_PR }}
+          CODEX_GATE_BOOTSTRAP_TREE: ${{ vars.CODEX_GATE_BOOTSTRAP_TREE }}
         run: |
           set -euo pipefail
-          cp -r trusted/.github/scripts "$RUNNER_TEMP/gate"
-          rm -rf trusted
+          stager=trusted/.github/scripts/stage-gate.sh
+          if [ ! -f "$stager" ]; then stager=head/.github/scripts/stage-gate.sh; fi
+          bash "$stager" trusted head "$PR" "$RUNNER_TEMP/gate"
+          rm -rf trusted head
 
       - name: Confirm the review targets the current head and findings remain
         id: gate
@@ -91,7 +105,8 @@ jobs:
           prompt: |
             Address only the unresolved findings from the latest Codex review on PR #${{ github.event.pull_request.number }}
             at commit ${{ github.event.review.commit_id }}. List them with the review threads on that pull request.
-            Follow AGENTS.md. Do not modify main, hosted Supabase, secrets, Vercel settings or any production
+            Follow AGENTS.md. Do not change anything under .github/, including the gate scripts and workflows: the gate
+            is pinned to a reviewed tree. Do not modify main, hosted Supabase, secrets, Vercel settings or any production
             configuration, and do not run commands against a hosted database.
             For each finding, check it against the code. Fix it when it is actionable and in scope. Otherwise change nothing.
             Run `npm run typecheck`, `npm run lint` and `npm test`, plus any other check the change touches, and say in
