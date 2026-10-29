@@ -1,5 +1,6 @@
 import type { AttendanceStatus, ConferenceData } from "./domain";
 const timestamp = "2026-10-05T06:30:00.000Z";
+const rollCallTime = "2026-10-05T05:00:00.000Z";
 const countries = [
   ["France", "🇫🇷", "Mohammad Maaz"],
   ["Japan", "🇯🇵", "Hana Tanaka"],
@@ -222,9 +223,10 @@ export function createSeed(): ConferenceData {
       id: `rc-${committeeId}`,
       revision: 1,
       committeeId,
-      observedAt: timestamp,
-      committedAt: timestamp,
-      effectiveAt: timestamp,
+      // Committed before any demo or test action of the day, so everyone it marks present is present from the start.
+      observedAt: rollCallTime,
+      committedAt: rollCallTime,
+      effectiveAt: rollCallTime,
       timeConfidence: "trusted" as const,
       rows: delegates.flatMap((d, i) => d.committeeId === committeeId
         ? [{ delegateId: d.id, status: (i === 10 ? "Absent" : i % 3 === 0 ? "Present & Voting" : "Present") as AttendanceStatus }] : []),
