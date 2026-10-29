@@ -82,6 +82,10 @@ check "Codex security review with unresolved findings on head blocks merge" fals
 check "no ruleset requiring verify blocks merge" false false \
   "$(with_summary "$clean_code" | jq '.pr.draft = false | .threads |= map(.isResolved = true) | .rules = []')"
 
+check "ruleset with verify but not the codex-review-gate status blocks merge" false false \
+  "$(with_summary "$clean_code" | jq '.pr.draft = false | .threads |= map(.isResolved = true)
+    | .rules[0].parameters.required_status_checks = [{context: "verify"}]')"
+
 check "unprotected main blocks merge" false false \
   "$(with_summary "$clean_code" | jq '.pr.draft = false | .threads |= map(.isResolved = true) | .branch_protected = false')"
 

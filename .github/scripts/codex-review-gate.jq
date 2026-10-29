@@ -36,7 +36,7 @@ def summary_state:
 | ([$in.reviews | group_by(.user.login) | .[] | sort_by(.submitted_at) | last
     | select(.state == "CHANGES_REQUESTED")] | length) as $changes_requested
 | ([$in.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context]) as $checks
-| (any($checks[]; . == "verify") and $in.branch_protected == true) as $verify_required
+| (any($checks[]; . == "verify") and any($checks[]; . == "codex-review-gate") and $in.branch_protected == true) as $verify_required
 | ($same_repo and $base_main and $open) as $targetable
 | ($targetable and ($open_codex > 0 or $code_findings)) as $needs_repair
 | ($targetable and $in.pr.draft == false and $verify_required and $code_clean
@@ -50,7 +50,7 @@ def summary_state:
       if $base_main | not then "base branch is not main" else empty end,
       if $open | not then "pull request is not open" else empty end,
       if $in.pr.draft then "pull request is a draft" else empty end,
-      if $verify_required | not then "main has no ruleset requiring the verify check" else empty end,
+      if $verify_required | not then "main has no ruleset requiring the verify and codex-review-gate checks" else empty end,
       if $code_clean | not then "Codex summary is not clean on the current head (status \($code.status // "missing") at \($code.commit_sha // "none"))" else empty end,
       if $code_findings then "Codex reports unresolved findings on the current head" else empty end,
       if $security_findings then "Codex security review reports unresolved findings on the current head" else empty end,

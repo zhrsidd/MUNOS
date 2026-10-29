@@ -20,10 +20,12 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    - Codex's summary is `completed` for the current head, with no findings and no unresolved findings;
    - no Codex security review reports unresolved findings on the current head;
    - no review thread from anyone is unresolved, and no reviewer's latest review requests changes;
-   - a repository ruleset on `main` requires the `verify` check.
+   - a repository ruleset on `main` requires both the `verify` and `codex-review-gate` checks.
 
-   Otherwise it **cancels** auto-merge. Every new commit triggers a re-evaluation, so a new head never inherits an earlier
-   enablement. Auto-merge still waits for branch protection, so `verify` must pass before anything merges.
+   It publishes the decision as a **`codex-review-gate` commit status** on the head. The ruleset requires that status, so
+   GitHub itself blocks any head Codex has not cleared, even if a new commit lands before the workflow cancels anything.
+   Otherwise it **cancels** auto-merge. Re-evaluation runs on PR open, new commits, marking ready, and Codex's reviews and
+   summary updates.
 4. **Identity.** Codex is trusted only as its GitHub App: numeric ID `199175422`, login `chatgpt-codex-connector[bot]`
    and type `Bot`, all together. Any other account with the same name, or a copy of Codex's summary text, is ignored.
    The ID is pinned in `.github/scripts/codex-review-gate.jq` and both workflows; the test checks all three agree.
@@ -35,7 +37,8 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
 1. **Codex:** enable automatic pull request review for `zhrsidd/MUNOS` in the Codex settings for this repository.
 2. **Ruleset on `main`:** create a repository **ruleset** (not classic branch protection). The gate reads rulesets with the
    workflow token; classic protection can only be read with administration access, which this design avoids.
-   - Require the status check **`verify`** (from `ci.yml`).
+   - Require the status checks **`verify`** (from `ci.yml`) and **`codex-review-gate`** (published by the gate; add it
+     by name once the first gate run has reported it). The gate refuses to merge if either is missing.
    - Require pull requests before merging; block force pushes and deletions.
    - Add no bypass actors for automation.
    - Optional: require one human approval if the owner wants a person to approve every merge. The gate does not depend
@@ -54,6 +57,8 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
 
 - At most three `fix(review):` commits are created per PR. A fourth request posts `NEEDS_DECISION` and stops.
 - A repair runs only for a review on the **current** head. A review for an older commit is skipped.
+- Until the required `codex-review-gate` status exists on a head, GitHub blocks that head. A new PR therefore needs its
+  first gate run before it can merge, which the `opened` trigger provides.
 - Resolving the last open thread does not re-run the gate by itself. The next Codex summary update, a new commit, or a
   manual `workflow_dispatch` (input: pull request number) re-evaluates it. Until then auto-merge stays off.
 - Human inline threads block auto-merge until resolved, even when they are not Codex's. A human must decide them.
