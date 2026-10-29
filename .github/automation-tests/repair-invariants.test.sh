@@ -34,8 +34,12 @@ check(wf["permissions"] == {"contents": "read"}, "workflow-level permissions are
 
 # The repair job runs Claude with a shell, so it must not be able to push.
 check(repair["permissions"].get("contents") == "read", "repair job has contents: read, not write")
-check("write" not in [v for k, v in repair["permissions"].items() if k not in ("pull-requests", "issues")],
-      "repair job grants write only to pull-requests and issues")
+check({k for k, v in repair["permissions"].items() if v == "write"} == {"issues"},
+      "repair job can write only issues (comments), so it cannot resolve threads or dismiss reviews")
+check(repair["permissions"].get("pull-requests") == "read", "repair job has pull-requests: read, not write")
+every_permission = [wf["permissions"]] + [j.get("permissions", {}) for j in jobs.values()]
+check(all("id-token" not in p for p in every_permission),
+      "no job can request an OIDC token, so the action cannot exchange for the write-capable Claude App token")
 check("CLAUDE_AUTOMATION_TOKEN" not in blob(repair), "repair job never references the push token")
 check("git push" not in blob(repair).replace("Bash(git push:*)", ""), "repair job runs no git push")
 claude_steps = [s for s in repair["steps"] if str(s.get("uses", "")).startswith("anthropics/claude-code-action")]
@@ -46,6 +50,8 @@ check(claude["with"].get("github_token") == "${{ github.token }}",
 check("--disallowedTools" in claude["with"].get("claude_args", "") and "git push" in claude["with"].get("claude_args", ""),
       "Claude's tool list disallows git push")
 check(set(repair["outputs"].keys()) == {"has_patch"}, "repair job exposes only whether a patch exists")
+check("Resolve each review thread" not in claude["with"].get("prompt", "") and "Do not resolve or dismiss" in claude["with"].get("prompt", ""),
+      "Claude's prompt tells it not to resolve or dismiss reviews and threads")
 
 # The push job holds the push token, and only after the changed-file check.
 steps = push["steps"]
@@ -57,8 +63,11 @@ check(push["permissions"] == {"contents": "read"}, "push job has contents: read 
 check(apply_i < push_i, "the changed-file check runs before the push")
 check("steps.apply.outputs.changed == 'true'" in str(steps[push_i].get("if", "")), "the push runs only when the check passed and left changes")
 holders = [s.get("name", "") for s in steps if "CLAUDE_AUTOMATION_TOKEN" in blob(s)]
-check(holders == ["Push the checked repair", "Request a fresh Codex review of the repaired head"],
-      "only the push and the re-review request hold the push token")
+check(holders == ["Push the checked repair", "Request a fresh Codex review of the repaired head", "Resolve the Codex review threads"],
+      "only the push, the re-review request and the Codex-thread resolver hold the push token")
+resolve_i = names.index("Resolve the Codex review threads")
+check(resolve_i > push_i and "steps.push.outcome == 'success'" in str(steps[resolve_i].get("if", "")),
+      "threads are resolved only after a successful push")
 check("secrets." not in blob(steps[apply_i]), "the changed-file check holds no secret")
 pushers = [s.get("name", "") for s in steps if "git push" in str(s.get("run", ""))]
 check(pushers == ["Push the checked repair"], "git push appears only in the guarded push step")
@@ -73,7 +82,7 @@ check(secrets_used == ["CLAUDE_AUTOMATION_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"], "t
 check("## Protected paths in automated review repairs" in claude_md, "CLAUDE.md has the protected-paths section")
 section = claude_md.split("## Protected paths in automated review repairs", 1)[1]
 for needle in [".github/", ".claude/", ".mcp.json", ".env", "CLAUDE.md", "AGENTS.md", "package.json", "supabase/",
-               "target-guard.ts", "NEEDS_DECISION", "symlinks", "Do not commit or push"]:
+               "target-guard.ts", "NEEDS_DECISION", "symlinks", "Do not commit or push", "resolve or dismiss"]:
     check(needle in section, f"CLAUDE.md protected-paths section mentions {needle}")
 
 if failures:

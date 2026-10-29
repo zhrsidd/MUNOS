@@ -13,9 +13,9 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    whether findings remain. When it finds nothing, it reacts with a thumbs-up instead of approving. So a clean head is
    read from that summary state, never from a single comment or reaction.
 2. **`claude-review-repair.yml` (Claude repair).** After a Codex review on the current head that leaves unresolved Codex
-   threads, Claude edits files to fix what is actionable and resolves the threads it fixed. Claude cannot push. A separate
-   job checks the changed files, makes one `fix(review):` commit (at most three per PR), pushes it, and requests a fresh
-   Codex review with `@codex review`, once per new head. See "Write safety for repairs" below.
+   threads, Claude edits files to fix what is actionable. Claude cannot push and cannot resolve threads. A separate job
+   checks the changed files, makes one `fix(review):` commit (at most three per PR), pushes it, requests a fresh Codex
+   review with `@codex review` once per new head, and resolves Codex's own open threads. See "Write safety for repairs".
 3. **`codex-reviewed-automerge.yml` (gate).** Enables squash auto-merge only when **all** of these hold:
    - the head branch is in this repository, the base is `main`, and the PR is not a draft;
    - Codex's summary is `completed` for the current head, with no findings and no unresolved findings;
@@ -67,11 +67,12 @@ Claude runs with a shell, so the safety of its edits cannot rest on instructions
 credential out of its reach and checks the result before anything is pushed. `CLAUDE.md` tells Claude the same rules, but
 the workflow enforces them even if Claude ignores `CLAUDE.md`.
 
-1. **`repair` job (runs Claude).** It holds only the workflow token, with `contents: read` (plus `pull-requests` and `issues`
-   write for comments and threads). The action is given that token explicitly, so it does not exchange for the
-   write-capable Claude App token. `CLAUDE_AUTOMATION_TOKEN` is never referenced in this job. Claude edits files only; the
-   job collects the edits as a patch and uploads it. `git push` and the action's file-commit tools are also disallowed, as
-   defence in depth.
+1. **`repair` job (runs Claude).** It holds only the workflow token, with `contents: read`, `pull-requests: read` and
+   `issues: write` (for `NEEDS_DECISION` comments). Without `pull-requests: write` Claude cannot resolve a human's review
+   thread or dismiss a review, both of which the gate relies on. The job has no `id-token: write`, so the action cannot
+   obtain the write-capable Claude App token, and the action is also given the workflow token explicitly.
+   `CLAUDE_AUTOMATION_TOKEN` is never referenced in this job. Claude edits files only; the job collects the edits as a
+   patch and uploads it. `git push` and the action's file-commit tools are also disallowed, as defence in depth.
 2. **`push` job (fresh runner).** It applies the patch to the reviewed commit and judges the result, not the patch headers.
    It reads every changed path from `git diff --cached --raw -z --no-renames`, so a rename counts as a delete plus an add
    and both paths are checked. It refuses the whole patch, with an `::error::` that names the path, on any of:
@@ -82,6 +83,11 @@ the workflow enforces them even if Claude ignores `CLAUDE.md`.
 3. **Push.** Only after that check passes, one step holds `CLAUDE_AUTOMATION_TOKEN`. The job itself makes the single
    `fix(review):` commit, so Claude cannot choose the message that the three-repair cap counts. It confirms the branch is
    still at the reviewed commit, then pushes without force, so a moved branch fails closed.
+4. **Threads.** After a successful push, the `push` job resolves the open review threads whose first comment was written by
+   the pinned Codex App (matched by numeric ID, login and type, as the gate does). Human threads and impostors stay open.
+   It resolves nothing if the thread query fails or there are more than 100 threads. Resolving does not decide anything:
+   Codex's fresh review of the new head still has to come back clean before the gate clears it, and an unfixed finding is
+   raised again as a new thread.
 
 Protected paths (the `protected()` function in the `push` job; keep this table and `CLAUDE.md` in step with it):
 
@@ -98,13 +104,19 @@ owner decides.
 
 Residual risks:
 
-- The `repair` job's token can still write to pull requests and issues, so Claude could resolve a review thread without
-  fixing it or post a comment. The gate does not trust that: Codex must still clear the new head.
+- The `repair` job's token can still write issues, so Claude can post a comment (a misleading one, for example). The gate
+  does not read comments as clearance.
+- After any successful push, every open Codex thread is resolved, including one that Claude chose not to fix. Codex's next
+  review of the new head decides: an unfixed finding comes back as a new thread and blocks the gate.
 - The check is path-based. It does not judge whether an allowed change is correct; Codex's review and `verify` do.
 - The workflow files themselves still come from the pull request head, as for any pull request (see the bootstrap trust
   limits). Someone with write access can edit this guard in a PR, so changes under `.github/` need the owner's review.
 - Not proven live: that the action runs with the read-only token and the tool list in `claude_args`, and that it cannot push
-  with it. Run the acceptance test before relying on this.
+  with it. The action's documentation does not say how it pushes, so the guarantee rests on the token and permissions,
+  not on the action's internals. Run the acceptance test before relying on this.
+- `git add -A` in the `repair` job collects whatever the action or `npm` writes into the checkout. A stray file under a
+  protected path, such as a `.claude/` file, would make every repair fail closed. That is safe but would stop the feature
+  working, so check the patch artifact's file list on the first live run.
 
 ## One-time bootstrap (before the gate is on main)
 
@@ -158,8 +170,10 @@ from editing the workflows, which is the trust model the rest of this document a
 - Repair write safety: `bash .github/automation-tests/repair-push.test.sh` runs the `push` job's real check and push steps
   against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
   executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
-  go through. `bash .github/automation-tests/repair-invariants.test.sh` checks that the job running Claude holds no push
-  credential and that only the guarded step pushes.
+  go through. `bash .github/automation-tests/repair-resolve.test.sh` runs the thread-resolution step against a fake `gh`:
+  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-invariants.test.sh` checks that the job
+  running Claude holds no push credential or pull-request write access, that no job can request an OIDC token, and that only
+  the guarded steps use the push token. Each suite was mutation-tested: weakening the guard makes the matching cases fail.
 - Workflow syntax and expressions: `actionlint .github/workflows/*.yml`.
 
 ## Acceptance test (required before enabling for real work)
@@ -177,3 +191,6 @@ Use a disposable same-repository PR, not a production change.
    `NEEDS_DECISION:`.
 8. In the `repair` run, confirm Claude's own attempts to push (if any) fail, and that the action authenticates with
    `CLAUDE_CODE_OAUTH_TOKEN` and the read-only workflow token.
+9. Open the `repair-patch` artifact on the first live run and check its file list contains only the intended edits.
+10. Leave a human review thread open during a repair. After the push, only Codex's threads must be resolved, and the
+    human thread must still be open.

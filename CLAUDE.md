@@ -32,7 +32,8 @@ whole, including the changes to other files in it. When you run as that workflow
 - `docs/AGENT_AUTOMATION.md`.
 
 Do not add symlinks or submodules, change file modes, or rename or delete a protected file. Do not commit or push: edit files
-and leave the rest to the workflow. If a Codex finding needs a change to a protected path, change nothing and comment
+and leave the rest to the workflow. Do not resolve or dismiss any review or review thread: the workflow resolves Codex's own
+threads after a push, and Codex's next review decides whether each finding is fixed. If a Codex finding needs a change to a protected path, change nothing and comment
 `NEEDS_DECISION:` with the finding and the path. The owner decides.
 
 These rules bind the automated workflow only. In an interactive session, edit a protected path only when the owner directs it,
