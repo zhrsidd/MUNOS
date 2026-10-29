@@ -83,7 +83,8 @@ After this pull request merges, delete `CODEX_GATE_BOOTSTRAP_PR` and `CODEX_GATE
 `stage-gate.sh` then has no effect. Remove that path in a follow-up change so no bootstrap code remains.
 
 Trust limits of the bootstrap: the workflow files still come from the pull request head, as they do for any pull
-request. The pinned tree stops drift in the gate scripts after review. It does not stop someone with write access
+request. The workflow checks the pinned tree before it runs any script from the head, so editing the staging script
+cannot skip the check. The pinned tree stops drift in the gate scripts after review. It does not stop someone with write access
 from editing the workflows, which is the trust model the rest of this document already assumes.
 
 ## Behaviour and limits
