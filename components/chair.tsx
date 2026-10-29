@@ -1,12 +1,13 @@
 "use client";
-import Link from "next/link";
 import { AmendmentInbox } from "./amendments/inbox";
 import { PassedAmendmentHistory } from "./amendments/history";
 import {DebateConsole} from "./debate-console";
 import {VotingConsole} from "./voting-console";
+import { RollCallPanel } from "./roll-call";
+import { useCommitteeSession } from "./session-status";
 import { useState } from "react";
 import { useConference } from "@/lib/context";
-import { AttendanceStatus, Delegate } from "@/lib/domain";
+import { Delegate } from "@/lib/domain";
 import { participationSummary, votingOutcome, effectiveScoring } from "@/lib/repository";
 import { frozenOrder, participationOrder } from "@/lib/commands";
 import { contributionCount, isContribution } from "@/lib/participation-view";
@@ -17,18 +18,15 @@ import { resolutionLabel } from "@/lib/resolution-identity";
 import {
   Chip,
   DelegateIdentity,
-  Empty,
   Modal,
   PageHeading,
   Panel,
 } from "./ui";
 export function Scorer({
   delegate,
-  sessionId,
   resolutionId,
 }: {
   delegate: Delegate;
-  sessionId: string;
   resolutionId: string | null;
 }) {
   const { data, act } = useConference();
@@ -50,7 +48,7 @@ export function Scorer({
                       delegateId: delegate.id,
                       categoryId: category.id,
                       points,
-                      sessionId,
+                      committeeId: delegate.committeeId,
                       resolutionId,
                     },
                     "chair",
@@ -69,11 +67,9 @@ export function Scorer({
 export function ChairScreen({
   section,
   committeeId,
-  sessionId,
 }: {
   section: string;
   committeeId: string;
-  sessionId: string;
 }) {
   const { data, act } = useConference();
   const [search, setSearch] = useState("");
@@ -85,7 +81,9 @@ export function ChairScreen({
   const [keyboardInList, setKeyboardInList] = useState(false);
   const [adjusted, setAdjusted] = useState("");
   const committee = data.committees.find((c) => c.id === committeeId)!;
-  const session = data.sessions.find((s) => s.id === sessionId);
+  // Sessions follow the published schedule; this is only what the schedule says now ("this session" in the counts below).
+  const { session, resolution: scheduleNow } = useCommitteeSession(committeeId);
+  const since = scheduleNow?.windowStart ?? null;
   const delegates = data.delegates.filter((d) => d.committeeId === committeeId);
   const filtered = delegates.filter((d) =>
     `${d.country} ${d.name} ${data.schools.find((s) => s.id === d.schoolId)?.name}`
@@ -95,39 +93,19 @@ export function ChairScreen({
   const resolution = data.documents.find(
     (r) => r.committeeId === committeeId && r.status === "In Debate",
   );
-  const attendance = data.attendance.filter((a) => a.sessionId === sessionId);
-  const present = attendance.filter((a) => a.status !== "Absent").length;
-  const pv = attendance.filter((a) => a.status === "Present & Voting").length;
   const events = data.events
-    .filter((e) => e.sessionId === sessionId && !e.voidedAt)
+    .filter((e) => e.committeeId === committeeId && (!since || e.createdAt >= since) && !e.voidedAt)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const detail = delegates.find((d) => d.id === selected);
   const edit = data.events.find((e) => e.id === eventEdit);
   const voteList = data.votes.filter(
-    (v) => v.resolutionId === resolution?.id && v.sessionId === sessionId,
+    (v) => v.resolutionId === resolution?.id && !v.sessionId,
   );
   if (section === "amendments") return <><AmendmentInbox committeeId={committeeId} /><PassedAmendmentHistory committeeId={committeeId} /></>;
-  if (!session)
-    return (
-      <>
-        <PageHeading
-          eyebrow={committee.code}
-          title="Ready when you are"
-          description="Select the current session above to begin roll call and debate."
-        />
-        <Empty
-          title="No session configured"
-          text="The committee exists. Add its first session to start recording conference activity."
-        />
-        <Link className="button primary" href="/admin/sessions">
-          Configure sessions
-        </Link>
-      </>
-    );
   const heading = {
     "roll-call": [
       "Roll call",
-      "One attendance record per delegate, per session. Voting eligibility updates automatically.",
+      "Take the whole roll call, then commit it once. Copy the last one and change only what differs.",
     ],
     participation: [
       "Participation log",
@@ -144,103 +122,25 @@ export function ChairScreen({
   return (
     <>
       <PageHeading
-        eyebrow={`${committee.code} · ${session.name}`}
+        eyebrow={`${committee.code} · ${session?.name ?? "No session"}`}
         title={heading[0]}
         description={heading[1]}
         action={
           <div className="session-status">
             <span className="dot" />
-            {session.state === "active"
-              ? "Session active"
-              : "Session ready"}{" "}
+            {session ? "Session in progress" : "Between sessions"}{" "}
             <small>{committee.room}</small>
           </div>
         }
       />
-      {!section && <DebateConsole committeeId={committeeId} sessionId={sessionId} />}
-      {section === "roll-call" && (
-        <>
-          <div className="metrics">
-            <Metric value={present} label="Present in the room" />
-            <Metric value={pv} label="Present & Voting" />
-            <Metric
-              value={attendance.filter((a) => a.status === "Absent").length}
-              label="Absent"
-            />
-            <Metric
-              value={delegates.length - attendance.length}
-              label="Not yet called"
-            />
-          </div>
-          <Panel
-            title="Delegations"
-            subtitle={`${session.name} · Select one attendance status`}
-            action={<Search value={search} onChange={setSearch} />}
-          >
-            <div className="roll-list">
-              {filtered.map((d) => {
-                const status = attendance.find(
-                  (a) => a.delegateId === d.id,
-                )?.status;
-                return (
-                  <div className="roll-row" key={d.id}>
-                    <button
-                      className="identity-button"
-                      onClick={() => setSelected(d.id)}
-                    >
-                      <DelegateIdentity delegate={d} detail />
-                    </button>
-                    <div
-                      className="attendance-segments"
-                      role="group"
-                      aria-label={`Attendance for ${d.country}`}
-                    >
-                      {(
-                        [
-                          "Present",
-                          "Present & Voting",
-                          "Absent",
-                        ] as AttendanceStatus[]
-                      ).map((s) => (
-                        <button
-                          key={s}
-                          aria-pressed={s === status}
-                          className={s === status ? "selected" : ""}
-                          onClick={() =>
-                            void act(
-                              {
-                                type: "attendance",
-                                delegateId: d.id,
-                                sessionId,
-                                status: s,
-                              },
-                              "chair",
-                            )
-                          }
-                        >
-                          {s === status ? "✓ " : ""}
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Panel>
-          <p className="footnote">
-            Changing a delegate to Absent removes their vote in this session.
-            Present & Voting removes any abstention. Click a delegation for
-            contact details.
-          </p>
-        </>
-      )}
+      {!section && <DebateConsole committeeId={committeeId} />}
+      {section === "roll-call" && <RollCallPanel committeeId={committeeId} />}
       {section === "participation" && (
         <>
           <div className="metrics">
             <Metric value={contributionCount(events)} label="Contributions this session" />
             <Metric
-              value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && a.sessionId === sessionId).reduce((m, a) => m + a.points, 0), 0)}
+              value={events.reduce((n, e) => n + e.points, 0) + delegates.reduce((n, d) => n + (data.pointAdjustments ?? []).filter((a) => a.delegateId === d.id && (!since || a.createdAt >= since)).reduce((m, a) => m + a.points, 0), 0)}
               label="Points awarded this session (net)"
             />
             <Metric
@@ -296,7 +196,6 @@ export function ChairScreen({
                   </span>
                   <Scorer
                     delegate={d}
-                    sessionId={sessionId}
                     resolutionId={resolution?.id || null}
                   />
                   <button
@@ -381,7 +280,7 @@ export function ChairScreen({
           <AdjustmentHistory committeeId={committeeId} />
         </>
       )}
-      {section === "voting" && <VotingConsole committeeId={committeeId} sessionId={sessionId} />}
+      {section === "voting" && <VotingConsole committeeId={committeeId} />}
       {detail && (
         <Modal title="Delegate details" onClose={() => setSelected(null)}>
           <DelegateIdentity delegate={detail} detail />
@@ -406,7 +305,6 @@ export function ChairScreen({
       {deducting && delegates.find((d) => d.id === deducting) && (
         <DeductPoints
           delegate={delegates.find((d) => d.id === deducting)!}
-          sessionId={sessionId}
           onClose={(saved) => {
             const who = delegates.find((d) => d.id === deducting)!;
             setDeducting(null);

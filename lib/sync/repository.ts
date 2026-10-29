@@ -6,6 +6,7 @@ import type { ConferenceData, Role } from "../domain";
 import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
 import { committeeOfCommand, displayedLabel } from "../sessions/display";
+import { isLive } from "../sessions/presence";
 import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
   actorId: string;
@@ -38,23 +39,24 @@ export interface Health {
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
   if(isBatchCommand(c))return batchFingerprint(data,c);
+  // Live state is keyed by committee (an older saved action names a session, which identifies the committee).
+  const cid=committeeOfCommand(data,c)??"";
   switch (c.type) {
     case "staffContact": return String(data.staff.find(s=>s.id===c.id)?.contactRevision ?? 1);
     case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);
-    case "debateMode": return String(data.debateStates?.find(x=>x.sessionId===c.sessionId)?.revision??0);
-    case "queueOrder": return data.queue.filter(q=>q.sessionId===c.sessionId&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
+    case "debateMode": return String(data.debateStates?.find(x=>isLive(x,cid))?.revision??0);
+    case "queueOrder": return data.queue.filter(q=>isLive(q,cid)&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
     case "poiOrder": return (data.poiQueue??[]).filter(q=>q.speechId===c.speechId).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
-    case "speechStart": return data.speeches?.find(s=>s.sessionId===c.sessionId&&s.state!=="finished")?.id??"empty";
+    case "speechStart": return data.speeches?.find(s=>isLive(s,cid)&&s.state!=="finished")?.id??"empty";
     case "speechYield": case "speechFinish": case "poiAllowance": case "poiRecognize": case "poiScore": case "poiRemove": return String(data.speeches?.find(s=>s.id===c.speechId)?.revision??0);
     case "voteMode": return String(data.documents.find(r=>r.id===c.resolutionId)?.revision??0);
-    case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
-    case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
+    case "queue": return c.advance ? data.queue.filter(q => isLive(q,cid)).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
     case "event": return String(data.events.find(e=>e.id===c.id)?.revision ?? 0);
     // A clear-majority close is bound to the revision the Chair opened it on, not the one current at confirm time.
     case "document": case "version":
       if(c.type==="document"&&c.method==="observed"&&c.status==="Closed"&&c.outcome!=="Withdrawn")return String(c.ballotRevision??"missing");
       return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
-    case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
+    case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && !v.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
     default: return isOperationsCommand(c)?operationsFingerprint(data,c):null;
   }
 }

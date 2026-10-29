@@ -67,7 +67,8 @@ export interface PhotoEpoch {
 export interface PointAdjustment {
   id: string;
   delegateId: string;
-  sessionId: string;
+  /** Legacy: the session a Chair had selected. New adjustments carry none; the server's label gives the session. */
+  sessionId?: string | null;
   points: number;
   reason: string;
   chairId: string;

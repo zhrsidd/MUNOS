@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { rollCallAt } from "@/lib/sessions/presence";
 import { useConference } from "@/lib/context";
 import { committeePhotoReminders, type PhotoReminder } from "@/lib/operations/photo-reminders";
 import { zonedDay, zonedTime } from "@/lib/operations/time";
@@ -94,15 +95,17 @@ export function PhotoAlert({ reminder, absent, open, onToggle, onAcknowledge }: 
     </div>
   );
 }
-function ReminderCard({ reminder, committeeId, sessionId, prominent }: { reminder: PhotoReminder; committeeId: string; sessionId: string; prominent: boolean }) {
+function ReminderCard({ reminder, committeeId, prominent }: { reminder: PhotoReminder; committeeId: string; prominent: boolean }) {
   const { data, act } = useConference();
   const [open, setOpen] = useState(prominent || reminder.stage === "due");
-  const absent = new Set(data.attendance.filter((a) => a.sessionId === sessionId && a.status === "Absent").map((a) => a.delegateId));
+  // Absent in the live roll call (presence comes from roll calls now).
+  const live = rollCallAt(data, committeeId);
+  const absent = new Set((live?.rows ?? []).filter((r) => r.status === "Absent").map((r) => r.delegateId));
   const acknowledge = (s: "warning" | "due") => void act({ type: "photoAck", committeeId, slotId: reminder.slot.id, stage: s, revision: reminder.slot.revision, epoch: reminder.epoch, chairs: reminder.chairsVersion }, "chair");
   return <PhotoAlert reminder={reminder} absent={absent} open={open} onToggle={() => setOpen(!open)} onAcknowledge={acknowledge} />;
 }
 /** Shown on every Chair Console screen, prominently on Debate. Derived from slot times on this device; works offline and after refresh. */
-export function PhotoReminderBanner({ committeeId, sessionId, prominent = false }: { committeeId: string; sessionId: string; prominent?: boolean }) {
+export function PhotoReminderBanner({ committeeId, prominent = false }: { committeeId: string; prominent?: boolean }) {
   const { data } = useConference();
   const now = useClock();
   const active = committeePhotoReminders(data, committeeId, now).filter((r) => r.attention);
@@ -110,7 +113,7 @@ export function PhotoReminderBanner({ committeeId, sessionId, prominent = false 
   return (
     <div className={`photo-banner${prominent ? " prominent" : ""}`} aria-label="Group photo alert">
       {active.map((r) => (
-        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.epoch}-${r.chairsVersion}-${r.stage}`} reminder={r} committeeId={committeeId} sessionId={sessionId} prominent={prominent} />
+        <ReminderCard key={`${r.slot.id}-${r.slot.revision}-${r.epoch}-${r.chairsVersion}-${r.stage}`} reminder={r} committeeId={committeeId} prominent={prominent} />
       ))}
     </div>
   );

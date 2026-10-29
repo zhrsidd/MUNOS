@@ -29,7 +29,8 @@ export type OperationsCommand =
   | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number; epoch?: number; chairs?: string }
   /** A Chair's school for group photos; null clears it. */
   | { type: "staffSchool"; staffId: string; schoolId: string | null }
-  | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
+  /** `sessionId` only on actions saved by an older build: it must be the delegate's committee's; the deduction is committee-level. */
+  | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId?: string; amount: number; reason: string }
   | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string }
   /**
    * Session schedule (docs/SESSION_MODEL.md 12.4). Executive only, applied by the database; the offline demo has no schedule data.
@@ -210,9 +211,8 @@ export function applyOperationsCommand(
       if (c.action === "deduct") {
         const problem = deductionProblem(c.amount, c.reason);
         if (problem) throw Error(problem);
-        const session = d.sessions.find((s) => s.id === c.sessionId);
-        if (!session || session.committeeId !== delegate.committeeId) throw Error("Session unavailable.");
-        list.push({ id, delegateId: delegate.id, sessionId: session.id, points: -c.amount, reason: c.reason.trim(), chairId: actorId, chairName: null, reverses: null, createdAt: now });
+        if (c.sessionId && d.sessions.find((s) => s.id === c.sessionId)?.committeeId !== delegate.committeeId) throw Error("Session unavailable.");
+        list.push({ id, delegateId: delegate.id, sessionId: null, points: -c.amount, reason: c.reason.trim(), chairId: actorId, chairName: null, reverses: null, createdAt: now });
       } else {
         const original = list.find((a) => a.id === c.adjustmentId);
         if (!original) throw Error("Adjustment unavailable.");

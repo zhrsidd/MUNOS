@@ -1,4 +1,4 @@
-import { ConferenceData } from "./domain";
+import type { AttendanceStatus, ConferenceData } from "./domain";
 const timestamp = "2026-10-05T06:30:00.000Z";
 const countries = [
   ["France", "🇫🇷", "Mohammad Maaz"],
@@ -216,18 +216,18 @@ export function createSeed(): ConferenceData {
         state: "active",
       },
     ],
-    attendance: delegates.map((d, i) => ({
-      id: `a${i}`,
-      delegateId: d.id,
-      sessionId:
-        d.committeeId === "ecosoc"
-          ? "s2"
-          : d.committeeId === "sc"
-            ? "s3"
-            : "s1",
-      status:
-        i === 10 ? "Absent" : i % 3 === 0 ? "Present & Voting" : "Present",
-      updatedAt: timestamp,
+    // Presence comes from committed roll calls (docs/SESSION_MODEL.md section 6): one per committee for the demo.
+    attendance: [],
+    rollCalls: ["ga1", "ecosoc", "sc"].map((committeeId) => ({
+      id: `rc-${committeeId}`,
+      revision: 1,
+      committeeId,
+      observedAt: timestamp,
+      committedAt: timestamp,
+      effectiveAt: timestamp,
+      timeConfidence: "trusted" as const,
+      rows: delegates.flatMap((d, i) => d.committeeId === committeeId
+        ? [{ delegateId: d.id, status: (i === 10 ? "Absent" : i % 3 === 0 ? "Present & Voting" : "Present") as AttendanceStatus }] : []),
     })),
     documents: docs,
     versions: docs.flatMap((d) =>
@@ -248,14 +248,14 @@ export function createSeed(): ConferenceData {
       categoryId: i % 3 === 0 ? "poi" : "speech",
       points: i % 3 === 0 ? 2 : (i % 3) + 1,
       createdAt: `2026-10-05T06:${String(31 + i).padStart(2, "0")}:00.000Z`,
-      sessionId: "s1",
+      committeeId: "ga1",
       resolutionId: "r1",
       chairId: "chair-demo",
     })),
     queue: [
-      { id: "q1", delegateId: "d0", sessionId: "s1", position: 0 },
-      { id: "q2", delegateId: "d1", sessionId: "s1", position: 1 },
-      { id: "q3", delegateId: "d2", sessionId: "s1", position: 2 },
+      { id: "q1", delegateId: "d0", committeeId: "ga1", position: 0 },
+      { id: "q2", delegateId: "d1", committeeId: "ga1", position: 1 },
+      { id: "q3", delegateId: "d2", committeeId: "ga1", position: 2 },
     ],
     votes: [],
     scoring: [

@@ -10,7 +10,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: 
 const QUICK = [1, 2, 3, 5, 10];
 
 /** Deduct a chosen number of points. Recorded as an adjustment; the delegate's original scores are not changed. */
-export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Delegate; sessionId: string; onClose: (savedAmount?: number) => void }) {
+export function DeductPoints({ delegate, onClose }: { delegate: Delegate; onClose: (savedAmount?: number) => void }) {
   const { data, act } = useConference();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -24,7 +24,7 @@ export function DeductPoints({ delegate, sessionId, onClose }: { delegate: Deleg
     const problem = deductionProblem(parsed, reason);
     if (problem) return setError(problem);
     setBusy(true);
-    const ok = await act({ type: "pointAdjustment", action: "deduct", delegateId: delegate.id, sessionId, amount: parsed, reason: reason.trim() }, "chair");
+    const ok = await act({ type: "pointAdjustment", action: "deduct", delegateId: delegate.id, amount: parsed, reason: reason.trim() }, "chair");
     setBusy(false);
     if (ok) onClose(parsed);
   }
