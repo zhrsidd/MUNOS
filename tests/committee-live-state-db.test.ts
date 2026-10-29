@@ -167,3 +167,25 @@ test('real PostgreSQL: resolutions and amendments no longer need a session point
   }
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a roll call is admitted, labelled and made effective by its own commit time, not the action that carries it',async()=>{
+ const f=await fixture();const {db,now,send,delegates,roll,one,count,session,A,ops}=f;
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const stored=()=>count('select 1 from public.roll_call where created_by is not null and id<>$1',['da2fcd3a-3f33-41c3-a06d-82bd22b6bc3e']);
+  const before=await stored();
+  // The carrying action is on time, but the roll call claims a commit time 30 minutes ahead: held, never live.
+  const future=crypto.randomUUID();
+  const heldId=await send(roll(present(delegates[0]),{id:future,committed:now+30*M,observed:now+30*M-1000}),now);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[heldId])).reason,'uncertain_time');
+  assert.equal(await stored(),before,'the future-dated roll call is not stored while it is held');
+  // The carrying action's own clock is 3 hours stale, but the roll call's commit time is trusted and inside A's window: applied and labelled A.
+  const fresh=crypto.randomUUID();
+  await send(roll(present(delegates[0]),{id:fresh,committed:now-60_000}),now-3*H);
+  assert.equal(await stored(),before+1,'admitted on the roll call\'s own time');
+  const e=await one<{e:string}>('select effective_at e from public.roll_call where id=$1',[fresh]);
+  assert.ok(Math.abs(new Date(e.e).getTime()-(now-60_000))<=1,'effective at its commit time');
+  const l=await one<{a:string|null}>(`select assigned_label a from public.record_label where record_table='roll_call' and record_id=$1`,[fresh]);
+  assert.equal(l.a,await session(A),'labelled by the session holding its effective time');
+ }finally{await db.close();}
+});

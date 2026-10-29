@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshDatabase} from './helpers/database';
+import {day,setFixtureTimeZone} from './helpers/session-fixture';
 
 // Session model phase 3a (docs/SESSION_MODEL.md 2, 4, 12.5): every Record-class row is labelled by the server, in the same
 // transaction as the record, from the schedule version in effect at the action's trusted time. Labels only: nothing is held.
@@ -8,11 +9,11 @@ const U=(n:number)=>`78000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`
 const exec=U(1),chair=U(2);
 const H=3600_000,M=60_000;
 const iso=(t:number)=>new Date(t).toISOString();
-const day=(t:number)=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Asia/Qatar'});
 
 async function setup(){
  const f=await freshDatabase();
  const {db,ids,query,as,asOwner,grant}=f;
+ await setFixtureTimeZone(db,ids.conference);
  await grant(exec,'admin');await grant(chair,'chair',ids.ga1);
  const now=Date.now();
  const slot=async(name:string,start:number,end:number)=>{

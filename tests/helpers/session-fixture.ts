@@ -6,11 +6,17 @@ export const U=(n:number)=>`79000000-0000-4000-8000-${n.toString(16).padStart(12
 export const exec=U(1),chair=U(2),whoChair=U(3);
 export const H=3600_000,M=60_000;
 export const iso=(t:number)=>new Date(t).toISOString();
-export const day=(t:number)=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Asia/Qatar'});
+// Fixtures place sessions up to 5 hours either side of the real clock, and a session window never crosses local midnight. Run the conference
+// in a fixed-offset zone where "now" is local midday, so the fixtures mean the same thing at any time of day (the real venue is Asia/Qatar).
+export const fixtureTimeZone=(at=Date.now())=>{const k=12-new Date(at).getUTCHours();return k===0?'Etc/GMT':k>0?`Etc/GMT-${k}`:`Etc/GMT+${-k}`;};
+export const day=(t:number)=>new Date(t).toLocaleDateString('en-CA',{timeZone:fixtureTimeZone()});
+export const setFixtureTimeZone=async(db:{query:(sql:string,p?:unknown[])=>Promise<unknown>},conference:string)=>{
+ await db.query(`insert into private.conference_settings(conference_id,time_zone) values($1,$2) on conflict (conference_id) do update set time_zone=excluded.time_zone`,[conference,fixtureTimeZone()]);};
 
 export async function setupSessions(){
  const f=await freshDatabase();
  const {db,ids,query,as,asOwner,grant}=f;
+ await setFixtureTimeZone(db,ids.conference);
  await grant(exec,'admin');await grant(chair,'chair',ids.ga1);await grant(whoChair,'chair',ids.who);
  const now=Date.now();
  const mutate=async(user:string,command:Record<string,unknown>,role:string,clientTime:number,key=crypto.randomUUID(),expected:string|null=null)=>{

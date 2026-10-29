@@ -79,3 +79,21 @@ test('amendment links, public submission, limits, lifecycle, RLS and token-safe 
   await f.query(`update public.documents set status='Closed',outcome='Passed' where id=$1`,[doc.id]);await f.as(chair);assert.deepEqual((await f.snapshot()).amendments,[]);assert.equal((await f.query<{n:number}>('select count(*)::int n from public.amendments'))[0].n,20,'closed resolution history stays stored');
  }finally{await f.db.close();}
 });
+
+test('a slot can be archived while a resolution is in debate: retained document and session pointers are history, not a guard',async()=>{
+ const f=await setup();
+ try{
+  await f.as(admin);
+  const create:Command={type:'sessionSlot',action:'create',name:'Pointer slot',startsAt:'2026-11-06T06:00:00Z',endsAt:'2026-11-06T09:00:00Z'};
+  await (await f.mutate(create)).run;
+  const data=await f.snapshot();const slot=data.sessionSlots!.find(x=>x.name==='Pointer slot')!;
+  const local=data.sessions.find(x=>x.slotId===slot.id&&x.committeeId===f.ids.ga1)!;
+  await f.asOwner();
+  await f.db.query(`update public.committees set "currentSessionId"=$1 where id=$2`,[local.id,f.ids.ga1]);
+  await f.db.query(`update public.documents set "sessionId"=$1 where id=$2`,[local.id,f.ids.resolution]);
+  assert.equal((await f.query<{n:number}>(`select count(*)::int n from public.documents where id=$1 and status='In Debate'`,[f.ids.resolution]))[0].n,1);
+  await f.as(admin);
+  await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});
+  assert.ok((await f.snapshot()).sessionSlots!.find(x=>x.id===slot.id)?.archived);
+ }finally{await f.db.close();}
+});
