@@ -1,0 +1,63 @@
+{
+  "repo": "zhrsidd/MUNOS",
+  "branch_protected": true,
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [{ "context": "verify" }]
+      }
+    }
+  ],
+  "pr": {
+    "number": 79,
+    "state": "open",
+    "draft": true,
+    "base": { "ref": "main", "sha": "dc72afa6ad4a6c7aa2f0e957328b8790a2744e82" },
+    "head": {
+      "ref": "automation/claude-codex-review-loop",
+      "sha": "00499a0509d86ab15107069569de688a29ef8652",
+      "repo": { "full_name": "zhrsidd/MUNOS" }
+    }
+  },
+  "reviews": [
+    {
+      "id": 5704468854,
+      "state": "COMMENTED",
+      "commit_id": "00499a0509d86ab15107069569de688a29ef8652",
+      "submitted_at": "2026-10-29T20:24:29Z",
+      "user": { "login": "chatgpt-codex-connector[bot]", "id": 199175422, "type": "Bot" }
+    }
+  ],
+  "issue_comments": [
+    {
+      "id": 6507462414,
+      "body": "@codex review",
+      "updated_at": "2026-10-29T20:22:41Z",
+      "user": { "login": "zhrsidd", "id": 326150552, "type": "User" }
+    },
+    {
+      "id": 6507467898,
+      "body": "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"00499a0509d86ab15107069569de688a29ef8652\",\"has_any_findings\":true,\"has_unresolved_findings\":true,\"status\":\"completed\"},\"security_review\":{\"commit_sha\":null,\"has_any_findings\":null,\"has_unresolved_findings\":null,\"status\":null}} -->\n\n## Codex Review Summary",
+      "updated_at": "2026-10-29T20:24:34Z",
+      "user": { "login": "chatgpt-codex-connector[bot]", "id": 199175422, "type": "Bot" }
+    }
+  ],
+  "review_comments": [
+    {
+      "id": 4417496971,
+      "body": "**P2** Use credentials capable of reading branch protection",
+      "user": { "login": "chatgpt-codex-connector[bot]", "id": 199175422, "type": "Bot" }
+    },
+    {
+      "id": 4417496979,
+      "body": "**P2** Allow the configured reviewer bot to trigger Claude",
+      "user": { "login": "chatgpt-codex-connector[bot]", "id": 199175422, "type": "Bot" }
+    }
+  ],
+  "threads": [
+    { "id": "PRRT_kwDOU8jpqc6xvU79", "isResolved": false, "isOutdated": false, "first_comment_id": 4417496971 },
+    { "id": "PRRT_kwDOU8jpqc6xvU8D", "isResolved": false, "isOutdated": false, "first_comment_id": 4417496979 }
+  ]
+}
