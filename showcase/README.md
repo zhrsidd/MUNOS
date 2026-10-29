@@ -39,7 +39,7 @@ No environment variables, database credentials or server functions are required.
 
 Reference: https://developers.cloudflare.com/pages/configuration/build-configuration/
 
-The site still carries staging `noindex, nofollow` metadata. Remove that tag in index.html when ready for search indexing. Do not deploy the repository root, which is the separate DCMUN application.
+The public site allows indexing and large image previews. Do not deploy the repository root, which is the separate DCMUN application.
 
 ## Previous GitHub Pages preparation
 
@@ -53,4 +53,4 @@ The compact conference-history section names DCMUN XVIII and PHESMUN X as reques
 
 Static Open Graph and Twitter Card tags in index.html point to https://munos.pages.dev/ and its public 1200×630 social-preview.png. Bots can read these tags without JavaScript or authentication. The generated PNG is committed, so deployment builds need no browser. To regenerate it after a logo update: install Chromium with `npx playwright install chromium`, then run `node scripts/render-social-image.mjs` from showcase/.
 
-If you add a custom domain, update canonical, og:url and the absolute Open Graph/Twitter image URLs together. Staging noindex metadata is independent of the robots.txt crawl allowance. After deployment, refresh LinkedIn's cached preview at https://www.linkedin.com/post-inspector/ and then add the link again.
+If you add a custom domain, update canonical, og:url and the absolute Open Graph/Twitter image URLs together. The public landing page uses index/follow/max-image-preview:large and robots.txt allows crawling. After deployment, refresh LinkedIn's cached preview at https://www.linkedin.com/post-inspector/ and then add the link again.

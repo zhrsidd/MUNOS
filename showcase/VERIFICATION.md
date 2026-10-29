@@ -42,3 +42,7 @@ Added a compact “Conferences this was used at” section below the hero with D
 ## Social link preview
 
 The live Cloudflare project was confirmed as munos.pages.dev, deploying codex/munos-showcase from showcase/. LinkedInBot-style HTTP request returned 200 HTML with no Open Graph tags; /robots.txt returned the HTML SPA fallback. Added static canonical/Open Graph/Twitter tags, a publicly served 1200×630 PNG rendered from the current vector logo, and a plain-text crawl allowance. Retained existing staging noindex metadata. The crawler integration test failed before the fix (missing og:title) and passed after; all 5 browser/request tests pass. Preview image inspected. No Cloudflare security or conference application configuration changed. LinkedIn itself may need its cache refreshed through Post Inspector.
+
+## LinkedIn Projects follow-up
+
+Owner reports that Projects → Add media still fails for HTTP and HTTPS. Both public URLs resolve to HTTPS 200, image is image/png 200, and robots.txt is plain text with Allow: /. Removed remaining staging noindex/nofollow metadata in favour of index/follow/max-image-preview:large for the public site. This corrects a crawler restriction but is not proof that LinkedIn's Projects importer accepts the URL. Regression assertion failed on old noindex/nofollow before the change. Post Inspector result requested to diagnose any remaining LinkedIn-specific rejection.

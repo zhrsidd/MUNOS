@@ -89,6 +89,8 @@ test('social crawlers receive static Open Graph metadata and a valid PNG preview
   const response = await request.get('/', { headers: { 'User-Agent': 'LinkedInBot/1.0' } });
   expect(response.ok()).toBeTruthy();
   const html = await response.text();
+  const robotsDirective = html.match(/<meta name="robots" content="([^"]+)"/)?.[1];
+  expect(robotsDirective).not.toMatch(/noindex|nofollow/);
   expect(html).toContain('property="og:title"');
   expect(html).toContain('property="og:description"');
   expect(html).toContain('property="og:url" content="https://munos.pages.dev/"');
