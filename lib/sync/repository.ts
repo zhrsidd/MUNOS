@@ -1,7 +1,7 @@
 import {batchFingerprint} from '../batch/commands';
 import {isBatchCommand} from '../batch/types';
 import {operationsFingerprint} from "../operations/fingerprint";
-import {isOperationsCommand} from "../operations/commands";
+import {isOperationsCommand,serverOnlyCommandTypes} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
 import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
@@ -120,6 +120,7 @@ export class DurableRepository implements ConferenceRepository {
     // The single queue/apply boundary: normalise BEFORE the fingerprint, the local apply and the persisted outbox entry,
     // so the queued JSON, its replay and the server's idempotent retry are identical (a title-less create never reaches SQL).
     const command = normalizeCommand(raw);
+    if(!this.transport && serverOnlyCommandTypes.has(command.type)) throw Error("Schedule and review changes are made on the live conference database.");
     // A transaction commits before any optimistic state or successful-save message is visible.
     const mutation: Mutation={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:this.transport?.actorId ?? `${role}-demo`,role,command,expected:fingerprint(this.data,command),state:"pending"};
     // Hosted only: the device protocol block. The sequence is allocated before the transaction, so a refused save leaves a gap, never a repeat.

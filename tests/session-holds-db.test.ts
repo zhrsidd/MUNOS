@@ -252,3 +252,58 @@ test('real PostgreSQL: a published session cannot be deleted - archive it; score
   void ops;void one;void ids;
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a missing or null decision is rejected and changes nothing',async()=>{
+ const {db,now,ops,send,score,one,count}=await setupSessions();
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const key=await send(score,now-3*H);
+  const events=await count('select 1 from public.participation_events');
+  for(const bad of [{},{decision:null},{decision:''},{decision:'APPROVE'}])
+   await assert.rejects(()=>ops(exec,{type:'heldDecide',heldId:key,reason:'x',...bad}),/approve or discard/,JSON.stringify(bad));
+  const h=await one<Held>('select * from public.held_action where id=$1',[key]);
+  assert.equal(h.state,'held');assert.equal(h.decided_by,null);
+  assert.equal(await count('select 1 from public.participation_events'),events,'nothing was applied');
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: approval keeps Control ordering - a later Control waits for the earlier one; Records continue; a failed Control blocks the rest in bulk',async()=>{
+ const {db,ids,now,ops,send,eventOf,one,count,debateRevision,asOwner}=await setupSessions();
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(140);
+  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const slow=now-3*H;
+  const rev=await debateRevision();
+  const c1=await send({...control('for'),_device:{deviceId:dev,deviceSeq:1}},slow,'chair',chair,crypto.randomUUID(),rev);
+  const c2=await send({...control('against'),_device:{deviceId:dev,deviceSeq:2}},slow+1000,'chair',chair,crypto.randomUUID(),rev);
+  const r1=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev,deviceSeq:3}},slow+2000);
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).state,'held');
+
+  // Individually: the later Control cannot be approved while the earlier one is held; the independent Record can.
+  await assert.rejects(()=>ops(exec,{type:'heldDecide',heldId:c2,decision:'approve',reason:'x'}),/earlier held action/);
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).state,'held');
+  await ops(exec,{type:'heldDecide',heldId:r1,decision:'approve',reason:'Record is independent'});
+  assert.equal(await count('select 1 from public.participation_events where id=$1',[eventOf(r1)]),1);
+  // Discarding the earlier Control releases the later one.
+  await ops(exec,{type:'heldDecide',heldId:c1,decision:'discard',reason:'Not needed'});
+  await ops(exec,{type:'heldDecide',heldId:c2,decision:'approve',reason:'Now first in line'});
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).state,'applied');
+
+  // Bulk: the first Control fails its revision check, so the later Control stays held; a Record still applies.
+  const dev2=U(141);
+  const rev2=await debateRevision();
+  const d1=await send({...control('for'),_device:{deviceId:dev2,deviceSeq:1}},slow,'chair',chair,crypto.randomUUID(),rev2);
+  const d2=await send({...control('against'),_device:{deviceId:dev2,deviceSeq:2}},slow+1000,'chair',chair,crypto.randomUUID(),rev2);
+  const d3=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev2,deviceSeq:3}},slow+2000);
+  await send(control('for'),now,'chair',chair,crypto.randomUUID(),await debateRevision());
+  await asOwner();
+  await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,$5)`,[ids.conference,dev2,chair,day(now),-3*H]);
+  await ops(exec,{type:'clockConfirm',deviceId:dev2,offsetMs:-3*H,reason:'Slow clock'});
+  await ops(exec,{type:'heldBulkApprove',deviceId:dev2,reason:'Clock error confirmed'});
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d1])).reason,'revision_mismatch');
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d2])).state,'held','a later Control stays behind the failed one');
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d3])).state,'applied','an independent Record is applied');
+  assert.equal(await count('select 1 from public.participation_events where id=$1',[eventOf(d3)]),1);
+ }finally{await db.close();}
+});

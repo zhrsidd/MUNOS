@@ -100,3 +100,40 @@ test('the hosted transport sends the protocol block with the command and never m
  assert.equal(calls[4].fn,'record_device_clock');assert.equal(calls[4].args.device,'dev-1');
  assert.ok(Number.isFinite(Date.parse(calls[4].args.device_time as string)));
 });
+
+test('the access wrapper forwards the clock report with the same access checks as every other call',async()=>{
+ const {AccessGatedTransport}=await import('../lib/access');
+ const server=new Server();let allowed=true;
+ const gated=new AccessGatedTransport(server,()=>allowed);
+ await gated.syncClock('dev-1');
+ assert.deepEqual(server.clockCalls,['dev-1']);
+ allowed=false;
+ await assert.rejects(()=>gated.syncClock('dev-2'),/Staff access is unavailable/);
+ assert.deepEqual(server.clockCalls,['dev-1'],'a revoked session reports nothing');
+});
+
+test('every Executive session command enters the durable outbox and is sent through the real transport stack; the offline demo refuses them',async()=>{
+ const {AccessGatedTransport}=await import('../lib/access');
+ const calls:{fn:string;args:Record<string,unknown>}[]=[];
+ const client={rpc:async(fn:string,args:Record<string,unknown>)=>{calls.push({fn,args});return {error:null,data:fn.endsWith('snapshot')?structuredClone(createSeed()):null,status:200};},auth:{getSession:async()=>({data:{session:null}})}} as unknown as SupabaseClient;
+ const transport=new AccessGatedTransport(new SupabaseTransport(client,'conf-1','test-chair'),()=>true);
+ const store=new DurableStore('exec-'+crypto.randomUUID());
+ const repo=new DurableRepository('exec',createSeed,store,transport);await repo.ready();await tick();await tick();
+ const before=structuredClone(repo.getSnapshot());
+ const commands=[
+  {type:'scheduleVersion',reason:'r'},{type:'automationToggle',enabled:true,reason:'r'},{type:'overrideSet',scope:'conference',slotId:'x'},
+  {type:'labelCorrection',recordTable:'votes',recordId:'r',label:null,reason:'r'},{type:'clockConfirm',deviceId:'d',offsetMs:1,reason:'r'},
+  {type:'closeDay',reason:'r'},{type:'holdSettings',enforce:true},{type:'heldDecide',heldId:'h',decision:'approve',reason:'r'},{type:'heldBulkApprove',deviceId:'d',reason:'r'},
+ ] as const;
+ for(const c of commands)await repo.execute(c as never,'admin');
+ for(let i=0;i<20&&calls.filter(x=>x.fn==='apply_operations_mutation').length<commands.length;i++)await tick();
+ const sent=calls.filter(x=>x.fn==='apply_operations_mutation').map(x=>(x.args.command as {type:string;_device?:{deviceId:string}}));
+ assert.deepEqual(sent.map(c=>c.type),commands.map(c=>c.type),'each reached the database in order');
+ assert.ok(sent.every(c=>c._device?.deviceId),'with the device protocol block');
+ assert.ok(calls.some(x=>x.fn==='record_device_clock'),'and the clock was reported through the same stack');
+ assert.deepEqual(repo.getSnapshot()!.events,before!.events,'no optimistic change: the database decides');
+ repo.dispose();await store.close();
+ const demoStore=new DurableStore('demo-'+crypto.randomUUID());const demo=new DurableRepository('exec',createSeed,demoStore);await demo.ready();await tick();
+ await assert.rejects(()=>demo.execute({type:'holdSettings',enforce:true} as never,'admin'),/live conference database/);
+ await demoStore.close();
+});

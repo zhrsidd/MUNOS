@@ -100,6 +100,8 @@ function checkSlot(d: ConferenceData, f: PhotoSlotFields) {
   if (!Number.isInteger(warn) || warn < 1 || warn > 60) throw Error("Warning time must be 1 to 60 minutes.");
   return { schoolId: f.schoolId, startsAt: new Date(f.startsAt).toISOString(), endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : null, location, note: f.note, enabled: f.enabled ?? true, warnMinutes: warn };
 }
+/** Commands only the live database can apply: no local projection, refused in the offline demo. */
+export const serverOnlyCommandTypes: ReadonlySet<string> = new Set(["scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm", "closeDay", "holdSettings", "heldDecide", "heldBulkApprove"]);
 export function isOperationsCommand(c: { type: string }): c is OperationsCommand {
   return (operationsCommandTypes as readonly string[]).includes(c.type);
 }
@@ -222,6 +224,8 @@ export function applyOperationsCommand(
       }
       break;
     }
+    // Executive session commands have no optimistic projection: the database decides, and the confirming snapshot shows the result.
+    // They travel through the same durable outbox as every other command; DurableRepository refuses them in the local demo.
     case "scheduleVersion":
     case "automationToggle":
     case "overrideSet":
@@ -231,7 +235,7 @@ export function applyOperationsCommand(
     case "holdSettings":
     case "heldDecide":
     case "heldBulkApprove":
-      throw Error("Schedule changes are made on the live conference database.");
+      break;
     case "staffSchool": {
       const staff = d.staff.find((s) => s.id === c.staffId);
       if (!staff || staff.role !== "chair") throw Error("Choose a Chair.");

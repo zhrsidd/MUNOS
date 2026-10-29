@@ -180,11 +180,17 @@ declare
   why text := btrim(command->>'reason');
   hid uuid := private.uuid_or_null(command->>'heldId');
 begin
-  if decision not in ('approve', 'discard') then raise exception 'decision must be approve or discard' using errcode = '22023'; end if;
+  if decision is null or decision not in ('approve', 'discard') then raise exception 'decision must be approve or discard' using errcode = '22023'; end if;
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
   select * into h from public.held_action where id = hid and conference_id = conf for update;
   if not found then raise exception 'Held action unavailable' using errcode = '22023'; end if;
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
+  -- A Control cannot overtake an earlier held Control from the same device and committee: approve or discard that one first. Records are independent.
+  if decision = 'approve' and private.command_class(h.command->>'type') = 'control' and h.device_id is not null and h.device_seq is not null and exists (
+       select 1 from public.held_action e where e.state = 'held' and e.committee_id = h.committee_id and e.device_id = h.device_id and e.device_seq < h.device_seq
+          and private.command_class(e.command->>'type') = 'control') then
+    raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
+  end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
   update public.held_action set state = case decision when 'approve' then 'applied' else 'discarded' end, decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
   return array[h.committee_id];
@@ -197,7 +203,7 @@ language plpgsql set search_path='' as $$
 declare
   device uuid := private.uuid_or_null(command->>'deviceId');
   why text := btrim(command->>'reason');
-  off bigint; h public.held_action; affected uuid[] := '{}';
+  off bigint; h public.held_action; affected uuid[] := '{}'; blocked uuid[] := '{}';
 begin
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
   if device is null then raise exception 'deviceId is required' using errcode = '22023'; end if;
@@ -205,8 +211,12 @@ begin
   if off is null then raise exception 'Confirm this device''s clock error first' using errcode = '22023'; end if;
   for h in select * from public.held_action where conference_id = conf and device_id = device and state = 'held' and reason in ('uncertain_time', 'behind_held')
             order by device_seq nulls last, received_at, id for update loop
+    -- Once a Control fails for a committee, later Controls from this device for that committee stay held behind it. Records continue.
+    continue when private.command_class(h.command->>'type') = 'control' and h.committee_id = any(blocked);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
+    elsif private.command_class(h.command->>'type') = 'control' then
+      blocked := blocked || h.committee_id;
     end if;
     if not h.committee_id = any(affected) then affected := affected || h.committee_id; end if;
   end loop;
