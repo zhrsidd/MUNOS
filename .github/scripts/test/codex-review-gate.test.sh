@@ -135,6 +135,14 @@ for file in "$scripts/codex-review-gate.jq" "$workflows/claude-review-repair.yml
     failures=$((failures + 1))
   fi
 done
+# shellcheck disable=SC2016 # the ${{ }} is a literal workflow expression, not a shell expansion
+if grep -q 'claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}' "$workflows/claude-review-repair.yml" \
+  && ! grep -rq ANTHROPIC_API_KEY "$workflows"; then
+  echo "ok    repair uses CLAUDE_CODE_OAUTH_TOKEN and no workflow reads ANTHROPIC_API_KEY"
+else
+  echo "FAIL  repair must authenticate with CLAUDE_CODE_OAUTH_TOKEN and no workflow may read ANTHROPIC_API_KEY"
+  failures=$((failures + 1))
+fi
 if grep -rq CODEX_REVIEWER_LOGIN "$workflows"; then
   echo "FAIL  workflows still read CODEX_REVIEWER_LOGIN, which cannot distinguish a bot from a spoofed name"
   failures=$((failures + 1))

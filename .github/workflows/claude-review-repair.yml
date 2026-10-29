@@ -84,7 +84,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         if: steps.cap.outcome == 'success'
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.CLAUDE_AUTOMATION_TOKEN }}
           # Codex is a GitHub App, so the action rejects it unless its exact login is allowed. Nothing else is.
           allowed_bots: "chatgpt-codex-connector[bot]"

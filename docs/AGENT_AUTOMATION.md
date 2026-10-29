@@ -45,7 +45,11 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
      on approvals.
 3. **Repository settings:** enable **Allow auto-merge**.
 4. **Actions secrets** (secrets, not variables; no repository variable is needed):
-   - `ANTHROPIC_API_KEY` for the Claude Code action.
+   - `CLAUDE_CODE_OAUTH_TOKEN` for the Claude Code action (`claude_code_oauth_token` input). Create it by running the
+     Claude Code OAuth token setup for the account that owns the Claude subscription, then paste the value into this
+     secret. The action's documentation does not describe how to generate it, so confirm the procedure in the Claude Code
+     docs before relying on it. The value is never printed in logs or documents. Remove any older `ANTHROPIC_API_KEY`
+     secret once this one works, since the workflow no longer reads it.
    - `CLAUDE_AUTOMATION_TOKEN`: a fine-grained personal access token limited to `zhrsidd/MUNOS` with Contents, Pull requests
      and Issues set to read and write. It pushes repair commits, which trigger CI, and posts `@codex review`, which Codex
      acts on. Keep its scope minimal and never give it access to other repositories.
