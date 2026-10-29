@@ -1,6 +1,6 @@
 # Session model: sessions are a schedule that labels records (contract draft v3)
 
-**Status:** draft contract for review; **not approved for schema work.** No schema or command code has been changed for this model. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
+**Status:** draft contract v3 with the owner-confirmed 5-minute lead (29 Oct 2026) and an implementation plan in §12, issued on the owner's instruction to implement from this document. Schema, RLS and sync changes still go through the review gates in `AGENTS.md`. Implementation has not started yet. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
 
 ## 1. Decisions and their provenance
 
@@ -16,7 +16,7 @@
 | 8 | Roll call is prompted at each session start, with an option to copy the last roll call | **Owner**: "yes with option to copy last sessions roll call" |
 | 9 | Timers are local-only and not audited; the projector page is removed | **Owner**: timers "not necessary to audit and save"; projector: "6. Remove" |
 | 10 | Amendments and votes belong to the resolution, not the session | Follows from decision 1; owner approved the restructure |
-| 11 | Lead default 5 minutes; close grace 20 minutes | **Proposed, unconfirmed by the owner.** Both are parameters, not rules. The contract cannot be frozen until the owner confirms or replaces them |
+| 11 | Lead default 5 minutes; close grace 20 minutes | **Lead 5 minutes: confirmed by the owner, 29 Oct 2026** ("the previous 5 minute structure is ideal"). The previous session holds through the break and switches 5 minutes before the next session starts, never before the previous session ends. **Close grace 20 minutes: still proposed**, a parameter, not a rule |
 
 ## 2. Four labels for one record (resolves the "nearest session" contradiction)
 
@@ -176,9 +176,124 @@ Shared vectors for the window function, identical in TypeScript and SQL: all of 
 
 ## 11. Open items
 
-- Owner: confirm or replace the 5-minute lead, 20-minute grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance. **All four are proposals, not approved release settings.**
+- Owner: confirm or replace the 20-minute grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance. **All three are proposals, not approved release settings.** The 5-minute lead is confirmed (decision 11).
 - Reports, exports and awards that group by session are **not yet audited** for the four-label model.
 - Every UI use of `currentSessionId` is not yet inventoried; the Executive archive and "session used" checks need design.
 - Whether `Present` (non-voting) may abstain exactly as today when snapshot-based; confirm with the procedure rules.
 - Schema detail: `final_label` is derived, but "no correction yet" must be distinguishable from "corrected to null"; store an explicit correction record, not a nullable column that falls back to `assigned_label`.
-- The review UI for held items (per device, bulk approve, reasons) is not designed.
+- The review UI for held items (per device, bulk approve, reasons) is not designed. §12 gives it a minimum scope.
+
+## 12. Implementation plan
+
+This section tells the implementer what to build. Where it says "per §N", the rule is defined above and is not restated. Where a choice is not covered, record it in the pull request and in §11 instead of guessing.
+
+### 12.1 Ground rules
+
+- **Owner decisions in force:** decisions 1–10 in §1, lead 5 minutes (decision 11), and the break rule in §3: the previous session holds through the break and the next session switches at `max(start − 5 min, end of previous session)`.
+- **Protected areas (`AGENTS.md`):** schema, RLS, auth, shared domain types and repository contracts. One person changes these at a time, the change is announced, and an independent reviewer reads it before it ships. Claude does not approve its own protected-area changes.
+- **Migrations:** add new files under `supabase/migrations`. Never edit an applied migration. Replay every migration from empty on a local disposable Postgres before anything else. After `20261022090000_privilege_hardening`, every new table, function or RPC must grant access to the API roles explicitly.
+- **Access:** no role gets `UPDATE` on `sessions` or on the new schedule tables. All writes go through security-definer RPCs in the existing batch/procedure pattern, with mutation receipts and payload fingerprints for idempotency.
+- **Hosted project:** do not run anything against a hosted project. Local tests and source review only, per `AGENTS.md` and `docs/LIFECYCLE_CONTROLS.md`.
+
+### 12.2 Phases and order
+
+Do the phases in this order. Each one must pass its tests before the next starts.
+
+1. **Pure window function.** Implement the window rule from §3 in TypeScript and SQL, with the shared conformance vectors from §3 and §10.
+2. **Schema and RPCs** for schedule versions, overrides, roll calls, label fields, held actions and corrections (§12.3–12.4).
+3. **Server labelling** on every record-writing command (§12.5), and time-confidence classification at receipt (§4).
+4. **Command surface changes:** remove chair selection of sessions, add Executive schedule commands (§12.6).
+5. **Roll calls and votes** (§6, §12.7).
+6. **Backfill** of existing data (§12.8).
+7. **UI** (§12.9).
+8. **Timer removal** (§8).
+9. **Docs, rehearsal scripts and permission inventory** (§12.10).
+
+### 12.3 Schema
+
+- **`schedule_version`**: immutable. Columns: `id`, `conference_id`, `committee_id`, `effective_from` (server time), `changed_by`, `reason`, `lead_minutes` (default 5), `grace_minutes` (default 20, proposed), `automation_enabled`, and a snapshot of the committee's session windows as jsonb, so history does not change when sessions are later edited or archived. Validation at publish follows §3 exactly; a rejected publish writes nothing.
+- **`session_override`**: append-only. Columns: `id`, `conference_id`, `scope` (`committee` or `conference`), `committee_id` (null for conference scope), `session_id`, `set_by`, `set_at`, `expires_at` (stored at creation, §3). End events are separate rows that reference the override they end, with `ended_reason` (for example `automation_enabled`) and `ended_at`. Never update an existing row.
+- **`roll_call`** and **`roll_call_row`**: as in §6. `id` is generated on the device. Store the four times (`observed_at`, `local_committed_at`, `received_at`, `server_committed_at`), `state` (`draft` or `committed`), `revision`, `copied_from`, and `time_confidence`. Row status is one of `Present`, `Present & Voting` or `Absent`.
+- **Label fields** on every session-bound record (§2): `displayed_label`, `assigned_label`, `final_label` (derived). Reviewed corrections go in a separate `label_correction` table with its reason and audit entry. Do not use a nullable column that falls back to `assigned_label` (§11).
+- **`held_action`**: one row per held command. Columns: `id` (the command UUID), `conference_id`, `committee_id`, `device_id`, `device_seq`, `payload_hash`, `reason`, `state` (`held`, `applied`, `discarded`), `decided_by`, `decided_at`, `decision_reason`. Applied and discarded rows are kept.
+- **Device clock:** store the clock offset from each successful sync per device per conference day, so time confidence (§4) can be computed at receipt.
+- **Session columns:** keep `slotId` on `sessions` as it is. Do not add a second link between committees and sessions.
+
+### 12.4 Commands and RPCs
+
+**Executive only** (add to `lib/commands.ts` permissions and the database role check):
+- `scheduleVersion`: publish a new version for a committee or the conference (lead, grace, automation, windows).
+- `overrideSet`: create an override at committee or conference scope.
+- `automationToggle`: enable or disable automation. Enabling it appends `automation_enabled` end events for every override in scope, as §3 requires.
+- `labelCorrection`: reviewed relabel, with reason.
+- `heldDecide`: approve (applies the original payload once, under current authorisation and current revision) or discard, with reason.
+- `clockConfirm`: confirm a device's clock error, for bulk approval (§4).
+
+**Chair** (committee-scoped, no session parameter):
+- Queue, debate mode and phase, speech, POI, vote and attendance commands keep their committee scope. Remove any requirement that the command names a session. The server stamps the label (§12.5).
+- `roll_call` commands: `draftStart` (including copy of the last committed roll call), `draftEdit`, `commit` (one idempotent mutation carrying the full row set, per §6).
+
+**Remove:** the `currentSession` command everywhere it appears: `lib/commands.ts:234`, `lib/procedure/types.ts`, `lib/procedure/commands.ts:22`, the `currentSession` branches in the migrations' `elsif command->>'type' in (...)` lists (write a new migration; do not edit old ones), `lib/sync/repository.ts:31`, `tests/helpers/authz-catalogue.ts`, `tests/helpers/authz-suite-writes.ts`, `tests/helpers/authz-suite-core.ts`, `scripts/rehearsal/scenario.ts:72`, `scripts/rehearsal/metrics.ts`, `scripts/rehearsal-run.mts`, `scripts/remote-integration.mts`. Then drop `committees.currentSessionId` and `committees.sessionRevision` in a later migration, after nothing reads them.
+
+### 12.5 Server labelling
+
+- On every session-bound write, the server computes `assigned_label` from the schedule version in effect at the action's time (§3, §6a). The client's `displayed_label` is stored as evidence only.
+- If no window applies, store a null label and set `outside_schedule`. Never choose the nearest session.
+- Time confidence (§4) is computed at receipt. Apply, hold or flag according to the acceptance table in §4. Records with Uncertain time are held, and so are control commands arriving after the day is closed.
+
+### 12.6 Chair experience
+
+- Chairs never choose a session. The Chair Console shows the current label, derived by the server, and the time it switches next.
+- If automation is off with no applicable override, show "No session", as §3 requires.
+- Dependent control commands from the same device are held behind a held control command, by `device_seq` (§5).
+
+### 12.7 Roll calls and votes
+
+- Roll calls follow §6 exactly. The session-start roll-call prompt fires when the chair's label changes, not when a session is created in the schedule.
+- A roll call taken during a break is labelled by the window that contains its effective time. Under the 5-minute rule that is the previous session.
+- Votes: on vote open, the server snapshots the eligible set from the live roll call (§6). Every vote is validated against that snapshot. Replace the current eligibility check at `lib/commands.ts:327`, which reads attendance in the resolution's session. Results are immutable once closed; a late vote is held.
+
+### 12.8 Backfill
+
+- For each committee, create one `schedule_version` at migration time from its active central sessions, with `effective_from` set to the migration time. Never back-date it (§3).
+- Existing session-bound records keep their `sessionId` as the label source. Set `assigned_label` to that session, and mark them `legacy` so reports can tell them apart (§11).
+- Sessions created before the central schedule (no `slotId`) stay read-only and are not grouped (`components/central-sessions.tsx`, "Earlier committee sessions").
+- Existing per-session attendance: convert each session's attendance into one committed roll call with the same rows, effective at the session's start time, and mark it `legacy`. Confirm this conversion with the owner before running it on real data (§12.11).
+- Do not migrate timers; they are removed (§8).
+
+### 12.9 Interface
+
+- `components/workspace.tsx:106–128`: remove the "Current session" selector for chairs. Replace it with the read-only label and switch time from §12.6.
+- `components/central-sessions.tsx`: add the Executive schedule controls: publish a schedule version (lead, grace, automation), set overrides, toggle automation, and show held items with approve and discard.
+- `components/admin.tsx:129`: list committees with no session (automation off, no override).
+- Remove the projector page and the `<Timer>` component (§8, `components/workspace.tsx`, `components/ui.tsx`).
+- Follow `docs/BRAND.md` tokens. Do not add one-off colours or sizes (`AGENTS.md`).
+
+### 12.10 Tests and docs
+
+- **Window function:** every case in the §3 table, in both TypeScript and SQL, with the same vectors.
+- **Acceptance table (§4):** every cell, including held Uncertain-time records, held-behind controls, approve-once, replay of an approved UUID, same UUID with a different payload rejected, revision mismatch on approval, bulk approval after a confirmed clock error.
+- **Roll calls and votes (§6):** the 11:55/12:30/12:40 example, offline roll call plus action arriving together, future-dated roll call held, delayed older roll call, copy-last as draft until committed, vote snapshot with `Present & Voting` and abstention, late vote after close.
+- **Overrides and automation (§3):** precedence, expiry, automation toggled both ways, overnight override expiry.
+- **Authorisation:** chairs denied every schedule command and every write to `sessions`; `tests/helpers/authz-catalogue.ts` updated; `docs/generated` permission inventory regenerated.
+- **Updated existing tests:** `tests/procedure.test.ts`, `tests/procedure-usability-db.test.ts`, `tests/archive-blockers.test.ts`, `tests/rehearsal-multi-committee.test.ts` and `tests/rehearsal.test.ts` (the `TOPIC_OF` list at line 131 and the floor list at line 34) must match the new command surface.
+- **Docs:** update `docs/STAGING_REHEARSAL.md:42` (remove the "each Chair selects it" step) and `docs/BACKLOG.md` if the plan changes priorities.
+- **Before declaring UI work done:** `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`, plus a real browser check of the chair and Executive views (`AGENTS.md`).
+
+### 12.11 Open questions to settle before the relevant phase
+
+- **Close grace (20 minutes):** still proposed. Confirm it, or confirm the last session of the day closes at midnight.
+- **Attendance conversion (§12.8):** confirm the rule before it touches real data.
+- **Roll call during a break:** the design labels it with the previous session. Confirm that is the owner's intent.
+- **Reports and exports** that group by session (§11) need a separate design before the four-label model is used in reports.
+- **Timer table:** dropping it is left to the schema owner (§8).
+
+### 12.12 Done means
+
+- Chairs cannot select, write or see a session they should not; the dropdown is gone.
+- Sessions switch by the schedule, with the 5-minute lead and break rule, with no chair action.
+- Every session-bound record carries the four labels, and "outside schedule" is flagged, not guessed.
+- Held items wait for Executive review and are applied at most once.
+- The §3, §4 and §6 vectors pass in TypeScript and SQL, and the migration replays from empty.
+- The authorisation tests, the updated existing tests and the browser checks pass.
+- Anything not done is listed in §11 rather than left implicit.
