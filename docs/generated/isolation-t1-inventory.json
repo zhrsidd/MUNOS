@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "f7e0304cc7783ea337ea4bae9f4cc42ce4ed51291a180cfb3faee125123dd6ae",
+ "migrationsSha256": "816bf42e8798cd22ba0a7ed35089c7dc3637deb0e94d2b92df4ea0cd5c34d61d",
  "supabase-model": {
   "fns": [
    {
@@ -321,6 +321,36 @@
     "volatility": "immutable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "command_device_time",
+    "args": "command jsonb, fallback timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -5800,6 +5830,36 @@
     "volatility": "immutable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "command_device_time",
+    "args": "command jsonb, fallback timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",

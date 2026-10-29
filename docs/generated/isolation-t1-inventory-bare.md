@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `f7e0304cc7783ea3`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `816bf42e8798cd22`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -48,7 +48,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-107 functions (96 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+108 functions (97 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -62,6 +62,7 @@ Executed in the disposable database after the inventory was read:
 | `private.batch_has_references(target regclass, target_id uuid, ignored regclass[])` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.batch_session_used(sid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.command_class(kind text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
+| `private.command_device_time(command jsonb, fallback timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.commit_roll_call(conf uuid, cid uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.committee_session_at(conf uuid, committee uuid, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.committees_for_schools(schools uuid[])` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |

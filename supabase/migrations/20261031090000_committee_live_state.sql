@@ -62,6 +62,42 @@ create policy read_authorized on public.ballot_eligibility for select to authent
   using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'observer']::public.conference_role[]));
 
 -- ---- Presence, eligibility and ballots ---------------------------------------------------------------------------------------
+-- A roll call is timed by ITS OWN commit time (docs/SESSION_MODEL.md section 6), not by the action that carries it: admission (the hold
+-- gate), the session label and the effective time must all use the same instant. Every other command keeps the action's time.
+create function private.command_device_time(command jsonb, fallback timestamptz) returns timestamptz
+language plpgsql stable set search_path='' as $$
+begin
+  if command->>'type' = 'rollCallCommit' then
+    begin
+      return coalesce(private.session_ts(command->>'committedAt'), fallback);
+    exception when others then
+      return null; -- an unreadable commit time is Uncertain (held with enforcement on), never the outer action time
+    end;
+  end if;
+  return fallback;
+end $$;
+
+-- Same body as 20261030090000, except the device time a roll call is labelled by is its own commit time.
+create or replace function private.set_mutation_context(conf uuid, mutation uuid, client_time timestamptz, command jsonb) returns void
+language plpgsql set search_path='' as $$
+declare
+  dev jsonb := case when jsonb_typeof(command->'_device') = 'object' then command->'_device' else '{}'::jsonb end;
+  approving boolean := coalesce(current_setting('munos.approving', true), '') = mutation::text;
+  held public.held_action;
+begin
+  if approving then select * into held from public.held_action where id = mutation; end if;
+  perform set_config('munos.mutation_ctx', jsonb_build_object(
+    'conference', conf, 'mutation', mutation,
+    'receivedAt', private.session_iso(coalesce(held.received_at, date_trunc('milliseconds', clock_timestamp()))),
+    'heldActionId', held.id,
+    'confirmedOffsetMs', case when held.id is not null then nullif(current_setting('munos.approval_offset', true), '')::bigint end,
+    'clientTime', private.session_iso(private.command_device_time(command, client_time)),
+    'deviceId', private.uuid_or_null(dev->>'deviceId'),
+    'deviceSeq', case when dev->>'deviceSeq' ~ '^[0-9]{1,15}$' then (dev->>'deviceSeq')::bigint end,
+    'displayedLabel', private.uuid_or_null(dev->>'displayedLabel'),
+    'displayedReported', (dev ? 'displayedLabel') and (jsonb_typeof(dev->'displayedLabel') = 'null' or private.uuid_or_null(dev->>'displayedLabel') is not null))::text, true);
+end $$;
+
 create function private.require_operational_committee(conf uuid, cid uuid) returns void
 language plpgsql set search_path='' as $$
 begin
@@ -867,7 +903,6 @@ begin
    update public.conference_session_slots set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz,revision=revision+1 where id=slot.id;
    update public.sessions set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz where "slotId"=slot.id;
   elsif action='archive' then
-   if exists(select 1 from public.documents d where d.status='In Debate' and (d."sessionId" in (select id from public.sessions where "slotId"=slot.id) or d.committee_id in (select id from public.committees where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id)))) then raise exception 'Close the current resolution debate before archiving this session.' using errcode='22023';end if;
    update public.conference_session_slots set archived=true,revision=revision+1 where id=slot.id;
    update public.sessions set archived=true,state='closed' where "slotId"=slot.id;
    update public.committees set "currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id);
@@ -914,7 +949,7 @@ declare
   st private.conference_settings;
   ctx jsonb := nullif(current_setting('munos.mutation_ctx', true), '')::jsonb;
   tz text := private.conference_time_zone(conf);
-  received timestamptz; device uuid; seq bigint; confidence text; acted timestamptz; why text;
+  received timestamptz; device_time timestamptz; device uuid; seq bigint; confidence text; acted timestamptz; why text;
 begin
   if coalesce(current_setting('munos.approving', true), '') = mutation::text then return false; end if;
   if cls is null or requested_role <> 'chair' or cid is null or ctx is null then return false; end if;
@@ -923,8 +958,10 @@ begin
   received := private.session_ts(ctx->>'receivedAt');
   device := private.uuid_or_null(ctx->>'deviceId');
   seq := (ctx->>'deviceSeq')::bigint;
-  confidence := private.time_confidence(conf, device, client_time, received);
-  acted := case when confidence = 'trusted' then client_time else received end;
+  -- A roll call is admitted by its own commit time, not by the action that carries it (the same instant its effective time and label use).
+  device_time := private.command_device_time(command, client_time);
+  confidence := private.time_confidence(conf, device, device_time, received);
+  acted := case when confidence = 'trusted' then device_time else received end;
   if exists (select 1 from public.conference_day_close c where c.conference_id = conf and c.conference_day = (acted at time zone tz)::date and c.closed_at <= received) then
     why := 'day_closed';
   elsif confidence = 'uncertain' then
@@ -976,6 +1013,6 @@ language sql immutable set search_path='' as $$
   end
 $$;
 
-revoke all on function private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
+revoke all on function private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
   private.eligible(uuid, uuid, uuid, jsonb), private.open_ballot(uuid, uuid, uuid), private.commit_roll_call(uuid, uuid, uuid, jsonb)
   from public, anon, authenticated, service_role;
