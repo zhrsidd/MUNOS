@@ -137,3 +137,17 @@ test('every Executive session command enters the durable outbox and is sent thro
  await assert.rejects(()=>demo.execute({type:'holdSettings',enforce:true} as never,'admin'),/live conference database/);
  await demoStore.close();
 });
+
+test('a clock report that never answers does not stop the outbox: sending carries on after the deadline',async()=>{
+ const {CLOCK_SYNC_DEADLINE_MS}=await import('../lib/sync/repository');
+ const store=new DurableStore('hang-'+crypto.randomUUID()),server=new Server();
+ server.syncClock=(device:string)=>{server.clockCalls.push(device);return new Promise<void>(()=>{});};
+ const repo=new DurableRepository('ga1',createSeed,store,server);await repo.ready();
+ await repo.execute(speech,'chair');
+ const started=Date.now();
+ while(!server.sent.length&&Date.now()-started<CLOCK_SYNC_DEADLINE_MS+3000)await tick();
+ assert.equal(server.sent.length,1,'the saved action was sent although the clock report never answered');
+ assert.equal(server.clockCalls.length,1);
+ assert.ok(Date.now()-started>=CLOCK_SYNC_DEADLINE_MS-500,'it waited for the deadline, not longer');
+ repo.dispose();await store.close();
+});

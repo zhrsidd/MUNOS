@@ -203,7 +203,7 @@ language plpgsql set search_path='' as $$
 declare
   device uuid := private.uuid_or_null(command->>'deviceId');
   why text := btrim(command->>'reason');
-  off bigint; h public.held_action; affected uuid[] := '{}'; blocked uuid[] := '{}';
+  off bigint; h public.held_action; affected uuid[] := '{}';
 begin
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
   if device is null then raise exception 'deviceId is required' using errcode = '22023'; end if;
@@ -211,12 +211,13 @@ begin
   if off is null then raise exception 'Confirm this device''s clock error first' using errcode = '22023'; end if;
   for h in select * from public.held_action where conference_id = conf and device_id = device and state = 'held' and reason in ('uncertain_time', 'behind_held')
             order by device_seq nulls last, received_at, id for update loop
-    -- Once a Control fails for a committee, later Controls from this device for that committee stay held behind it. Records continue.
-    continue when private.command_class(h.command->>'type') = 'control' and h.committee_id = any(blocked);
+    -- A Control never overtakes an earlier UNRESOLVED Control from this device and committee, whatever that one was held for (including
+    -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt). Records are independent.
+    continue when private.command_class(h.command->>'type') = 'control' and exists (
+      select 1 from public.held_action e where e.state = 'held' and e.committee_id = h.committee_id and e.device_id = h.device_id
+         and e.device_seq < h.device_seq and private.command_class(e.command->>'type') = 'control');
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
-    elsif private.command_class(h.command->>'type') = 'control' then
-      blocked := blocked || h.committee_id;
     end if;
     if not h.committee_id = any(affected) then affected := affected || h.committee_id; end if;
   end loop;

@@ -36,7 +36,7 @@
   "20261030100000_session_holds.sql",
   "20261030110000_session_schedules_snapshot.sql"
  ],
- "migrationsSha256": "4a43f69ed9d5c3992c8b10905ad74d72b60eab191d6b8081e17dbe7b199137c8",
+ "migrationsSha256": "cd36f1947820cb81a301e060501f22e6e7b61d2ecac3ec73628d7f01b5451582",
  "supabase-model": {
   "fns": [
    {

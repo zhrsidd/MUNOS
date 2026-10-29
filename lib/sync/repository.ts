@@ -18,6 +18,13 @@ export interface Transport {
 export class ConflictError extends Error {}
 /** At most one clock report per page session per minute (the server also limits one stored row per device per minute). */
 const CLOCK_SYNC_GAP_MS = 60_000;
+/** How long sending waits for a clock report before it carries on without it. */
+export const CLOCK_SYNC_DEADLINE_MS = 3_000;
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error("Clock report timed out")), ms); });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
 export interface Health {
   mode: "local" | "supabase"; state: "saved" | "syncing" | "waiting" | "conflict" | "error";
   pending: number; conflicts: number; realtime: boolean; latency: number | null;
@@ -205,7 +212,8 @@ export class DurableRepository implements ConferenceRepository {
       if(this.transport!.syncClock && Date.now()-this.lastClockSync>CLOCK_SYNC_GAP_MS) {
         this.lastClockSync=Date.now();
         const deviceId=await this.store.deviceId().catch(()=>undefined);
-        if(deviceId) await this.transport!.syncClock(deviceId).catch(()=>undefined);
+        // Best effort with a deadline: a report that never answers must not hold the sync lock and stop the outbox.
+        if(deviceId) await withDeadline(this.transport!.syncClock(deviceId),CLOCK_SYNC_DEADLINE_MS).catch(()=>undefined);
       }
       // Stop at a conflict, preserving subsequent intent until an operator resolves it.
       let settled=false;

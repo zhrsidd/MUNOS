@@ -307,3 +307,44 @@ test('real PostgreSQL: approval keeps Control ordering - a later Control waits f
   assert.equal(await count('select 1 from public.participation_events where id=$1',[eventOf(d3)]),1);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: bulk approval never overtakes an earlier unresolved Control, whatever it was held for, including after a failed attempt',async()=>{
+ const {db,ids,now,ops,send,one,debateRevision,asOwner}=await setupSessions();
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const dev=U(150);
+  const early=now-270*M;
+  await asOwner();
+  // The device's clock is verified for the early instant: the first Control is Trusted but outside every window.
+  await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,0)`,[ids.conference,dev,chair,day(early)]);
+  const rev=await debateRevision();
+  const c1=await send({...control('for'),_device:{deviceId:dev,deviceSeq:1}},early,'chair',chair,crypto.randomUUID(),rev);
+  const c2=await send({...control('against'),_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),rev);
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c1])).reason,'outside_window');
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).reason,'behind_held');
+  await asOwner();
+  await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,0)`,[ids.conference,dev,chair,day(now)]);
+  await ops(exec,{type:'clockConfirm',deviceId:dev,offsetMs:0,reason:'Clock fine'});
+  // c1 is not a clock item, so the batch does not approve it; c2 must still wait behind it.
+  await ops(exec,{type:'heldBulkApprove',deviceId:dev,reason:'Clock confirmed'});
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c1])).state,'held');
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).state,'held','behind an outside-window predecessor');
+
+  // A predecessor left as revision_mismatch by an earlier attempt also blocks a later batch.
+  const dev2=U(151);
+  const slow=now-3*H;
+  const rev2=await debateRevision();
+  const d1=await send({...control('for'),_device:{deviceId:dev2,deviceSeq:1}},slow,'chair',chair,crypto.randomUUID(),rev2);
+  await send(control('for'),now,'chair',chair,crypto.randomUUID(),await debateRevision());
+  await ops(exec,{type:'heldDecide',heldId:d1,decision:'approve',reason:'Try'});
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d1])).reason,'revision_mismatch');
+  const d2=await send({...control('against'),_device:{deviceId:dev2,deviceSeq:2}},slow+1000,'chair',chair,crypto.randomUUID(),await debateRevision());
+  await asOwner();
+  await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,$5)`,[ids.conference,dev2,chair,day(now),-3*H]);
+  await ops(exec,{type:'clockConfirm',deviceId:dev2,offsetMs:-3*H,reason:'Slow clock'});
+  await ops(exec,{type:'heldBulkApprove',deviceId:dev2,reason:'Clock confirmed'});
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d1])).state,'held');
+  assert.equal((await one<Held>('select * from public.held_action where id=$1',[d2])).state,'held','behind a predecessor that failed earlier');
+ }finally{await db.close();}
+});
