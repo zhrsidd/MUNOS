@@ -43,7 +43,7 @@ insert into public.attendance(id,conference_id,committee_id,"delegateId","sessio
 insert into private.conference_settings(conference_id) values (${C});
 insert into public.schedule_version(id,conference_id,committee_id,effective_from,changed_by,reason,automation_enabled,sessions) values (${u('sched')},${C},${u('committee-a')},now(),${u('user-exec')},'Fixture',true,'[]');
 insert into public.session_override(id,conference_id,scope,committee_id,session_id,set_by,set_at) values (${u('ovr-1')},${C},'committee',${u('committee-a')},${u('session')},${u('user-exec')},now());
-insert into public.session_override(id,conference_id,scope,slot_id,set_by,set_at) values (${u('ovr-2')},${C},'conference',${u('slot')},${u('user-exec')},now());
+insert into public.session_override(id,conference_id,scope,slot_id,targets,set_by,set_at) values (${u('ovr-2')},${C},'conference',${u('slot')},'{}'::jsonb,${u('user-exec')},now());
 insert into public.session_override_end(id,conference_id,override_id,committee_id,ended_at,ended_reason) values (${u('ovr-end')},${C},${u('ovr-1')},${u('committee-a')},now(),'automation_enabled');
 insert into public.roll_call(id,revision,conference_id,committee_id,state,observed_at,local_committed_at,server_committed_at,time_confidence,created_by) values (${u('rc')},1,${C},${u('committee-a')},'committed',now(),now(),now(),'trusted',${u('user-chair')});
 insert into public.roll_call_row(roll_call_id,revision,conference_id,committee_id,delegate_id,status) values (${u('rc')},1,${C},${u('committee-a')},${u('del-1')},'Present');

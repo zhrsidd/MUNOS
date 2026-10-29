@@ -33,7 +33,7 @@
   "20261029100000_session_window.sql",
   "20261029110000_session_schedule.sql"
  ],
- "migrationsSha256": "3e09077de891cc0c4ddd6c56d970fb7febd64bc62e029fce3986af014935fc53",
+ "migrationsSha256": "3d919e8a23c8fee4d5f4a6f83f409b81fc42b1932cb44160022f53397c9f8b66",
  "supabase-model": {
   "fns": [
    {
@@ -450,6 +450,36 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "end_overrides",
+    "args": "conf uuid, p_committee uuid, eff timestamp with time zone",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -4394,7 +4424,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -4403,7 +4433,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -5143,6 +5173,36 @@
    },
    {
     "schema": "private",
+    "name": "end_overrides",
+    "args": "conf uuid, p_committee uuid, eff timestamp with time zone",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "final_label",
     "args": "table_name text, rid uuid",
     "result": "uuid",
@@ -9079,7 +9139,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -9088,7 +9148,7 @@
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {

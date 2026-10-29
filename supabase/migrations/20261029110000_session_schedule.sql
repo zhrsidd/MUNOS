@@ -106,14 +106,17 @@ create table public.session_override (
   committee_id uuid,
   session_id uuid,
   slot_id uuid,
+  -- Conference scope: {committeeId: sessionId | null} captured at creation, one key per active committee, so archiving a slot or a session
+  -- later cannot change which session a delayed action is assigned (null = that committee had no session in the slot: "no session").
+  targets jsonb,
   set_by uuid not null,
   set_at timestamptz not null,
   -- Committee scope: the next scheduled switch under the version in effect (null when automation is off). Conference scope: null;
   -- each committee derives it from its own versions (private.session_overrides_for), which is deterministic because versions are immutable.
   expires_at timestamptz,
   created_at timestamptz not null default now(),
-  check ((scope = 'committee' and committee_id is not null and session_id is not null and slot_id is null)
-      or (scope = 'conference' and committee_id is null and session_id is null and slot_id is not null)),
+  check ((scope = 'committee' and committee_id is not null and session_id is not null and slot_id is null and targets is null)
+      or (scope = 'conference' and committee_id is null and session_id is null and slot_id is not null and jsonb_typeof(targets) = 'object')),
   foreign key (committee_id, conference_id) references public.committees(id, conference_id),
   foreign key (session_id, conference_id, committee_id) references public.sessions(id, conference_id, committee_id),
   foreign key (slot_id, conference_id) references public.conference_session_slots(id, conference_id),
@@ -277,10 +280,11 @@ create policy read_authorized on public.session_override for select to authentic
   using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'approval', 'logistics', 'observer']::public.conference_role[]));
 create policy read_authorized on public.session_override_end for select to authenticated
   using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'approval', 'logistics', 'observer']::public.conference_role[]));
+-- Roll calls carry delegates' Present / Present & Voting / Absent statuses: the same boundary as attendance (Executive, Chair, observer).
 create policy read_authorized on public.roll_call for select to authenticated
-  using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'approval', 'logistics', 'observer']::public.conference_role[]));
+  using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'observer']::public.conference_role[]));
 create policy read_authorized on public.roll_call_row for select to authenticated
-  using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'approval', 'logistics', 'observer']::public.conference_role[]));
+  using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'observer']::public.conference_role[]));
 create policy read_authorized on public.record_label for select to authenticated
   using (private.has_access(conference_id, committee_id, array['admin', 'chair', 'approval', 'logistics', 'observer']::public.conference_role[]));
 create policy read_authorized on public.label_correction for select to authenticated
@@ -311,8 +315,9 @@ language sql stable set search_path='' as $$
     from public.schedule_version v where v.conference_id = conf and v.committee_id = committee
 $$;
 
--- The override log as the pure resolver reads it. A conference-scope override is mapped to this committee's own session in the
--- slot (null when it has none) and its expiry is derived from this committee's versions at the time it was set.
+-- The override log as the pure resolver reads it. A conference-scope override uses the session captured for this committee when it
+-- was set (null when it had none; a committee that did not exist then is not covered) and its expiry is derived from this committee's
+-- versions at the time it was set.
 create function private.session_overrides_for(conf uuid, committee uuid) returns jsonb
 language plpgsql stable set search_path='' as $$
 declare
@@ -322,15 +327,14 @@ begin
   return coalesce((
     select jsonb_agg(jsonb_build_object(
              'id', o.id, 'scope', o.scope, 'committeeId', o.committee_id,
-             'sessionId', case o.scope when 'committee' then o.session_id
-                            else (select s.id from public.sessions s where s."slotId" = o.slot_id and s.committee_id = committee and not s.archived) end,
+             'sessionId', case o.scope when 'committee' then o.session_id else (o.targets ->> committee::text)::uuid end,
              'setAt', private.session_iso(o.set_at),
              'expiresAt', case o.scope when 'committee' then private.session_iso(o.expires_at)
                             else private.session_iso(private.session_override_expiry(versions, o.set_at, null, tz)) end,
              'endedAt', private.session_iso(e.ended_at)) order by o.set_at, o.id)
       from public.session_override o
       left join public.session_override_end e on e.override_id = o.id
-     where o.conference_id = conf and (o.scope = 'conference' or o.committee_id = committee)), '[]'::jsonb);
+     where o.conference_id = conf and ((o.scope = 'conference' and o.targets ? committee::text) or o.committee_id = committee)), '[]'::jsonb);
 end $$;
 
 -- The server's assignment (assigned_label) for a committee at an instant: what phase 3 stamps on records.
@@ -361,8 +365,25 @@ language sql volatile set search_path='' as $$
   select greatest(date_trunc('milliseconds', clock_timestamp()), coalesce((select max(effective_from) + interval '1 millisecond' from public.schedule_version where committee_id = cid), '-infinity'::timestamptz))
 $$;
 
+-- Enabling automation ends every manual override in scope at that moment, by appending end events (nothing is rewritten).
+-- p_committee given: that committee's committee-scope overrides. Null (whole conference): every committee-scope override and the
+-- conference-scope ones. Used by every path that turns automation on, whether or not a committee was already on.
+create function private.end_overrides(conf uuid, p_committee uuid, eff timestamptz) returns void
+language plpgsql set search_path='' as $$
+declare tz text := private.conference_time_zone(conf);
+begin
+  insert into public.session_override_end(conference_id, override_id, committee_id, ended_at, ended_reason)
+  select conf, o.id, o.committee_id, eff, 'automation_enabled' from public.session_override o
+   where o.conference_id = conf and o.set_at <= eff
+     and ((o.scope = 'committee' and (p_committee is null or o.committee_id = p_committee)) or (o.scope = 'conference' and p_committee is null))
+     and (o.expires_at is null or o.expires_at > eff)
+     and (((o.set_at at time zone tz)::date + 1)::timestamp at time zone tz) > eff
+     and not exists (select 1 from public.session_override_end e where e.override_id = o.id);
+end $$;
+
 -- scheduleVersion: {committeeId?: uuid (absent = every active committee), leadMinutes?: 5, graceMinutes?: 20, automationEnabled?: true,
---                   slotLeads?: {slotId: minutes}, reason}. All committees publish together or none does.
+--                   slotLeads?: {slotId: minutes}, reason}. All committees publish together or none does. A version that turns
+--                   automation on ends the overrides in scope, exactly as automationToggle does.
 create function private.ops_schedule_version(conf uuid, actor uuid, command jsonb) returns uuid[]
 language plpgsql set search_path='' as $$
 declare
@@ -371,7 +392,7 @@ declare
   grace integer := coalesce((command->>'graceMinutes')::integer, 20);
   auto boolean := coalesce((command->>'automationEnabled')::boolean, true);
   why text := btrim(command->>'reason');
-  c uuid; snapshot jsonb; errors jsonb; affected uuid[] := '{}';
+  c uuid; snapshot jsonb; errors jsonb; eff timestamptz; latest timestamptz; affected uuid[] := '{}';
 begin
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
   if command ? 'slotLeads' and jsonb_typeof(command->'slotLeads') is distinct from 'object' then raise exception 'slotLeads must be an object' using errcode = '22023'; end if;
@@ -379,28 +400,32 @@ begin
     snapshot := private.ops_schedule_snapshot(conf, c, command->'slotLeads');
     errors := private.session_schedule_errors(snapshot, lead, grace);
     if jsonb_array_length(errors) > 0 then raise exception 'Schedule rejected: %', errors::text using errcode = '22023'; end if;
+    eff := private.next_effective_from(c);
     insert into public.schedule_version(conference_id, committee_id, effective_from, changed_by, reason, lead_minutes, grace_minutes, automation_enabled, sessions)
-    values (conf, c, private.next_effective_from(c), actor, why, lead, grace, auto, snapshot);
+    values (conf, c, eff, actor, why, lead, grace, auto, snapshot);
+    latest := greatest(latest, eff);
     affected := affected || c;
   end loop;
   if target is not null and coalesce(array_length(affected, 1), 0) = 0 then raise exception 'Committee unavailable' using errcode = '22023'; end if;
+  if auto and latest is not null then perform private.end_overrides(conf, target, latest); end if;
   return affected;
 end $$;
 
--- automationToggle: {committeeId?: uuid (absent = whole conference), enabled: boolean, reason}. A toggle is a new schedule version
--- that copies the latest one. Enabling ends every manual override in scope at that moment (an end event; nothing is rewritten):
--- one committee: that committee's committee-scope overrides; the whole conference: all of them and the conference-scope ones.
+-- automationToggle: {committeeId?: uuid (absent = whole conference), enabled: boolean, reason}. A change of state is a new schedule
+-- version that copies the latest one; a toggle to the state a committee is already in writes no version. ENABLING always ends the
+-- overrides in scope (see end_overrides), including for committees that were already on, so "enable" reliably means "back to the
+-- schedule". A committee with no version cannot be toggled by name; a whole-conference toggle skips it.
 create function private.ops_automation_toggle(conf uuid, actor uuid, command jsonb) returns uuid[]
 language plpgsql set search_path='' as $$
 declare
   target uuid := private.uuid_or_null(command->>'committeeId');
   want boolean := (command->>'enabled')::boolean;
   why text := btrim(command->>'reason');
-  tz text := private.conference_time_zone(conf);
   c uuid; prev public.schedule_version; eff timestamptz; latest timestamptz; affected uuid[] := '{}';
 begin
   if want is null then raise exception 'enabled must be true or false' using errcode = '22023'; end if;
   if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
+  if target is not null and not exists (select 1 from public.committees where id = target and conference_id = conf and not archived) then raise exception 'Committee unavailable' using errcode = '22023'; end if;
   for c in select id from public.committees where conference_id = conf and not archived and (target is null or id = target) order by id loop
     select * into prev from public.schedule_version where committee_id = c order by effective_from desc limit 1;
     if not found then
@@ -411,23 +436,13 @@ begin
     eff := private.next_effective_from(c);
     insert into public.schedule_version(conference_id, committee_id, effective_from, changed_by, reason, lead_minutes, grace_minutes, automation_enabled, sessions)
     values (conf, c, eff, actor, why, prev.lead_minutes, prev.grace_minutes, want, prev.sessions);
-    if want then
-      insert into public.session_override_end(conference_id, override_id, committee_id, ended_at, ended_reason)
-      select conf, o.id, o.committee_id, eff, 'automation_enabled' from public.session_override o
-       where o.conference_id = conf and o.scope = 'committee' and o.committee_id = c and o.set_at <= eff
-         and (o.expires_at is null or o.expires_at > eff)
-         and (((o.set_at at time zone tz)::date + 1)::timestamp at time zone tz) > eff
-         and not exists (select 1 from public.session_override_end e where e.override_id = o.id);
-    end if;
     latest := greatest(latest, eff);
     affected := affected || c;
   end loop;
-  if want and target is null and latest is not null then
-    insert into public.session_override_end(conference_id, override_id, committee_id, ended_at, ended_reason)
-    select conf, o.id, null, latest, 'automation_enabled' from public.session_override o
-     where o.conference_id = conf and o.scope = 'conference' and o.set_at <= latest
-       and (((o.set_at at time zone tz)::date + 1)::timestamp at time zone tz) > latest
-       and not exists (select 1 from public.session_override_end e where e.override_id = o.id);
+  if want then
+    perform private.end_overrides(conf, target, coalesce(latest, date_trunc('milliseconds', clock_timestamp())));
+    -- Committees whose overrides ended without a new version still need their devices told.
+    affected := affected || array(select id from public.committees where conference_id = conf and not archived and (target is null or id = target) and not id = any(affected));
   end if;
   return affected;
 end $$;
@@ -458,8 +473,11 @@ begin
   if not exists (select 1 from public.conference_session_slots where id = slot and conference_id = conf and not archived) then
     raise exception 'Session slot unavailable' using errcode = '22023';
   end if;
-  insert into public.session_override(id, conference_id, scope, slot_id, set_by, set_at)
-  values (new_id, conf, 'conference', slot, actor, at);
+  insert into public.session_override(id, conference_id, scope, slot_id, targets, set_by, set_at)
+  values (new_id, conf, 'conference', slot,
+          (select coalesce(jsonb_object_agg(c.id::text, (select s.id from public.sessions s where s."slotId" = slot and s.committee_id = c.id and not s.archived)), '{}'::jsonb)
+             from public.committees c where c.conference_id = conf and not c.archived),
+          actor, at);
   return array(select id from public.committees where conference_id = conf and not archived order by id);
 end $$;
 
@@ -535,6 +553,6 @@ end $patch$;
 -- Internal helpers: no API-role EXECUTE (new functions have none by default; made explicit here).
 revoke all on function private.conference_time_zone(uuid), private.reject_append_only_change(), private.final_label(text, uuid),
   private.session_versions_for(uuid, uuid), private.session_overrides_for(uuid, uuid), private.committee_session_at(uuid, uuid, timestamptz),
-  private.ops_schedule_snapshot(uuid, uuid, jsonb), private.next_effective_from(uuid), private.ops_schedule_version(uuid, uuid, jsonb),
+  private.ops_schedule_snapshot(uuid, uuid, jsonb), private.next_effective_from(uuid), private.end_overrides(uuid, uuid, timestamptz), private.ops_schedule_version(uuid, uuid, jsonb),
   private.ops_automation_toggle(uuid, uuid, jsonb), private.ops_override_set(uuid, uuid, uuid, jsonb), private.ops_label_correction(uuid, uuid, uuid, jsonb),
   private.ops_clock_confirm(uuid, uuid, uuid, jsonb) from public, anon, authenticated, service_role;

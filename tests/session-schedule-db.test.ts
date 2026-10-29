@@ -166,14 +166,14 @@ test('real PostgreSQL: overrides - committee expiry is stored at creation; a con
   // Conference override on slot S6 at 2099-10-17 12:00 local (owner-inserted so the instant is in the schedule's year).
   await asOwner();
   const kid=U(5000);
-  await db.query(`insert into public.session_override(id,conference_id,scope,slot_id,set_by,set_at) values($1,$2,'conference',$3,$4,$5)`,[kid,ids.conference,S.S6,exec,`${D}T12:00:00+03:00`]);
-  const who=await sessionOf(S.S6,ids.who);
-  assert.equal((await at(ids.ga1,`${D}T12:10:00+03:00`)).sessionId,await sessionOf(S.S6,ids.ga1),'GA1 shows its own S6 session');
-  assert.equal((await at(ids.who,`${D}T12:10:00+03:00`)).sessionId,who,'WHO shows its own S6 session');
-  // A committee with no session in that slot: no session, flagged, and the schedule is not consulted.
-  await db.query('delete from public.sessions where id=$1',[who]);
+  const ga1S6=await sessionOf(S.S6,ids.ga1),whoS6=await sessionOf(S.S6,ids.who);
+  // The captured mapping: GA1 had its S6 session; WHO had none in the slot.
+  await db.query(`insert into public.session_override(id,conference_id,scope,slot_id,targets,set_by,set_at) values($1,$2,'conference',$3,$4::jsonb,$5,$6)`,
+   [kid,ids.conference,S.S6,JSON.stringify({[ids.ga1]:ga1S6,[ids.who]:null}),exec,`${D}T12:00:00+03:00`]);
+  assert.equal((await at(ids.ga1,`${D}T12:10:00+03:00`)).sessionId,ga1S6,'GA1 shows its own S6 session');
   const none=await at(ids.who,`${D}T12:10:00+03:00`);
   assert.equal(none.sessionId,null);assert.equal(none.flag,'no_session');assert.equal(none.source,'override');
+  assert.notEqual(whoS6,null,'WHO does have an S6 session now: the override still shows none, because the mapping was captured when it was set');
   // The conference override ends for each committee at its own next switch (12:25 with the default lead).
   assert.equal((await at(ids.ga1,`${D}T12:25:00+03:00`)).source,'schedule');
   // A committee override beats it.
@@ -252,5 +252,92 @@ test('real PostgreSQL: label correction is an explicit record - corrected to no 
   await assert.rejects(()=>ops(exec,{type:'clockConfirm',deviceId:device,offsetMs:864000000,reason:'x'}),/within one day/);
   await asOwner();
   assert.equal((await query('select 1 from public.clock_confirmation where device_id=$1',[device])).length,1);
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: a conference override keeps the mapping it was set with; archiving a slot or session never changes a historical assignment',async()=>{
+ const {db,ids,ops,mutate,at,sessionOf,S,query,asOwner}=await setup();
+ try{
+  await ops(exec,{type:'scheduleVersion',reason:'All'});
+  const key=await ops(exec,{type:'overrideSet',scope:'conference',slotId:S.S6});
+  await asOwner();
+  const row=(await query<{set_at:string;targets:Record<string,string|null>}>('select set_at,targets from public.session_override where id=$1',[key.slice(0,24)+'000000000001']))[0];
+  const ga1S6=await sessionOf(S.S6,ids.ga1);
+  assert.equal(row.targets[ids.ga1],ga1S6,'every active committee is captured at creation');
+  assert.ok(Object.keys(row.targets).length>=2);
+  const instant=new Date(new Date(row.set_at).getTime()+1000).toISOString();
+  assert.equal((await at(ids.ga1,instant)).sessionId,ga1S6);
+  await asOwner();
+  const revision=String((await query<{r:string}>('select revision::text r from public.conference_session_slots where id=$1',[S.S6]))[0].r);
+  await mutate(exec,{type:'sessionSlot',id:S.S6,action:'archive'},'admin',crypto.randomUUID(),revision);
+  const after=await at(ids.ga1,instant);
+  assert.equal(after.sessionId,ga1S6,'the same historical instant resolves to the same session after the slot is archived');
+  assert.equal(after.source,'override');
+  // A committee created after the override was set is not covered by it.
+  await asOwner();
+  const newer=crypto.randomUUID();
+  await db.query(`insert into public.committees(id,conference_id,code,name,room) values($1,$2,'NEW','Newer','R9')`,[newer,ids.conference]);
+  assert.equal((await at(newer,instant)).source,'none');
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: turning automation on always ends the overrides in scope - by publishing a version, by toggling, and for committees already on',async()=>{
+ const {db,ids,ops,sessionOf,S,query,asOwner}=await setup();
+ try{
+  const open=async()=>{await asOwner();return (await query<{committee_id:string}>('select committee_id from public.session_override o where not exists(select 1 from public.session_override_end e where e.override_id=o.id) order by committee_id',[])).map(r=>r.committee_id);};
+  await ops(exec,{type:'scheduleVersion',reason:'All'});
+  await ops(exec,{type:'automationToggle',committeeId:ids.ga1,enabled:false,reason:'Manual'});
+  await ops(exec,{type:'overrideSet',scope:'committee',committeeId:ids.ga1,sessionId:await sessionOf(S.S5,ids.ga1)});
+  assert.deepEqual(await open(),[ids.ga1]);
+
+  // 1. Publishing a version with automation on ends it.
+  await ops(exec,{type:'scheduleVersion',committeeId:ids.ga1,automationEnabled:true,reason:'Republish with automation'});
+  assert.deepEqual(await open(),[],'a published version that turns automation on ends the committee override');
+  await asOwner();
+  const e=(await query<{ended_reason:string;ended_at:string}>('select ended_reason,ended_at from public.session_override_end',[]))[0];
+  const latest=(await query<{t:string}>('select max(effective_from) t from public.schedule_version where committee_id=$1',[ids.ga1]))[0].t;
+  assert.equal(e.ended_reason,'automation_enabled');assert.equal(new Date(e.ended_at).toISOString(),new Date(latest).toISOString());
+
+  // 2. Whole-conference enable also ends overrides in committees that were already on, and conference-scope overrides.
+  await ops(exec,{type:'automationToggle',committeeId:ids.ga1,enabled:false,reason:'GA1 manual'});
+  await ops(exec,{type:'overrideSet',scope:'committee',committeeId:ids.ga1,sessionId:await sessionOf(S.S5,ids.ga1)});
+  await ops(exec,{type:'overrideSet',scope:'committee',committeeId:ids.who,sessionId:await sessionOf(S.S5,ids.who)});
+  await ops(exec,{type:'overrideSet',scope:'conference',slotId:S.S7});
+  assert.equal((await open()).length,3);
+  await ops(exec,{type:'automationToggle',enabled:true,reason:'Everything back to the schedule'});
+  assert.deepEqual(await open(),[],'WHO was already on and GA1 was off: both overrides and the conference override end');
+
+  // 3. Enabling a committee that is already on ends its own override too, and writes no new version.
+  await ops(exec,{type:'overrideSet',scope:'committee',committeeId:ids.who,sessionId:await sessionOf(S.S6,ids.who)});
+  await asOwner();
+  const before=Number((await query<{n:number}>('select count(*)::int n from public.schedule_version where committee_id=$1',[ids.who]))[0].n);
+  await ops(exec,{type:'automationToggle',committeeId:ids.who,enabled:true,reason:'Back to schedule'});
+  assert.deepEqual(await open(),[]);
+  await asOwner();
+  assert.equal(Number((await query<{n:number}>('select count(*)::int n from public.schedule_version where committee_id=$1',[ids.who]))[0].n),before);
+  // Publishing with automation off never ends anything.
+  await ops(exec,{type:'overrideSet',scope:'committee',committeeId:ids.who,sessionId:await sessionOf(S.S5,ids.who)});
+  await ops(exec,{type:'scheduleVersion',committeeId:ids.who,automationEnabled:false,reason:'Manual mode'});
+  assert.deepEqual(await open(),[ids.who]);
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: roll calls follow the attendance boundary - Approval Panel and Logistics cannot read delegates\' statuses',async()=>{
+ const {db,ids,as,asOwner,grant}=await setup();
+ try{
+  const observer=U(6);await grant(observer,'observer');
+  await asOwner();
+  const del=(await db.query<{id:string}>('select id from public.delegates where committee_id=$1 limit 1',[ids.ga1])).rows[0].id;
+  const rc=U(7000);
+  await db.query(`insert into public.roll_call(id,revision,conference_id,committee_id,state,observed_at,local_committed_at,server_committed_at,time_confidence,created_by) values($1,1,$2,$3,'committed',now(),now(),now(),'trusted',$4)`,[rc,ids.conference,ids.ga1,exec]);
+  await db.query(`insert into public.roll_call_row(roll_call_id,revision,conference_id,committee_id,delegate_id,status) values($1,1,$2,$3,$4,'Present & Voting')`,[rc,ids.conference,ids.ga1,del]);
+  for(const [user,table,expected] of [[exec,'roll_call',1],[chair,'roll_call',1],[observer,'roll_call',1],[panel,'roll_call',0],[print,'roll_call',0],[other,'roll_call',0],
+                                      [exec,'roll_call_row',1],[chair,'roll_call_row',1],[observer,'roll_call_row',1],[panel,'roll_call_row',0],[print,'roll_call_row',0],[other,'roll_call_row',0]] as const){
+   await as(user);
+   assert.equal((await db.query(`select 1 from public.${table}`)).rows.length,expected,`${table} as ${user}`);
+  }
+  // The attendance boundary it must match.
+  await as(panel);assert.equal((await db.query('select 1 from public.attendance')).rows.length,0);
+  await as(print);assert.equal((await db.query('select 1 from public.attendance')).rows.length,0);
  }finally{await db.close();}
 });

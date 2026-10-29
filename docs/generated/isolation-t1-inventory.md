@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 31 files, combined SHA-256 `3e09077de891cc0c`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 31 files, combined SHA-256 `3d919e8a23c8fee4`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -54,7 +54,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-83 functions (74 callable, 9 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+84 functions (75 callable, 9 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -72,6 +72,7 @@ Executed in the disposable database after the inventory was read:
 | `private.decision_history(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.document_round()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.document_submitter_countries(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.end_overrides(conf uuid, p_committee uuid, eff timestamp with time zone)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.final_label(table_name text, rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.guard_lifecycle_transition()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.has_access(conf uuid, committee uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
@@ -306,8 +307,8 @@ Column-level privileges: none.
 | `public.poi_queue` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) | - |
 | `public.record_label` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conferenc... | - |
 | `public.resolution_links` | read_authorized | SELECT | authenticated | yes | (EXISTS ( SELECT 1 FROM documents d WHERE (d.id = resolution_links.document_id))) | - |
-| `public.roll_call` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conferenc... | - |
-| `public.roll_call_row` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conferenc... | - |
+| `public.roll_call` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
+| `public.roll_call_row` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.schedule_version` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conferenc... | - |
 | `public.schools` | read_authorized | SELECT | authenticated | yes | (private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) OR (EXISTS ( SELECT 1 ... | - |
 | `public.scoring_definitions` | read_authorized | SELECT | authenticated | yes | (private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) OR ((committee_id IS... | - |
@@ -325,5 +326,5 @@ Column-level privileges: none.
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 83.
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 84.
 
