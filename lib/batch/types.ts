@@ -2,7 +2,7 @@ export interface ConferenceSessionSlot {id:string;name:string;startsAt:string;en
 export interface AmendmentLink {id:string;committeeId:string;token:string;createdAt:string}
 export type AmendmentStatus='Submitted'|'Accepted for Debate'|'In Debate'|'Closed';
 export type AmendmentOutcome='Passed'|'Failed'|'Withdrawn'|'Ruled Out';
-export interface Amendment {id:string;committeeId:string;resolutionId:string;sessionId:string;submitterId:string;type:'Add'|'Strike'|'Replace';clause:string;wording:string;status:AmendmentStatus;outcome:AmendmentOutcome|null;createdAt:string;revision:number}
+export interface Amendment {id:string;committeeId:string;resolutionId:string;sessionId:string|null;submitterId:string;type:'Add'|'Strike'|'Replace';clause:string;wording:string;status:AmendmentStatus;outcome:AmendmentOutcome|null;createdAt:string;revision:number}
 export interface BatchData {sessionSlots?:ConferenceSessionSlot[];amendmentLinks?:AmendmentLink[];amendments?:Amendment[]}
 export type BatchCommand=
  | {type:'committeeUpdate';id:string;code:string;name:string;room:string}

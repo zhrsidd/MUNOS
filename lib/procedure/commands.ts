@@ -22,8 +22,6 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
  const reorder=(entries:{id:string;position:number}[],ids:string[])=>{if(ids.length!==entries.length||new Set(ids).size!==ids.length||ids.some(id=>!entries.some(e=>e.id===id)))throw Error('Queue changed. Review its current order.');ids.forEach((id,i)=>{entries.find(e=>e.id===id)!.position=i;});};
  const event=(s:Speech,delegateId:string,categoryId:string,points:number)=>{const e:ParticipationEvent={id:nextId(),delegateId,categoryId,points,committeeId:cid,resolutionId:s.resolutionId,chairId:actor,createdAt:now,speechId:s.id,classification:s.classification,yieldedFrom:s.yieldedFrom};d.events.push(e);};
  switch(c.type){
- case 'currentSession':
-  throw Error('Sessions follow the published schedule; Chairs no longer choose them.');
  case 'vetoRules':
   if(new Set(c.delegateIds).size!==c.delegateIds.length||c.delegateIds.some(id=>!d.delegates.some(x=>x.id===id&&x.committeeId===committee.id)))throw Error('Choose delegations in this committee.');
   committee.vetoEnabled=c.enabled;committee.vetoDelegateIds=c.delegateIds;break;

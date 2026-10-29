@@ -43,7 +43,6 @@ export function fingerprint(data: ConferenceData, c: Command): string | null {
   const cid=committeeOfCommand(data,c)??"";
   switch (c.type) {
     case "staffContact": return String(data.staff.find(s=>s.id===c.id)?.contactRevision ?? 1);
-    case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);
     case "debateMode": return String(data.debateStates?.find(x=>isLive(x,cid))?.revision??0);
     case "queueOrder": return data.queue.filter(q=>isLive(q,cid)&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
     case "poiOrder": return (data.poiQueue??[]).filter(q=>q.speechId===c.speechId).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");

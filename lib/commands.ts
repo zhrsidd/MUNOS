@@ -33,6 +33,8 @@ export type Command =
       sessionId: string;
       status: AttendanceStatus;
     }
+  /** Retired: sessions follow the published schedule. Kept so an action saved by an older build can be shown and refused. */
+  | { type: "currentSession"; committeeId: string; sessionId: string }
   /**
    * A whole roll call, committed once (docs/SESSION_MODEL.md section 6). The id is made on the device, so a roll call taken offline
    * has its identity before it reaches the server; a correction is the next revision of the same id. Drafts never leave the device.
@@ -272,6 +274,8 @@ export function applyCommand(
   switch (c.type) {
     case "attendance":
       throw Error("Attendance is taken with roll calls now.");
+    case "currentSession":
+      throw Error("Sessions follow the published schedule; Chairs no longer choose them.");
     case "rollCallCommit": {
       // Mirrors private.commit_roll_call: one whole roll call; a correction is the next revision of the same id.
       const list = (d.rollCalls ??= []);

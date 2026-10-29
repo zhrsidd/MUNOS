@@ -7,8 +7,6 @@ export interface Speech { id: string; committeeId?: string; sessionId?: string |
 /** recognizedAt: set when the Chair gives this POI the floor; it stays queued until scored or withdrawn. */
 export interface PoiEntry { id: string; speechId: string; delegateId: string; position: number; recognizedAt?: string | null }
 export type ProcedureCommand =
- /** Retired: sessions follow the published schedule. Kept only so an action saved by an older build can be shown and refused. */
- | {type:'currentSession'; committeeId:string; sessionId:string}
  | {type:'debateMode'; committeeId:string; sessionId?:string; mode:'open'|'closed'; phase:'for'|'against'}
  | {type:'queueAdd'; committeeId:string; sessionId?:string; delegateId:string; lane:Lane}
  | {type:'queueOrder'; committeeId:string; sessionId?:string; lane:Lane; ids:string[]}
@@ -29,5 +27,5 @@ export type ProcedureCommand =
  | {type:'poiRemove'; committeeId:string; sessionId?:string; speechId:string; entryId:string}
  | {type:'voteMode'; committeeId:string; sessionId?:string; resolutionId:string; mode:'normal'|'divide'; voteType:'substantive'|'procedural'}
  | {type:'vetoRules'; committeeId:string; enabled:boolean; delegateIds:string[]};
-export const procedureTypes = ['currentSession','debateMode','queueAdd','queueOrder','queueRemove','speechStart','speechYield','speechScore','speechFinish','poiAllowance','poiAdd','poiOrder','poiRecognize','poiScore','poiRemove','voteMode','vetoRules'];
+export const procedureTypes = ['debateMode','queueAdd','queueOrder','queueRemove','speechStart','speechYield','speechScore','speechFinish','poiAllowance','poiAdd','poiOrder','poiRecognize','poiScore','poiRemove','voteMode','vetoRules'];
 export const isProcedureCommand = (c:{type:string}):c is ProcedureCommand => procedureTypes.includes(c.type);
