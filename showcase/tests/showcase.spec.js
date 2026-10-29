@@ -6,7 +6,7 @@ test('desktop visitor can explore workspaces and request a custom paid build', a
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Make room for diplomacy.' })).toBeVisible();
-  await page.getByRole('link', { name: 'Explore the platform' }).click();
+  await page.getByRole('link', { name: 'See the connected workflow' }).click();
   await page.getByRole('tab', { name: /Move ideas forward/ }).click();
   await expect(page.getByRole('tabpanel')).toContainText('Changes requested');
   await page.getByRole('tab', { name: /Move ideas forward/ }).press('ArrowDown');
@@ -59,4 +59,25 @@ test('reduced motion and disabling JavaScript keep the message usable', async ({
   await expect(fallback.locator('#contact')).toContainText('paid service');
   await expect(fallback.locator('.no-script-note')).toContainText('approval review');
   await noJs.close();
+});
+
+test('scroll storytelling highlights the resolution handoffs beneath executive oversight', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveClass(/scroll-cinema/);
+  await expect(page.locator('.workflow-stages li')).toHaveCount(3);
+  await expect(page.locator('.oversight-band')).toContainText('Decisions stay in each team’s workspace');
+  for (const [fraction, index] of [[0.1, 0], [0.5, 1], [0.9, 2]]) {
+    await page.locator('.workflow-scene').evaluate((scene, f) => {
+      const start = scene.getBoundingClientRect().top + window.scrollY - 90;
+      const end = scene.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
+      window.scrollTo({ top: start + (end - start) * f, behavior: 'instant' });
+    }, fraction);
+    await expect(page.locator('.workflow-stages li').nth(index)).toHaveAttribute('data-active', 'true');
+    await expect(page.locator('.oversight-band')).toBeInViewport();
+  }
+  await page.screenshot({ path: 'test-results/workflow-scroll.png', animations: 'disabled' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('html')).not.toHaveClass(/scroll-cinema/);
+  await expect(page.locator('.workflow-pin')).toHaveCSS('position', 'static');
 });

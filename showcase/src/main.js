@@ -1,4 +1,4 @@
-import { animate, inView, stagger } from 'motion';
+import { animate, inView, stagger, scroll } from 'motion';
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 const panel = document.querySelector('#workspace-panel');
@@ -12,10 +12,11 @@ const previews = {
     caption: 'Bring Google Docs submissions, approval feedback and resolution progress into one workflow.',
   },
   printing: {
-    html: `<div class="mock-sidebar" aria-hidden="true"><span class="mini-mark">M<span>O</span></span><span>◫</span><span class="sidebar-selected">☷</span><span>▤</span><span>⚙</span></div><div class="mock-main"><div class="mock-heading"><div><p class="mock-kicker">PRINTING TEAM · DEMO</p><h3>Ready for the next step.</h3></div><span class="mock-avatar">PT</span></div><div class="mock-tabs"><span class="selected">Print queue</span><span>Completed</span><span>Overview</span></div><div class="mock-summary"><span>Approved resolutions</span><span class="mock-chip">Illustrative data</span></div><div class="delegate-row"><span><b class="country-code">01</b>GA1/01 — France</span><span class="attendance">Queued</span></div><div class="delegate-row"><span><b class="country-code">02</b>GA1/02 — Qatar</span><span class="attendance">Printing</span></div><div class="delegate-row"><span><b class="country-code">03</b>GA1/03 — Singapore</span><span class="attendance">Printed</span></div><div class="delegate-row"><span><b class="country-code">04</b>GA1/04 — Kenya</span><span class="attendance">Collected</span></div><p class="mock-footer"><span>◉</span> Clear handoffs from approval to paper.</p></div>`,
+    html: `<div class="mock-sidebar" aria-hidden="true"><span class="mini-mark">M<span>O</span></span><span>◫</span><span class="sidebar-selected">☷</span><span>▤</span><span>⚙</span></div><div class="mock-main"><div class="mock-heading"><div><p class="mock-kicker">PRINTING TEAM · DEMO</p><h3>Ready for the next step.</h3></div><span class="mock-avatar">PT</span></div><div class="mock-tabs"><span class="selected">Print queue</span><span>Completed</span><span>Overview</span></div><div class="mock-summary"><span>Approved resolutions</span><span class="mock-chip">Illustrative data</span></div><div class="delegate-row"><span><b class="country-code">01</b>GA1/01 — France</span><span class="attendance">Queued</span></div><div class="delegate-row"><span><b class="country-code">02</b>GA1/02 — Qatar</span><span class="attendance">Printing</span></div><div class="delegate-row"><span><b class="country-code">03</b>GA1/03 — Singapore</span><span class="attendance">Printed</span></div><div class="delegate-row"><span><b class="country-code">04</b>GA1/04 — Kenya</span><span class="attendance">Printed</span></div><p class="mock-footer"><span>◉</span> Clear handoffs from approval to paper.</p></div>`,
     caption: 'Give printing teams their own queue and executives a view across the conference.',
   },
 };
+const cinematicLayout = window.matchMedia('(min-width: 1001px) and (min-height: 760px)');
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 let tabAnimation;
 function selectTab(tab, focus = false) {
@@ -65,6 +66,9 @@ function stopMotion() {
     element.style.opacity = ''; element.style.transform = '';
   });
   content.style.opacity = ''; content.style.transform = '';
+  document.documentElement.classList.remove('scroll-cinema');
+  document.querySelectorAll('.workflow-stages li').forEach(stage => stage.removeAttribute('data-active'));
+  document.querySelector('.workflow-progress span').style.transform = '';
 }
 function startMotion() {
   stopMotion();
@@ -72,14 +76,31 @@ function startMotion() {
   const intro = [...document.querySelectorAll('.hero-content > *')];
   intro.forEach(element => element.setAttribute('data-motion', ''));
   animations.push(animate(intro, { opacity: [0, 1], y: [22, 0] }, { duration: 0.8, delay: stagger(0.085), ease: [0.22, 1, 0.36, 1] }));
-  const sections = document.querySelectorAll('.section-heading, .benefit-grid article, .tailored-grid > div, .steps article, .brand-text, .logo-frame, .people-heading, .people-grid article, .contact-section h2');
+  const sections = document.querySelectorAll('.workflow-heading, .oversight-band, .workflow-stages li, .section-heading, .benefit-grid article, .tailored-grid > div, .steps article, .brand-text, .logo-frame, .people-heading, .people-grid article, .contact-section h2');
   sections.forEach(element => {
     element.setAttribute('data-motion', '');
     stops.push(inView(element, () => {
       animations.push(animate(element, { opacity: [0.15, 1], y: [25, 0] }, { duration: 0.75, ease: [0.22, 1, 0.36, 1] }));
     }, { amount: 0.15 }));
   });
+  const hero = document.querySelector('.hero');
   const art = document.querySelector('.hero-art');
+  if (cinematicLayout.matches) {
+    document.documentElement.classList.add('scroll-cinema');
+    const scene = document.querySelector('.workflow-scene');
+    const stages = [...document.querySelectorAll('.workflow-stages li')];
+    const progress = document.querySelector('.workflow-progress span');
+    stops.push(scroll(value => {
+      const index = Math.min(2, Math.floor(value * 3));
+      stages.forEach((stage, i) => stage.setAttribute('data-active', String(i === index)));
+      progress.style.transform = `scaleX(${value})`;
+    }, { target: scene, offset: ['start 90px', 'end end'] }));
+    const parallax = animate(art, { y: [0, 110], opacity: [1, 0.3] }, { autoplay: false, ease: 'linear' });
+    art.setAttribute('data-motion', '');
+    animations.push(parallax);
+    stops.push(scroll(parallax, { target: hero, offset: ['start start', 'end start'] }));
+  }
+
   const floating = [...document.querySelectorAll('.satellite')];
   floating.forEach(element => element.setAttribute('data-motion', ''));
   // Pause ambient animation while the decorative artwork is outside the viewport.
@@ -95,4 +116,5 @@ function startMotion() {
   }));
 }
 motionPreference.addEventListener('change', startMotion);
+cinematicLayout.addEventListener('change', startMotion);
 startMotion();
