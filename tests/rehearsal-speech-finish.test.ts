@@ -33,8 +33,8 @@ test('a missing finish fails instead of silently allowing navigation', async () 
 
 test('offline completion uses the persisted outbox projection without requiring a server read', async () => {
   const base = createSeed();
-  base.speeches = [{id: 'speech', sessionId: 's1', delegateId: 'd0', resolutionId: 'r1', classification: 'Other', yieldedFrom: null, state: 'speaking', poiLimit: null, poiCount: 0, revision: 0, createdAt: new Date().toISOString()}];
-  const checkpoint: Checkpoint = {key: 'offline', base, savedAt: new Date().toISOString(), pending: [{id: 'finish', actorId: 'chair', role: 'chair', state: 'pending', expected: '0', createdAt: new Date().toISOString(), command: {type: 'speechFinish', sessionId: 's1', speechId: 'speech'}}]};
+  base.speeches = [{id: 'speech', committeeId:'ga1', delegateId: 'd0', resolutionId: 'r1', classification: 'Other', yieldedFrom: null, state: 'speaking', poiLimit: null, poiCount: 0, revision: 0, createdAt: new Date().toISOString()}];
+  const checkpoint: Checkpoint = {key: 'offline', base, savedAt: new Date().toISOString(), pending: [{id: 'finish', actorId: 'chair', role: 'chair', state: 'pending', expected: '0', createdAt: new Date().toISOString(), command: {type: 'speechFinish', committeeId:'ga1', speechId: 'speech'}}]};
   await waitForSpeechFinish({getByRole: () => ({waitFor: async () => {}})}, async () => project(checkpoint), 'speech', {timeout: 5});
   assert.equal(checkpoint.base.speeches?.[0]?.state, 'speaking', 'authoritative base has not changed while offline');
   assert.equal(checkpoint.pending.length, 1, 'the finish is still durably queued for later sync');

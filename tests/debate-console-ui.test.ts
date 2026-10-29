@@ -26,7 +26,7 @@ async function renderChair(t:test.TestContext,data:ConferenceData,committee='ga1
  const page=await Page({params:Promise.resolve({route:['chair']})});
  return renderToStaticMarkup(createElement(AppRouterContext.Provider,{value:router},createElement(PathnameContext.Provider,{value:'/chair'},createElement(ConferenceProvider,null,page))));
 }
-const seed=()=>{const d=createSeed();d.committees.find(c=>c.id==='ga1')!.currentSessionId='s1';return d;};
+const seed=createSeed;
 const text=(html:string)=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&#x27;|&#39;/g,"'").replace(/\s+/g,' ');
 function photoSlot(d:ConferenceData,startsInMinutes:number){
  d.photoSlots=[{id:'ph1',schoolId:'school0',startsAt:new Date(Date.now()+startsInMinutes*60000).toISOString(),endsAt:null,location:'Main Courtyard',note:'',warnMinutes:10,enabled:true,revision:1} as NonNullable<ConferenceData['photoSlots']>[number]];
@@ -52,7 +52,7 @@ test('Chair Debate: one Next speaker action, configured speech values, no per-ro
  assert.doesNotMatch(raw,/>Recognize[^<]*<\/button>/,'no per-row Recognize buttons');
  assert.equal((raw.match(/Next speaker ·/g)??[]).length,1,'exactly one Next speaker action');
  const active=seed();active.scoring=d.scoring;
- active.speeches=[{id:'sp1',sessionId:'s1',delegateId:'d1',resolutionId:'r1',amendmentId:null,classification:'Other',yieldedFrom:null,state:'pois',poiLimit:null,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];
+ active.speeches=[{id:'sp1',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',amendmentId:null,classification:'Other',yieldedFrom:null,state:'pois',poiLimit:null,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];
  active.poiQueue=[{id:'p1',speechId:'sp1',delegateId:'d2',position:0,recognizedAt:null},{id:'p2',speechId:'sp1',delegateId:'d3',position:1,recognizedAt:null}];
  const speaking=await renderChair(t,active);
  assert.match(speaking,/aria-label="Record Japan speech for 2 points"/);assert.match(speaking,/aria-label="Record Japan speech for 4 points"/);
@@ -67,19 +67,19 @@ test('Chair Debate: one Next speaker action, configured speech values, no per-ro
 
 test('Chair Debate: amendment in debate takes over the console; passed reminder afterwards',async t=>{
  const d=seed();
- d.amendments=[{id:'am1',committeeId:'ga1',resolutionId:'r1',sessionId:'s1',submitterId:'d3',type:'Replace',clause:'Operative clause 2',wording:'Replace “working group” with “expert panel”.',status:'In Debate',outcome:null,createdAt:'2026-10-05T06:00:00.000Z',revision:3}];
+ d.amendments=[{id:'am1',committeeId:'ga1',resolutionId:'r1',sessionId:null,submitterId:'d3',type:'Replace',clause:'Operative clause 2',wording:'Replace “working group” with “expert panel”.',status:'In Debate',outcome:null,createdAt:'2026-10-05T06:00:00.000Z',revision:3}];
  const html=text(await renderChair(t,d));
  const submitter=d.delegates.find(x=>x.id==='d0')!.country;
  for(const s of ['AMENDMENT IN DEBATE','Resolution debate paused · amendment has priority',`GA1/01 — ${submitter}`,'Kenya','Replace','Operative clause 2','expert panel','Pass amendment','Fail amendment','Withdraw','Rule out'])assert.ok(html.includes(s),s);
  assert.ok(!html.includes('Safeguarding civilians in autonomous warfare'),'the resolution is named by code and Main Submitter, not title');
  assert.doesNotMatch(html,/Invite Main Submitter/);
  assert.doesNotMatch(await renderChair(t,d),/<button[^>]*disabled[^>]*>Pass amendment/,'floor with the Chair: closing is available');
- d.speeches=[{id:'sp1',sessionId:'s1',delegateId:'d1',resolutionId:'r1',amendmentId:'am1',classification:'For',yieldedFrom:null,state:'pois',poiLimit:1,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];
+ d.speeches=[{id:'sp1',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',amendmentId:'am1',classification:'For',yieldedFrom:null,state:'pois',poiLimit:1,poiCount:0,revision:2,createdAt:'2026-10-05T06:00:00.000Z'}];
  const held=await renderChair(t,d);
  for(const label of ['Pass amendment','Fail amendment','Withdraw'])assert.match(held,new RegExp(`<button[^>]*disabled[^>]*>${label}<`),label);
  assert.match(text(held),/Finish the current speech and return the floor to the Chair first\./);
  d.speeches[0]={...d.speeches[0],state:'finished'};
- d.amendments[0]={...d.amendments[0],status:'Closed',outcome:'Passed',revision:4};
+ d.amendments![0]={...d.amendments![0],status:'Closed',outcome:'Passed',revision:4};
  const after=text(await renderChair(t,d));
  assert.match(after,/RESOLUTION IN DEBATE/);assert.doesNotMatch(after,/AMENDMENT IN DEBATE/);
  assert.match(after,/Apply the passed amendment to the working Google Doc\./);

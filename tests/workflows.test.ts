@@ -7,60 +7,26 @@ import {
 } from "../lib/repository";
 import { createSeed } from "../lib/seed";
 import { parseCSV, validateImport } from "../lib/import";
+import { rollCall } from "./helpers/roll-call";
 
-test("roll call remains exclusive and removes an ineligible vote and queued speaker", () => {
+test("a ballot uses the roll call in force when it opens; Present & Voting cannot abstain; an absent delegate leaves the queue", () => {
   let data = createSeed();
-  data = applyCommand(
-    data,
-    {
-      type: "vote",
-      delegateId: "d1",
-      sessionId: "s1",
-      resolutionId: "r1",
-      choice: "Abstain",
-    },
-    "chair",
-  );
-  data = applyCommand(
-    data,
-    {
-      type: "attendance",
-      delegateId: "d1",
-      sessionId: "s1",
-      status: "Present & Voting",
-    },
-    "chair",
-  );
-  assert.equal(data.votes.length, 0);
-  assert.equal(
-    data.attendance.filter((a) => a.delegateId === "d1" && a.sessionId === "s1")
-      .length,
-    1,
-  );
-  assert.throws(
-    () =>
-      applyCommand(
-        data,
-        {
-          type: "vote",
-          delegateId: "d1",
-          sessionId: "s1",
-          resolutionId: "r1",
-          choice: "Abstain",
-        },
-        "chair",
-      ),
-    /Attendance/,
-  );
-  data = applyCommand(
-    data,
-    { type: "attendance", delegateId: "d1", sessionId: "s1", status: "Absent" },
-    "chair",
-  );
-  assert.equal(
-    data.queue.some((q) => q.delegateId === "d1"),
-    false,
-  );
+  const run = (c: Parameters<typeof applyCommand>[1]) => { data = applyCommand(data, c, "chair"); };
+  // Seed roll call: d1 is Present, so may abstain once the ballot is open.
+  run({ type: "voteMode", committeeId: "ga1", resolutionId: "r1", mode: "normal", voteType: "procedural" });
+  run({ type: "vote", delegateId: "d1", committeeId: "ga1", resolutionId: "r1", choice: "Abstain" });
+  // A later roll call makes d1 Present & Voting: the open ballot keeps its snapshot.
+  run(rollCall("ga1", { d0: "Present & Voting", d1: "Present & Voting", d2: "Present" }));
+  run({ type: "vote", delegateId: "d1", committeeId: "ga1", resolutionId: "r1", choice: "Abstain" });
+  // A fresh ballot snapshots the new roll call: d1 can no longer abstain.
+  run({ type: "voteMode", committeeId: "ga1", resolutionId: "r1", mode: "normal", voteType: "procedural" });
+  assert.throws(() => applyCommand(data, { type: "vote", delegateId: "d1", committeeId: "ga1", resolutionId: "r1", choice: "Abstain" }, "chair"), /Attendance/);
+  // The live roll call marks d1 absent: d1 leaves the speaker queue.
+  assert.equal(data.queue.some((q) => q.delegateId === "d1"), true);
+  run(rollCall("ga1", { d0: "Present & Voting", d2: "Present" }));
+  assert.equal(data.queue.some((q) => q.delegateId === "d1"), false);
+  // Attendance commands are retired.
+  assert.throws(() => applyCommand(data, { type: "attendance", delegateId: "d1", sessionId: "s1", status: "Present" }, "chair"), /roll calls/);
 });
 test("participation counts opportunities independently of points; undo retains an event", () => {
   let data = createSeed();
@@ -72,7 +38,7 @@ test("participation counts opportunities independently of points; undo retains a
       delegateId: "d0",
       categoryId: "speech",
       points: 3,
-      sessionId: "s1",
+      committeeId:"ga1",
       resolutionId: "r1",
     },
     "chair",
@@ -99,7 +65,7 @@ test("participation counts opportunities independently of points; undo retains a
 });
 test("suggestions favor opportunities, exclude absent and already queued delegates", () => {
   const data = createSeed();
-  const list = suggestedDelegates(data, "s1");
+  const list = suggestedDelegates(data, "ga1");
   assert.equal(participationSummary(data, list[0].id).opportunities, 0);
   assert.equal(
     list.some((d) => ["d0", "d1", "d2", "d10"].includes(d.id)),
@@ -108,7 +74,7 @@ test("suggestions favor opportunities, exclude absent and already queued delegat
   const reordered = structuredClone(data);
   reordered.events.forEach((e) => (e.points = 999));
   assert.deepEqual(
-    suggestedDelegates(reordered, "s1").map((d) => d.id),
+    suggestedDelegates(reordered, "ga1").map((d) => d.id),
     list.map((d) => d.id),
   );
 });
@@ -188,15 +154,10 @@ test("session and committee foreign-key boundaries are enforced", () => {
     () =>
       applyCommand(
         data,
-        {
-          type: "attendance",
-          delegateId: "d0",
-          sessionId: "s2",
-          status: "Present",
-        },
+        rollCall("ecosoc", { d0: "Present" }),
         "chair",
       ),
-    /outside/,
+    /delegate of this committee/,
   );
   assert.throws(
     () =>
@@ -205,7 +166,7 @@ test("session and committee foreign-key boundaries are enforced", () => {
         {
           type: "participation",
           delegateId: "d0",
-          sessionId: "s1",
+          committeeId:"ga1",
           resolutionId: "r3",
           categoryId: "speech",
           points: 2,
@@ -218,7 +179,7 @@ test("session and committee foreign-key boundaries are enforced", () => {
     () =>
       applyCommand(
         data,
-        { type: "queue", delegateId: "d10", sessionId: "s1" },
+        { type: "queue", delegateId: "d10", committeeId:"ga1" },
         "chair",
       ),
     /present/,
@@ -227,7 +188,7 @@ test("session and committee foreign-key boundaries are enforced", () => {
 test("the speaker timer is not part of conference state: queue advance and speech transitions write no timer", () => {
   let data = createSeed();
   assert.equal(data.timers, undefined, "the seed carries no stored timers");
-  data = applyCommand(data, { type: "queue", sessionId: "s1", advance: true }, "chair");
+  data = applyCommand(data, { type: "queue", committeeId:"ga1", advance: true }, "chair");
   assert.equal(data.timers, undefined, "advancing the queue no longer resets a stored timer");
 });
 test("committee scoring overrides do not change other committees", () => {
@@ -246,7 +207,7 @@ test("committee scoring overrides do not change other committees", () => {
     {
       type: "participation",
       delegateId: "d0",
-      sessionId: "s1",
+      committeeId:"ga1",
       resolutionId: "r1",
       categoryId: "speech",
       points: 4,

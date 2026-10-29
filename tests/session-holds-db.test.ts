@@ -64,13 +64,13 @@ test('real PostgreSQL: Control commands - held outside a window, when stale, beh
  const {db,ids,now,ops,send,one,count,debateRevision,asOwner}=await setupSessions();
  try{
   await ops(exec,{type:'holdSettings',enforce:true});
-  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const control=(phase:'for'|'against')=>({type:'debateMode',committeeId:ids.ga1,mode:'open',phase});
   const dev=U(110);
   await asOwner();
   const verified=async(d:string,t:number)=>{await asOwner();await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,0)`,[ids.conference,d,chair,day(t)]);};
   // Inside a window and fresh: applied.
   const ok=await send(control('against'),now,'chair',chair,crypto.randomUUID(),await debateRevision());
-  assert.equal(await count(`select 1 from public.debate_states where "sessionId"=$1 and phase='against'`,[ids.session]),1);
+  assert.equal(await count(`select 1 from public.debate_states where committee_id=$1 and "sessionId" is null and phase='against'`,[ids.ga1]),1);
   assert.equal(await count('select 1 from public.held_action where id=$1',[ok]),0);
 
   // Outside every window (before X's switch), Trusted via a verified clock: HELD (a Record would have applied).
@@ -78,7 +78,7 @@ test('real PostgreSQL: Control commands - held outside a window, when stale, beh
   await verified(dev,early);
   const k1=await send({...control('for'),_device:{deviceId:dev,deviceSeq:1}},early,'chair',chair,crypto.randomUUID(),await debateRevision());
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[k1])).reason,'outside_window');
-  assert.equal(await count(`select 1 from public.debate_states where "sessionId"=$1 and phase='for'`,[ids.session]),0);
+  assert.equal(await count(`select 1 from public.debate_states where committee_id=$1 and "sessionId" is null and phase='for'`,[ids.ga1]),0);
 
   // Behind: a later command from the same device and committee is held behind it, even though it is inside a window.
   await verified(dev,now);
@@ -87,9 +87,9 @@ test('real PostgreSQL: Control commands - held outside a window, when stale, beh
   // Another device is not blocked.
   const k3=await send({...control('for'),_device:{deviceId:U(111),deviceSeq:1}},now,'chair',chair,crypto.randomUUID(),await debateRevision());
   assert.equal(await count('select 1 from public.held_action where id=$1',[k3]),0);
-  assert.equal(await count(`select 1 from public.debate_states where "sessionId"=$1 and phase='for'`,[ids.session]),1);
+  assert.equal(await count(`select 1 from public.debate_states where committee_id=$1 and "sessionId" is null and phase='for'`,[ids.ga1]),1);
   // A Record from the held device is NOT held behind a Control (records follow the table on their own).
-  const rec=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev,deviceSeq:3}},now);
+  const rec=await send({type:'participation',committeeId:ids.ga1,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev,deviceSeq:3}},now);
   assert.equal(await count('select 1 from public.held_action where id=$1',[rec]),0);
 
   // Stale: Trusted via a verified clock but received more than 5 minutes after its device time.
@@ -115,7 +115,7 @@ test('real PostgreSQL: an Executive-closed day holds everything that arrives aft
   await assert.rejects(()=>ops(exec,{type:'closeDay',reason:'Again'}),/already closed/);
   const rec=await send(score,now);
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[rec])).reason,'day_closed');
-  const ctl=await send({type:'debateMode',sessionId:ids.session,mode:'open',phase:'against'},now,'chair',chair,crypto.randomUUID(),await debateRevision());
+  const ctl=await send({type:'debateMode',committeeId:ids.ga1,mode:'open',phase:'against'},now,'chair',chair,crypto.randomUUID(),await debateRevision());
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[ctl])).reason,'day_closed');
  }finally{await db.close();}
 });
@@ -167,7 +167,7 @@ test('real PostgreSQL: approval stays held with a new reason when the revision m
  const {db,ids,now,ops,send,one,count,debateRevision,asOwner}=await setupSessions();
  try{
   await ops(exec,{type:'holdSettings',enforce:true});
-  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const control=(phase:'for'|'against')=>({type:'debateMode',committeeId:ids.ga1,mode:'open',phase});
   // Held Control, then the entity moves on (another command changes the debate state): the approval reports a revision mismatch.
   const held=await send(control('for'),now-3*H,'chair',chair,crypto.randomUUID(),await debateRevision());
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[held])).reason,'uncertain_time');
@@ -175,10 +175,10 @@ test('real PostgreSQL: approval stays held with a new reason when the revision m
   await ops(exec,{type:'heldDecide',heldId:held,decision:'approve',reason:'Try'});
   const h=await one<Held>('select * from public.held_action where id=$1',[held]);
   assert.equal(h.state,'held');assert.equal(h.reason,'revision_mismatch');assert.ok(h.last_error);
-  assert.equal(await count(`select 1 from public.debate_states where "sessionId"=$1 and phase='against'`,[ids.session]),1,'nothing was applied');
+  assert.equal(await count(`select 1 from public.debate_states where committee_id=$1 and "sessionId" is null and phase='against'`,[ids.ga1]),1,'nothing was applied');
 
   // The original actor's CURRENT permissions decide: revoke the Chair and the approval reports it.
-  const rec=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null},now-3*H);
+  const rec=await send({type:'participation',committeeId:ids.ga1,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null},now-3*H);
   await asOwner();
   await db.query(`update public.user_access set revoked_at=now() where user_id=$1`,[chair]);
   await ops(exec,{type:'heldDecide',heldId:rec,decision:'approve',reason:'Try'});
@@ -272,12 +272,12 @@ test('real PostgreSQL: approval keeps Control ordering - a later Control waits f
  try{
   await ops(exec,{type:'holdSettings',enforce:true});
   const dev=U(140);
-  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const control=(phase:'for'|'against')=>({type:'debateMode',committeeId:ids.ga1,mode:'open',phase});
   const slow=now-3*H;
   const rev=await debateRevision();
   const c1=await send({...control('for'),_device:{deviceId:dev,deviceSeq:1}},slow,'chair',chair,crypto.randomUUID(),rev);
   const c2=await send({...control('against'),_device:{deviceId:dev,deviceSeq:2}},slow+1000,'chair',chair,crypto.randomUUID(),rev);
-  const r1=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev,deviceSeq:3}},slow+2000);
+  const r1=await send({type:'participation',committeeId:ids.ga1,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev,deviceSeq:3}},slow+2000);
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[c2])).state,'held');
 
   // Individually: the later Control cannot be approved while the earlier one is held; the independent Record can.
@@ -295,7 +295,7 @@ test('real PostgreSQL: approval keeps Control ordering - a later Control waits f
   const rev2=await debateRevision();
   const d1=await send({...control('for'),_device:{deviceId:dev2,deviceSeq:1}},slow,'chair',chair,crypto.randomUUID(),rev2);
   const d2=await send({...control('against'),_device:{deviceId:dev2,deviceSeq:2}},slow+1000,'chair',chair,crypto.randomUUID(),rev2);
-  const d3=await send({type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev2,deviceSeq:3}},slow+2000);
+  const d3=await send({type:'participation',committeeId:ids.ga1,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null,_device:{deviceId:dev2,deviceSeq:3}},slow+2000);
   await send(control('for'),now,'chair',chair,crypto.randomUUID(),await debateRevision());
   await asOwner();
   await db.query(`insert into public.device_clock_sync(conference_id,device_id,actor_id,conference_day,offset_ms) values($1,$2,$3,$4,$5)`,[ids.conference,dev2,chair,day(now),-3*H]);
@@ -312,7 +312,7 @@ test('real PostgreSQL: bulk approval never overtakes an earlier unresolved Contr
  const {db,ids,now,ops,send,one,debateRevision,asOwner}=await setupSessions();
  try{
   await ops(exec,{type:'holdSettings',enforce:true});
-  const control=(phase:'for'|'against')=>({type:'debateMode',sessionId:ids.session,mode:'open',phase});
+  const control=(phase:'for'|'against')=>({type:'debateMode',committeeId:ids.ga1,mode:'open',phase});
   const dev=U(150);
   const early=now-270*M;
   await asOwner();

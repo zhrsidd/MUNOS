@@ -156,13 +156,14 @@ test('real PostgreSQL: corrections, point adjustments and replays are labelled o
 test('real PostgreSQL: a changed vote is re-labelled with its newest action',async()=>{
  const {db,ids,now,A,B,session,send,labelOf,asOwner,query}=await setup();
  try{
+  // Open the ballot: eligibility comes from the seeded roll call (France is Present & Voting there).
   await asOwner();
-  const att=String((await query<{r:string}>('select coalesce((select revision from public.attendance where "sessionId"=$1 and "delegateId"=$2),0)::text r',[ids.session,ids.france]))[0].r);
-  await send({type:'attendance',sessionId:ids.session,delegateId:ids.france,status:'Present & Voting'},now,'chair',chair,crypto.randomUUID(),att);
+  const rev=String((await query<{r:string}>('select revision::text r from public.documents where id=$1',[ids.resolution]))[0].r);
+  await send({type:'voteMode',committeeId:ids.ga1,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'},now,'chair',chair,crypto.randomUUID(),rev);
   const vote=async(choice:string,device:string)=>{
    await asOwner();
-   const revision=String((await query<{r:string}>('select coalesce((select revision from public.votes where "sessionId"=$1 and "delegateId"=$2 and "resolutionId"=$3),0)::text r',[ids.session,ids.france,ids.resolution]))[0].r);
-   return send({type:'vote',sessionId:ids.session,resolutionId:ids.resolution,delegateId:ids.france,choice,_device:{deviceId:device,deviceSeq:1,displayedLabel:await session(B)}},now,'chair',chair,crypto.randomUUID(),revision);};
+   const revision=String((await query<{r:string}>('select coalesce((select revision from public.votes where "sessionId" is null and "delegateId"=$1 and "resolutionId"=$2),0)::text r',[ids.france,ids.resolution]))[0].r);
+   return send({type:'vote',committeeId:ids.ga1,resolutionId:ids.resolution,delegateId:ids.france,choice,_device:{deviceId:device,deviceSeq:1,displayedLabel:await session(B)}},now,'chair',chair,crypto.randomUUID(),revision);};
   await vote('For',U(600));
   await asOwner();
   const row=(await query<{id:string}>('select id from public.votes where "delegateId"=$1 and "resolutionId"=$2',[ids.france,ids.resolution]))[0];

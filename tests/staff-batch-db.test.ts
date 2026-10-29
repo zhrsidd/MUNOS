@@ -33,7 +33,8 @@ test('central slots preserve local identities and history; committee/session del
   await assert.rejects(()=>f.mutate({type:'committeeUpdate',id:f.ids.ga1,code:original.committees.find(c=>c.id!==f.ids.ga1)!.code,name:'Duplicate',room:'A'}),code('23505'));
   await assert.rejects(()=>f.mutate({type:'committeeLifecycle',id:f.ids.ga1,action:'delete'}),/linked records/);
   const local=copies.find(s=>s.committeeId===f.ids.ga1)!;const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;
-  await f.as(chair);await f.mutate({type:'attendance',delegateId:delegate.id,sessionId:local.id,status:'Present'},'chair');
+  // Session-keyed history written before roll calls (attendance is no longer a command) still marks the session as used.
+  await f.asOwner();await f.db.query(`insert into public.attendance(conference_id,committee_id,"delegateId","sessionId",status) values($1,$2,$3,$4,'Present')`,[f.ids.conference,f.ids.ga1,delegate.id,local.id]);await f.as(chair);
   await assert.rejects(()=>f.mutate({...create,name:'unauthorized'},'admin'),code('42501'));
   await f.as(admin);await assert.rejects(()=>f.mutate({type:'sessionSlot',action:'delete',id:slot.id}),/operational history/);
   await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});data=await f.snapshot();assert.ok(data.sessionSlots!.find(s=>s.id===slot.id)?.archived);assert.equal(data.attendance.find(a=>a.sessionId===local.id)?.status,'Present');assert.ok(data.sessions.filter(s=>s.slotId===slot.id).every(s=>s.archived&&s.state==='closed'));

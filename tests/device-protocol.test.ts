@@ -12,7 +12,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 
 // Device protocol (docs/SESSION_MODEL.md 4, 5, 7): a stable device id, a sequence that only grows, the session the device displayed, and a clock
 // report before anything is sent. Evidence only: none of it changes what is saved or applied.
-const speech={type:'participation' as const,delegateId:'d0',sessionId:'s1',resolutionId:'r1',categoryId:'speech',points:2};
+const speech={type:'participation' as const,delegateId:'d0',committeeId:'ga1',resolutionId:'r1',categoryId:'speech',points:2};
 const tick=()=>new Promise(r=>setTimeout(r,15));
 class Server implements Transport{
  actorId='test-chair';data=createSeed();online=true;sent:Mutation[]=[];clockCalls:string[]=[];clockFails=false;
@@ -61,7 +61,7 @@ test('the displayed label: unknown without a schedule, "no session" outside ever
  assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now).toISOString()),'s1');
  assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now+5*3600000).toISOString()),null,'after close: an explicit "no session"');
  assert.equal(displayedLabel(scheduled(data,now),null,new Date(now).toISOString()),undefined);
- assert.equal(committeeOfCommand(data,{type:'participation',sessionId:'s1'} as {type:string}),committeeId);
+ assert.equal(committeeOfCommand(data,{type:'participation',committeeId:'ga1'} as {type:string}),committeeId);
  assert.equal(committeeOfCommand(data,{type:'vetoRules',committeeId:'x'} as {type:string}),'x');
  assert.equal(committeeOfCommand(data,{type:'import'}),null);
 });

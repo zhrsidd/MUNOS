@@ -32,6 +32,6 @@ export async function setupSessions(){
  const count=async(sql:string,p:unknown[]=[])=>Number((await one<{n:number}>(`select count(*)::int n from (${sql}) q`,p)).n);
  const score={type:'participation',sessionId:ids.session,delegateId:ids.france,categoryId:'speech',points:1,resolutionId:null};
  const eventOf=(key:string)=>key.slice(0,24)+'000000000001';
- const debateRevision=async()=>String((await one<{r:string}>('select coalesce((select revision from public.debate_states where "sessionId"=$1),0)::text r',[ids.session])).r);
+ const debateRevision=async()=>String((await one<{r:string}>('select coalesce((select revision from public.debate_states where committee_id=$1 and "sessionId" is null),0)::text r',[ids.ga1])).r);
  return {...f,now,mutate,ops,slot,session,send,one,count,score,eventOf,debateRevision,X,A,B};
 }

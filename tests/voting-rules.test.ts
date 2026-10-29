@@ -23,7 +23,7 @@ function clientData(c:Case,committeeRule:Rule|undefined,conferenceRule:Rule|unde
  const d=createSeed(),r=d.documents.find(r=>r.id==='r1')!;
  d.conference.votingRule=conferenceRule;d.committees.find(x=>x.id==='ga1')!.votingRule=committeeRule;
  const members=d.delegates.filter(x=>x.committeeId==='ga1');
- d.votes=ballots(c).map((choice,i)=>({id:`v${i}`,delegateId:members[i].id,sessionId:r.sessionId!,resolutionId:r.id,choice,createdAt:'2026-11-05'}));
+ d.votes=ballots(c).map((choice,i)=>({id:`v${i}`,delegateId:members[i].id,committeeId:'ga1',resolutionId:r.id,choice,createdAt:'2026-11-05'}));
  return d;
 }
 
@@ -38,7 +38,7 @@ test('voting rule (client): the committee rule overrides the conference rule, wh
  assert.equal(votingOutcome(clientData(threeTwo,undefined,undefined),'r1'),'Passed');
  const d=clientData(threeTwo,'simple_majority',undefined);
  d.votes.push({id:'other-session',delegateId:d.votes[0].delegateId,sessionId:'elsewhere',resolutionId:'r1',choice:'Against',createdAt:'2026-11-05'},{id:'x1',delegateId:'x',sessionId:'elsewhere',resolutionId:'r1',choice:'Against',createdAt:'2026-11-05'});
- assert.equal(votingOutcome(d,'r1'),'Passed','ballots from another session are ignored');
+ assert.equal(votingOutcome(d,'r1'),'Passed','session-keyed ballots from before the committee rekey are history and ignored');
 });
 
 test('voting rule (PostgreSQL): closing accepts exactly the outcome the client computes',async()=>{
@@ -55,15 +55,14 @@ test('voting rule (PostgreSQL): closing accepts exactly the outcome the client c
   const prepare=async(c:Case,committeeRule:Rule|null,conferenceRule:Rule)=>{
    await asOwner();
    await db.query('delete from public.votes where "resolutionId"=$1',[ids.resolution]);
-   await db.query('delete from public.attendance where "sessionId"=$1',[ids.session]);
+   await db.query('delete from public.ballot_eligibility where resolution_id=$1',[ids.resolution]);
    await db.query('update public.conferences set voting_rule=$1 where id=$2',[conferenceRule,ids.conference]);
    await db.query('update public.committees set voting_rule=$1 where id=$2',[committeeRule,ids.ga1]);
    await db.query(`update public.documents set status='In Debate',outcome=null,"sessionId"=$1 where id=$2`,[ids.session,ids.resolution]);
-   // Every ballot comes from a present member and every present member votes, as closing requires.
-   for(const [i,choice] of ballots(c).entries()){
-    await db.query(`insert into public.attendance(conference_id,committee_id,"delegateId","sessionId",status) values($1,$2,$3,$4,'Present')`,[ids.conference,ids.ga1,members[i],ids.session]);
-    await db.query(`insert into public.votes(conference_id,committee_id,"delegateId","sessionId","resolutionId",choice) values($1,$2,$3,$4,$5,$6)`,[ids.conference,ids.ga1,members[i],ids.session,ids.resolution,choice]);
-   }
+   // The ballot's eligibility snapshot: every ballot comes from an eligible member and every eligible member votes, as closing requires.
+   for(const [i,m] of members.entries())await db.query(`insert into public.ballot_eligibility(resolution_id,delegate_id,conference_id,committee_id,status) values($1,$2,$3,$4,$5)`,[ids.resolution,m,ids.conference,ids.ga1,i<ballots(c).length?'Present':'Absent']);
+   for(const [i,choice] of ballots(c).entries())
+    await db.query(`insert into public.votes(conference_id,committee_id,"delegateId","sessionId","resolutionId",choice) values($1,$2,$3,null,$4,$5)`,[ids.conference,ids.ga1,members[i],ids.resolution,choice]);
   };
   const check=async(label:string,c:Case,committeeRule:Rule|null,conferenceRule:Rule,expected:'Passed'|'Failed')=>{
    await prepare(c,committeeRule,conferenceRule);

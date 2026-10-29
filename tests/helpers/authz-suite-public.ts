@@ -91,7 +91,8 @@ export async function submissionSection(t: TestContext, {engine, f}: Ctx) {
  await t.test('submit_amendment as the server: needs an open debate; invalid / revoked / archived link, wrong-committee submitter and malformed amendment are refused', async () => {
   const cases: {n: string; call: string; pre?: string; code: string; status?: string; message?: RegExp}[] = [
    {n: 'valid amendment during debate', call: amendmentCall(f), pre: openCommittee(f), code: 'ok', status: 'created'},
-   {n: 'no current session selected (debate not open)', call: amendmentCall(f), code: '22023', message: /^not_open$/},
+   // Sessions are labels now (docs/SESSION_MODEL.md section 8): debate is open when the committee has a resolution in debate.
+   {n: 'no current session selected, resolution in debate', call: amendmentCall(f), code: 'ok', status: 'created'},
    {n: 'resolution not in debate', call: amendmentCall(f), pre: `${openCommittee(f)} update public.documents set status='Closed', outcome='Withdrawn' where id=${q(f.resolution)};`, code: '22023', message: /^not_open$/},
    {n: 'unknown link token', call: amendmentCall(f, {token: 'nope_nope_nope_nope_nope_nope'}), pre: openCommittee(f), code: '22023', message: /^invalid_link$/},
    {n: 'revoked link token', call: amendmentCall(f), pre: `${openCommittee(f)} update public.amendment_links set revoked_at=now() where token=${q(f.amendmentToken)};`, code: '22023', message: /^invalid_link$/},

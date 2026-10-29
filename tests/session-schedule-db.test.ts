@@ -334,7 +334,7 @@ test('real PostgreSQL: roll calls follow the attendance boundary - Approval Pane
   for(const [user,table,expected] of [[exec,'roll_call',1],[chair,'roll_call',1],[observer,'roll_call',1],[panel,'roll_call',0],[print,'roll_call',0],[other,'roll_call',0],
                                       [exec,'roll_call_row',1],[chair,'roll_call_row',1],[observer,'roll_call_row',1],[panel,'roll_call_row',0],[print,'roll_call_row',0],[other,'roll_call_row',0]] as const){
    await as(user);
-   assert.equal((await db.query(`select 1 from public.${table}`)).rows.length,expected,`${table} as ${user}`);
+   assert.equal((await db.query(`select 1 from public.${table} where ${table==='roll_call'?'id':'roll_call_id'}=$1`,[rc])).rows.length,expected,`${table} as ${user}`);
   }
   // The attendance boundary it must match.
   await as(panel);assert.equal((await db.query('select 1 from public.attendance')).rows.length,0);

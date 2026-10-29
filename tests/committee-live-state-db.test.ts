@@ -4,7 +4,6 @@ import {H,M,U,chair,day,exec,iso,setupSessions} from './helpers/session-fixture'
 
 // Live state keyed by committee, roll calls, historical eligibility and ballot snapshots (docs/SESSION_MODEL.md sections 6 and 8) on real
 // PostgreSQL with every migration applied. Chairs never name a session: commands name their committee.
-type Setup=Awaited<ReturnType<typeof setupSessions>>;
 async function fixture(){
  const f=await setupSessions();
  const {ids,query,asOwner}=f;
@@ -24,7 +23,8 @@ const present=(...ds:string[])=>Object.fromEntries(ds.map(d=>[d,'Present & Votin
 test('real PostgreSQL: a Chair works without choosing a session - committee-keyed queue and debate state, the old commands refused',async()=>{
  const f=await fixture();const {db,ids,now,send,delegates,c,roll,queue,one,debateRevision}=f;
  try{
-  // No roll call yet: nobody is present.
+  // A roll call marking everyone absent: nobody may join the queue.
+  await send(roll({},{committed:now-90_000}),now);
   await assert.rejects(()=>send({type:'queueAdd',...c,delegateId:delegates[0],lane:'open'},now),/must be present/);
   await send(roll(present(delegates[0],delegates[1])),now);
   await send({type:'queueAdd',...c,delegateId:delegates[0],lane:'open'},now);
@@ -143,9 +143,10 @@ test('real PostgreSQL: a roll call taken in the break is labelled with the previ
   assert.equal(r.c,'uncertain');assert.ok(Date.parse(r.e)<=Date.now()+1000,'never effective in the future');
   // Enforcement on: held.
   await ops(exec,{type:'holdSettings',enforce:true});
+  const stored=await count('select 1 from public.roll_call');
   const held=await send(roll({},{committed:now+30*M}),now+30*M);
   assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[held])).reason,'uncertain_time');
-  assert.equal(await count('select 1 from public.roll_call where created_by is not null'),2);
+  assert.equal(await count('select 1 from public.roll_call'),stored,'the held roll call is not stored');
  }finally{await db.close();}
 });
 

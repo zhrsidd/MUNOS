@@ -30,22 +30,22 @@ test('blank conference: required procedure scoring exists with defaults and can 
 test('configured Speech values drive the Chair console and are enforced',()=>{
  const t=runner(blank());t.run({type:'scoring',id:'speech',values:[2,4,6]},'admin');
  assert.deepEqual(scoringValues(t.d,'ga1','speech'),[2,4,6]);
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
  const s=t.d.speeches![0];
- assert.throws(()=>t.run({type:'speechScore',sessionId:'s1',speechId:s.id,points:3}),/configured speech value/);
- t.run({type:'speechScore',sessionId:'s1',speechId:s.id,points:6});
+ assert.throws(()=>t.run({type:'speechScore',committeeId:'ga1',speechId:s.id,points:3}),/configured speech value/);
+ t.run({type:'speechScore',committeeId:'ga1',speechId:s.id,points:6});
  assert.equal(t.d.events.at(-1)?.points,6);
 });
 test('configured POI values drive POI scoring and are enforced',()=>{
  const t=runner(blank());t.run({type:'scoring',id:'poi',values:[1,3]},'admin');
  assert.deepEqual(scoringValues(t.d,'ga1','poi'),[1,3]);
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
  const s=t.d.speeches![0];
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:null});
- t.run({type:'poiAdd',sessionId:'s1',speechId:s.id,delegateId:'d2'});
- const entry=t.d.poiQueue![0];t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:entry.id});
- assert.throws(()=>t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:entry.id,points:2}),/configured POI value/);
- t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:entry.id,points:3});
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:null});
+ t.run({type:'poiAdd',committeeId:'ga1',speechId:s.id,delegateId:'d2'});
+ const entry=t.d.poiQueue![0];t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:entry.id});
+ assert.throws(()=>t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:entry.id,points:2}),/configured POI value/);
+ t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:entry.id,points:3});
  assert.equal(t.d.events.at(-1)?.points,3);
 });
 test('a committee override replaces only its own category; other committees keep the conference default',()=>{
@@ -69,14 +69,14 @@ test('invalid scoring values are rejected',()=>{
 test('Main Submitter credit: configurable single value, once per resolution, earlier credits keep their points',()=>{
  const t=runner(blank());
  const mainSubmitterSpeech=(resolutionId:string,delegateId:string)=>{
-  t.run({type:'speechStart',sessionId:'s1',delegateId,resolutionId,classification:'Main Submitter'});
-  const s=t.d.speeches!.at(-1)!;t.run(speechScoreCommand(t.d,'ga1',s,2));t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+  t.run({type:'speechStart',committeeId:'ga1',delegateId,resolutionId,classification:'Main Submitter'});
+  const s=t.d.speeches!.at(-1)!;t.run(speechScoreCommand(t.d,'ga1',s,2));t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  };
  const credits=(resolutionId:string)=>t.d.events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===resolutionId);
  // Default +5 before any configuration; a second Main Submitter speech adds nothing.
  mainSubmitterSpeech('r1','d0');mainSubmitterSpeech('r1','d0');
  assert.deepEqual(credits('r1').map(e=>[e.delegateId,e.points]),[['d0',5]]);
- assert.throws(()=>t.run({type:'participation',delegateId:'d0',categoryId:'submitter',points:5,sessionId:'s1',resolutionId:'r1'}),/only be recorded once/);
+ assert.throws(()=>t.run({type:'participation',delegateId:'d0',categoryId:'submitter',points:5,committeeId:'ga1',resolutionId:'r1'}),/only be recorded once/);
  // A committee override applies to that committee only; the stored +5 is unchanged.
  t.run({type:'scoring',id:'submitter',values:[4]},'admin');
  t.run({type:'scoring',id:'submitter',values:[8],committeeId:'ga1'},'admin');
@@ -84,7 +84,7 @@ test('Main Submitter credit: configurable single value, once per resolution, ear
  assert.deepEqual(scoringValues(t.d,'ecosoc','submitter'),[4]);
  const r2=t.d.documents.find(r=>r.id==='r2')!;r2.status='In Debate';r2.sessionId='s1';
  // A manual credit must use the configured value.
- assert.throws(()=>t.run({type:'participation',delegateId:r2.submitterId,categoryId:'submitter',points:5,sessionId:'s1',resolutionId:'r2'}),/configured point value/);
+ assert.throws(()=>t.run({type:'participation',delegateId:r2.submitterId,categoryId:'submitter',points:5,committeeId:'ga1',resolutionId:'r2'}),/configured point value/);
  // The automatic credit uses the configured value, still once per resolution.
  mainSubmitterSpeech('r2',r2.submitterId);mainSubmitterSpeech('r2',r2.submitterId);
  assert.deepEqual(credits('r2').map(e=>e.points),[8]);
@@ -127,51 +127,51 @@ test('an applicable photo slot produces a GROUP PHOTO attention alert; unrelated
 // ---------------------------------------------------------------- 4. Speaker and POI queues
 test('Next speaker: only queue position 1 can be recognized; reordering changes who is next',()=>{
  const t=runner(createSeed());
- const [first,second]=t.d.queue.filter(q=>q.sessionId==='s1').sort((a,b)=>a.position-b.position);
- assert.equal(nextSpeaker(t.d,'s1')?.id,first.id);
- assert.throws(()=>t.run({type:'speechStart',sessionId:'s1',delegateId:second.delegateId,resolutionId:'r1',classification:'Other',entryId:second.id}),/Only the first speaker/);
- const order=t.d.queue.filter(q=>q.sessionId==='s1').sort((a,b)=>a.position-b.position).map(q=>q.id);
- t.run({type:'queueOrder',sessionId:'s1',lane:'open',ids:[order[1],order[0],...order.slice(2)]});
- assert.equal(nextSpeaker(t.d,'s1')?.id,second.id);
- t.run({type:'speechStart',sessionId:'s1',delegateId:second.delegateId,resolutionId:'r1',classification:'Other',entryId:second.id});
+ const [first,second]=t.d.queue.filter(q=>q.committeeId==='ga1'&&!q.sessionId).sort((a,b)=>a.position-b.position);
+ assert.equal(nextSpeaker(t.d,'ga1')?.id,first.id);
+ assert.throws(()=>t.run({type:'speechStart',committeeId:'ga1',delegateId:second.delegateId,resolutionId:'r1',classification:'Other',entryId:second.id}),/Only the first speaker/);
+ const order=t.d.queue.filter(q=>q.committeeId==='ga1'&&!q.sessionId).sort((a,b)=>a.position-b.position).map(q=>q.id);
+ t.run({type:'queueOrder',committeeId:'ga1',lane:'open',ids:[order[1],order[0],...order.slice(2)]});
+ assert.equal(nextSpeaker(t.d,'ga1')?.id,second.id);
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:second.delegateId,resolutionId:'r1',classification:'Other',entryId:second.id});
  assert.equal(t.d.speeches!.at(-1)?.delegateId,second.delegateId);
- t.run({type:'speechFinish',sessionId:'s1',speechId:t.d.speeches!.at(-1)!.id});
+ t.run({type:'speechFinish',committeeId:'ga1',speechId:t.d.speeches!.at(-1)!.id});
  assert.ok(!t.d.speeches!.some(s=>s.state!=='finished'),'finishing never starts the next speaker');
- assert.equal(nextSpeaker(t.d,'s1')?.id,first.id);
+ assert.equal(nextSpeaker(t.d,'ga1')?.id,first.id);
 });
 test('closed debate: Next speaker uses only the active For/Against phase',()=>{
  const t=runner(createSeed());t.d.queue=[];
- t.run({type:'queueAdd',sessionId:'s1',delegateId:'d1',lane:'for'});t.run({type:'queueAdd',sessionId:'s1',delegateId:'d2',lane:'against'});
- t.run({type:'debateMode',sessionId:'s1',mode:'closed',phase:'against'});
+ t.run({type:'queueAdd',committeeId:'ga1',delegateId:'d1',lane:'for'});t.run({type:'queueAdd',committeeId:'ga1',delegateId:'d2',lane:'against'});
+ t.run({type:'debateMode',committeeId:'ga1',mode:'closed',phase:'against'});
  const forEntry=t.d.queue.find(q=>q.lane==='for')!,against=t.d.queue.find(q=>q.lane==='against')!;
- assert.equal(nextSpeaker(t.d,'s1')?.id,against.id);
- assert.throws(()=>t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'For',entryId:forEntry.id}),/Only the first speaker/);
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d2',resolutionId:'r1',classification:'Against',entryId:against.id});
+ assert.equal(nextSpeaker(t.d,'ga1')?.id,against.id);
+ assert.throws(()=>t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'For',entryId:forEntry.id}),/Only the first speaker/);
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d2',resolutionId:'r1',classification:'Against',entryId:against.id});
  assert.equal(t.d.speeches!.at(-1)?.classification,'Against');
 });
 test('POIs: recognize (no event) → score (exactly one event); one active POI; allowance applies',()=>{
  const t=runner(createSeed());const before=t.d.events.length;
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'Other'});
  const s=t.d.speeches!.at(-1)!;
- t.run({type:'poiAdd',sessionId:'s1',speechId:s.id,delegateId:'d2'});t.run({type:'poiAdd',sessionId:'s1',speechId:s.id,delegateId:'d3'});
+ t.run({type:'poiAdd',committeeId:'ga1',speechId:s.id,delegateId:'d2'});t.run({type:'poiAdd',committeeId:'ga1',speechId:s.id,delegateId:'d3'});
  const [p1,p2]=t.d.poiQueue!;
- assert.throws(()=>t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p1.id}),/allowance/);
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:1});
- assert.throws(()=>t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p2.id}),/Only the first POI/);
- assert.throws(()=>t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:p1.id,points:2}),/Recognize this POI/);
- t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p1.id});
+ assert.throws(()=>t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p1.id}),/allowance/);
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:1});
+ assert.throws(()=>t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p2.id}),/Only the first POI/);
+ assert.throws(()=>t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:p1.id,points:2}),/Recognize this POI/);
+ t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p1.id});
  assert.equal(t.d.events.length,before,'recognition records no participation');
  assert.equal(activePoi(t.d,s.id)?.id,p1.id);assert.equal(nextPoi(t.d,s.id),undefined,'next POI blocked while one is active');
- assert.throws(()=>t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p2.id}),/current POI first/);
- t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:p1.id,points:2});
+ assert.throws(()=>t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p2.id}),/current POI first/);
+ t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:p1.id,points:2});
  const pois=t.d.events.filter(e=>e.speechId===s.id&&e.categoryId==='poi');
  assert.equal(pois.length,1);assert.equal(pois[0].delegateId,'d2');assert.equal(t.d.speeches!.at(-1)!.poiCount,1);
- assert.throws(()=>t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:p1.id,points:2}),/Recognize this POI/,'cannot score twice');
+ assert.throws(()=>t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:p1.id,points:2}),/Recognize this POI/,'cannot score twice');
  assert.equal(nextPoi(t.d,s.id)?.id,p2.id);
- assert.throws(()=>t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p2.id}),/allowance/,'allowance of 1 is used');
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:2});
- t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p2.id});
- t.run({type:'poiRemove',sessionId:'s1',speechId:s.id,entryId:p2.id});
+ assert.throws(()=>t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p2.id}),/allowance/,'allowance of 1 is used');
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:2});
+ t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p2.id});
+ t.run({type:'poiRemove',committeeId:'ga1',speechId:s.id,entryId:p2.id});
  assert.equal(t.d.events.filter(e=>e.speechId===s.id&&e.categoryId==='poi').length,1,'withdrawn POI records nothing');
 });
 
@@ -185,20 +185,20 @@ test('amendment debate: context, one active amendment, retained context on event
  assert.equal(activeAmendment(t.d,'ga1')?.id,'am0');
  assert.equal(t.d.documents.find(r=>r.id==='r1')?.status,'In Debate','parent resolution remains In Debate');
  assert.throws(()=>t.run({type:'amendmentStatus',id:'am1',status:'In Debate'}),/current amendment debate first/);
- assert.throws(()=>t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'For',amendmentId:null}),/amendment debate changed/);
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'For',amendmentId:'am0'});
+ assert.throws(()=>t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'For',amendmentId:null}),/amendment debate changed/);
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'For',amendmentId:'am0'});
  const s=t.d.speeches!.at(-1)!;assert.equal(s.amendmentId,'am0');assert.equal(s.resolutionId,'r1');
- t.run({type:'speechScore',sessionId:'s1',speechId:s.id,points:2});
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:1});t.run({type:'poiAdd',sessionId:'s1',speechId:s.id,delegateId:'d2'});
- const p=t.d.poiQueue![0];t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:p.id});t.run({type:'poiScore',sessionId:'s1',speechId:s.id,entryId:p.id,points:1});
+ t.run({type:'speechScore',committeeId:'ga1',speechId:s.id,points:2});
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:1});t.run({type:'poiAdd',committeeId:'ga1',speechId:s.id,delegateId:'d2'});
+ const p=t.d.poiQueue![0];t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:p.id});t.run({type:'poiScore',committeeId:'ga1',speechId:s.id,entryId:p.id,points:1});
  for(const e of t.d.events.filter(e=>e.speechId===s.id))assert.equal(eventAmendmentId(t.d,e),'am0',e.categoryId);
- t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+ t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  t.run({type:'amendmentStatus',id:'am0',status:'Closed',outcome:'Passed'});
  assert.equal(activeAmendment(t.d,'ga1'),undefined,'Debate Console returns to resolution debate');
  assert.equal(t.d.documents.find(r=>r.id==='r1')?.status,'In Debate');
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d4',resolutionId:'r1',classification:'Other',amendmentId:null});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d4',resolutionId:'r1',classification:'Other',amendmentId:null});
  assert.equal(t.d.speeches!.at(-1)?.amendmentId,null,'later speeches are resolution debate again');
- t.run({type:'speechFinish',sessionId:'s1',speechId:t.d.speeches!.at(-1)!.id});
+ t.run({type:'speechFinish',committeeId:'ga1',speechId:t.d.speeches!.at(-1)!.id});
  t.run({type:'amendmentStatus',id:'am1',status:'In Debate'});t.run({type:'amendmentStatus',id:'am1',status:'Closed',outcome:'Failed'});
  assert.equal(activeAmendment(t.d,'ga1'),undefined);
 });
@@ -207,37 +207,37 @@ test('amendment debate: context, one active amendment, retained context on event
 const withAmendment=()=>{const d=createSeed();d.amendments=[{id:'am',committeeId:'ga1',resolutionId:'r1',sessionId:'s1',submitterId:'d3',type:'Strike' as const,clause:'Clause 1',wording:'Strike clause 1.',status:'Accepted for Debate' as const,outcome:null,createdAt:'2026-10-05T06:00:00.000Z',revision:1}];d.committees.find(c=>c.id==='ga1')!.currentSessionId='s1';return runner(d);};
 test('an amendment debate cannot start while a speech (including its POI phase) holds the floor; it can after speechFinish',()=>{
  const t=withAmendment();
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'Other',amendmentId:null});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'Other',amendmentId:null});
  const s=t.d.speeches!.at(-1)!;
  assert.ok(amendmentFloorTaken(t.d,t.d.amendments![0]));
  assert.throws(()=>t.run({type:'amendmentStatus',id:'am',status:'In Debate'}),/return the floor to the Chair/);
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:2});
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:2});
  assert.throws(()=>t.run({type:'amendmentStatus',id:'am',status:'In Debate'}),/return the floor to the Chair/,'POI phase still holds the floor');
- t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+ t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  assert.equal(amendmentFloorTaken(t.d,t.d.amendments![0]),false);
  t.run({type:'amendmentStatus',id:'am',status:'In Debate'});
  assert.equal(activeAmendment(t.d,'ga1')?.id,'am');
 });
 for(const outcome of ['Passed','Failed','Withdrawn','Ruled Out'] as const)test(`an active amendment cannot be ${outcome} while a speech/POI holds the floor; it can once the floor returns`,()=>{
  const t=withAmendment();t.run({type:'amendmentStatus',id:'am',status:'In Debate'});
- t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'Against',amendmentId:'am'});
+ t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'Against',amendmentId:'am'});
  const s=t.d.speeches!.at(-1)!;
  assert.throws(()=>t.run({type:'amendmentStatus',id:'am',status:'Closed',outcome}),/return the floor to the Chair/);
- t.run({type:'poiAllowance',sessionId:'s1',speechId:s.id,limit:1});t.run({type:'poiAdd',sessionId:'s1',speechId:s.id,delegateId:'d2'});
- t.run({type:'poiRecognize',sessionId:'s1',speechId:s.id,entryId:t.d.poiQueue![0].id});
+ t.run({type:'poiAllowance',committeeId:'ga1',speechId:s.id,limit:1});t.run({type:'poiAdd',committeeId:'ga1',speechId:s.id,delegateId:'d2'});
+ t.run({type:'poiRecognize',committeeId:'ga1',speechId:s.id,entryId:t.d.poiQueue![0].id});
  assert.throws(()=>t.run({type:'amendmentStatus',id:'am',status:'Closed',outcome}),/return the floor to the Chair/,'active POI holds the floor');
- t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+ t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  t.run({type:'amendmentStatus',id:'am',status:'Closed',outcome});
  assert.equal(t.d.amendments![0].outcome,outcome);assert.equal(activeAmendment(t.d,'ga1'),undefined);
 });
 test('stale Main Submitter speechStart is rejected during amendment debate; For/Against/Other remain available',()=>{
  const t=withAmendment();t.run({type:'amendmentStatus',id:'am',status:'In Debate'});
- assert.throws(()=>t.run({type:'speechStart',sessionId:'s1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter',amendmentId:'am'}),/not amendment debate/);
- assert.throws(()=>t.run({type:'speechStart',sessionId:'s1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter'}),/not amendment debate/,'older client without amendmentId');
+ assert.throws(()=>t.run({type:'speechStart',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter',amendmentId:'am'}),/not amendment debate/);
+ assert.throws(()=>t.run({type:'speechStart',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter'}),/not amendment debate/,'older client without amendmentId');
  for(const classification of ['For','Against','Other'] as const){
-  t.run({type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification,amendmentId:'am'});
+  t.run({type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification,amendmentId:'am'});
   const s=t.d.speeches!.at(-1)!;assert.equal(s.amendmentId,'am');
-  assert.throws(()=>t.run({type:'speechYield',sessionId:'s1',speechId:s.id,delegateId:'d2'}),/Only a Main Submitter/,'no Co-Submitter yield');
-  t.run({type:'speechFinish',sessionId:'s1',speechId:s.id});
+  assert.throws(()=>t.run({type:'speechYield',committeeId:'ga1',speechId:s.id,delegateId:'d2'}),/Only a Main Submitter/,'no Co-Submitter yield');
+  t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  }
 });
