@@ -52,7 +52,7 @@ export const HOSTED_AUDIT = {
  serviceRole: new Set(['public.submission_link_info', 'public.amendment_link_info', 'public.submit_resolution', 'public.submit_amendment']),
 };
 /** Reviewed session-model additions (docs/SESSION_MODEL.md): the device clock call and its private implementation, executable by signed-in users only. */
-const SESSION_MODEL_DELTA = ['public.record_device_clock', 'private.record_device_clock'];
+const SESSION_MODEL_DELTA = ['public.record_device_clock', 'private.record_device_clock', 'private.session_schedules', 'private.hold_settings'];
 const nameOf = (key: string) => key.slice(0, key.indexOf('('));
 
 export async function privilegeSection(t: TestContext, {engine}: Ctx) {

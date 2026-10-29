@@ -20,6 +20,7 @@ import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { AccessCodes } from "./access-codes";
 import { CentralSessions } from "./central-sessions";
+import { HeldNotice, HeldReview } from "./held-actions";
 import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
@@ -102,6 +103,7 @@ export function Workspace({ path }: { path: string }) {
       </div>
       <div className="main-shell">
         <main className="workspace-content">
+          {section !== "health" && role === "chair" && committee && <HeldNotice committeeId={committeeId} />}
           {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} prominent={section === ""} />}
           {section !== "health" && role === "chair" &&
             data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
@@ -152,7 +154,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics section={section} />
           ) : (
-            section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
+            section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "held" ? <HeldReview /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

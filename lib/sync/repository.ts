@@ -5,14 +5,19 @@ import {isOperationsCommand} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
 import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
+import { committeeOfCommand, displayedLabel } from "../sessions/display";
 import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
   actorId: string;
   read(): Promise<ConferenceData>;
   send(mutation: Mutation): Promise<void>;
+  /** Report this device's clock to the server (offset = device time - server time). Best effort; never blocks sending. */
+  syncClock?(deviceId: string): Promise<void>;
   subscribe?(refresh: () => void, state: (connected: boolean) => void): () => void;
 }
 export class ConflictError extends Error {}
+/** At most one clock report per page session per minute (the server also limits one stored row per device per minute). */
+const CLOCK_SYNC_GAP_MS = 60_000;
 export interface Health {
   mode: "local" | "supabase"; state: "saved" | "syncing" | "waiting" | "conflict" | "error";
   pending: number; conflicts: number; realtime: boolean; latency: number | null;
@@ -70,6 +75,7 @@ export class DurableRepository implements ConferenceRepository {
   // Coalescing only applies after THIS page session has completed a sync: the first read after opening is never skipped.
   private hasSynced = false;
   private lastReadAt = 0;
+  private lastClockSync = 0;
   private deferTimer?: ReturnType<typeof setTimeout>;
   private onlineTimer?: ReturnType<typeof setTimeout>;
   health: Health;
@@ -116,6 +122,12 @@ export class DurableRepository implements ConferenceRepository {
     const command = normalizeCommand(raw);
     // A transaction commits before any optimistic state or successful-save message is visible.
     const mutation: Mutation={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:this.transport?.actorId ?? `${role}-demo`,role,command,expected:fingerprint(this.data,command),state:"pending"};
+    // Hosted only: the device protocol block. The sequence is allocated before the transaction, so a refused save leaves a gap, never a repeat.
+    if(this.transport) {
+      Object.assign(mutation,await this.store.nextDeviceSeq());
+      const shown=displayedLabel(this.data,committeeOfCommand(this.data,command),mutation.createdAt);
+      if(shown!==undefined) mutation.displayedLabel=shown;
+    }
     this.publish(await this.store.update(this.key, old=>{
       if(!old) throw Error("Workspace unavailable. Reload before continuing.");
       const current=project(old);
@@ -188,6 +200,12 @@ export class DurableRepository implements ConferenceRepository {
       await this.reload();
       if(passive && this.refreshWait()>0) { this.deferRefresh(); return; }
       this.health={...this.health,state:"syncing",message:"Syncing…"}; this.emit();
+      // Tell the server this device's clock before anything is sent, so what was saved offline can be trusted or held on evidence.
+      if(this.transport!.syncClock && Date.now()-this.lastClockSync>CLOCK_SYNC_GAP_MS) {
+        this.lastClockSync=Date.now();
+        const deviceId=await this.store.deviceId().catch(()=>undefined);
+        if(deviceId) await this.transport!.syncClock(deviceId).catch(()=>undefined);
+      }
       // Stop at a conflict, preserving subsequent intent until an operator resolves it.
       let settled=false;
       for(;;) {

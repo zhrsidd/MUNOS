@@ -1,3 +1,4 @@
+import type { ScheduleSnapshot, SessionOverride } from "../sessions/window";
 // Data owned by the Claude operations extensions. Read through public.operations_snapshot
 // and merged into ConferenceData as optional fields (absent until the migration is applied).
 export interface SubmissionLink {
@@ -98,7 +99,43 @@ export interface DocumentDecision {
   commentId: string | null;
   decidedAt: string;
 }
+/**
+ * A Chair command the server received but did not apply (docs/SESSION_MODEL.md section 5): waiting for Executive review.
+ * Visible to the Executive and to the Chair of the committee. `command` is the original command, including its `_device` block.
+ */
+export interface HeldAction {
+  id: string;
+  committeeId: string;
+  deviceId: string | null;
+  deviceSeq: number | null;
+  actorId: string;
+  role: string;
+  command: { type: string } & Record<string, unknown>;
+  /** uncertain_time, outside_window, stale, behind_held, day_closed; after a failed approval also revision_mismatch, actor_not_authorised, not_applicable. */
+  reason: string;
+  state: "held" | "applied" | "discarded";
+  timeConfidence: "trusted" | "uncertain" | null;
+  receivedAt: string;
+  clientTime: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionReason: string | null;
+  lastError: string | null;
+}
+/** A committee's schedule versions and override log, in the shape lib/sessions/window.ts resolves. */
+export interface SessionSchedule {
+  committeeId: string;
+  timeZone: string;
+  versions: ScheduleSnapshot[];
+  overrides: SessionOverride[];
+}
+export interface HoldSettings { enforce: boolean; trustMinutes: number; staleMinutes: number }
+export interface DayClose { day: string; closedAt: string; reason: string }
 export interface OperationsData {
+  heldActions?: HeldAction[];
+  sessionSchedules?: SessionSchedule[];
+  dayCloses?: DayClose[];
+  holdSettings?: HoldSettings | null;
   pointAdjustments?: PointAdjustment[];
   documentDecisions?: DocumentDecision[];
   submissionLinks?: SubmissionLink[];

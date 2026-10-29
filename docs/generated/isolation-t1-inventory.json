@@ -33,9 +33,10 @@
   "20261029100000_session_window.sql",
   "20261029110000_session_schedule.sql",
   "20261030090000_record_labelling.sql",
-  "20261030100000_session_holds.sql"
+  "20261030100000_session_holds.sql",
+  "20261030110000_session_schedules_snapshot.sql"
  ],
- "migrationsSha256": "c631ef6894a590a8bce199b21f2bcc77e5d0b7a8d77a8446a723b141292b2279",
+ "migrationsSha256": "4a43f69ed9d5c3992c8b10905ad74d72b60eab191d6b8081e17dbe7b199137c8",
  "supabase-model": {
   "fns": [
    {
@@ -662,6 +663,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "hold_settings",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -2132,6 +2163,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedules",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -5872,6 +5933,36 @@
    },
    {
     "schema": "private",
+    "name": "hold_settings",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "label_record",
     "args": "",
     "result": "trigger",
@@ -7334,6 +7425,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedules",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true

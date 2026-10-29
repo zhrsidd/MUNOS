@@ -18,6 +18,7 @@ const paths = [
   "logistics/health",
   "admin",
   "admin/resolution-status",
+  "admin/held",
   "admin/conference",
   "admin/committees",
   "admin/sessions",

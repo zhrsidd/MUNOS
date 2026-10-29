@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 33 files, combined SHA-256 `c631ef6894a590a8`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 34 files, combined SHA-256 `4a43f69ed9d5c399`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -48,7 +48,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-99 functions (88 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+101 functions (90 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -73,6 +73,7 @@ Executed in the disposable database after the inventory was read:
 | `private.has_access(conf uuid, committee uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.held_replay(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.hold_gate(conf uuid, cid uuid, mutation uuid, command jsonb, requested_role conference_role, expe...)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
+| `private.hold_settings(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.label_record()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.lifecycle_allows(test_only boolean)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.lifecycle_new_test_only()` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
@@ -122,6 +123,7 @@ Executed in the disposable database after the inventory was read:
 | `private.session_overrides_for(conf uuid, committee uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_resolve(versions jsonb, overrides jsonb, day_close jsonb, committee text, at timestamp with tim...)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_schedule_errors(sessions jsonb, lead_minutes integer, grace_minutes integer)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.session_schedules(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.session_ts(value text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_version_at(versions jsonb, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.session_versions_for(conf uuid, committee uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
@@ -184,7 +186,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 - none
 
-### `private` functions callable by a Data API role (13)
+### `private` functions callable by a Data API role (15)
 
 `private` is not an exposed PostgREST schema (hosted exposure is assumption A3), so these are reachable only from SQL, policies and other functions, but the role privileges below are what a SQL-level caller would have.
 
@@ -196,10 +198,12 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 - `private.decision_history(conf uuid)`: authenticated (reads/none)
 - `private.document_submitter_countries(conf uuid)`: authenticated (reads/none)
 - `private.has_access(conf uuid, committee uuid, roles conference_role[])`: authenticated (reads/none)
+- `private.hold_settings(conf uuid)`: authenticated (reads/none)
 - `private.lifecycle_allows(test_only boolean)`: authenticated (reads/none)
 - `private.permitted(grants jsonb, conf uuid, committee uuid, roles conference_role[])`: authenticated (reads/none)
 - `private.photo_chairs(conf uuid)`: authenticated (reads/none)
 - `private.record_device_clock(conf uuid, device uuid, device_time timestamp with time zone)`: authenticated (writes)
+- `private.session_schedules(conf uuid)`: authenticated (reads/none)
 - `private.uuid_or_null(value text)`: authenticated (reads/none)
 
 ## Tables, views and sequences
