@@ -16,3 +16,14 @@
 - Standalone build and 4/4 Playwright tests passed, including actual scroll progression through all stages, oversight visibility and disabling the pin when reduced motion changes. Workflow screenshot visually inspected.
 - Cloudflare deployment settings documented for the private repository; no Cloudflare deployment performed because owner will deploy. Legacy gh-pages snapshot left untouched.
 - Full application suite not repeated: no conference application code changed; earlier native V8 crash remains the reported limitation.
+
+## UN-inspired colour revision
+
+- Replaced blue-violet styling with flat cyan (#009EDB), marine, white and ice. Removed all generated CSS/SVG gradients, glow and glass styling; replaced the hero sphere with a cartographic line SVG. Original draft logo remains unchanged.
+- Updated SVG/PNG brand sheets, favicon, showcase/BRAND.md, README and identity scope in docs/BRAND.md. Self-hosted fonts and scroll workflow remain.
+- Independent visual review: desktop/mobile layouts have no clipping. Fixed small preview labels to use muted/action ink and darkened focus rings in the cyan contact section.
+- Measured contrast: reading ink on cyan 4.83:1; action blue on white 6.06:1; muted on ice 5.56:1; large white display text on cyan 3.04:1.
+- Four Playwright browser tests pass after rebrand; application typecheck/lint and standalone build pass. Root build run recorded in session; full application suite limitation remains as above.
+
+- Final rendered-style check: zero generated gradient backgrounds; UN cyan field and dark contact ink match tokens; original logo decodes; small preview labels use reading ink. Brand PNG regenerated with embedded self-hosted fonts.
+- Browser test timing correction: reduced-motion preference changes dispatch asynchronously; the test now waits for running animations to reach zero instead of reading before the media-change event. Final 4/4 tests passed.

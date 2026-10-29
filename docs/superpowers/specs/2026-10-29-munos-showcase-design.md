@@ -12,3 +12,7 @@ Approaches: separate static Vite site (chosen: independent staging and no applic
 
 ## Owner follow-up
 Make Chair → Approval Panel → Printing the defining feature with Executive read-only oversight spanning all stages and a changes-requested loop to chairs. Deployment will be handled by the owner on Cloudflare. Replace generic typography with Fraunces + Space Grotesk. Add Apple-inspired scroll-linked storytelling, preserving mobile and reduced-motion access.
+
+## UN-inspired colour revision
+
+Owner requests a complete visual colour refresh, using the UN palette as reference and rejecting purple gradients. Direction: diplomatic editorial design, UN-style cyan blue #009EDB as a large solid brand field, deep marine #0B3D5B for ink, accessible action blue #00689D, ice #E4F3FA, paper #F4F8FA, and white. Bright brand blue is not used for small white text. Remove generated gradients, glows and glass effects throughout; replace the 3D hero sphere with flat cartographic line art. Use crisp rules, square corners and restrained solid colour blocks. Keep Fraunces/Space Grotesk and scroll storytelling. Preserve the supplied draft logo as the original mark, without introducing UN emblems or affiliation claims. Update downloadable brand sheets and isolated showcase brand documentation.

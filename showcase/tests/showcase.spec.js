@@ -45,12 +45,12 @@ test('reduced motion and disabling JavaScript keep the message usable', async ({
   const page = await context.newPage();
   await page.goto('http://localhost:4173');
   await expect(page.getByRole('heading', { name: 'Make room for diplomacy.' })).toBeVisible();
-  expect(await page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
   await page.getByRole('tab', { name: /Close the loop/ }).click();
   await expect(page.getByRole('tabpanel')).toContainText('Print queue');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  expect(await page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length)).toBe(0);
   await context.close();
   const noJs = await browser.newContext({ javaScriptEnabled: false });
   const fallback = await noJs.newPage();

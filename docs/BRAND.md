@@ -218,3 +218,7 @@ legacy not-null column.
 - Search matches the code with or without the slash and spaces (`ga1/01`, `ga1 / 01`, `ga1 01`) and the country,
   case- and accent-insensitively; resolution lists also match status and outcome.
 - The identity replaces the title text only: status chips, latest Approval feedback and the working Doc link stay.
+
+## Independent MUNOS showcase
+
+The standalone marketing site in `showcase/` uses its own UN-inspired editorial identity, documented in [showcase/BRAND.md](../showcase/BRAND.md). Its cyan, marine and white palette, Fraunces/Space Grotesk pairing and scroll storytelling apply only to the MUNOS showcase. The DCMUN workspace tokens, supplied seal and operational UI rules above remain authoritative for the conference application.

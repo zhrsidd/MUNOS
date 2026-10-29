@@ -14,7 +14,7 @@ Open http://localhost:4173. For a static build: `npm run build`; the output is `
 
 - Original logo: `public/munos-logo.png`, unchanged from draft PR #75 (`codex/munos-future-branding`, `docs/branding/munos-future/munos-brand-identity.png`). It is distinct from the DCMUN seal.
 - Downloadable brand image: `public/munos-brand-sheet.svg`, standalone SVG with embedded original logo.
-- Identity: navy `#080e22`, royal blue `#3564f3`, pale blue `#9fbaff`, paper `#f7f8fc`. Tokens scoped to this site in `src/style.css`.
+- Identity: UN-inspired cyan `#009EDB`, marine ink `#062B42`, action blue `#00689D`, ice `#E4F3FA` and white. Flat colour surfaces, crisp rules, cartographic line globe; no generated gradients or glow. See BRAND.md for colour roles. Tokens scoped to this site in src/style.css.
 - Type: self-hosted Fraunces (display headings, with a true italic) and Space Grotesk (body/interface). Downloaded from Google Fonts; font-specific SIL Open Font License notices are included in public/. The original brand sheet preserves the original mark.
 - Motion: locally bundled Motion. Viewport entrances, finite decorative float, tab transitions, button hover, hero parallax and a scroll-linked pinned resolution workflow on wide/tall screens. Reduced-motion preference disables animation, including when changed during the session. All information remains visible with JavaScript disabled.
 - Contacts and credits mirror `lib/brand.ts`; email provided by owner. Custom builds are paid and quoted by scope. No invented pricing or customer claims.
