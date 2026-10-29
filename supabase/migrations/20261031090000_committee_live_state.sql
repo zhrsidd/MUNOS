@@ -792,6 +792,117 @@ AS $function$ begin
  else perform private.apply_mutation(conf,mutation,command,requested_role,expected,client_time);end if;
 end $function$;
 
+CREATE OR REPLACE FUNCTION private.apply_staff_batch(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+ actor uuid:=auth.uid();kind text:=command->>'type';action text:=command->>'action';cid uuid;entity uuid;sid uuid;
+ new_id uuid:=(substr(mutation::text,1,24)||'000000000001')::uuid;counter integer:=1;
+ prior private.mutation_receipts;actual text;slot public.conference_session_slots;committee public.committees;amend public.amendments;
+ payload jsonb:=jsonb_build_object('command',command,'role',requested_role,'expected',expected,'client_time',client_time);
+ topic text:='configuration';target text:=command->>'status';outcome_value text:=command->>'outcome';
+begin
+ perform private.lock_lifecycle();
+ if actor is null then raise exception 'Session required' using errcode='42501';end if;
+ if pg_column_size(command)>16384 then raise exception 'Command too large' using errcode='22023';end if;
+ perform pg_advisory_xact_lock(hashtextextended(mutation::text,0));
+ select * into prior from private.mutation_receipts where id=mutation;
+ if found then
+  if prior.actor_id<>actor or prior.conference_id<>conf or prior.payload<>payload then raise exception 'Idempotency key reused for a different action' using errcode='22023';end if;return;
+ end if;
+ if kind='amendmentStatus' then select * into amend from public.amendments where id=(command->>'id')::uuid and conference_id=conf;cid:=amend.committee_id;
+ elsif kind in ('committeeUpdate','committeeLifecycle') then cid:=(command->>'id')::uuid;
+ elsif kind='amendmentLink' then cid:=(command->>'committeeId')::uuid;end if;
+ if requested_role is distinct from (case when kind='amendmentStatus' then 'chair'::public.conference_role else 'admin'::public.conference_role end)
+ or not private.has_access(conf,cid,array[requested_role]) then raise exception 'Access denied' using errcode='42501';end if;
+ -- Serialize configuration without blocking grant/audit foreign-key KEY SHARE locks.
+ if kind<>'amendmentStatus' then perform 1 from public.conferences where id=conf for no key update;end if;
+ if cid is not null then select * into committee from public.committees where id=cid and conference_id=conf for update;
+  if not found then raise exception 'Committee unavailable' using errcode='42501';end if;
+ else perform 1 from public.committees where conference_id=conf order by id for update;end if;
+ if kind='amendmentStatus' then
+  select * into amend from public.amendments where id=(command->>'id')::uuid and conference_id=conf for update;actual:=amend.revision::text;
+ elsif kind in ('committeeUpdate','committeeLifecycle') then actual:=committee.revision::text;
+ elsif kind='sessionSlot' and action<>'create' then select * into slot from public.conference_session_slots where id=(command->>'id')::uuid and conference_id=conf for update;actual:=slot.revision::text;
+ elsif kind='amendmentLink' then select coalesce((select id::text from public.amendment_links where committee_id=cid and revoked_at is null),'none') into actual;end if;
+ if (kind in ('amendmentStatus','committeeUpdate','committeeLifecycle') or (kind='sessionSlot' and action<>'create')) and actual is null then raise exception 'Record unavailable' using errcode='42501';end if;
+ if actual is not null and actual is distinct from expected then raise exception 'This record changed. Review before retrying.' using errcode='PT409';end if;
+ entity:=coalesce(cid,slot.id,new_id);
+ case kind
+ when 'committeeUpdate' then
+  if coalesce(length(btrim(command->>'code')),0) not between 1 and 30 or coalesce(length(btrim(command->>'name')),0) not between 1 and 200 or coalesce(length(command->>'room'),0)>200 then raise exception 'Enter a valid committee code, name and room' using errcode='22023';end if;
+  update public.committees set code=btrim(command->>'code'),name=btrim(command->>'name'),room=btrim(command->>'room'),revision=revision+1 where id=cid;
+ when 'committeeLifecycle' then
+  if action='archive' then
+   if exists(select 1 from public.documents where committee_id=cid and status='In Debate') then raise exception 'Close the current resolution debate before archiving this committee.' using errcode='22023';end if;
+   update public.committees set archived=true,revision=revision+1,"currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where id=cid;
+   -- The committee lock serializes rotation. Credential locks serialize redemption;
+   -- revoke grants only after all in-flight successful redemptions have committed.
+   update private.access_credentials set revoked_at=now(),updated_at=now() where conference_id=conf and committee_id=cid and role='chair' and revoked_at is null;
+   update public.user_access set revoked_at=now(),updated_at=now() where conference_id=conf and committee_id=cid and role='chair' and revoked_at is null;
+  elsif action='delete' then
+   if private.batch_has_references('public.committees',cid,array['public.sessions'::regclass,'public.operational_changes'::regclass,'public.audit_log'::regclass]) then raise exception 'Committee has linked records. Archive it to preserve history.' using errcode='22023';end if;
+   for sid in select id from public.sessions where committee_id=cid loop
+    if private.batch_session_used(sid) then raise exception 'Committee sessions have history. Archive the committee instead.' using errcode='22023';end if;
+   end loop;
+   -- Invalidation rows are transient; audit content survives with its entity UUID.
+   delete from public.operational_changes where conference_id=conf and committee_id=cid;
+   update public.audit_log set committee_id=null where conference_id=conf and committee_id=cid;
+   delete from public.sessions where committee_id=cid;delete from public.committees where id=cid;
+  else raise exception 'Unknown committee action' using errcode='22023';end if;
+  -- Audit references the preserved entity UUID without retaining a FK to a deleted committee.
+  cid:=null;
+ when 'sessionSlot' then
+  if action='create' then
+   insert into public.conference_session_slots(id,conference_id,name,"startsAt","endsAt") values(new_id,conf,btrim(command->>'name'),(command->>'startsAt')::timestamptz,(command->>'endsAt')::timestamptz);
+   for committee in select * from public.committees where conference_id=conf and not archived order by id loop
+    counter:=counter+1;
+    insert into public.sessions(id,conference_id,committee_id,"slotId",name,"startsAt","endsAt",state) values((substr(mutation::text,1,24)||lpad(to_hex(counter),12,'0'))::uuid,conf,committee.id,new_id,btrim(command->>'name'),(command->>'startsAt')::timestamptz,(command->>'endsAt')::timestamptz,'scheduled');
+   end loop;
+  elsif action='update' then
+   if slot.archived then raise exception 'Archived session cannot be edited' using errcode='22023';end if;
+   update public.conference_session_slots set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz,revision=revision+1 where id=slot.id;
+   update public.sessions set name=btrim(command->>'name'),"startsAt"=(command->>'startsAt')::timestamptz,"endsAt"=(command->>'endsAt')::timestamptz where "slotId"=slot.id;
+  elsif action='archive' then
+   if exists(select 1 from public.documents d where d.status='In Debate' and (d."sessionId" in (select id from public.sessions where "slotId"=slot.id) or d.committee_id in (select id from public.committees where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id)))) then raise exception 'Close the current resolution debate before archiving this session.' using errcode='22023';end if;
+   update public.conference_session_slots set archived=true,revision=revision+1 where id=slot.id;
+   update public.sessions set archived=true,state='closed' where "slotId"=slot.id;
+   update public.committees set "currentSessionId"=null,"sessionRevision"="sessionRevision"+1 where "currentSessionId" in (select id from public.sessions where "slotId"=slot.id);
+  elsif action='delete' then
+   for sid in select id from public.sessions where "slotId"=slot.id loop
+    if private.batch_session_used(sid) then raise exception 'Session has operational history. Archive the slot instead.' using errcode='22023';end if;
+   end loop;
+   delete from public.sessions where "slotId"=slot.id;delete from public.conference_session_slots where id=slot.id;
+  else raise exception 'Unknown session action' using errcode='22023';end if;
+ when 'amendmentLink' then
+  topic:='documents';if committee.archived then raise exception 'Committee is archived' using errcode='22023';end if;
+  if action='create' and actual<>'none' then raise exception 'An amendment link already exists. Replace it instead.' using errcode='22023';end if;
+  if action not in ('create','rotate','revoke') then raise exception 'Unknown link action' using errcode='22023';end if;
+  update public.amendment_links set revoked_at=now() where committee_id=cid and revoked_at is null;
+  if action<>'revoke' then insert into public.amendment_links(id,conference_id,committee_id,token) values(new_id,conf,cid,command->>'token');end if;
+ when 'amendmentStatus' then
+  entity:=amend.id;topic:='documents';perform private.require_operational_session(conf,amend."sessionId");perform private.require_operational_committee(conf,cid);
+  if committee.archived or not exists(select 1 from public.documents where id=amend."resolutionId" and status='In Debate') then raise exception 'Amendments are not currently open in this committee.' using errcode='22023';end if;
+  if not coalesce((amend.status='Submitted' and target='Accepted for Debate' and outcome_value is null) or (amend.status='Accepted for Debate' and target='In Debate' and outcome_value is null) or (amend.status<>'Closed' and target='Closed' and (outcome_value in ('Ruled Out','Withdrawn') or (amend.status='In Debate' and outcome_value in ('Passed','Failed')))),false) then raise exception 'Invalid amendment transition' using errcode='22023';end if;
+  if target='In Debate' and exists(select 1 from public.amendments where committee_id=cid and status='In Debate' and id<>amend.id) then raise exception 'Close the current amendment debate first' using errcode='22023';end if;
+  -- Procedural invariant: start an amendment debate, or close an active one, only with the floor at the Chair.
+  if (target='In Debate' or (amend.status='In Debate' and target='Closed')) and exists(select 1 from public.speeches where committee_id=cid and conference_id=conf and state<>'finished' and "sessionId" is null) then raise exception 'Finish the current speech and return the floor to the Chair first.' using errcode='22023';end if;
+  update public.amendments set status=target,outcome=outcome_value,revision=revision+1 where id=amend.id;
+ else raise exception 'Unknown batch command' using errcode='22023';end case;
+ insert into public.audit_log(conference_id,committee_id,"actorId",action,"entityId",mutation_id,details) values(conf,cid,actor,kind||' updated',entity,mutation,command-'token');
+ insert into private.mutation_receipts(id,conference_id,actor_id,payload) values(mutation,conf,actor,payload);
+ insert into public.operational_changes(conference_id,committee_id,topic,mutation_id) values(conf,cid,topic,mutation);
+ -- Central configuration must reach committee-filtered Chair channels without broadening subscriptions.
+ if kind='sessionSlot' then
+  for committee in select * from public.committees where conference_id=conf loop
+   insert into public.operational_changes(conference_id,committee_id,topic,mutation_id) values(conf,committee.id,'configuration',gen_random_uuid());
+  end loop;
+ end if;
+end $function$;
+
 CREATE OR REPLACE FUNCTION private.hold_gate(conf uuid, cid uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone)
  RETURNS boolean
  LANGUAGE plpgsql

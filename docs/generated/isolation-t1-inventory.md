@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 34 files, combined SHA-256 `cd36f1947820cb81`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `f7e0304cc7783ea3`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -54,11 +54,12 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-101 functions (90 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+107 functions (96 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `private.access_grants()` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.action_time(conf uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.advance_photo_epoch(conf uuid, committees uuid[], schools uuid[])` | function | definer | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.apply_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
 | `private.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
@@ -67,12 +68,14 @@ Executed in the disposable database after the inventory was read:
 | `private.batch_has_references(target regclass, target_id uuid, ignored regclass[])` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.batch_session_used(sid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.command_class(kind text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
+| `private.commit_roll_call(conf uuid, cid uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.committee_session_at(conf uuid, committee uuid, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.committees_for_schools(schools uuid[])` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.conference_time_zone(conf uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.decision_history(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.document_round()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.document_submitter_countries(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.eligible(conf uuid, cid uuid, did uuid, command jsonb)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.end_overrides(conf uuid, p_committee uuid, eff timestamp with time zone)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.final_label(table_name text, rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.guard_lifecycle_transition()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
@@ -88,6 +91,7 @@ Executed in the disposable database after the inventory was read:
 | `private.materialize_new_committee_slots()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.next_effective_from(conf uuid, target uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.next_resolution_code(conf uuid, committee uuid)` | function | definer | postgres | volatile | search_path="" | postgres | - | reads/none |
+| `private.open_ballot(conf uuid, cid uuid, rid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.ops_automation_toggle(conf uuid, actor uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.ops_clock_confirm(conf uuid, actor uuid, new_id uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.ops_close_day(conf uuid, actor uuid, new_id uuid, command jsonb)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
@@ -111,12 +115,14 @@ Executed in the disposable database after the inventory was read:
 | `private.photo_chairs(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.photo_epoch_chair(conf uuid, member uuid, committees uuid[])` | function | definer | postgres | volatile | search_path="" | postgres | - | writes (via callee) |
 | `private.photo_epoch_trigger()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes (via callee) |
+| `private.presence_at(cid uuid, did uuid, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.print_copies(conf uuid, cid uuid)` | function | definer | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.record_device_clock(conf uuid, device uuid, device_time timestamp with time zone)` | function | definer | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes |
 | `private.record_document_decision()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.reject_append_only_change()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.reject_archived_chair_credential()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.reject_published_session_delete()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
+| `private.require_operational_committee(conf uuid, cid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.require_operational_session(conf uuid, sid uuid)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.required_scoring_label(category text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.run_held(h held_action, offset_ms bigint)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
@@ -232,6 +238,7 @@ Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t
 | `public.audit_log` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.award_criteria` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.award_scores` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
+| `public.ballot_eligibility` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.clock_confirmation` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.committee_staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.committees` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
@@ -289,7 +296,7 @@ Column-level privileges: none.
 
 ## RLS policies
 
-54 policies.
+55 policies.
 
 | Table | Policy | Command | Roles | Permissive | USING | WITH CHECK |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -305,6 +312,7 @@ Column-level privileges: none.
 | `public.audit_log` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role]) | - |
 | `public.award_criteria` | read_authorized | SELECT | authenticated | yes | (private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) OR ((committee_id IS... | - |
 | `public.award_scores` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
+| `public.ballot_eligibility` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.clock_confirmation` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role]) | - |
 | `public.committee_staff` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.committees` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'o... | - |
@@ -350,5 +358,5 @@ Column-level privileges: none.
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 101.
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 107.
 
