@@ -27,6 +27,10 @@ jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Enabling auto-merge needs contents write as well as pull-request write.
+    permissions:
+      contents: write
+      pull-requests: write
     # Codex's summary comment is the only comment that counts, and only from its pinned identity.
     if: >-
       github.event_name != 'issue_comment' ||
@@ -74,7 +78,8 @@ jobs:
             if [ "$enabled" = true ]; then
               echo "Auto-merge is already enabled for $HEAD."
             else
-              gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
+              # --match-head-commit makes GitHub refuse the enable if the head moved after the check above.
+              gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch --match-head-commit "$HEAD"
               echo "Enabled auto-merge for $HEAD. Branch protection still requires verify to pass."
             fi
           elif [ "$enabled" = true ]; then
@@ -82,4 +87,17 @@ jobs:
             echo "Cancelled auto-merge: the gate is not clear on the current head."
           else
             echo "Not ready; auto-merge stays off."
+          fi
+
+      # A failed evaluation must never leave an earlier enablement in place. This runs only after a failure above.
+      - name: Cancel auto-merge when the evaluation failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+        run: |
+          enabled=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json autoMergeRequest --jq '.autoMergeRequest != null' || echo unknown)
+          if [ "$enabled" != false ] && ! gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --disable-auto; then
+            echo "::error::Could not cancel auto-merge on PR $PR; cancel it manually before anything else merges."
+            exit 1
           fi
