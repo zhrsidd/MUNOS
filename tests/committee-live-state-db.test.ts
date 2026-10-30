@@ -362,6 +362,9 @@ for(const approval of ['single','bulk'] as const)test(`real PostgreSQL: restorat
   assert.equal((await one<{total:number}>('select sum(points)::int total from public.participation_adjustments where "delegateId"=$1',[delegateId])).total,0);
   assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[restore])).state,'applied');
   await assert.rejects(()=>send({type:'pointAdjustment',...f.c,delegateId,action:'restore',adjustmentId:crypto.randomUUID()},now),/Adjustment unavailable/);
+ }finally{await db.close();}
+});
+
 test('real PostgreSQL: anything that names a record by id waits for the held command that creates it, even from another device',async()=>{
  const f=await fixture();const {db,ids,now,send,delegates,roll,one,count,ops,verify}=f;
  try{
