@@ -133,6 +133,20 @@ e2e "PR #79 as captured" "$scratch/current.json" false true
 e2e "clean head, threads resolved" "$scratch/clean.json" true false
 e2e "clean head with a conversation over 300 KB" "$scratch/big.json" true false
 
+# A reconciliation uses fresh API data rather than a saved failed decision.
+with_summary "$clean_code" | jq '.pr.draft = false' > "$scratch/transition.json"
+e2e "reconciliation before thread resolution" "$scratch/transition.json" false true
+jq '.threads |= map(.isResolved = true)' "$scratch/transition.json" > "$scratch/resolved.json"
+e2e "reconciliation after thread resolution" "$scratch/resolved.json" true false
+if PATH="$fake_dir:$PATH" FAKE_API_FAILURE=true FAKE_SNAPSHOT="$scratch/clean.json" \
+  GITHUB_REPOSITORY=zhrsidd/MUNOS "$scripts/codex-review-gate.sh" 79 > "$scratch/failed.json" 2>/dev/null; then
+  echo "FAIL API failure must fail closed"; failures=$((failures + 1))
+elif [ -s "$scratch/failed.json" ]; then
+  echo "FAIL API failure emitted a decision"; failures=$((failures + 1))
+else
+  echo "ok    API failure emits no successful decision"
+fi
+
 # Every workflow and the decision logic must pin the same Codex App ID; a stale copy would silently skip Codex.
 for file in "$scripts/codex-review-gate.jq" "$workflows/claude-review-repair.yml" "$workflows/codex-reviewed-automerge.yml"; do
   if grep -q 199175422 "$file"; then

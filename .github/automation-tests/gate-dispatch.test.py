@@ -74,7 +74,7 @@ class Reconciliation(unittest.TestCase):
             gh.chmod(0o755)
             def pr(number, draft=False, repo='zhrsidd/MUNOS'):
                 return {'number': number, 'draft': draft, 'head': {'repo': {'full_name': repo} if repo else None}}
-            (path / 'candidates').write_text(json.dumps([[pr(84), pr(85, True), pr(86, repo='fork/MUNOS'), pr(87, repo=None)]]))
+            (path / 'candidates').write_text('\n'.join(json.dumps(p) for p in [pr(84), pr(85, True), pr(86, repo='fork/MUNOS'), pr(87, repo=None)]))
             (path / 'event').write_text('{}')
             env = {**os.environ, 'PATH': directory + ':' + os.environ['PATH'],
                    'CANDIDATES': str(path / 'candidates'), 'GITHUB_EVENT_NAME': 'schedule',

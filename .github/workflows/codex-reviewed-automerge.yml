@@ -48,10 +48,10 @@ jobs:
           import json, os, re, subprocess
           event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
           if os.environ['GITHUB_EVENT_NAME'] == 'schedule':
-              result = subprocess.run(['gh', 'api', '--paginate', '--slurp',
+              result = subprocess.run(['gh', 'api', '--paginate', '--jq', '.[]',
                   'repos/' + os.environ['GITHUB_REPOSITORY'] + '/pulls?state=open&base=main&per_page=100'],
                   check=True, capture_output=True, text=True)
-              prs = [p['number'] for page in json.loads(result.stdout) for p in page
+              prs = [p['number'] for p in map(json.loads, result.stdout.splitlines())
                   if not p['draft'] and p['head']['repo']
                   and p['head']['repo']['full_name'] == os.environ['GITHUB_REPOSITORY']]
           else:
