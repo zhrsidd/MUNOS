@@ -3,6 +3,8 @@
 # codex-review-gate.sh makes. It applies --jq the way gh does and ignores --paginate and graphql variables.
 set -euo pipefail
 
+if [ "${FAKE_API_FAILURE:-false}" = true ]; then exit 1; fi
+
 snapshot=${FAKE_SNAPSHOT:?FAKE_SNAPSHOT must name a snapshot file}
 jqexpr=""
 args=()
