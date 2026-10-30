@@ -263,6 +263,9 @@ create function private.open_ballot(conf uuid, cid uuid, rid uuid) returns void
 language plpgsql set search_path='' as $$
 declare at timestamptz := private.action_time(conf); l record;
 begin
+  -- A ballot opened by an Executive approval opens when it is approved, against the roll call in force then: the roll calls approved before it
+  -- in the same chain are effective at their receipt time, later than the held command's own client time, and must not be skipped.
+  if nullif(current_setting('munos.approving', true), '') is not null then at := greatest(at, now()); end if;
   select r.id, r.revision into l from public.roll_call r
    where r.committee_id = cid and r.state = 'committed' and r.effective_at is not null and r.effective_at <= at
    order by r.effective_at desc, r.id desc, r.revision desc limit 1;

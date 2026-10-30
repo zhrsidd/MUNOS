@@ -446,3 +446,25 @@ for(const approval of ['single','bulk'] as const)test(`held vote changes preserv
   assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[second])).state,'applied');
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a ballot opened by approval snapshots the roll calls approved before it in the same chain',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,verify}=f;
+ try{
+  const [pv]=delegates;
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(250);
+  // An older offline roll call is held for its clock; the ballot restart that follows on the same device is Trusted but waits behind it.
+  const rcId=crypto.randomUUID();
+  const rollKey=await send(roll(present(pv),{id:rcId,committed:now-3*H,device:dev,seq:1}),now-3*H);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[rollKey])).reason,'uncertain_time');
+  // No clock report for this device (the reconnect report failed): the roll call stays Uncertain, the restart is within tolerance of its receipt.
+  // The roll call is received (and so effective, once approved) after the restart's own client time.
+  await new Promise(r=>setTimeout(r,1500));
+  const rev=(await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision;
+  const modeKey=await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural',_device:{deviceId:dev,deviceSeq:2}},Date.now()-90_000,'chair',chair,crypto.randomUUID(),String(rev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[modeKey])).reason,'behind_held');
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  await decide(rollKey);await decide(modeKey);
+  assert.equal((await one<{status:string}>('select status from public.ballot_eligibility where resolution_id=$1 and delegate_id=$2',[ids.resolution,pv])).status,'Present & Voting','the ballot was opened against the roll call approved just before it');
+ }finally{await db.close();}
+});
