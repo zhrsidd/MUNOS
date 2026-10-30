@@ -189,3 +189,30 @@ test('real PostgreSQL: a roll call is admitted, labelled and made effective by i
   assert.equal(l.a,await session(A),'labelled by the session holding its effective time');
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a Control that cites a held roll call is held with it and approved after it, never a permanent conflict',async()=>{
+ const f=await fixture();const {db,now,send,delegates,roll,queue,one,count,ops,verify}=f;
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const queuedBefore=(await queue()).map(r=>r.d);const who=delegates.find(d=>!queuedBefore.includes(d))!;
+  const dev=U(210);const early=now-270*M;
+  await verify(dev,early);await verify(dev,now);
+  // Offline before the first window opens: the roll call is held as outside the schedule...
+  const rcId=crypto.randomUUID();
+  const rollKey=await send(roll(present(who),{id:rcId,committed:early,device:dev,seq:1}),early);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[rollKey])).reason,'outside_window');
+  // ...then, after the window opens, the Chair queues a delegate relying on it. It must be held too (not refused for citing an unapplied roll call).
+  const queueKey=await send({type:'queueAdd',...f.c,delegateId:who,lane:'open',rollCall:{id:rcId,revision:1},_device:{deviceId:dev,deviceSeq:2}},now);
+  assert.equal((await one<{reason:string;state:string}>('select reason,state from public.held_action where id=$1',[queueKey])).reason,'behind_held');
+  assert.deepEqual((await queue()).map(r=>r.d),queuedBefore,'nothing applied yet');
+  // The Executive cannot approve the dependent action first...
+  const decide=(id:string,decision='approve')=>ops(exec,{type:'heldDecide',heldId:id,decision,reason:'Reviewed'});
+  await assert.rejects(()=>decide(queueKey),/Decide the earlier held action/);
+  // ...but approving the roll call first lets the dependent action follow.
+  await decide(rollKey);
+  assert.equal(await count(`select 1 from public.roll_call where id=$1 and state='committed'`,[rcId]),1);
+  await decide(queueKey);
+  // The approved roll call is now the live one (only this delegate present), so the others left the queue and the dependent action applied.
+  assert.deepEqual((await queue()).map(r=>r.d),[who]);
+ }finally{await db.close();}
+});

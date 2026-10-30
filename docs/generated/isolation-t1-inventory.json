@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "1c906227a2e06042841fbbc19fe65048bca52f7cf90f0ac03795b2a315351a22",
+ "migrationsSha256": "d6a08b61b208a296f537071e085d1a7dcf9c962d74fc33831f5ce05276b90b43",
  "supabase-model": {
   "fns": [
    {
@@ -2715,6 +2715,36 @@
     "name": "veto_delegates",
     "args": "rid uuid",
     "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "waits_for_held",
+    "args": "committee uuid, device uuid, seq bigint, command jsonb",
+    "result": "boolean",
     "kind": "f",
     "security": "invoker",
     "owner": "postgres",
@@ -8224,6 +8254,36 @@
     "name": "veto_delegates",
     "args": "rid uuid",
     "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "waits_for_held",
+    "args": "committee uuid, device uuid, seq bigint, command jsonb",
+    "result": "boolean",
     "kind": "f",
     "security": "invoker",
     "owner": "postgres",

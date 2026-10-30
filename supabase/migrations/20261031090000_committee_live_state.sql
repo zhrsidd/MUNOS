@@ -98,6 +98,67 @@ begin
     'displayedReported', (dev ? 'displayedLabel') and (jsonb_typeof(dev->'displayedLabel') = 'null' or private.uuid_or_null(dev->>'displayedLabel') is not null))::text, true);
 end $$;
 
+-- A held Control waits for what it depends on (section 5): an earlier held Control OR roll call from the same device and committee, and the
+-- held roll call it cites (from any device). Without this a queue action that cites a held roll call reaches private.eligible, fails because
+-- the cited revision was never applied, and becomes a permanent client conflict that blocks the rest of the outbox.
+create function private.waits_for_held(committee uuid, device uuid, seq bigint, command jsonb) returns boolean
+language sql stable set search_path='' as $$
+  select exists (
+    select 1 from public.held_action e
+     where e.state = 'held' and e.committee_id = committee
+       and ((device is not null and seq is not null and e.device_id = device and e.device_seq < seq
+             and private.command_class(e.command->>'type') in ('control', 'rollcall'))
+         or (e.command->>'type' = 'rollCallCommit' and e.command->>'rollCallId' = command#>>'{rollCall,id}')))
+$$;
+
+-- Same bodies as 20261030100000, except that the ordering rule uses private.waits_for_held (Controls wait for held roll calls too).
+create or replace function private.ops_held_decide(conf uuid, actor uuid, command jsonb) returns uuid[]
+language plpgsql set search_path='' as $$
+declare
+  h public.held_action;
+  decision text := command->>'decision';
+  why text := btrim(command->>'reason');
+  hid uuid := private.uuid_or_null(command->>'heldId');
+begin
+  if decision is null or decision not in ('approve', 'discard') then raise exception 'decision must be approve or discard' using errcode = '22023'; end if;
+  if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
+  select * into h from public.held_action where id = hid and conference_id = conf for update;
+  if not found then raise exception 'Held action unavailable' using errcode = '22023'; end if;
+  if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
+  -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
+  -- decide that one first. Records are independent.
+  if decision = 'approve' and private.command_class(h.command->>'type') = 'control' and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+    raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
+  end if;
+  if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
+  update public.held_action set state = case decision when 'approve' then 'applied' else 'discarded' end, decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
+  return array[h.committee_id];
+end $$;
+
+create or replace function private.ops_held_bulk_approve(conf uuid, actor uuid, command jsonb) returns uuid[]
+language plpgsql set search_path='' as $$
+declare
+  device uuid := private.uuid_or_null(command->>'deviceId');
+  why text := btrim(command->>'reason');
+  off bigint; h public.held_action; affected uuid[] := '{}';
+begin
+  if why is null or length(why) not between 1 and 500 then raise exception 'A reason is required' using errcode = '22023'; end if;
+  if device is null then raise exception 'deviceId is required' using errcode = '22023'; end if;
+  select offset_ms into off from public.clock_confirmation where conference_id = conf and device_id = device order by confirmed_at desc, id desc limit 1;
+  if off is null then raise exception 'Confirm this device''s clock error first' using errcode = '22023'; end if;
+  for h in select * from public.held_action where conference_id = conf and device_id = device and state = 'held' and reason in ('uncertain_time', 'behind_held')
+            order by device_seq nulls last, received_at, id for update loop
+    -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
+    -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
+    continue when private.command_class(h.command->>'type') = 'control' and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    if private.run_held(h, off) is null then
+      update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
+    end if;
+    if not h.committee_id = any(affected) then affected := affected || h.committee_id; end if;
+  end loop;
+  return affected;
+end $$;
+
 create function private.require_operational_committee(conf uuid, cid uuid) returns void
 language plpgsql set search_path='' as $$
 begin
@@ -971,9 +1032,7 @@ begin
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';
     elsif cls = 'control' and received - client_time > make_interval(mins => st.control_stale_minutes) then why := 'stale';
-    elsif cls = 'control' and device is not null and seq is not null and exists (
-            select 1 from public.held_action h where h.state = 'held' and h.committee_id = cid and h.device_id = device and h.device_seq < seq
-               and private.command_class(h.command->>'type') = 'control') then why := 'behind_held';
+    elsif cls = 'control' and private.waits_for_held(cid, device, seq, command) then why := 'behind_held';
     end if;
   end if;
   if why is null then return false; end if;
@@ -1012,6 +1071,6 @@ language sql immutable set search_path='' as $$
   end
 $$;
 
-revoke all on function private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
+revoke all on function private.waits_for_held(uuid, uuid, bigint, jsonb), private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
   private.eligible(uuid, uuid, uuid, jsonb), private.open_ballot(uuid, uuid, uuid), private.commit_roll_call(uuid, uuid, uuid, jsonb)
   from public, anon, authenticated, service_role;
