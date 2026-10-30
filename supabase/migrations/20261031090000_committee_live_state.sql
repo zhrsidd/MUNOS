@@ -975,6 +975,8 @@ begin
  if actor is null then raise exception 'Session required' using errcode='42501';end if;
  if pg_column_size(command)>16384 then raise exception 'Command too large' using errcode='22023';end if;
  perform pg_advisory_xact_lock(hashtextextended(mutation::text,0));
+ -- A retried delivery of a held amendment transition is acknowledged again with no effect, as in the other Chair dispatchers.
+ if kind='amendmentStatus' and private.held_replay(conf, mutation, command, requested_role, expected, client_time) then return; end if;
  select * into prior from private.mutation_receipts where id=mutation;
  if found then
   if prior.actor_id<>actor or prior.conference_id<>conf or prior.payload<>payload then raise exception 'Idempotency key reused for a different action' using errcode='22023';end if;return;

@@ -543,6 +543,9 @@ test('real PostgreSQL: an amendment transition waits for the held speech finish 
   assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[finish])).reason,'stale');
   const start=await send({type:'amendmentStatus',id:amendmentId,status:'In Debate',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),String(amendmentRev));
   assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[start])).reason,'behind_held');
+  // The outbox retries the same delivery: acknowledged again, still one held row, no error.
+  await send({type:'amendmentStatus',id:amendmentId,status:'In Debate',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,start,String(amendmentRev));
+  assert.equal(await count('select 1 from public.held_action where id=$1',[start]),1);
   const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
   await assert.rejects(()=>decide(start),/Decide the earlier held action/);
   await decide(finish);await decide(start);
