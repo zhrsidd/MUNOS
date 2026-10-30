@@ -478,3 +478,109 @@ for(const approval of ['single','bulk'] as const)test(`held vote changes preserv
   assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[second])).state,'applied');
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a ballot opened by approval snapshots the roll calls approved before it in the same chain',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,verify}=f;
+ try{
+  const [pv]=delegates;
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(250);
+  // An older offline roll call is held for its clock; the ballot restart that follows on the same device is Trusted but waits behind it.
+  const rcId=crypto.randomUUID();
+  const rollKey=await send(roll(present(pv),{id:rcId,committed:now-3*H,device:dev,seq:1}),now-3*H);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[rollKey])).reason,'uncertain_time');
+  // No clock report for this device (the reconnect report failed): the roll call stays Uncertain, the restart is within tolerance of its receipt.
+  // The roll call is received (and so effective, once approved) after the restart's own client time.
+  await new Promise(r=>setTimeout(r,1500));
+  const rev=(await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision;
+  const modeKey=await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural',_device:{deviceId:dev,deviceSeq:2}},Date.now()-90_000,'chair',chair,crypto.randomUUID(),String(rev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[modeKey])).reason,'behind_held');
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  await decide(rollKey);await decide(modeKey);
+  assert.equal((await one<{status:string}>('select status from public.ballot_eligibility where resolution_id=$1 and delegate_id=$2',[ids.resolution,pv])).status,'Present & Voting','the ballot was opened against the roll call approved just before it');
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: held votes stay with the ballot they were recorded against, and a superseded one is refused on approval',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(251);await verify(dev,now-10*M);await verify(dev,now);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  const reason=async(id:string)=>(await one<{reason:string}>('select reason from public.held_action where id=$1',[id])).reason;
+  const rev=async()=>(await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision;
+  const r0=Number(await rev());
+  const mode={type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'};
+  const vote={type:'vote',...f.c,resolutionId:ids.resolution,delegateId:pv};
+  // Restart, vote, restart again, replacement vote: both restarts are stale and held; the votes are Trusted.
+  const restart1=await send({...mode,_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),String(r0));
+  const vote1=await send({...vote,choice:'Against',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),'0');
+  const restart2=await send({...mode,_device:{deviceId:dev,deviceSeq:3}},now-10*M,'chair',chair,crypto.randomUUID(),String(r0+1));
+  const vote2=await send({...vote,choice:'For',_device:{deviceId:dev,deviceSeq:4}},now,'chair',chair,crypto.randomUUID(),'0');
+  for(const id of [restart1,vote1,restart2,vote2])assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[id])).state,'held');
+  assert.equal(await reason(restart1),'stale');assert.equal(await reason(restart2),'stale');
+  // The first ballot's vote waits for its own restart only, so it can be approved before the second restart.
+  await assert.rejects(()=>decide(vote1),/Decide the earlier held action/);
+  await decide(restart1);await decide(vote1);
+  assert.equal((await one<{choice:string}>(`select choice from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null`,[ids.resolution,pv])).choice,'Against');
+  // The replacement vote waits for the second restart, which clears the first ballot's vote; then it is recorded fresh.
+  await assert.rejects(()=>decide(vote2),/Decide the earlier held action/);
+  await decide(restart2);await decide(vote2);
+  const final=await one<{choice:string;revision:number}>(`select choice,revision from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null`,[ids.resolution,pv]);
+  assert.equal(final.choice,'For');assert.equal(Number(final.revision),1,'a fresh vote in the replacement ballot');
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: approving a held vote after its ballot was restarted is refused, not inserted into the replacement ballot',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  const rev=async()=>String((await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision);
+  const mode={type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'};
+  await send(mode,now,'chair',chair,crypto.randomUUID(),await rev());
+  await ops(exec,{type:'holdSettings',enforce:true});
+  // A vote recorded against the first ballot with an unverified clock is held...
+  const vote1=await send({type:'vote',...f.c,resolutionId:ids.resolution,delegateId:pv,choice:'Against',_device:{deviceId:U(252),deviceSeq:1}},now-3*H,'chair',chair,crypto.randomUUID(),'0');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[vote1])).reason,'uncertain_time');
+  await new Promise(r=>setTimeout(r,50));
+  // ...the ballot is restarted meanwhile...
+  await send(mode,Date.now(),'chair',chair,crypto.randomUUID(),await rev());
+  // ...so approving the old vote is refused and it stays held for discard.
+  await ops(exec,{type:'heldDecide',heldId:vote1,decision:'approve',reason:'Reviewed'});
+  const h=await one<{state:string;last_error:string}>('select state,last_error from public.held_action where id=$1',[vote1]);
+  assert.equal(h.state,'held');assert.match(h.last_error,/since been restarted/);
+  assert.equal(await count(`select 1 from public.votes where "resolutionId"=$1 and "sessionId" is null`,[ids.resolution]),0);
+ }finally{await db.close();}
+});
+
+test('real PostgreSQL: an amendment transition waits for the held speech finish that clears the floor',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify,asOwner}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  const speechKey=await send({type:'speechStart',...f.c,delegateId:pv,resolutionId:ids.resolution,classification:'Other'},now,'chair',chair,crypto.randomUUID(),'empty');
+  const speechId=speechKey.slice(0,24)+'000000000001';
+  await asOwner();
+  const amendmentId=crypto.randomUUID();
+  await db.query(`insert into public.amendments(id,conference_id,committee_id,"resolutionId","submitterId",type,clause,wording,status) values($1,$2,$3,$4,$5,'Add','1','New clause','Accepted for Debate')`,[amendmentId,ids.conference,ids.ga1,ids.resolution,ids.france]);
+  const amendmentRev=(await one<{revision:number}>('select revision from public.amendments where id=$1',[amendmentId])).revision;
+  const speechRev=(await one<{revision:number}>('select revision from public.speeches where id=$1',[speechId])).revision;
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(253);await verify(dev,now-10*M);await verify(dev,now);
+  // The Chair finishes the speech offline (stale, so held), then starts the amendment debate with the floor optimistically clear.
+  const finish=await send({type:'speechFinish',...f.c,speechId,_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),String(speechRev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[finish])).reason,'stale');
+  const start=await send({type:'amendmentStatus',id:amendmentId,status:'In Debate',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),String(amendmentRev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[start])).reason,'behind_held');
+  // The outbox retries the same delivery: acknowledged again, still one held row, no error.
+  await send({type:'amendmentStatus',id:amendmentId,status:'In Debate',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,start,String(amendmentRev));
+  assert.equal(await count('select 1 from public.held_action where id=$1',[start]),1);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  await assert.rejects(()=>decide(start),/Decide the earlier held action/);
+  await decide(finish);await decide(start);
+  assert.equal(await count(`select 1 from public.amendments where id=$1 and status='In Debate'`,[amendmentId]),1,'the amendment debate started once the floor was clear');
+ }finally{await db.close();}
+});

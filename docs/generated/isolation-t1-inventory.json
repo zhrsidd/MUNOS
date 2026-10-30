@@ -38,7 +38,7 @@
   "20261031090000_committee_live_state.sql",
   "20261031100000_attendance_to_roll_calls.sql"
  ],
- "migrationsSha256": "00420750f536f2a350a5551183059906b83ea6194244ef3c708bd05f7a34f888",
+ "migrationsSha256": "8ac1bdb676b4376fb7581861a186c2f6390390754df0ee976c4fd3121d72a956",
  "supabase-model": {
   "fns": [
    {
@@ -485,6 +485,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -2774,7 +2804,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",
@@ -6025,6 +6055,36 @@
    },
    {
     "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "decision_history",
     "args": "conf uuid",
     "result": "jsonb",
@@ -8306,7 +8366,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",

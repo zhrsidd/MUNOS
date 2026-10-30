@@ -101,7 +101,7 @@ end $$;
 -- A held command waits for what it depends on (section 5): a Control for an earlier held Control or roll call from the same device and committee,
 -- anything citing a held roll call, a roll call revision or copy for the roll call it builds on, a vote for its resolution's held ballot restart, and a speech or POI score for the held command that creates its speech or POI entry. Without this a queue action that cites a held roll call reaches private.eligible, fails because
 -- the cited revision was never applied, and becomes a permanent client conflict that blocks the rest of the outbox.
-create function private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb) returns boolean
+create function private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamptz default null) returns boolean
 language sql stable set search_path='' as $$
   select exists (
     select 1 from public.held_action e
@@ -117,22 +117,33 @@ language sql stable set search_path='' as $$
          or (p_command->>'type' = 'rollCallCommit' and e.command->>'type' = 'rollCallCommit' and (
               (e.command->>'rollCallId' = p_command->>'rollCallId' and (e.command->>'revision')::int < (p_command->>'revision')::int)
            or e.command->>'rollCallId' = p_command->>'copiedFrom'))
-         -- A vote waits for the held ballot-opening command (voteMode) of its resolution: approving that restart later clears the ballot's votes.
-         or (p_command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = p_command->>'resolutionId')
+         -- A vote waits for the held ballot-opening command (voteMode) of its resolution that reached the server before it: approving that restart
+         -- later clears the ballot's votes. A restart that arrived after the vote opens a later ballot and is not this vote's prerequisite.
+         or (p_command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = p_command->>'resolutionId'
+             and e.received_at <= coalesce(p_received, 'infinity'::timestamptz))
          -- Anything on a speech waits for an earlier held command on the same speech from the same device (its revision and state depend on it);
          -- a POI score also waits for the held recognition of its entry from any device.
          or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
              and e.command->>'speechId' = p_command->>'speechId')
          or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
-         -- Repeated corrections of one event, and repeated votes of one delegate on one resolution, carry optimistically incremented revisions:
-         -- keep that device's order (an earlier held one must be decided first).
+         -- Repeated corrections of one event, and repeated votes of one delegate on one resolution, use optimistically incremented revisions,
+         -- so preserve that device's order (an earlier held one must be decided first).
          or (p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq and e.command->>'type' = p_command->>'type' and (
               (p_command->>'type' = 'event' and e.command->>'id' = p_command->>'id')
-           or (p_command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'resolutionId' and e.command->>'delegateId' = p_command->>'delegateId')))
+           or (p_command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'resolutionId' and e.command->>'delegateId' = p_command->>'delegateId'
+               -- Only within one ballot: a restart between the two (held, or already applied) starts a new ballot with reset revisions.
+               and not exists (select 1 from public.held_action r where r.state = 'held' and r.committee_id = p_committee and r.command->>'type' = 'voteMode'
+                                  and r.command->>'resolutionId' = p_command->>'resolutionId' and r.received_at > e.received_at and r.received_at <= coalesce(p_received, 'infinity'::timestamptz))
+               and not exists (select 1 from public.ballot_eligibility b where b.resolution_id = private.uuid_or_null(p_command->>'resolutionId')
+                                  and b.opened_at > e.received_at and b.opened_at <= coalesce(p_received, 'infinity'::timestamptz)))))
          -- A counted close must include unresolved vote changes for its ballot, even from another device.
          or (p_command->>'type' = 'document' and p_command->>'status' = 'Closed'
              and coalesce(p_command->>'method', '') <> 'observed' and coalesce(p_command->>'outcome', '') <> 'Withdrawn'
              and e.command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'id')
+         -- An amendment transition waits for the held floor changes (speech start, yield, finish) of its committee that reached the server before it:
+         -- it may start or close an amendment debate only with the floor at the Chair.
+         or (p_command->>'type' = 'amendmentStatus' and e.command->>'type' in ('speechStart', 'speechYield', 'speechFinish')
+             and e.received_at <= coalesce(p_received, 'infinity'::timestamptz))
          -- A correction of an event waits for the held command that creates that event (ids derive from the creating command's key).
          or (p_command->>'type' = 'event' and (substr(e.id::text, 1, 24) || '000000000001' = p_command->>'id' or substr(e.id::text, 1, 24) || '000000000002' = p_command->>'id'))
          -- Whatever names a record by id waits for the held command that creates it, from any device (the id derives from that command's key):
@@ -171,8 +182,8 @@ begin
   if not found then raise exception 'Held action unavailable' using errcode = '22023'; end if;
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
   -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
-  -- decide that one first. Records are independent.
-  if decision = 'approve' and private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+  -- decide that one first. Dependent records obey the same prerequisite rule.
+  if decision = 'approve' and private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command, h.received_at) then
     raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
   end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
@@ -195,7 +206,7 @@ begin
             order by device_seq nulls last, received_at, id for update loop
     -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
     -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
-    continue when private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    continue when private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command, h.received_at);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
     end if;
@@ -264,12 +275,16 @@ create function private.open_ballot(conf uuid, cid uuid, rid uuid) returns void
 language plpgsql set search_path='' as $$
 declare at timestamptz := private.action_time(conf); l record;
 begin
+  -- A ballot opened by an Executive approval opens when it is approved, against the roll call in force then: the roll calls approved before it
+  -- in the same chain are effective at their receipt time, later than the held command's own client time, and must not be skipped.
+  if nullif(current_setting('munos.approving', true), '') is not null then at := greatest(at, now()); end if;
   select r.id, r.revision into l from public.roll_call r
    where r.committee_id = cid and r.state = 'committed' and r.effective_at is not null and r.effective_at <= at
    order by r.effective_at desc, r.id desc, r.revision desc limit 1;
   delete from public.ballot_eligibility where resolution_id = rid;
-  insert into public.ballot_eligibility(resolution_id, delegate_id, conference_id, committee_id, status, roll_call_id, roll_call_revision)
-  select rid, d.id, conf, cid, coalesce(x.status, 'Absent'), l.id, l.revision
+  insert into public.ballot_eligibility(resolution_id, delegate_id, conference_id, committee_id, status, roll_call_id, roll_call_revision, opened_at)
+  select rid, d.id, conf, cid, coalesce(x.status, 'Absent'), l.id, l.revision,
+         coalesce(private.session_ts(nullif(current_setting('munos.mutation_ctx', true), '')::jsonb->>'receivedAt'), clock_timestamp())
     from public.delegates d
     left join public.roll_call_row x on x.roll_call_id = l.id and x.revision = l.revision and x.delegate_id = d.id
    where d.committee_id = cid and d.conference_id = conf;
@@ -592,6 +607,12 @@ begin
    -- Eligibility is the snapshot taken when the ballot opened (section 6), not whoever is present now.
    select status into elig from public.ballot_eligibility where resolution_id=rid and delegate_id=did;
    if not found then raise exception 'Open the ballot before recording votes' using errcode='22023'; end if;
+   -- A held vote approved after its ballot was restarted belongs to the superseded ballot: refuse it (the Executive discards it) instead of
+   -- inserting a superseded choice into the replacement ballot.
+   if nullif(current_setting('munos.approving', true), '') is not null and exists (select 1 from public.ballot_eligibility b where b.resolution_id=rid and b.delegate_id=did
+        and b.opened_at > private.session_ts(nullif(current_setting('munos.mutation_ctx', true), '')::jsonb->>'receivedAt')) then
+     raise exception 'This vote was recorded for a ballot that has since been restarted; discard it' using errcode='22023';
+   end if;
    if elig='Absent' or (elig='Present & Voting' and command->>'choice'='Abstain') then raise exception 'Attendance does not permit vote' using errcode='22023'; end if;
    insert into public.votes(id,conference_id,committee_id,"sessionId","delegateId","resolutionId",choice) values(new_id,conf,cid,null,did,rid,command->>'choice')
    on conflict("resolutionId","delegateId") where "sessionId" is null do update set choice=excluded.choice,revision=votes.revision+1,"createdAt"=now(),updated_at=now();
@@ -951,9 +972,12 @@ declare
  topic text:='configuration';target text:=command->>'status';outcome_value text:=command->>'outcome';
 begin
  perform private.lock_lifecycle();
+ perform private.set_mutation_context(conf, mutation, client_time, command);
  if actor is null then raise exception 'Session required' using errcode='42501';end if;
  if pg_column_size(command)>16384 then raise exception 'Command too large' using errcode='22023';end if;
  perform pg_advisory_xact_lock(hashtextextended(mutation::text,0));
+ -- A retried delivery of a held amendment transition is acknowledged again with no effect, as in the other Chair dispatchers.
+ if kind='amendmentStatus' and private.held_replay(conf, mutation, command, requested_role, expected, client_time) then return; end if;
  select * into prior from private.mutation_receipts where id=mutation;
  if found then
   if prior.actor_id<>actor or prior.conference_id<>conf or prior.payload<>payload then raise exception 'Idempotency key reused for a different action' using errcode='22023';end if;return;
@@ -968,6 +992,8 @@ begin
  if cid is not null then select * into committee from public.committees where id=cid and conference_id=conf for update;
   if not found then raise exception 'Committee unavailable' using errcode='42501';end if;
  else perform 1 from public.committees where conference_id=conf order by id for update;end if;
+ -- An amendment transition is a Control: with hold enforcement on it waits behind the held floor changes it depends on (private.waits_for_held).
+ if kind='amendmentStatus' and private.hold_gate(conf, cid, mutation, command, requested_role, expected, client_time) then return; end if;
  if kind='amendmentStatus' then
   select * into amend from public.amendments where id=(command->>'id')::uuid and conference_id=conf for update;actual:=amend.revision::text;
  elsif kind in ('committeeUpdate','committeeLifecycle') then actual:=committee.revision::text;
@@ -1078,12 +1104,12 @@ begin
   elsif kind = 'vote' and not exists (select 1 from public.documents d where d.id = private.uuid_or_null(command->>'resolutionId') and d.status = 'In Debate') then
     -- A ballot that arrives after its result was declared is held: closed results are immutable (section 6).
     why := 'ballot_closed';
-  elsif cls = 'record' and private.waits_for_held(cid, device, seq, command) then
+  elsif cls = 'record' and private.waits_for_held(cid, device, seq, command, received) then
     why := 'behind_held';
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';
     elsif cls = 'control' and received - client_time > make_interval(mins => st.control_stale_minutes) then why := 'stale';
-    elsif private.waits_for_held(cid, device, seq, command) then why := 'behind_held';
+    elsif private.waits_for_held(cid, device, seq, command, received) then why := 'behind_held';
     end if;
   end if;
   if why is null then return false; end if;
@@ -1117,11 +1143,11 @@ language sql immutable set search_path='' as $$
   select case
     when kind in ('participation', 'event', 'vote', 'speechScore', 'poiScore', 'pointAdjustment') then 'record'
     when kind in ('queue', 'queueAdd', 'queueOrder', 'queueRemove', 'debateMode', 'speechStart', 'speechYield', 'speechFinish', 'poiAllowance', 'poiAdd',
-                  'poiOrder', 'poiRecognize', 'poiRemove', 'voteMode', 'document') then 'control'
+                  'poiOrder', 'poiRecognize', 'poiRemove', 'voteMode', 'document', 'amendmentStatus') then 'control'
     when kind = 'rollCallCommit' then 'rollcall'
   end
 $$;
 
-revoke all on function private.held_event_committee(uuid, text), private.waits_for_held(uuid, uuid, bigint, jsonb), private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
+revoke all on function private.held_event_committee(uuid, text), private.waits_for_held(uuid, uuid, bigint, jsonb, timestamptz), private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
   private.eligible(uuid, uuid, uuid, jsonb), private.open_ballot(uuid, uuid, uuid), private.commit_roll_call(uuid, uuid, uuid, jsonb)
   from public, anon, authenticated, service_role;

@@ -241,3 +241,10 @@ test('stale Main Submitter speechStart is rejected during amendment debate; For/
   t.run({type:'speechFinish',committeeId:'ga1',speechId:s.id});
  }
 });
+
+test('a retained historical speech does not hold the amendment floor',()=>{
+ const base={committeeId:'c1'};
+ assert.equal(amendmentFloorTaken({speeches:[{id:'s1',committeeId:'c1',sessionId:'old',state:'speaking'}]} as never,base),false,'a session-keyed speech is history');
+ assert.equal(amendmentFloorTaken({speeches:[{id:'s2',committeeId:'c1',sessionId:null,state:'speaking'}]} as never,base),true);
+ assert.equal(amendmentFloorTaken({speeches:[{id:'s3',committeeId:'c2',sessionId:null,state:'speaking'}]} as never,base),false,'another committee');
+});
