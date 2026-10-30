@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "c6cb80b4f3895752a10fecab43c20eac7848aa7be62a89d12e42acc87a530db5",
+ "migrationsSha256": "c04ebf1dc3eb1d917925b51dd1844bc42a287c5ed730c3ef1e1c7afb227c7fe1",
  "supabase-model": {
   "fns": [
    {
@@ -2773,7 +2773,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",
@@ -8342,7 +8342,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",

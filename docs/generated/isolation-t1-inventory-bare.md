@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `c6cb80b4f3895752`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `c04ebf1dc3eb1d91`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -143,7 +143,7 @@ Executed in the disposable database after the inventory was read:
 | `private.uuid_or_null(value text)` | function | invoker | postgres | immutable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.valid_flag(value text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.veto_delegates(rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
-| `private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp wi...)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `public.access_code_status(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.amendment_link_info(link_token text)` | function | definer | postgres | stable | search_path="" | service_role, postgres | service_role | reads/none |
 | `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes (via callee) |
