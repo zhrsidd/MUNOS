@@ -1,0 +1,152 @@
+name: Codex reviewed auto-merge
+# This workflow is a gate, not a trigger. Every event re-reads Codex's summary state for the current head, its
+# unresolved threads and the main ruleset, then enables auto-merge only when all of them are clear. Otherwise it
+# cancels auto-merge. A comment or review alone never enables it.
+on:
+  pull_request_review:
+    # dismissed: removing a blocking review must re-evaluate the head, or a stale failing status stays in place.
+    types: [submitted, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited]
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to re-evaluate
+        required: true
+        type: number
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: codex-merge-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Enabling auto-merge needs contents write as well as pull-request write.
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    # Codex's summary comment is the only comment that counts, and only from its pinned identity.
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request != null &&
+       github.event.comment.user.id == 199175422 &&
+       github.event.comment.user.type == 'Bot' &&
+       contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
+    steps:
+      # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate.
+      # The gate comes from main once main has it. Before that, stage-gate.sh allows only the owner-pinned bootstrap PR at
+      # its pinned tree (see docs/AGENT_AUTOMATION.md). Either way the gate never comes from an arbitrary pull request.
+      - name: Check out gate scripts from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: .github/scripts
+          path: trusted
+          persist-credentials: false
+      - name: Check out the pull request head for bootstrap staging only
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}/head
+          sparse-checkout: .github/scripts
+          path: head
+          persist-credentials: false
+      - name: Stage gate scripts outside the workspace
+        env:
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          CODEX_GATE_BOOTSTRAP_PR: ${{ vars.CODEX_GATE_BOOTSTRAP_PR }}
+          CODEX_GATE_BOOTSTRAP_TREE: ${{ vars.CODEX_GATE_BOOTSTRAP_TREE }}
+        run: |
+          set -euo pipefail
+          if [ -f trusted/.github/scripts/stage-gate.sh ]; then
+            stager=trusted/.github/scripts/stage-gate.sh
+          else
+            # Bootstrap: verify the head's gate tree here, before any head-supplied script runs.
+            if [ -z "$CODEX_GATE_BOOTSTRAP_PR" ] || [ -z "$CODEX_GATE_BOOTSTRAP_TREE" ] || [ "$PR" != "$CODEX_GATE_BOOTSTRAP_PR" ]; then
+              echo "::error::main has no gate scripts and no bootstrap is pinned for pull request $PR." >&2
+              exit 1
+            fi
+            tree=$(git -C head rev-parse "HEAD:.github/scripts")
+            if [ "$tree" != "$CODEX_GATE_BOOTSTRAP_TREE" ]; then
+              echo "::error::Gate tree $tree is not the pinned bootstrap tree; refusing to run the pull request's gate." >&2
+              exit 1
+            fi
+            stager=head/.github/scripts/stage-gate.sh
+          fi
+          bash "$stager" trusted head "$PR" "$RUNNER_TEMP/gate"
+          rm -rf trusted head
+
+      - name: Decide from Codex's structured state on the current head
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+        run: |
+          set -euo pipefail
+          state=$("$RUNNER_TEMP/gate/codex-review-gate.sh" "$PR")
+          echo "$state"
+          jq -r '"ready=\(.ready_to_merge)\nhead=\(.head_sha)"' <<<"$state" >> "$GITHUB_OUTPUT"
+
+      # The ruleset requires this status on the head, so GitHub itself blocks a merge of any head Codex has not cleared,
+      # even when the cancellation below has not run yet.
+      - name: Publish the gate decision as a commit status on the head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          READY: ${{ steps.gate.outputs.ready }}
+          HEAD: ${{ steps.gate.outputs.head }}
+        run: |
+          set -euo pipefail
+          if [ "$READY" = true ]; then state=success; else state=failure; fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD" -f state="$state" \
+            -f context=codex-review-gate -f "description=Codex review gate: $state" >/dev/null
+
+      - name: Enable auto-merge only for a clear head, otherwise cancel it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          READY: ${{ steps.gate.outputs.ready }}
+          HEAD: ${{ steps.gate.outputs.head }}
+        run: |
+          set -euo pipefail
+          current=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          enabled=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [ "$READY" = true ] && [ "$current" = "$HEAD" ]; then
+            if [ "$enabled" = true ]; then
+              echo "Auto-merge is already enabled for $HEAD."
+            else
+              # --match-head-commit makes GitHub refuse the enable if the head moved after the check above.
+              gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch --match-head-commit "$HEAD"
+              echo "Enabled auto-merge for $HEAD. Branch protection still requires verify to pass."
+            fi
+          elif [ "$enabled" = true ]; then
+            gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --disable-auto
+            echo "Cancelled auto-merge: the gate is not clear on the current head."
+          else
+            echo "Not ready; auto-merge stays off."
+          fi
+
+      # A failed evaluation must never leave an earlier enablement or success status in place. Runs only after a failure above.
+      - name: Fail the gate status and cancel auto-merge when the evaluation failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+        run: |
+          head=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid || echo "")
+          if [ -n "$head" ]; then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$head" -f state=failure \
+              -f context=codex-review-gate -f "description=Codex review gate: evaluation failed" >/dev/null \
+              || echo "::error::Could not publish a failing gate status on $head."
+          fi
+          enabled=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json autoMergeRequest --jq '.autoMergeRequest != null' || echo unknown)
+          if [ "$enabled" != false ] && ! gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --disable-auto; then
+            echo "::error::Could not cancel auto-merge on PR $PR; cancel it manually before anything else merges."
+            exit 1
+          fi
