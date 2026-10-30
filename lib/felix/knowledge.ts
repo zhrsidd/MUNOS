@@ -36,9 +36,9 @@ export const KNOWLEDGE: Entry[] = [
     examples: ["I marked the wrong delegate absent", "how do I fix attendance", "undo absent"],
     answers: {
       chair: {
-        text: "Roll-call marks can be corrected at any time: the record is updated in place.",
-        steps: ["Open Roll call (it uses the current session).", "Find the delegation and press the correct status: Present, Present & Voting or Absent. The selected one shows a ✓."],
-        mistakes: "Marking someone Absent removes their speaker-queue entries and their vote in this session on resolutions not yet closed. Present & Voting removes any abstention. Switching back does not restore those: queue them again on Debate and record their vote again in Voting if needed.",
+        text: "A roll call is committed whole, so a mistake is fixed with a correction: the next revision of the last roll call.",
+        steps: ["Open Roll call and press “Correct last roll call”.", "Find the delegation and press the correct status: Present, Present & Voting or Absent. The selected one shows a ✓.", "Press “Commit roll call”. Nothing changes until you commit."],
+        mistakes: "A delegate marked Absent leaves the speaker queue when the roll call is committed. An open ballot keeps the statuses it was opened with: if the correction must count for that vote, start a fresh ballot in Voting.",
         href: "/chair/roll-call", linkLabel: "Open Roll call",
       },
     },
@@ -49,8 +49,8 @@ export const KNOWLEDGE: Entry[] = [
     examples: ["how do I take roll call", "where is attendance", "mark delegates present"],
     answers: {
       chair: ctx => ({
-        text: ctx.chair?.sessionName ? `Roll call for ${ctx.chair.sessionName}: ${ctx.chair.marked} of ${ctx.chair.delegates} delegations marked, ${ctx.chair.present} present.` : "First choose the committee’s current session in the “Current session” selector above the Chair pages.",
-        steps: ["Choose the current session in the “Current session” selector.", "Open Roll call and press Present, Present & Voting or Absent for each delegation.", "Only delegates who are not Absent can be queued to speak or vote. Present & Voting delegates cannot abstain."],
+        text: ctx.chair?.marked ? `The live roll call has ${ctx.chair.present} of ${ctx.chair.delegates} delegations present.` : "No roll call has been committed yet: nobody counts as present until one is.",
+        steps: ["Open Roll call and press “Copy last roll call” (or “Start roll call” the first time).", "Press Present, Present & Voting or Absent for each delegation. The draft stays on this device and changes nothing yet.", "Press “Commit roll call”. Only delegates who are not Absent can be queued to speak or vote; Present & Voting delegates cannot abstain."],
         href: "/chair/roll-call", linkLabel: "Open Roll call",
       }),
     },
@@ -208,7 +208,7 @@ export const KNOWLEDGE: Entry[] = [
     answers: {
       chair: {
         text: "Open debate from Resolutions, then run it from the Debate page.",
-        steps: ["Make sure the current session is selected and roll call is taken.", "Resolutions: on a Printed resolution press “Open debate”.", "Debate: choose Open or Closed debate, queue speakers, recognize them with “Next speaker”, score speeches and run POIs.", "When debate ends, use “Go to voting” and record the vote in Voting."],
+        steps: ["Make sure a roll call is committed.", "Resolutions: on a Printed resolution press “Open debate”.", "Debate: choose Open or Closed debate, queue speakers, recognize them with “Next speaker”, score speeches and run POIs.", "When debate ends, use “Go to voting” and record the vote in Voting."],
         href: "/chair/documents", linkLabel: "Open Resolutions",
       },
     },
@@ -376,8 +376,8 @@ export const KNOWLEDGE: Entry[] = [
     examples: ["why can't I close voting", "abstain is disabled"],
     answers: {
       chair: {
-        text: "“Close voting” is enabled only once every delegation not marked Absent has voted.",
-        mistakes: "Present & Voting delegates cannot abstain, and Divide the House allows only For and Against. If a delegate left, correct their mark in Roll call (marking them Absent removes their vote in this session).",
+        text: "“Close voting” is enabled only once every delegation eligible on this ballot has voted. The ballot uses the roll call in force when it was opened.",
+        mistakes: "Present & Voting delegates cannot abstain, and Divide the House allows only For and Against. A later roll call does not change an open ballot: if a delegate left, correct the roll call, then start a fresh ballot (earlier choices stay in the audit history).",
         href: "/chair/voting", linkLabel: "Open Voting",
       },
     },
@@ -402,8 +402,8 @@ export const KNOWLEDGE: Entry[] = [
     all: ["session"], any: ["how"], none: ["offline", "save", "error", "conflict", "slow"],
     examples: ["how do I choose the session", "schedule sessions"],
     answers: {
-      chair: ctx => ({ text: `${ctx.chair?.sessionName ? `The current session is ${ctx.chair.sessionName}. ` : ctx.chair && !ctx.chair.hasSessions ? "Your committee has no sessions yet: they come from the Executive’s central schedule. " : "No current session is selected. "}Choose it in the “Current session” selector above the Chair pages; it may suggest the session scheduled for now. Roll call, debate and voting use the current session.`, href: "/chair", linkLabel: "Open Debate" }),
-      admin: { text: "Programme → Sessions holds one shared conference schedule. Each committee keeps its own attendance, debate and participation history for each session.", href: "/admin/sessions", linkLabel: "Open Sessions" },
+      chair: ctx => ({ text: `${ctx.chair?.sessionName ? `The schedule puts your committee in ${ctx.chair.sessionName}. ` : ctx.chair && !ctx.chair.schedulePublished ? "Your committee’s schedule is not published yet. " : "Your committee is between sessions. "}Chairs do not choose sessions: the Executive’s published schedule decides, and every record is labelled by it. Take a roll call when a new session starts.`, href: "/chair", linkLabel: "Open Debate" }),
+      admin: { text: "Programme → Sessions holds one shared conference schedule. Publish it for the committees (lead time and automation), or set a session now as an override. Records are labelled by the schedule; roll call, debate and voting belong to each committee.", href: "/admin/sessions", linkLabel: "Open Sessions" },
     },
   },
   {

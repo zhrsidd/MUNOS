@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Test double for the gh CLI used by repair-resolve.test.sh. Serves the review comments and review threads in $FAKE_DIR,
+# applies --jq the way gh does, and records the id of every resolveReviewThread mutation in $FAKE_DIR/resolved.log.
+set -euo pipefail
+
+dir=${FAKE_DIR:?FAKE_DIR must name the fixture directory}
+jqexpr=""
+args=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --jq) jqexpr=$2; shift 2 ;;
+    --paginate) shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+if [ "${args[0]:-}" != api ]; then
+  echo "fake gh: only the api subcommand is supported" >&2
+  exit 2
+fi
+endpoint=${args[1]:?fake gh: missing endpoint}
+
+case $endpoint in
+  graphql)
+    query=""
+    id=""
+    for a in "${args[@]:2}"; do
+      case $a in
+        query=*) query=${a#query=} ;;
+        id=*) id=${a#id=} ;;
+      esac
+    done
+    if [[ $query == *resolveReviewThread* ]]; then
+      echo "$id" >> "$dir/resolved.log"
+      echo '{"data":{}}'
+    else
+      if [ -f "$dir/graphql-fails" ]; then
+        echo "fake gh: simulated GraphQL failure" >&2
+        exit 1
+      fi
+      cat "$dir/threads.json"
+    fi
+    ;;
+  repos/*/pulls/*/comments*)
+    if [ -n "$jqexpr" ]; then jq -rc "$jqexpr" "$dir/comments.json"; else cat "$dir/comments.json"; fi
+    ;;
+  *)
+    echo "fake gh: unexpected endpoint $endpoint" >&2
+    exit 1
+    ;;
+esac

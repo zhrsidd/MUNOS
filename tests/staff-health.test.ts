@@ -67,14 +67,14 @@ test('Chair health requires export before conflict dismissal and retains/resumes
  const sent:string[]=[];
  const transport:Transport={actorId:'chair-only',read:async()=>{if(!online)throw Error('Offline');return data;},send:async m=>{
   if(!online)throw Error('Offline');
-  if(m.command.type==='attendance')throw new ConflictError('PT409: Another Chair updated attendance');
+  if(m.command.type==='rollCallCommit')throw new ConflictError('PT409: Another Chair updated attendance');
   data=applyCommand(data,m.command,m.role,m);sent.push(m.id);
  }};
  const repo=new DurableRepository('chair-device',()=>data,store,transport);await repo.ready();await tick();
  const savedDocument=Object.getOwnPropertyDescriptor(globalThis,'document'),savedWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
  try{
-  await repo.execute({type:'attendance',sessionId:'s1',delegateId:'d0',status:'Absent'},'chair');
-  await repo.execute({type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},'chair');
+  await repo.execute({type:'rollCallCommit',committeeId:'ga1',rollCallId:crypto.randomUUID(),revision:1,observedAt:new Date().toISOString(),committedAt:new Date().toISOString(),rows:[{delegateId:'d0',status:'Absent'}]},'chair');
+  await repo.execute({type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},'chair');
   await tick();online=true;await repo.flush();assert.equal(repo.getHealth().conflicts,1);
   const [conflict,later]=repo.getPending();assert.equal(later.state,'pending');assert.deepEqual(sent,[]);
   t.mock.method(repository,'getHealth',()=>repo.getHealth());t.mock.method(repository,'getPending',()=>repo.getPending());

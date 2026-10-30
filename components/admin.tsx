@@ -14,6 +14,8 @@ import { conferenceScoring, effectiveScoring, MAIN_SUBMITTER_ID, parseScoringVal
 import { Metric, Search } from "./chair";
 import { Chip, Empty, Icon, Modal, PageHeading, Panel } from "./ui";
 import { useDemo } from "./operations/submission-links";
+import { displayedResolution } from "@/lib/sessions/display";
+import { rollCallAt } from "@/lib/sessions/presence";
 const sections: Record<string, [string, string]> = {
   conference: ["Conference", "Set the defaults that every committee inherits."],
   committees: [
@@ -125,12 +127,10 @@ export function AdminScreen({ section }: { section: string }) {
                 const delegates = data.delegates.filter(
                   (d) => d.committeeId === c.id,
                 );
-                const session = data.sessions.find(
-                  (s) => s.id === c.currentSessionId,
-                );
-                const present = data.attendance.filter(
-                  (a) => a.sessionId === session?.id && a.status !== "Absent",
-                ).length;
+                // What the schedule says now, and who is present in the live roll call (docs/SESSION_MODEL.md sections 3 and 6).
+                const now = displayedResolution(data, c.id, new Date().toISOString());
+                const session = now?.sessionId ? data.sessions.find((s) => s.id === now.sessionId) : undefined;
+                const present = (rollCallAt(data, c.id)?.rows ?? []).filter((r) => r.status !== "Absent").length;
                 return (
                   <div className="committee-row" key={c.id}>
                     <span className="committee-badge">{c.code}</span>
@@ -142,7 +142,7 @@ export function AdminScreen({ section }: { section: string }) {
                       </p>
                     </div>
                     <Chip tone={session ? "green" : "neutral"}>
-                      {session ? "Session active" : "Setup"}
+                      {session ? session.name : now ? "No session" : "Schedule not published"}
                     </Chip>
                   </div>
                 );

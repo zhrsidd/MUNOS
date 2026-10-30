@@ -29,9 +29,16 @@
   "20261021130000_identity_projection.sql",
   "20261021140000_sequential_chair_numbering.sql",
   "20261022090000_privilege_hardening.sql",
-  "20261026003647_lifecycle_controls.sql"
+  "20261026003647_lifecycle_controls.sql",
+  "20261029100000_session_window.sql",
+  "20261029110000_session_schedule.sql",
+  "20261030090000_record_labelling.sql",
+  "20261030100000_session_holds.sql",
+  "20261030110000_session_schedules_snapshot.sql",
+  "20261031090000_committee_live_state.sql",
+  "20261031100000_attendance_to_roll_calls.sql"
  ],
- "migrationsSha256": "83aed5a42ade25ba996ceccc95dce66dd2c30b9732398a297b8ddae029b38ab0",
+ "migrationsSha256": "8ac1bdb676b4376fb7581861a186c2f6390390754df0ee976c4fd3121d72a956",
  "supabase-model": {
   "fns": [
    {
@@ -58,6 +65,36 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "action_time",
+    "args": "conf uuid",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -276,6 +313,126 @@
    },
    {
     "schema": "private",
+    "name": "command_class",
+    "args": "kind text",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "command_device_time",
+    "args": "command jsonb, fallback timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "commit_roll_call",
+    "args": "conf uuid, cid uuid, actor uuid, command jsonb",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "committee_session_at",
+    "args": "conf uuid, committee uuid, at timestamp with time zone",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "committees_for_schools",
     "args": "schools uuid[]",
     "result": "uuid[]",
@@ -298,6 +455,66 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "conference_time_zone",
+    "args": "conf uuid",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -396,6 +613,96 @@
    },
    {
     "schema": "private",
+    "name": "eligible",
+    "args": "conf uuid, cid uuid, did uuid, command jsonb",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "end_overrides",
+    "args": "conf uuid, p_committee uuid, eff timestamp with time zone",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "final_label",
+    "args": "table_name text, rid uuid",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "guard_lifecycle_transition",
     "args": "",
     "result": "trigger",
@@ -448,6 +755,156 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "held_event_committee",
+    "args": "conf uuid, event_id text",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "held_replay",
+    "args": "conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "hold_gate",
+    "args": "conf uuid, cid uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "hold_settings",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "label_record",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -606,11 +1063,311 @@
    },
    {
     "schema": "private",
+    "name": "next_effective_from",
+    "args": "conf uuid, target uuid",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "next_resolution_code",
     "args": "conf uuid, committee uuid",
     "result": "text",
     "kind": "f",
     "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "open_ballot",
+    "args": "conf uuid, cid uuid, rid uuid",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_automation_toggle",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_clock_confirm",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_close_day",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_held_bulk_approve",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_held_decide",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_hold_settings",
+    "args": "conf uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_label_correction",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_override_set",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
     "owner": "postgres",
     "volatility": "volatile",
     "config": "search_path=\"\"",
@@ -786,6 +1543,66 @@
    },
    {
     "schema": "private",
+    "name": "ops_schedule_snapshot",
+    "args": "conf uuid, cid uuid, slot_leads jsonb",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_schedule_version",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "ops_session_import",
     "args": "conf uuid, mutation uuid, command jsonb",
     "result": "uuid[]",
@@ -855,6 +1672,36 @@
     "volatility": "volatile",
     "config": "search_path=\"\"",
     "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "payload_hash",
+    "args": "command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -996,6 +1843,36 @@
    },
    {
     "schema": "private",
+    "name": "presence_at",
+    "args": "cid uuid, did uuid, at timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "print_copies",
     "args": "conf uuid, cid uuid",
     "result": "integer",
@@ -1018,6 +1895,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "record_device_clock",
+    "args": "conf uuid, device uuid, device_time timestamp with time zone",
+    "result": "bigint",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -1056,6 +1963,36 @@
    },
    {
     "schema": "private",
+    "name": "reject_append_only_change",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "reject_archived_chair_credential",
     "args": "",
     "result": "trigger",
@@ -1066,6 +2003,66 @@
     "config": "search_path=\"\"",
     "lang": "plpgsql",
     "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "reject_published_session_delete",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "require_operational_committee",
+    "args": "conf uuid, cid uuid",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
     "usage": {
@@ -1125,6 +2122,36 @@
     "volatility": "immutable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "run_held",
+    "args": "h held_action, offset_ms bigint",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -1206,6 +2233,396 @@
    },
    {
     "schema": "private",
+    "name": "session_iso",
+    "args": "ts timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ms",
+    "args": "ts timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_next_boundary",
+    "args": "windows jsonb, at timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_override_expiry",
+    "args": "versions jsonb, set_at timestamp with time zone, day_close jsonb, tz text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_overrides_for",
+    "args": "conf uuid, committee uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_resolve",
+    "args": "versions jsonb, overrides jsonb, day_close jsonb, committee text, at timestamp with time zone, tz text",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedule_errors",
+    "args": "sessions jsonb, lead_minutes integer, grace_minutes integer",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedules",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ts",
+    "args": "value text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_version_at",
+    "args": "versions jsonb, at timestamp with time zone",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_versions_for",
+    "args": "conf uuid, committee uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_windows",
+    "args": "sessions jsonb, lead_minutes integer, grace_minutes integer, day_close jsonb, tz text",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "set_mutation_context",
+    "args": "conf uuid, mutation uuid, client_time timestamp with time zone, command jsonb",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "set_print_copies",
     "args": "",
     "result": "trigger",
@@ -1245,6 +2662,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "time_confidence",
+    "args": "conf uuid, device uuid, client_time timestamp with time zone, received timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -1329,6 +2776,36 @@
     "name": "veto_delegates",
     "args": "rid uuid",
     "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "waits_for_held",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
+    "result": "boolean",
     "kind": "f",
     "security": "invoker",
     "owner": "postgres",
@@ -1656,6 +3133,36 @@
    },
    {
     "schema": "public",
+    "name": "record_device_clock",
+    "args": "conf uuid, device uuid, device_time timestamp with time zone",
+    "result": "bigint",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": true,
+     "authenticator": true,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "public",
     "name": "redeem_access_code",
     "args": "conf uuid, code text",
     "result": "jsonb",
@@ -1972,6 +3479,32 @@
    },
    {
     "schema": "private",
+    "name": "conference_settings",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "private",
     "name": "mutation_receipts",
     "kind": "r",
     "owner": "postgres",
@@ -2218,6 +3751,62 @@
    },
    {
     "schema": "public",
+    "name": "ballot_eligibility",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "clock_confirmation",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "committee_staff",
     "kind": "r",
     "owner": "postgres",
@@ -2247,6 +3836,34 @@
    {
     "schema": "public",
     "name": "committees",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "conference_day_close",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -2414,6 +4031,34 @@
    },
    {
     "schema": "public",
+    "name": "device_clock_sync",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "document_comments",
     "kind": "r",
     "owner": "postgres",
@@ -2499,6 +4144,62 @@
    {
     "schema": "public",
     "name": "documents",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "held_action",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "label_correction",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -2778,7 +4479,119 @@
    },
    {
     "schema": "public",
+    "name": "record_label",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "resolution_links",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "roll_call",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "roll_call_row",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "schedule_version",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -2835,6 +4648,62 @@
    {
     "schema": "public",
     "name": "scoring_definitions",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "session_override",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "session_override_end",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -2975,34 +4844,6 @@
    {
     "schema": "public",
     "name": "submission_links",
-    "kind": "r",
-    "owner": "postgres",
-    "rls": true,
-    "forceRls": false,
-    "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
-    "privs": {
-     "anon": [],
-     "authenticated": [
-      "SELECT"
-     ],
-     "service_role": [],
-     "authenticator": [],
-     "postgres": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER",
-      "MAINTAIN"
-     ]
-    }
-   },
-   {
-    "schema": "public",
-    "name": "timers",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -3196,6 +5037,24 @@
     "check": ""
    },
    {
+    "table": "public.ballot_eligibility",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.clock_confirmation",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.committee_staff",
     "name": "read_authorized",
     "cmd": "SELECT",
@@ -3211,6 +5070,15 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "private.has_access(conference_id, id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.conference_day_close",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
     "check": ""
    },
    {
@@ -3259,6 +5127,15 @@
     "check": ""
    },
    {
+    "table": "public.device_clock_sync",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.document_comments",
     "name": "read_authorized",
     "cmd": "SELECT",
@@ -3292,6 +5169,24 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) OR ((status = ANY (ARRAY['Submitted'::document_state, 'Review'::document_state, 'Approved'::document_state])) AND private.has_access(conference_id, committee_id, ARRAY['approval'::conference_role])) OR ((status = ANY (ARRAY['Approved'::document_state, 'Printed'::document_state, 'In Debate'::document_state, 'Closed'::document_state])) AND private.has_access(conference_id, committee_id, ARRAY['logistics'::conference_role])))",
+    "check": ""
+   },
+   {
+    "table": "public.held_action",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.label_correction",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
     "check": ""
    },
    {
@@ -3367,12 +5262,48 @@
     "check": ""
    },
    {
+    "table": "public.record_label",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.resolution_links",
     "name": "read_authorized",
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
     "using": "(EXISTS ( SELECT 1\n   FROM documents d\n  WHERE (d.id = resolution_links.document_id)))",
+    "check": ""
+   },
+   {
+    "table": "public.roll_call",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.roll_call_row",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.schedule_version",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -3391,6 +5322,24 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) OR ((committee_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM user_access a\n  WHERE ((a.conference_id = scoring_definitions.conference_id) AND (a.role = 'chair'::conference_role))))))",
+    "check": ""
+   },
+   {
+    "table": "public.session_override",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.session_override_end",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -3436,15 +5385,6 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
-    "check": ""
-   },
-   {
-    "table": "public.timers",
-    "name": "read_authorized",
-    "cmd": "SELECT",
-    "roles": "authenticated",
-    "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -3695,6 +5635,36 @@
    },
    {
     "schema": "private",
+    "name": "action_time",
+    "args": "conf uuid",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "advance_photo_epoch",
     "args": "conf uuid, committees uuid[], schools uuid[]",
     "result": "void",
@@ -3905,6 +5875,126 @@
    },
    {
     "schema": "private",
+    "name": "command_class",
+    "args": "kind text",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "command_device_time",
+    "args": "command jsonb, fallback timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "commit_roll_call",
+    "args": "conf uuid, cid uuid, actor uuid, command jsonb",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "committee_session_at",
+    "args": "conf uuid, committee uuid, at timestamp with time zone",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "committees_for_schools",
     "args": "schools uuid[]",
     "result": "uuid[]",
@@ -3927,6 +6017,66 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "conference_time_zone",
+    "args": "conf uuid",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -4025,6 +6175,96 @@
    },
    {
     "schema": "private",
+    "name": "eligible",
+    "args": "conf uuid, cid uuid, did uuid, command jsonb",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "end_overrides",
+    "args": "conf uuid, p_committee uuid, eff timestamp with time zone",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "final_label",
+    "args": "table_name text, rid uuid",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "guard_lifecycle_transition",
     "args": "",
     "result": "trigger",
@@ -4077,6 +6317,156 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "held_event_committee",
+    "args": "conf uuid, event_id text",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "held_replay",
+    "args": "conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "hold_gate",
+    "args": "conf uuid, cid uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "boolean",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "hold_settings",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "label_record",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -4235,11 +6625,311 @@
    },
    {
     "schema": "private",
+    "name": "next_effective_from",
+    "args": "conf uuid, target uuid",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "next_resolution_code",
     "args": "conf uuid, committee uuid",
     "result": "text",
     "kind": "f",
     "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "open_ballot",
+    "args": "conf uuid, cid uuid, rid uuid",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_automation_toggle",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_clock_confirm",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_close_day",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_held_bulk_approve",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_held_decide",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_hold_settings",
+    "args": "conf uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_label_correction",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_override_set",
+    "args": "conf uuid, actor uuid, new_id uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
     "owner": "postgres",
     "volatility": "volatile",
     "config": "search_path=\"\"",
@@ -4415,6 +7105,66 @@
    },
    {
     "schema": "private",
+    "name": "ops_schedule_snapshot",
+    "args": "conf uuid, cid uuid, slot_leads jsonb",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "ops_schedule_version",
+    "args": "conf uuid, actor uuid, command jsonb",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "ops_session_import",
     "args": "conf uuid, mutation uuid, command jsonb",
     "result": "uuid[]",
@@ -4484,6 +7234,36 @@
     "volatility": "volatile",
     "config": "search_path=\"\"",
     "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "payload_hash",
+    "args": "command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -4625,6 +7405,36 @@
    },
    {
     "schema": "private",
+    "name": "presence_at",
+    "args": "cid uuid, did uuid, at timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "print_copies",
     "args": "conf uuid, cid uuid",
     "result": "integer",
@@ -4647,6 +7457,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "record_device_clock",
+    "args": "conf uuid, device uuid, device_time timestamp with time zone",
+    "result": "bigint",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -4685,6 +7525,36 @@
    },
    {
     "schema": "private",
+    "name": "reject_append_only_change",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "reject_archived_chair_credential",
     "args": "",
     "result": "trigger",
@@ -4695,6 +7565,66 @@
     "config": "search_path=\"\"",
     "lang": "plpgsql",
     "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "reject_published_session_delete",
+    "args": "",
+    "result": "trigger",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": true,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "require_operational_committee",
+    "args": "conf uuid, cid uuid",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
     "usage": {
@@ -4754,6 +7684,36 @@
     "volatility": "immutable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "run_held",
+    "args": "h held_action, offset_ms bigint",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -4835,6 +7795,396 @@
    },
    {
     "schema": "private",
+    "name": "session_iso",
+    "args": "ts timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ms",
+    "args": "ts timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "immutable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_next_boundary",
+    "args": "windows jsonb, at timestamp with time zone",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_override_expiry",
+    "args": "versions jsonb, set_at timestamp with time zone, day_close jsonb, tz text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_overrides_for",
+    "args": "conf uuid, committee uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_resolve",
+    "args": "versions jsonb, overrides jsonb, day_close jsonb, committee text, at timestamp with time zone, tz text",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedule_errors",
+    "args": "sessions jsonb, lead_minutes integer, grace_minutes integer",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_schedules",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_ts",
+    "args": "value text",
+    "result": "timestamp with time zone",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_version_at",
+    "args": "versions jsonb, at timestamp with time zone",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_versions_for",
+    "args": "conf uuid, committee uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "session_windows",
+    "args": "sessions jsonb, lead_minutes integer, grace_minutes integer, day_close jsonb, tz text",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "set_mutation_context",
+    "args": "conf uuid, mutation uuid, client_time timestamp with time zone, command jsonb",
+    "result": "void",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "set_print_copies",
     "args": "",
     "result": "trigger",
@@ -4874,6 +8224,36 @@
     "volatility": "stable",
     "config": "search_path=\"\"",
     "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "time_confidence",
+    "args": "conf uuid, device uuid, client_time timestamp with time zone, received timestamp with time zone",
+    "result": "text",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "plpgsql",
     "trigger": false,
     "aclDefault": false,
     "aclRaw": "postgres=X/postgres",
@@ -4958,6 +8338,36 @@
     "name": "veto_delegates",
     "args": "rid uuid",
     "result": "uuid[]",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "waits_for_held",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp with time zone",
+    "result": "boolean",
     "kind": "f",
     "security": "invoker",
     "owner": "postgres",
@@ -5285,6 +8695,36 @@
    },
    {
     "schema": "public",
+    "name": "record_device_clock",
+    "args": "conf uuid, device uuid, device_time timestamp with time zone",
+    "result": "bigint",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "volatile",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": true,
+     "authenticated": true,
+     "service_role": true,
+     "authenticator": true,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "public",
     "name": "redeem_access_code",
     "args": "conf uuid, code text",
     "result": "jsonb",
@@ -5601,6 +9041,32 @@
    },
    {
     "schema": "private",
+    "name": "conference_settings",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "private",
     "name": "mutation_receipts",
     "kind": "r",
     "owner": "postgres",
@@ -5847,6 +9313,62 @@
    },
    {
     "schema": "public",
+    "name": "ballot_eligibility",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "clock_confirmation",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "committee_staff",
     "kind": "r",
     "owner": "postgres",
@@ -5876,6 +9398,34 @@
    {
     "schema": "public",
     "name": "committees",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "conference_day_close",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -6043,6 +9593,34 @@
    },
    {
     "schema": "public",
+    "name": "device_clock_sync",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "document_comments",
     "kind": "r",
     "owner": "postgres",
@@ -6128,6 +9706,62 @@
    {
     "schema": "public",
     "name": "documents",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "held_action",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "label_correction",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -6407,7 +10041,119 @@
    },
    {
     "schema": "public",
+    "name": "record_label",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
     "name": "resolution_links",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "roll_call",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "roll_call_row",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "schedule_version",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -6464,6 +10210,62 @@
    {
     "schema": "public",
     "name": "scoring_definitions",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "session_override",
+    "kind": "r",
+    "owner": "postgres",
+    "rls": true,
+    "forceRls": false,
+    "options": "",
+    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
+    "privs": {
+     "anon": [],
+     "authenticated": [
+      "SELECT"
+     ],
+     "service_role": [],
+     "authenticator": [],
+     "postgres": [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "MAINTAIN"
+     ]
+    }
+   },
+   {
+    "schema": "public",
+    "name": "session_override_end",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -6604,34 +10406,6 @@
    {
     "schema": "public",
     "name": "submission_links",
-    "kind": "r",
-    "owner": "postgres",
-    "rls": true,
-    "forceRls": false,
-    "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
-    "privs": {
-     "anon": [],
-     "authenticated": [
-      "SELECT"
-     ],
-     "service_role": [],
-     "authenticator": [],
-     "postgres": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER",
-      "MAINTAIN"
-     ]
-    }
-   },
-   {
-    "schema": "public",
-    "name": "timers",
     "kind": "r",
     "owner": "postgres",
     "rls": true,
@@ -6825,6 +10599,24 @@
     "check": ""
    },
    {
+    "table": "public.ballot_eligibility",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.clock_confirmation",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.committee_staff",
     "name": "read_authorized",
     "cmd": "SELECT",
@@ -6840,6 +10632,15 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "private.has_access(conference_id, id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.conference_day_close",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
     "check": ""
    },
    {
@@ -6888,6 +10689,15 @@
     "check": ""
    },
    {
+    "table": "public.device_clock_sync",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.document_comments",
     "name": "read_authorized",
     "cmd": "SELECT",
@@ -6921,6 +10731,24 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) OR ((status = ANY (ARRAY['Submitted'::document_state, 'Review'::document_state, 'Approved'::document_state])) AND private.has_access(conference_id, committee_id, ARRAY['approval'::conference_role])) OR ((status = ANY (ARRAY['Approved'::document_state, 'Printed'::document_state, 'In Debate'::document_state, 'Closed'::document_state])) AND private.has_access(conference_id, committee_id, ARRAY['logistics'::conference_role])))",
+    "check": ""
+   },
+   {
+    "table": "public.held_action",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.label_correction",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])",
     "check": ""
    },
    {
@@ -6996,12 +10824,48 @@
     "check": ""
    },
    {
+    "table": "public.record_label",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
     "table": "public.resolution_links",
     "name": "read_authorized",
     "cmd": "SELECT",
     "roles": "authenticated",
     "permissive": true,
     "using": "(EXISTS ( SELECT 1\n   FROM documents d\n  WHERE (d.id = resolution_links.document_id)))",
+    "check": ""
+   },
+   {
+    "table": "public.roll_call",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.roll_call_row",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.schedule_version",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -7020,6 +10884,24 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) OR ((committee_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM user_access a\n  WHERE ((a.conference_id = scoring_definitions.conference_id) AND (a.role = 'chair'::conference_role))))))",
+    "check": ""
+   },
+   {
+    "table": "public.session_override",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
+    "check": ""
+   },
+   {
+    "table": "public.session_override_end",
+    "name": "read_authorized",
+    "cmd": "SELECT",
+    "roles": "authenticated",
+    "permissive": true,
+    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'approval'::conference_role, 'logistics'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -7065,15 +10947,6 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
-    "check": ""
-   },
-   {
-    "table": "public.timers",
-    "name": "read_authorized",
-    "cmd": "SELECT",
-    "roles": "authenticated",
-    "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {

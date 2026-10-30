@@ -17,7 +17,9 @@ import { checkAppUrl, checkFixtureConference, checkHealthEnvironment, checkUsers
 import { TOPIC_OF, buildScenario, parseStaffProfile, summarize, type Action, type RealtimeModel, type SimUser, type StaffRole, type Topic } from "./rehearsal/scenario";
 import { ActualClient, commandCommittee, deliverChange, boundedFetch, ownsWorkItem, reviewableDocument } from "./rehearsal/actual-client";
 import { SUBMISSION_TOKEN } from "../lib/submissions/rules";
-import {activeLane,laneEntries,nextSpeaker} from '../lib/procedure/view';
+import {activeLane,floorSpeech,laneEntries,nextSpeaker} from '../lib/procedure/view';
+import { isLive, rollCallAt } from '../lib/sessions/presence';
+import type { AttendanceStatus } from '../lib/domain';
 import { createSeed } from "../lib/seed";
 import type { Transport } from "../lib/sync/repository";
 import { evaluate, report, type Sample } from "./rehearsal/metrics";
@@ -242,9 +244,10 @@ async function simulate(user: SimUser, t0: number) {
     catch { samples.push({ action: `${action} (local refusal)`, role: user.role, ms: 0, outcome: 'error' }); }
   };
   const d = () => device.data;
-  const sid = committee.session;
-  const present = () => (d()?.attendance ?? []).filter((a) => a.sessionId === sid && a.status !== "Absent").map((a) => a.delegateId);
-  const active = () => d()?.speeches?.find((s) => s.sessionId === sid && s.state !== "finished");
+  // Live state is keyed by committee and presence comes from the live roll call (docs/SESSION_MODEL.md sections 6 and 8).
+  const cid = committee.id;
+  const present = () => { const call = d() ? rollCallAt(d()!, cid) : undefined; return (call?.rows ?? []).filter((r) => r.status !== "Absent").map((r) => r.delegateId); };
+  const active = () => d() ? floorSpeech(d()!, cid) : undefined;
   const owns = (id:string) => ownsWorkItem(id,user,[...devices.keys()]);
   const myDelegates = () => (d()?.delegates.filter(x=>x.committeeId===committee.id&&ownsWorkItem(x.id,user,[...devices.keys()].filter(p=>p.committee===user.committee)))??[]);
   for (const step of user.steps) {
@@ -260,37 +263,42 @@ async function simulate(user: SimUser, t0: number) {
       case "read": if (!step.periodic) device.client.focus(); break;
       case "refocus": device.client.focus(); break;
       case "health": await timed("health", async () => { const r = await appFetch(`${base}/api/health`); if (r.status >= 500) throw Error(`HTTP ${r.status}`); }); break;
-      // Legacy floors share ONE committee row, so only floor 0 may set its current session there.
-      case "currentSession": if (legacy && user.committee > 0) break; await send("currentSession", { type: "currentSession", committeeId: committee.id, sessionId: sid }, step.retry); break;
-      case "attendance": { const delegate = myDelegates()[cursor % Math.max(1, myDelegates().length)]; if (delegate) await send("attendance", { type: "attendance", delegateId: delegate.id, sessionId: sid, status: cursor % 3 ? "Present" : "Present & Voting" }, step.retry); break; }
+      case "draft": break; // A roll call draft lives on the device until it is committed.
+      case "rollCall": {
+        // The whole roll call in one write: every delegate of the committee, nearly all present.
+        const rows = (data?.delegates.filter((x) => x.committeeId === cid) ?? []).map((x, i) => ({ delegateId: x.id, status: (i % 11 === 10 ? "Absent" : (i + cursor) % 3 ? "Present" : "Present & Voting") as AttendanceStatus }));
+        const at = new Date().toISOString();
+        if (rows.length) await send("rollCall", { type: "rollCallCommit", committeeId: cid, rollCallId: crypto.randomUUID(), revision: 1, observedAt: at, committedAt: at, rows }, step.retry);
+        break;
+      }
       case "queueAdd": {
-        const lane = data ? activeLane(data,sid) : "open";
-        const queued = new Set(data?.queue.filter((q) => q.sessionId === sid && (q.lane ?? "open") === lane).map((q) => q.delegateId));
+        const lane = data ? activeLane(data,cid) : "open";
+        const queued = new Set(data?.queue.filter((q) => isLive(q, cid) && (q.lane ?? "open") === lane).map((q) => q.delegateId));
         const delegate = myDelegates().map(d=>d.id).find((id) => here.includes(id)&&!queued.has(id));
-        if (delegate) await send("queueAdd", { type: "queueAdd", sessionId: sid, delegateId: delegate, lane }, step.retry);
+        if (delegate) await send("queueAdd", { type: "queueAdd", committeeId: cid, delegateId: delegate, lane }, step.retry);
         break;
       }
       case "queueOrder": {
-        const lane=data?activeLane(data,sid):"open";
-        const ids = data?laneEntries(data,sid,lane).map(q=>q.id):[];
-        if (ids.length > 1) await send("queueOrder", { type: "queueOrder", sessionId: sid, lane, ids: [...ids.slice(1), ids[0]] }, step.retry);
+        const lane=data?activeLane(data,cid):"open";
+        const ids = data?laneEntries(data,cid,lane).map(q=>q.id):[];
+        if (ids.length > 1) await send("queueOrder", { type: "queueOrder", committeeId: cid, lane, ids: [...ids.slice(1), ids[0]] }, step.retry);
         break;
       }
       case "speechStart": {
         if (active() || !anyPresent) break;
-        const entry = data ? nextSpeaker(data,sid) : undefined;
+        const entry = data ? nextSpeaker(data,cid) : undefined;
         if(entry&&!here.includes(entry.delegateId))break;
-        const lane=data?activeLane(data,sid):"open";
+        const lane=data?activeLane(data,cid):"open";
         const classification = lane === "for" ? "For" : lane === "against" ? "Against" : "Other";
-        await send("speechStart", { type: "speechStart", sessionId: sid, delegateId: entry?.delegateId ?? anyPresent, resolutionId: null, classification, ...(entry ? { entryId: entry.id } : {}) }, step.retry);
+        await send("speechStart", { type: "speechStart", committeeId: cid, delegateId: entry?.delegateId ?? anyPresent, resolutionId: null, classification, ...(entry ? { entryId: entry.id } : {}) }, step.retry);
         break;
       }
-      case "poiAllowance": { const s = active(); if (s) await send("poiAllowance", { type: "poiAllowance", sessionId: sid, speechId: s.id, limit: Math.max(2, s.poiCount + 1) }, step.retry); break; }
-      case "poiAdd": { const s = active(); const asker = here.find((id) => id !== s?.delegateId); if (s && asker) await send("poiAdd", { type: "poiAdd", sessionId: sid, speechId: s.id, delegateId: asker }, step.retry); break; }
-      case "poiRecognize": { const s = active(); const poi = (data?.poiQueue ?? []).filter((p) => p.speechId === s?.id).sort((a, b) => a.position - b.position)[0]; if (s?.state === "pois" && poi) await send("poiRecognize", { type: "poiRecognize", sessionId: sid, speechId: s.id, entryId: poi.id }, step.retry); break; }
-      case "poiScore": { const s = active(); const poi = (data?.poiQueue ?? []).find(p => p.speechId === s?.id && !!p.recognizedAt); if (s && poi) await send('poiScore', { type: 'poiScore', sessionId: sid, speechId: s.id, entryId: poi.id, points: 1 + (cursor % 2) }, step.retry); break; }
-      case "speechScore": { const s = active(); if (s && !data?.events.some((e) => e.speechId === s.id && e.categoryId === "speech")) await send("speechScore", { type: "speechScore", sessionId: sid, speechId: s.id, points: 1 + (cursor % 3) }, step.retry); break; }
-      case "speechFinish": { const s = active(); if (s) await send("speechFinish", { type: "speechFinish", sessionId: sid, speechId: s.id }, step.retry); break; }
+      case "poiAllowance": { const s = active(); if (s) await send("poiAllowance", { type: "poiAllowance", committeeId: cid, speechId: s.id, limit: Math.max(2, s.poiCount + 1) }, step.retry); break; }
+      case "poiAdd": { const s = active(); const asker = here.find((id) => id !== s?.delegateId); if (s && asker) await send("poiAdd", { type: "poiAdd", committeeId: cid, speechId: s.id, delegateId: asker }, step.retry); break; }
+      case "poiRecognize": { const s = active(); const poi = (data?.poiQueue ?? []).filter((p) => p.speechId === s?.id).sort((a, b) => a.position - b.position)[0]; if (s?.state === "pois" && poi) await send("poiRecognize", { type: "poiRecognize", committeeId: cid, speechId: s.id, entryId: poi.id }, step.retry); break; }
+      case "poiScore": { const s = active(); const poi = (data?.poiQueue ?? []).find(p => p.speechId === s?.id && !!p.recognizedAt); if (s && poi) await send('poiScore', { type: 'poiScore', committeeId: cid, speechId: s.id, entryId: poi.id, points: 1 + (cursor % 2) }, step.retry); break; }
+      case "speechScore": { const s = active(); if (s && !data?.events.some((e) => e.speechId === s.id && e.categoryId === "speech")) await send("speechScore", { type: "speechScore", committeeId: cid, speechId: s.id, points: 1 + (cursor % 3) }, step.retry); break; }
+      case "speechFinish": { const s = active(); if (s) await send("speechFinish", { type: "speechFinish", committeeId: cid, speechId: s.id }, step.retry); break; }
       case "timer": break; // Shipping timer is device-local: no mutation or notification.
       case "photoAck": { const slot = data?.photoSlots?.find((s) => s.enabled); if (slot) await send("photoAck", { type: "photoAck", committeeId: committee.id, slotId: slot.id, stage: "warning", revision: slot.revision }, step.retry); break; }
       case "sendToApproval": { const doc = data?.documents.find((x) => x.committeeId === committee.id && x.status === "Draft"); if (doc) await send("sendToApproval", { type: "document", id: doc.id, status: "Submitted" }, step.retry); break; }

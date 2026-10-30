@@ -1,18 +1,31 @@
 import {batchFingerprint} from '../batch/commands';
 import {isBatchCommand} from '../batch/types';
 import {operationsFingerprint} from "../operations/fingerprint";
-import {isOperationsCommand} from "../operations/commands";
+import {isOperationsCommand,serverOnlyCommandTypes} from "../operations/commands";
 import type { ConferenceData, Role } from "../domain";
 import { applyCommand, normalizeCommand, type Command, type ConferenceRepository } from "../commands";
 import { DurableStore, type Checkpoint, type Mutation } from "./store";
+import { committeeOfCommand, displayedLabel } from "../sessions/display";
+import { isLive, withRollCallReference } from "../sessions/presence";
 import { BLOCKED_REFRESH_GAP_MS, MAX_BATCH, MIN_REFRESH_GAP_MS, classifyError, errorCode, pollDelay, retryDelay, type ErrorKind } from "./backoff";
 export interface Transport {
   actorId: string;
   read(): Promise<ConferenceData>;
   send(mutation: Mutation): Promise<void>;
+  /** Report this device's clock to the server (offset = device time - server time). Best effort; never blocks sending. */
+  syncClock?(deviceId: string): Promise<void>;
   subscribe?(refresh: () => void, state: (connected: boolean) => void): () => void;
 }
 export class ConflictError extends Error {}
+/** At most one clock report per page session per minute (the server also limits one stored row per device per minute). */
+const CLOCK_SYNC_GAP_MS = 60_000;
+/** How long sending waits for a clock report before it carries on without it. */
+export const CLOCK_SYNC_DEADLINE_MS = 3_000;
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error("Clock report timed out")), ms); });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
 export interface Health {
   mode: "local" | "supabase"; state: "saved" | "syncing" | "waiting" | "conflict" | "error";
   pending: number; conflicts: number; realtime: boolean; latency: number | null;
@@ -26,23 +39,23 @@ export interface Health {
 }
 export function fingerprint(data: ConferenceData, c: Command): string | null {
   if(isBatchCommand(c))return batchFingerprint(data,c);
+  // Live state is keyed by committee (an older saved action names a session, which identifies the committee).
+  const cid=committeeOfCommand(data,c)??"";
   switch (c.type) {
     case "staffContact": return String(data.staff.find(s=>s.id===c.id)?.contactRevision ?? 1);
-    case "currentSession": return String(data.committees.find(x=>x.id===c.committeeId)?.sessionRevision??0);
-    case "debateMode": return String(data.debateStates?.find(x=>x.sessionId===c.sessionId)?.revision??0);
-    case "queueOrder": return data.queue.filter(q=>q.sessionId===c.sessionId&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
+    case "debateMode": return String(data.debateStates?.find(x=>isLive(x,cid))?.revision??0);
+    case "queueOrder": return data.queue.filter(q=>isLive(q,cid)&&(q.lane??"open")===c.lane).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
     case "poiOrder": return (data.poiQueue??[]).filter(q=>q.speechId===c.speechId).sort((a,b)=>a.position-b.position).map(q=>q.id).join(",");
-    case "speechStart": return data.speeches?.find(s=>s.sessionId===c.sessionId&&s.state!=="finished")?.id??"empty";
+    case "speechStart": return data.speeches?.find(s=>isLive(s,cid)&&s.state!=="finished")?.id??"empty";
     case "speechYield": case "speechFinish": case "poiAllowance": case "poiRecognize": case "poiScore": case "poiRemove": return String(data.speeches?.find(s=>s.id===c.speechId)?.revision??0);
     case "voteMode": return String(data.documents.find(r=>r.id===c.resolutionId)?.revision??0);
-    case "attendance": return String(data.attendance.find(a => a.delegateId === c.delegateId && a.sessionId === c.sessionId)?.revision ?? 0);
-    case "queue": return c.advance ? data.queue.filter(q => q.sessionId === c.sessionId).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
+    case "queue": return c.advance ? data.queue.filter(q => isLive(q,cid)).sort((a,b) => a.position-b.position)[0]?.id ?? "empty" : null;
     case "event": return String(data.events.find(e=>e.id===c.id)?.revision ?? 0);
     // A clear-majority close is bound to the revision the Chair opened it on, not the one current at confirm time.
     case "document": case "version":
       if(c.type==="document"&&c.method==="observed"&&c.status==="Closed"&&c.outcome!=="Withdrawn")return String(c.ballotRevision??"missing");
       return String(data.documents.find(d=>d.id===c.id)?.revision ?? 0);
-    case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
+    case "vote": return String(data.votes.find(v=>v.delegateId===c.delegateId && !v.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0);
     default: return isOperationsCommand(c)?operationsFingerprint(data,c):null;
   }
 }
@@ -70,6 +83,7 @@ export class DurableRepository implements ConferenceRepository {
   // Coalescing only applies after THIS page session has completed a sync: the first read after opening is never skipped.
   private hasSynced = false;
   private lastReadAt = 0;
+  private lastClockSync = 0;
   private deferTimer?: ReturnType<typeof setTimeout>;
   private onlineTimer?: ReturnType<typeof setTimeout>;
   health: Health;
@@ -113,9 +127,17 @@ export class DurableRepository implements ConferenceRepository {
     if (!this.data) throw Error("Workspace is still loading.");
     // The single queue/apply boundary: normalise BEFORE the fingerprint, the local apply and the persisted outbox entry,
     // so the queued JSON, its replay and the server's idempotent retry are identical (a title-less create never reaches SQL).
-    const command = normalizeCommand(raw);
+    const stamped = new Date().toISOString();
+    const command = withRollCallReference(this.data, committeeOfCommand(this.data, raw), normalizeCommand(raw), stamped);
+    if(!this.transport && serverOnlyCommandTypes.has(command.type)) throw Error("Schedule and review changes are made on the live conference database.");
     // A transaction commits before any optimistic state or successful-save message is visible.
     const mutation: Mutation={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:this.transport?.actorId ?? `${role}-demo`,role,command,expected:fingerprint(this.data,command),state:"pending"};
+    // Hosted only: the device protocol block. The sequence is allocated before the transaction, so a refused save leaves a gap, never a repeat.
+    if(this.transport) {
+      Object.assign(mutation,await this.store.nextDeviceSeq());
+      const shown=displayedLabel(this.data,committeeOfCommand(this.data,command),mutation.createdAt);
+      if(shown!==undefined) mutation.displayedLabel=shown;
+    }
     this.publish(await this.store.update(this.key, old=>{
       if(!old) throw Error("Workspace unavailable. Reload before continuing.");
       const current=project(old);
@@ -188,6 +210,13 @@ export class DurableRepository implements ConferenceRepository {
       await this.reload();
       if(passive && this.refreshWait()>0) { this.deferRefresh(); return; }
       this.health={...this.health,state:"syncing",message:"Syncing…"}; this.emit();
+      // Tell the server this device's clock before anything is sent, so what was saved offline can be trusted or held on evidence.
+      if(this.transport!.syncClock && Date.now()-this.lastClockSync>CLOCK_SYNC_GAP_MS) {
+        this.lastClockSync=Date.now();
+        const deviceId=await this.store.deviceId().catch(()=>undefined);
+        // Best effort with a deadline: a report that never answers must not hold the sync lock and stop the outbox.
+        if(deviceId) await withDeadline(this.transport!.syncClock(deviceId),CLOCK_SYNC_DEADLINE_MS).catch(()=>undefined);
+      }
       // Stop at a conflict, preserving subsequent intent until an operator resolves it.
       let settled=false;
       for(;;) {

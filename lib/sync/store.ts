@@ -4,6 +4,12 @@ import type { Command } from "../commands";
 export interface Mutation {
   id: string; createdAt: string; actorId: string; role: Role; command: Command;
   expected: string | null; state: "pending" | "conflict"; message?: string;
+  /**
+   * Device protocol (docs/SESSION_MODEL.md sections 4 and 5), assigned when the action is saved: a stable id for this browser profile,
+   * a number that only grows on this device (it orders actions without trusting the clock), and the session this device was
+   * displaying (null = "no session"; absent = unknown). Sent with the action as command._device. Absent on actions saved by older builds.
+   */
+  deviceId?: string; deviceSeq?: number; displayedLabel?: string | null;
 }
 export interface Checkpoint { key: string; base: ConferenceData; pending: Mutation[]; savedAt: string; }
 interface Database extends DBSchema { workspaces: { key: string; value: Checkpoint }; preferences: { key: string; value: Record<string,string> }; }
@@ -29,6 +35,25 @@ export class DurableStore {
       await tx.done.catch(() => undefined);
       throw error;
     }
+  }
+  /** This browser profile's device id and the next sequence number, allocated atomically across tabs. */
+  async nextDeviceSeq(): Promise<{ deviceId: string; deviceSeq: number }> {
+    const tx = (await this.open()).transaction("preferences", "readwrite");
+    const current = (await tx.store.get("device")) ?? {};
+    const deviceId = current.deviceId || crypto.randomUUID();
+    const deviceSeq = (Number(current.deviceSeq) || 0) + 1;
+    await tx.store.put({ ...current, deviceId, deviceSeq: String(deviceSeq) }, "device");
+    await tx.done;
+    return { deviceId, deviceSeq };
+  }
+  /** The device id alone (created if this profile has none), without consuming a sequence number. */
+  async deviceId(): Promise<string> {
+    const tx = (await this.open()).transaction("preferences", "readwrite");
+    const current = (await tx.store.get("device")) ?? {};
+    const deviceId = current.deviceId || crypto.randomUUID();
+    if (!current.deviceId) await tx.store.put({ ...current, deviceId }, "device");
+    await tx.done;
+    return deviceId;
   }
   async readPreferences(key: string) { return (await this.open()).get("preferences", key); }
   async savePreferences(key: string, values: Record<string,string>) {

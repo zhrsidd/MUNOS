@@ -12,7 +12,7 @@ import {MAX_BATCH,retryDelay} from '../lib/sync/backoff';
 // After a SUCCESSFUL flush the outbox is now re-checked. Failures follow the existing backoff path, never an immediate loop.
 const pause=()=>new Promise<void>(resolve=>setImmediate(resolve));
 async function until(check:()=>boolean){for(let n=0;n<500;n++){if(check())return;await pause();}assert.ok(check(),'repository did not settle');}
-const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
+const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
 const command=()=>mutation().command;
 const OVERLOAD=()=>Object.assign(Error('canceling statement due to statement timeout'),{code:'57014'});
 

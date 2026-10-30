@@ -32,22 +32,25 @@ test('stale core, procedure and operations mutations use PT409 and make no write
    assert.equal((await query('select mutation_id from public.operational_changes where mutation_id=$1',[failedId])).length,0,'no change notification for rejected write');
    await as(actor);
   });
-  const attendance:Command={type:'attendance',sessionId:ids.session,delegateId:ids.france,status:'Present & Voting'};
-  const oldAttendance=fingerprint(await snapshot(),attendance);await apply(attendance);await stale('attendance revision',attendance,oldAttendance);
-  const queue:Command={type:'queue',sessionId:ids.session,advance:true};
+  // Committee-level debate state replaces per-session attendance as the plain revision case (attendance is taken with roll calls now).
+  const debate:Command={type:'debateMode',committeeId:ids.ga1,mode:'closed',phase:'for'};
+  const oldDebate=fingerprint(await snapshot(),debate);await apply(debate);await stale('debate state revision',debate,oldDebate);
+  await apply({type:'debateMode',committeeId:ids.ga1,mode:'open',phase:'for'});
+  const queue:Command={type:'queue',committeeId:ids.ga1,advance:true};
   const oldQueue=fingerprint(await snapshot(),queue);await apply(queue);await stale('legacy queue head',queue,oldQueue);
-  await apply({type:'queueAdd',sessionId:ids.session,delegateId:ids.france,lane:'against'});
-  const order:Command={type:'queueOrder',sessionId:ids.session,lane:'against',ids:(await snapshot()).queue.filter(q=>q.lane==='against').map(q=>q.id)};
+  await apply({type:'queueAdd',committeeId:ids.ga1,delegateId:ids.france,lane:'against'});
+  const order:Command={type:'queueOrder',committeeId:ids.ga1,lane:'against',ids:(await snapshot()).queue.filter(q=>q.lane==='against').map(q=>q.id)};
   const oldOrder=fingerprint(await snapshot(),order);
-  await apply({type:'queueAdd',sessionId:ids.session,delegateId:ids.japan,lane:'against'});await stale('procedure queue order',order,oldOrder);
-  await apply({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
+  await apply({type:'queueAdd',committeeId:ids.ga1,delegateId:ids.japan,lane:'against'});await stale('procedure queue order',order,oldOrder);
+  await apply({type:'speechStart',committeeId:ids.ga1,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
   const speech=(await snapshot()).speeches!.find(s=>s.state!=='finished')!;
-  const allowance:Command={type:'poiAllowance',sessionId:ids.session,speechId:speech.id,limit:2};
+  const allowance:Command={type:'poiAllowance',committeeId:ids.ga1,speechId:speech.id,limit:2};
   const oldSpeech=fingerprint(await snapshot(),allowance);await apply(allowance);await stale('speech revision',allowance,oldSpeech);
-  const vote:Command={type:'vote',sessionId:ids.session,resolutionId:ids.resolution,delegateId:ids.france,choice:'For'};
+  await apply({type:'voteMode',committeeId:ids.ga1,resolutionId:ids.resolution,mode:'normal',voteType:'substantive'});
+  const vote:Command={type:'vote',committeeId:ids.ga1,resolutionId:ids.resolution,delegateId:ids.france,choice:'For'};
   const oldVote=fingerprint(await snapshot(),vote);await apply(vote);await stale('vote revision',vote,oldVote);
   const document:Command={type:'document',id:ids.resolution,status:'In Debate'};
-  const mode:Command={type:'voteMode',sessionId:ids.session,resolutionId:ids.resolution,mode:'divide',voteType:'substantive'};
+  const mode:Command={type:'voteMode',committeeId:ids.ga1,resolutionId:ids.resolution,mode:'divide',voteType:'substantive'};
   const oldDocument=fingerprint(await snapshot(),document);await apply(mode);await stale('document revision',document,oldDocument);
   const link:Command={type:'resolutionLink',documentId:ids.resolution,action:'access',access:'ok'};
   const oldLink=fingerprint(await snapshot(),link);await apply(link);await stale('operations revision',link,oldLink);
@@ -60,8 +63,8 @@ test('stale core, procedure and operations mutations use PT409 and make no write
 
 for(const code of ['PT409','40001'])test(`SupabaseTransport maps ${code} to retained durable conflict without retrying writes`,async()=>{
  const data=createSeed(),name='stale-'+crypto.randomUUID(),store=new DurableStore(name),calls:string[]=[];
- const first:Mutation={id:crypto.randomUUID(),actorId:actor,createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:'0',command:{type:'attendance',sessionId:'s1',delegateId:'d0',status:'Absent'}};
- const second:Mutation={...first,id:crypto.randomUUID(),expected:null,command:{type:'participation',sessionId:'s1',resolutionId:'r1',delegateId:'d1',categoryId:'speech',points:2}};
+ const first:Mutation={id:crypto.randomUUID(),actorId:actor,createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:'0',command:{type:'queue',committeeId:'ga1',advance:true}};
+ const second:Mutation={...first,id:crypto.randomUUID(),expected:null,command:{type:'participation',committeeId:'ga1',resolutionId:'r1',delegateId:'d1',categoryId:'speech',points:2}};
  const client={rpc:async(name:string,args?:{mutation?:string})=>{
   if(name.startsWith('apply_')){calls.push(args!.mutation!);return {data:null,error:{code,message:'Another chair changed attendance'}};}
   return {data:name==='conference_snapshot'||name==='conference_state_snapshot'?structuredClone(data):{},error:null};
@@ -82,7 +85,8 @@ for(const code of ['PT409','40001'])test(`SupabaseTransport maps ${code} to reta
   assert.deepEqual(saved.base.events,data.events,'no duplicate participation event');
   repo.dispose();await store.close();
   const reopened=new DurableStore(name);repo=new DurableRepository(name,()=>data,reopened,transport);
-  await repo.ready();await new Promise(r=>setTimeout(r,20));await repo.flush();
+  await repo.ready();await repo.flush();
+  for(let i=0;i<100&&repo.getHealth().conflicts!==1;i++){await new Promise(r=>setTimeout(r,50));await repo.flush();} // bounded wait, not a fixed pause
   assert.equal(repo.getHealth().conflicts,1);assert.equal(repo.getHealth().pending,2);assert.deepEqual(calls,[first.id]);
   repo.dispose();await reopened.close();
  }finally{repo.dispose();await store.close();}

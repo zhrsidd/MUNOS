@@ -23,7 +23,6 @@ test('real PostgreSQL: Main Submitter and Debated amendment points are configura
   const snap=async()=>(await query<{s:ConferenceData}>('select public.conference_snapshot($1) s',[ids.conference]))[0].s;
   const send=async(c:Command,role='chair')=>{const data=await snap();await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify(c),role,fingerprint(data,c),'2026-11-05T09:00:00Z']);};
   const credits=async(resolutionId:string)=>(await snap()).events.filter(e=>e.categoryId==='submitter'&&e.resolutionId===resolutionId).map(e=>e.points);
-  await send({type:'currentSession',committeeId:ids.ga1,sessionId:ids.session});
 
   // Validation: one whole number from 1 to 20, conference-wide or as a committee override.
   for(const values of [[],[0],[21],[4,6]])await assert.rejects(()=>send({type:'scoring',id:'submitter',values},'admin'),/one whole number from 1 to 20/,`submitter ${values}`);
@@ -41,17 +40,17 @@ test('real PostgreSQL: Main Submitter and Debated amendment points are configura
 
   // The automatic credit on the Main Submitter's first scored speech uses the committee value, once.
   for(let i=0;i<2;i++){
-   await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
+   await send({type:'speechStart',committeeId:ids.ga1,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
    const data=await snap(),s=data.speeches!.find(s=>s.state!=='finished')!;
    await send(speechScoreCommand(data,ids.ga1,s,2));
-   await send({type:'speechFinish',sessionId:ids.session,speechId:s.id});
+   await send({type:'speechFinish',committeeId:ids.ga1,speechId:s.id});
   }
   assert.deepEqual(await credits(ids.resolution),[9]);
 
   // A later change applies to new credits only; the stored credit keeps its points.
   await send({type:'scoring',id:'submitter',values:[6],committeeId:ids.ga1},'admin');
   assert.deepEqual(await credits(ids.resolution),[9]);
-  const manual=(points:number,categoryId='submitter',resolutionId=GA1_02,delegateId=JAPAN)=>send({type:'participation',delegateId,categoryId,points,sessionId:ids.session,resolutionId});
+  const manual=(points:number,categoryId='submitter',resolutionId=GA1_02,delegateId=JAPAN)=>send({type:'participation',delegateId,categoryId,points,committeeId:ids.ga1,resolutionId});
   await assert.rejects(()=>manual(9),/Invalid scoring value/,'a manual credit uses the current value');
   await manual(6);
   await assert.rejects(()=>manual(6),/already recorded/,'still once per resolution');
@@ -93,10 +92,9 @@ test('real PostgreSQL: a queued Main Submitter score is refused as a retained co
   const settle=()=>new Promise(r=>setTimeout(r,20));
   // Explicit sync attempts until the outbox reaches the expected state (an attempt already in flight is skipped).
   const syncUntil=async(done:()=>boolean)=>{for(let i=0;i<200&&!done();i++){await repo!.flush();if(!done())await settle();}assert.ok(done(),'outbox did not settle');};
-  await send({type:'currentSession',committeeId:ids.ga1,sessionId:ids.session});
   // An earlier credit at the old +5, recorded before the change.
-  await send({type:'participation',delegateId:JAPAN,categoryId:'submitter',points:5,sessionId:ids.session,resolutionId:GA1_02});
-  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
+  await send({type:'participation',delegateId:JAPAN,categoryId:'submitter',points:5,committeeId:ids.ga1,resolutionId:GA1_02});
+  await send({type:'speechStart',committeeId:ids.ga1,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
   const cached=await snap(),speech=cached.speeches!.find(s=>s.state!=='finished')!;
 
   // The device goes offline with that snapshot and scores the speech: it awards +5 locally and the action says so.
@@ -126,14 +124,14 @@ test('real PostgreSQL: a queued Main Submitter score is refused as a retained co
   // Replaying the original action (same id, command and fingerprint) is refused the same way and leaves no receipt.
   await assert.rejects(()=>call(queued.id,queued.command,queued.role,queued.expected),(e:unknown)=>{assert.equal((e as {code:string}).code,'PT409');assert.match((e as Error).message,/Main Submitter points changed/);return true;});
   // An action saved before the credit was configurable carries no value; it awarded +5, so it is refused too.
-  await assert.rejects(()=>send({type:'speechScore',sessionId:ids.session,speechId:speech.id,points:2}),/Main Submitter points changed/);
+  await assert.rejects(()=>send({type:'speechScore',committeeId:ids.ga1,speechId:speech.id,points:2}),/Main Submitter points changed/);
   await asOwner();
   assert.equal((await query('select id from private.mutation_receipts where id=$1',[queued.id])).length,0);
   await as(actor);
   // Client parity: the same rule refuses the queued action against the current conference.
   const current=await snap();
   assert.throws(()=>applyCommand(current,queued.command,'chair'),{message:SUBMITTER_POINTS_CHANGED});
-  assert.throws(()=>applyCommand(current,{type:'speechScore',sessionId:ids.session,speechId:speech.id,points:2},'chair'),{message:SUBMITTER_POINTS_CHANGED},'legacy action on the client');
+  assert.throws(()=>applyCommand(current,{type:'speechScore',committeeId:ids.ga1,speechId:speech.id,points:2},'chair'),{message:SUBMITTER_POINTS_CHANGED},'legacy action on the client');
 
   // Undoing the earlier +5 credit still works after the change, and keeps its points.
   const old=(await snap()).events.find(e=>e.categoryId==='submitter'&&e.resolutionId===GA1_02)!;
@@ -149,11 +147,11 @@ test('real PostgreSQL: a queued Main Submitter score is refused as a retained co
   await repo.execute(retry,'chair');await syncUntil(()=>repo!.getPending().length===0);
   assert.equal(repo.getPending().length,0);
   assert.deepEqual(await credits(),[7]);
-  await send({type:'speechFinish',sessionId:ids.session,speechId:speech.id});
+  await send({type:'speechFinish',committeeId:ids.ga1,speechId:speech.id});
   // A later Main Submitter speech on the same resolution is due no credit, so a stale carried value is not consulted.
-  await send({type:'speechStart',sessionId:ids.session,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
+  await send({type:'speechStart',committeeId:ids.ga1,delegateId:ids.france,resolutionId:ids.resolution,classification:'Main Submitter'});
   const again=(await snap()).speeches!.find(s=>s.state!=='finished')!;
-  await send({type:'speechScore',sessionId:ids.session,speechId:again.id,points:1,submitterPoints:5});
+  await send({type:'speechScore',committeeId:ids.ga1,speechId:again.id,points:1,submitterPoints:5});
   assert.deepEqual(await credits(),[7],'still exactly once per resolution');
  }finally{repo?.dispose();await store.close();await db.close();}
 });
@@ -161,15 +159,15 @@ test('real PostgreSQL: a queued Main Submitter score is refused as a retained co
 test('client: a Main Submitter score carries its credit and is refused if the setting changed',()=>{
  const run=(d:ConferenceData,c:Command,role:'chair'|'admin'='chair')=>applyCommand(d,c,role,{id:crypto.randomUUID(),createdAt:'2026-11-05T09:00:00Z',actorId:'chair-1'});
  let d=createSeed();d.scoring=[];d.events=[];
- d=run(d,{type:'speechStart',sessionId:'s1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter'});
+ d=run(d,{type:'speechStart',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',classification:'Main Submitter'});
  const s=d.speeches!.at(-1)!;
- assert.deepEqual(speechScoreCommand(d,'ga1',s,2),{type:'speechScore',sessionId:'s1',speechId:s.id,points:2,submitterPoints:5});
+ assert.deepEqual(speechScoreCommand(d,'ga1',s,2),{type:'speechScore',committeeId:'ga1',speechId:s.id,points:2,submitterPoints:5});
  // Legacy actions (no value) awarded +5: accepted while the credit is +5.
- assert.deepEqual(run(d,{type:'speechScore',sessionId:'s1',speechId:s.id,points:2}).events.filter(e=>e.categoryId==='submitter').map(e=>e.points),[5]);
+ assert.deepEqual(run(d,{type:'speechScore',committeeId:'ga1',speechId:s.id,points:2}).events.filter(e=>e.categoryId==='submitter').map(e=>e.points),[5]);
  const changed=run(d,{type:'scoring',id:'submitter',values:[7],committeeId:'ga1'},'admin');
- for(const c of [speechScoreCommand(d,'ga1',s,2),{type:'speechScore',sessionId:'s1',speechId:s.id,points:2} as Command])assert.throws(()=>run(changed,c),{message:SUBMITTER_POINTS_CHANGED});
+ for(const c of [speechScoreCommand(d,'ga1',s,2),{type:'speechScore',committeeId:'ga1',speechId:s.id,points:2} as Command])assert.throws(()=>run(changed,c),{message:SUBMITTER_POINTS_CHANGED});
  assert.deepEqual(run(changed,speechScoreCommand(changed,'ga1',s,2)).events.filter(e=>e.categoryId==='submitter').map(e=>e.points),[7]);
  // Other speeches carry no credit.
- const other=run(run(changed,{type:'speechFinish',sessionId:'s1',speechId:s.id}),{type:'speechStart',sessionId:'s1',delegateId:'d1',resolutionId:'r1',classification:'For'});
+ const other=run(run(changed,{type:'speechFinish',committeeId:'ga1',speechId:s.id}),{type:'speechStart',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',classification:'For'});
  assert.equal('submitterPoints' in speechScoreCommand(other,'ga1',other.speeches!.at(-1)!,2),false);
 });

@@ -200,7 +200,7 @@ const seed = () => { const d = createSeed(); d.committees.find(c => c.id === "ga
 test("the Chair's New resolution form asks only for the Main Submitter and keeps the identity preview line", async t => {
   const data = seed();
   const first = data.delegates.find(d => d.committeeId === "ga1")!;
-  const html = await renderWithProvider(t, data, "chair", null, createElement(NewResolutionForm, { committeeId: "ga1", sessionId: "s1", onDone() {} }));
+  const html = await renderWithProvider(t, data, "chair", null, createElement(NewResolutionForm, { committeeId: "ga1", onDone() {} }));
   assert.doesNotMatch(html, /title/i, "no title input or label");
   assert.equal((html.match(/<input/g) ?? []).length, 0, "no free-text field at all");
   assert.match(html, /Main submitter/);
@@ -210,7 +210,7 @@ test("the Chair's New resolution form asks only for the Main Submitter and keeps
 
 test("a Chair draft created without any title is stored with the compatibility title, a draft text to match, and the next code", () => {
   const before = seed();
-  const command = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const command = { type: "newDocument" as const, committeeId: "ga1", submitterId: "d1" };
   // The type requires a title (see the contract test below); this is what an untyped JS caller or an old path could pass.
   const after = applyCommand(before, command as unknown as Command, "chair", { id: "m1", actorId: "chair-demo" } as Mutation);
   const created = after.documents.find(d => !before.documents.some(b => b.id === d.id))!;
@@ -234,14 +234,14 @@ test("a Chair draft created without any title is stored with the compatibility t
 test("contract: the typed newDocument command requires a title", () => {
   // tsc checks this file: if `title` ever becomes optional again the directive below is unused and typecheck fails.
   // @ts-expect-error `title` is required on newDocument (documents.title is not null; the SQL rejects a command without it)
-  const missing: Command = { type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
-  const typed: Command = { type: "newDocument", committeeId: "ga1", sessionId: "s1", title: compatResolutionTitle(), submitterId: "d1" };
+  const missing: Command = { type: "newDocument", committeeId: "ga1", submitterId: "d1" };
+  const typed: Command = { type: "newDocument", committeeId: "ga1", title: compatResolutionTitle(), submitterId: "d1" };
   assert.equal(normalizeCommand(typed), typed, "a typed command is already complete");
   assert.equal(normalizeCommand(missing).type, "newDocument");
 });
 
 test("normalizeCommand fills the compatibility title for a missing, null, blank or non-string title and nothing else", () => {
-  const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const base = { type: "newDocument" as const, committeeId: "ga1", submitterId: "d1" };
   const compat = { ...base, title: COMPAT_RESOLUTION_TITLE };
   for (const title of [undefined, null, "", "   ", "\n\t", 42, {}, ["x"], false]) {
     const input = (title === undefined ? base : { ...base, title }) as unknown as Command;
@@ -255,14 +255,14 @@ test("normalizeCommand fills the compatibility title for a missing, null, blank 
     assert.equal(normalizeCommand(legacy), legacy, `real title ${JSON.stringify(title)} is left untouched`);
   }
   // Every other command is returned as it came.
-  const other: Command = { type: "queue", sessionId: "s1", advance: true };
+  const other: Command = { type: "queue", committeeId:"ga1", advance: true };
   assert.equal(normalizeCommand(other), other);
   assert.equal(JSON.stringify(normalizeCommand(base as unknown as Command)), JSON.stringify(compat), "deterministic bytes: identical on every retry");
 });
 
 test("the create command has no title in its optimistic fingerprint, with or without one", () => {
   const data = seed();
-  const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const base = { type: "newDocument" as const, committeeId: "ga1", submitterId: "d1" };
   assert.equal(fingerprint(data, base as unknown as Command), null);
   assert.equal(fingerprint(data, { ...base, title: "Legacy" }), null, "a command queued with a title fingerprints exactly as before");
   assert.equal(fingerprint(data, { ...base, title: compatResolutionTitle() }), null);
@@ -285,9 +285,9 @@ test("outbox: a create command queued before the change (with a title) and one a
   let repo = new DurableRepository("ga1", createSeed, store, server);
   await repo.ready(); await tick();
   const initial = repo.getSnapshot()!.documents.length;
-  await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", title: "Queued before the change", submitterId: "d1" }, "chair");
-  await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", title: compatResolutionTitle(), submitterId: "d2" }, "chair");
-  await repo.execute({ type: "newDocument", committeeId: "ga1", sessionId: "s1", submitterId: "d3" } as unknown as Command, "chair");
+  await repo.execute({ type: "newDocument", committeeId: "ga1", title: "Queued before the change", submitterId: "d1" }, "chair");
+  await repo.execute({ type: "newDocument", committeeId: "ga1", title: compatResolutionTitle(), submitterId: "d2" }, "chair");
+  await repo.execute({ type: "newDocument", committeeId: "ga1", submitterId: "d3" } as unknown as Command, "chair");
   await tick();
   assert.equal(repo.getHealth().pending, 3);
   repo.dispose(); await store.close();
@@ -315,7 +315,7 @@ test("outbox: a title-less create is normalised BEFORE it is queued; the persist
   const repo = new DurableRepository("ga1", createSeed, store, server);
   await repo.ready(); await tick();
   try {
-  const base = { type: "newDocument" as const, committeeId: "ga1", sessionId: "s1", submitterId: "d1" };
+  const base = { type: "newDocument" as const, committeeId: "ga1", submitterId: "d1" };
   const variants = [base, { ...base, title: null }, { ...base, title: "" }, { ...base, title: "   " }, { ...base, title: 7 }];
   for (const v of variants) await repo.execute(v as unknown as Command, "chair");
   const real: Command = { ...base, title: "Queued before the change" };

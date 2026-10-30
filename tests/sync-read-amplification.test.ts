@@ -8,7 +8,7 @@ import {DurableStore,type Mutation} from '../lib/sync/store';
 const pause=()=>new Promise<void>(resolve=>setImmediate(resolve));
 async function until(check:()=>boolean){for(let n=0;n<300;n++){if(check())return;await pause();}assert.ok(check(),'repository did not settle');}
 function gate(){let release!:()=>void;const promise=new Promise<void>(resolve=>{release=resolve;});return {promise,release};}
-const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
+const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
 class CountingServer implements Transport {
  actorId='chair-test';data=createSeed();reads=0;sends=0;active=0;maximum=0;receipts=new Set<string>();
  readGate?:ReturnType<typeof gate>;failRead=false;loseResponse=false;

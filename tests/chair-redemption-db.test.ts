@@ -7,7 +7,7 @@ import {freshDatabase} from './helpers/database';
 const executive='77000000-0000-4000-8000-000000000001';
 const chair='77000000-0000-4000-8000-000000000002';
 const late='77000000-0000-4000-8000-000000000003';
-const whoSession='1e487edd-bcb7-4141-a27e-e6df9f5bdb5a',whoDelegate='ffe91baa-66a7-4ab8-ac21-474e9478d15c';
+const whoDelegate='ffe91baa-66a7-4ab8-ac21-474e9478d15c';
 type Redemption={status:string;role?:string;committeeId?:string|null;expiresAt?:string};
 
 test('Chair code redemption: formatting, expiry, repeat redemption, committee boundary and grant lapse',async()=>{
@@ -33,10 +33,14 @@ test('Chair code redemption: formatting, expiry, repeat redemption, committee bo
 
   // The redeemed Chair works inside GA1 only.
   const send=async(c:unknown,expected:string)=>{await as(chair);return db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify(c),'chair',expected,'2026-11-05T09:00:00Z']);};
-  const revision=async(delegate:string,session:string)=>{await asOwner();return String((await query<{revision:number}>('select revision from public.attendance where "delegateId"=$1 and "sessionId"=$2',[delegate,session]))[0]?.revision??0);};
-  await send({type:'attendance',delegateId:ids.japan,sessionId:ids.session,status:'Absent'},await revision(ids.japan,ids.session));
-  await asOwner();assert.equal((await query<{status:string}>('select status from public.attendance where "delegateId"=$1 and "sessionId"=$2',[ids.japan,ids.session]))[0].status,'Absent');
-  await assert.rejects(async()=>send({type:'attendance',delegateId:whoDelegate,sessionId:whoSession,status:'Present'},await revision(whoDelegate,whoSession)),/no access to this role or committee/,'another committee is refused');
+  const rollCall=async(committeeId:string)=>{await asOwner();const ds=await query<{id:string}>('select id from public.delegates where committee_id=$1',[committeeId]);
+   return {type:'rollCallCommit',committeeId,rollCallId:crypto.randomUUID(),revision:1,observedAt:'2026-11-05T08:59:00Z',committedAt:'2026-11-05T09:00:00Z',rows:ds.map(d=>({delegateId:d.id,status:d.id===ids.japan?'Absent':'Present'}))};};
+  const own=await rollCall(ids.ga1);
+  await send(own,'0');
+  await asOwner();assert.equal((await query<{status:string}>('select status from public.roll_call_row where roll_call_id=$1 and delegate_id=$2',[own.rollCallId,ids.japan]))[0].status,'Absent');
+  const whoCommittee=(await query<{c:string}>('select committee_id c from public.delegates where id=$1',[whoDelegate]))[0].c;
+  const foreign=await rollCall(whoCommittee);
+  await assert.rejects(async()=>send(foreign,'0'),/no access to this role or committee/,'another committee is refused');
   await as(chair);
   const snapshot=(await query<{s:{committees:{id:string}[];delegates:{committeeId:string}[]}}>('select public.conference_snapshot($1) s',[ids.conference]))[0].s;
   assert.deepEqual(snapshot.committees.map(c=>c.id),[ids.ga1]);

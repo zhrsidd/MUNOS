@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Test double for the gh CLI. Serves the pull request state in $FAKE_SNAPSHOT for the calls that
+# codex-review-gate.sh makes. It applies --jq the way gh does and ignores --paginate and graphql variables.
+set -euo pipefail
+
+if [ "${FAKE_API_FAILURE:-false}" = true ]; then exit 1; fi
+
+snapshot=${FAKE_SNAPSHOT:?FAKE_SNAPSHOT must name a snapshot file}
+jqexpr=""
+args=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --jq) jqexpr=$2; shift 2 ;;
+    --paginate) shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+if [ "${args[0]:-}" != api ]; then
+  echo "fake gh: only the api subcommand is supported" >&2
+  exit 2
+fi
+endpoint=${args[1]:?fake gh: missing endpoint}
+
+case $endpoint in
+  graphql)
+    payload=$(jq '{data: {repository: {pullRequest: {reviewThreads: {
+      pageInfo: {hasNextPage: false, endCursor: null},
+      nodes: [.threads[] | {id, isResolved, isOutdated, comments: {nodes: [{databaseId: .first_comment_id}]}}]}}}}}' "$snapshot") ;;
+  repos/*/pulls/*/reviews*) payload=$(jq '.reviews' "$snapshot") ;;
+  repos/*/issues/*/comments*) payload=$(jq '.issue_comments' "$snapshot") ;;
+  repos/*/pulls/*/comments*) payload=$(jq '.review_comments' "$snapshot") ;;
+  repos/*/rules/branches/*) payload=$(jq '.rules' "$snapshot") ;;
+  repos/*/branches/*) payload=$(jq '{protected: .branch_protected}' "$snapshot") ;;
+  repos/*/pulls/[0-9]*) payload=$(jq '.pr' "$snapshot") ;;
+  *) echo "fake gh: unexpected endpoint $endpoint" >&2; exit 1 ;;
+esac
+
+if [ -n "$jqexpr" ]; then
+  printf '%s' "$payload" | jq -rc "$jqexpr"
+else
+  printf '%s\n' "$payload"
+fi

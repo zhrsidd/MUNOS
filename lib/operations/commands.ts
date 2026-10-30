@@ -29,8 +29,28 @@ export type OperationsCommand =
   | { type: "photoAck"; committeeId: string; slotId: string; stage: "warning" | "due"; revision: number; epoch?: number; chairs?: string }
   /** A Chair's school for group photos; null clears it. */
   | { type: "staffSchool"; staffId: string; schoolId: string | null }
-  | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId: string; amount: number; reason: string }
-  | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string };
+  /** `sessionId` only on actions saved by an older build: it must be the delegate's committee's; the deduction is committee-level. */
+  | { type: "pointAdjustment"; action: "deduct"; delegateId: string; sessionId?: string; amount: number; reason: string }
+  | { type: "pointAdjustment"; action: "restore"; delegateId: string; adjustmentId: string; reason?: string }
+  /**
+   * Session schedule (docs/SESSION_MODEL.md 12.4). Executive only, applied by the database; the offline demo has no schedule data.
+   * committeeId absent means every active committee. Lead and grace are parameters (defaults 5 and 20, grace still proposed).
+   */
+  | { type: "scheduleVersion"; committeeId?: string; leadMinutes?: number; graceMinutes?: number; automationEnabled?: boolean; slotLeads?: Record<string, number>; reason: string }
+  | { type: "automationToggle"; committeeId?: string; enabled: boolean; reason: string }
+  /** Committee scope names one of its sessions; conference scope names a central slot and each committee resolves its own session in it. */
+  | { type: "overrideSet"; scope: "committee"; committeeId: string; sessionId: string }
+  | { type: "overrideSet"; scope: "conference"; slotId: string }
+  /** `label: null` corrects the record to "no session" (distinct from never corrected). */
+  | { type: "labelCorrection"; recordTable: string; recordId: string; label: string | null; reason: string }
+  | { type: "clockConfirm"; deviceId: string; offsetMs: number; reason: string }
+  /** One-way: after this, anything that arrives for that conference day is held. `day` defaults to today in the conference zone. */
+  | { type: "closeDay"; day?: string; reason: string }
+  /** Hold rules switch and tolerances; absent keys are unchanged. Enforcement is off until the Executive turns it on. */
+  | { type: "holdSettings"; enforce?: boolean; trustMinutes?: number; staleMinutes?: number }
+  | { type: "heldDecide"; heldId: string; decision: "approve" | "discard"; reason: string }
+  /** Approve a device's items held for its clock, after clockConfirm gave the confirmed error. */
+  | { type: "heldBulkApprove"; deviceId: string; reason: string };
 export interface PhotoSlotFields {
   schoolId: string;
   startsAt: string;
@@ -40,7 +60,7 @@ export interface PhotoSlotFields {
   enabled?: boolean;
   warnMinutes?: number;
 }
-export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool"] as const satisfies readonly OperationsCommand["type"][];
+export const operationsCommandTypes = ["submissionLink", "resolutionLink", "sessionImport", "photoSlot", "photoImport", "photoAck", "pointAdjustment", "staffSchool", "scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm", "closeDay", "holdSettings", "heldDecide", "heldBulkApprove"] as const satisfies readonly OperationsCommand["type"][];
 export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   submissionLink: ["admin"],
   resolutionLink: ["chair", "admin"],
@@ -50,6 +70,15 @@ export const operationsRoles: Record<OperationsCommand["type"], Role[]> = {
   photoAck: ["chair"],
   pointAdjustment: ["chair"],
   staffSchool: ["admin"],
+  scheduleVersion: ["admin"],
+  automationToggle: ["admin"],
+  overrideSet: ["admin"],
+  labelCorrection: ["admin"],
+  clockConfirm: ["admin"],
+  closeDay: ["admin"],
+  holdSettings: ["admin"],
+  heldDecide: ["admin"],
+  heldBulkApprove: ["admin"],
 };
 export const MAX_DEDUCTION = 20;
 export const REASON_MIN = 3;
@@ -72,6 +101,8 @@ function checkSlot(d: ConferenceData, f: PhotoSlotFields) {
   if (!Number.isInteger(warn) || warn < 1 || warn > 60) throw Error("Warning time must be 1 to 60 minutes.");
   return { schoolId: f.schoolId, startsAt: new Date(f.startsAt).toISOString(), endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : null, location, note: f.note, enabled: f.enabled ?? true, warnMinutes: warn };
 }
+/** Commands only the live database can apply: no local projection, refused in the offline demo. */
+export const serverOnlyCommandTypes: ReadonlySet<string> = new Set(["scheduleVersion", "automationToggle", "overrideSet", "labelCorrection", "clockConfirm", "closeDay", "holdSettings", "heldDecide", "heldBulkApprove"]);
 export function isOperationsCommand(c: { type: string }): c is OperationsCommand {
   return (operationsCommandTypes as readonly string[]).includes(c.type);
 }
@@ -180,9 +211,8 @@ export function applyOperationsCommand(
       if (c.action === "deduct") {
         const problem = deductionProblem(c.amount, c.reason);
         if (problem) throw Error(problem);
-        const session = d.sessions.find((s) => s.id === c.sessionId);
-        if (!session || session.committeeId !== delegate.committeeId) throw Error("Session unavailable.");
-        list.push({ id, delegateId: delegate.id, sessionId: session.id, points: -c.amount, reason: c.reason.trim(), chairId: actorId, chairName: null, reverses: null, createdAt: now });
+        if (c.sessionId && d.sessions.find((s) => s.id === c.sessionId)?.committeeId !== delegate.committeeId) throw Error("Session unavailable.");
+        list.push({ id, delegateId: delegate.id, sessionId: null, points: -c.amount, reason: c.reason.trim(), chairId: actorId, chairName: null, reverses: null, createdAt: now });
       } else {
         const original = list.find((a) => a.id === c.adjustmentId);
         if (!original) throw Error("Adjustment unavailable.");
@@ -194,6 +224,18 @@ export function applyOperationsCommand(
       }
       break;
     }
+    // Executive session commands have no optimistic projection: the database decides, and the confirming snapshot shows the result.
+    // They travel through the same durable outbox as every other command; DurableRepository refuses them in the local demo.
+    case "scheduleVersion":
+    case "automationToggle":
+    case "overrideSet":
+    case "labelCorrection":
+    case "clockConfirm":
+    case "closeDay":
+    case "holdSettings":
+    case "heldDecide":
+    case "heldBulkApprove":
+      break;
     case "staffSchool": {
       const staff = d.staff.find((s) => s.id === c.staffId);
       if (!staff || staff.role !== "chair") throw Error("Choose a Chair.");

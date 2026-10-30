@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { PLATFORM } from "@/lib/brand";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useConference } from "@/lib/context";
 import type { Role } from "@/lib/domain";
@@ -20,6 +20,8 @@ import { AdminScreen } from "./admin";
 import { SubmissionLinks, SubmissionQrPanel } from "./operations/submission-links";
 import { AccessCodes } from "./access-codes";
 import { CentralSessions } from "./central-sessions";
+import { HeldNotice, HeldReview } from "./held-actions";
+import { RollCallPrompt, SessionLabel, useCommitteeSession } from "./session-status";
 import { AmendmentLinks } from "./amendments/links";
 import { ChairPhotos, PhotoReminderBanner } from "./operations/photo-reminders";
 import { PhotoSchedule } from "./operations/photo-schedule";
@@ -30,10 +32,8 @@ export function Workspace({ path }: { path: string }) {
     data,
     committeeId: requestedCommitteeId,
     setCommitteeId,
-    act,
     access,
   } = useConference();
-  const [now] = useState(()=>Date.now());
   const router = useRouter();
   // A staff member with exactly one workspace goes straight in; the picker is only for people with a choice.
   const soleWorkspace = !path ? soleWorkspacePath(access) : null;
@@ -46,8 +46,7 @@ export function Workspace({ path }: { path: string }) {
     activeCommittees.find((c) => c.id === requestedCommitteeId) ||
     activeCommittees.find(c=>c.code === "GA1") || activeCommittees[0];
   const committeeId = committee?.id ?? "";
-  const session = data.sessions.find(s=>s.id===committee?.currentSessionId && s.committeeId===committeeId && !s.archived);
-  const suggestedSession=data.sessions.find(s=>s.committeeId===committeeId && !s.archived && Date.parse(s.startsAt)<=now && (!s.endsAt || Date.parse(s.endsAt)>now));
+  const { session } = useCommitteeSession(committeeId);
   // While access is still loading the picker would flash every workspace, including ones this person cannot enter.
   if (soleWorkspace || (!path && access.status === "loading")) return <WorkspaceLoading/>;
   if (!path) return <WorkspaceHome conference={data.conference} availableRoles={availableRoles} demo={access.status === "demo"} />;
@@ -85,7 +84,7 @@ export function Workspace({ path }: { path: string }) {
               </label>
               <span className="context-secondary">
                 {committee ? `Room ${committee.room.replace(/^Room\s+/i, "")}` : ""}
-                {session ? ` · ${session.name}` : " · No current session"}
+                {committee ? <> · <SessionLabel committeeId={committeeId} /></> : null}
               </span>
             </>
           ) : (
@@ -102,30 +101,9 @@ export function Workspace({ path }: { path: string }) {
       </div>
       <div className="main-shell">
         <main className="workspace-content">
-          {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} sessionId={session?.id || ""} prominent={section === ""} />}
-          {section !== "health" && role === "chair" &&
-            data.sessions.filter((s) => s.committeeId === committeeId && !s.archived).length >
-              0 && (
-              <div className="session-selector">
-                <label>
-                  Current session
-                  <select
-                    aria-label="Current session"
-                    value={session?.id || ""}
-                    onChange={(e) => {if(e.target.value) void act({type:"currentSession",committeeId,sessionId:e.target.value},"chair");}}
-                  >
-                    <option value="">Select current session{suggestedSession?` · suggested ${suggestedSession.name}`:""}</option>
-                    {data.sessions
-                      .filter((s) => s.committeeId === committeeId && !s.archived)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              </div>
-            )}
+          {section !== "health" && role === "chair" && committee && <HeldNotice committeeId={committeeId} />}
+          {section !== "health" && role === "chair" && committee && <PhotoReminderBanner committeeId={committeeId} prominent={section === ""} />}
+          {section !== "health" && role === "chair" && committee && section !== "roll-call" && <RollCallPrompt committeeId={committeeId} />}
           {section === "health" ? <SystemHealth /> : role === "chair" ? (
             !committee ? <Panel title="No active committee"><p>No active committee is currently available for this workspace. Executive staff can check committee access and archived records.</p></Panel> : section === "photos" ? (
               <ChairPhotos committeeId={committeeId} />
@@ -135,16 +113,14 @@ export function Workspace({ path }: { path: string }) {
                 <Documents
                   key={committeeId}
                   committeeId={committeeId}
-                  sessionId={session?.id || ""}
                 />
                 <SubmissionQrPanel committeeId={committeeId} />
               </>
             ) : (
               <ChairScreen
-                key={`${committeeId}-${session?.id}`}
+                key={committeeId}
                 section={section}
                 committeeId={committeeId}
-                sessionId={session?.id || ""}
               />
             )
           ) : role === "approval" ? (
@@ -152,7 +128,7 @@ export function Workspace({ path }: { path: string }) {
           ) : role === "logistics" ? (
             <Logistics section={section} />
           ) : (
-            section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
+            section === "access-codes" ? <AccessCodes /> : section === "submissions" ? <SubmissionLinks /> : section === "schedule" ? <CentralSessions /> : section === "held" ? <HeldReview /> : section === "amendment-links" ? <AmendmentLinks /> : section === "photos" ? <PhotoSchedule /> : <AdminScreen section={section} />
           )}
         </main>
         <footer className="workspace-footer">

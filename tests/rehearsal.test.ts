@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {checkAppUrl,checkHealthEnvironment,checkUsers} from '../scripts/rehearsal/guard';
-import {buildScenario,summarize,assignStaffRoles,subscribers,recipients,receives,TOPIC_OF,HUMAN_FLOOR_SECONDS,READS,type SimUser} from '../scripts/rehearsal/scenario';
+import {buildScenario,summarize,assignStaffRoles,subscribers,recipients,receives,TOPIC_OF,HUMAN_FLOOR_SECONDS,READS,LOCAL_ACTIONS,isWrite,type SimUser} from '../scripts/rehearsal/scenario';
 import {SimClient,RECOVERY_MS,REALTIME_DEBOUNCE_MS} from '../scripts/rehearsal/client-model';
 import {VirtualClock,estimate} from '../scripts/rehearsal/estimate';
 import {evaluate,percentile,report} from '../scripts/rehearsal/metrics';
@@ -31,10 +31,13 @@ test('chair procedure: one floor device per committee drives speeches; others ne
  const users=buildScenario({staff:50,minutes:20,committees:14,seed:11});
  const chairs=users.filter(u=>u.role==='chair');
  for(let c=0;c<14;c++)assert.equal(chairs.filter(u=>u.floor&&u.committee===c).length,1,`committee ${c} has exactly one floor device`);
- const floorOnly=['currentSession','speechStart','speechScore','speechFinish','poiAllowance','poiAdd','poiRecognize','queueOrder'];
+ const floorOnly=['speechStart','speechScore','speechFinish','poiAllowance','poiAdd','poiRecognize','queueOrder'];
  for(const u of users.filter(u=>!u.floor))assert.ok(u.steps.every(s=>!floorOnly.includes(s.action)),'only the floor device runs the floor');
  for(const u of chairs.filter(u=>u.floor)){
-  assert.equal(u.steps.find(s=>s.action!=='open')?.action,'currentSession','floor sets the shared Current session first');
+  // Sessions follow the schedule: the floor device starts with a roll call (drafted on the device, committed once).
+  assert.equal(u.steps.find(s=>s.action!=='open')?.action,'draft','the floor starts drafting the roll call; nobody selects a session');
+  assert.ok(u.steps.some(s=>s.action==='rollCall'),'the floor commits a roll call');
+  assert.ok(u.steps.every(s=>(s.action as string)!=='currentSession'&&(s.action as string)!=='attendance'),'no session selection, no per-delegate attendance writes');
   const seq=u.steps.map(s=>s.action).filter(a=>['speechStart','speechScore','speechFinish'].includes(a));
   for(let i=0;i<seq.length;i++)if(seq[i]==='speechScore')assert.equal(seq[i-1],'speechStart','score follows a start');
  }
@@ -128,7 +131,8 @@ test('historical client model: Realtime notifications use a trailing 350 ms debo
 // ---- Realtime topics --------------------------------------------------------------------------------------------
 const dev=(id:number,role:SimUser['role'],committee:number):SimUser=>({id,role,committee,start:0,steps:[]});
 test('topics: the server emits chair/documents events per the function definitions; timer emits none',()=>{
- for(const a of ['currentSession','attendance','queueAdd','queueOrder','speechStart','speechScore','poiAllowance','poiAdd','poiRecognize','speechFinish','photoAck'] as const)assert.equal(TOPIC_OF[a],'chair',a);
+ for(const a of ['rollCall','queueAdd','queueOrder','speechStart','speechScore','poiAllowance','poiAdd','poiRecognize','speechFinish','photoAck'] as const)assert.equal(TOPIC_OF[a],'chair',a);
+ assert.equal(TOPIC_OF.draft,null,'a roll call draft stays on the device');
  for(const a of ['sendToApproval','approve','print','submit'] as const)assert.equal(TOPIC_OF[a],'documents',a);
  assert.equal(TOPIC_OF.timer,null,'apply_mutation skips operational_changes for timer');
 });
@@ -255,4 +259,19 @@ test('conference gate rejects the old Approval population, missing roles and inc
  assert.equal(conferenceGateProfile(valid).eligible,true);
  const bad=[undefined,[],[{chair:77,approval:11,admins:11,executive:11}],[{chair:75,approval:19,admins:11,executive:5}],[{chair:76,approval:20,admins:10,executive:4}],[{chair:75,approval:20,admins:9,executive:6}],[{chair:75,approval:20,admins:10,executive:6}]];
  for(const staffRolesPerStage of bad)assert.equal(conferenceGateProfile({...valid,staffRolesPerStage}).eligible,false);
+});
+test('device-local steps (roll call draft, timer) are not counted or sent as writes, and never marked for retry',async()=>{
+ const users=buildScenario({staff:50,minutes:10,committees:14,seed:7,retryFraction:1});
+ const staff=users.filter(u=>u.role!=='delegate');
+ const local=staff.flatMap(u=>u.steps).filter(s=>LOCAL_ACTIONS.includes(s.action));
+ assert.ok(local.some(s=>s.action==='draft')&&local.some(s=>s.action==='timer'),'the plan still has drafts and timers');
+ assert.ok(local.every(s=>!s.retry),'a local step is never re-sent');
+ const sent=staff.flatMap(u=>u.steps).filter(s=>isWrite(s.action));
+ assert.ok(sent.every(s=>s.retry),'with retryFraction 1 every real write is re-sent');
+ assert.equal(summarize(users,10).staffApp.writes,sent.length,'plan writes = mutations sent to the server');
+ const e=await estimate(staff,{minutes:10,readMs:600,sendMs:300,model:'topic-aware'});
+ assert.ok(e.writes<=sent.length,'the estimate sends only server writes');
+ // The retry draw is still taken for local steps: the public burst is the same as before this change.
+ const withDelegates=buildScenario({staff:50,delegates:100,minutes:10,committees:14,seed:7,submitFraction:0.3});
+ assert.deepEqual(withDelegates.filter(u=>u.role==='delegate').map(u=>u.steps.map(s=>s.at)),buildScenario({staff:50,delegates:100,minutes:10,committees:14,seed:7,submitFraction:0.3}).filter(u=>u.role==='delegate').map(u=>u.steps.map(s=>s.at)));
 });

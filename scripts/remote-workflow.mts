@@ -15,25 +15,29 @@ async function send(command:Command,role:Role='chair'){
  await transport.send(mutation);return mutation;
 }
 let data=await transport.read();assert.ok(data.committees.some(c=>c.code==='GA1'));marks.push('authorized snapshot');
-await send({type:'attendance',delegateId:ids.france,sessionId:ids.session,status:'Present & Voting'});
-await send({type:'attendance',delegateId:ids.japan,sessionId:ids.session,status:'Present'});
+// Presence comes from one committed roll call (docs/SESSION_MODEL.md section 6).
+const at=new Date().toISOString();
+await send({type:'rollCallCommit',committeeId:ids.ga1,rollCallId:crypto.randomUUID(),revision:1,observedAt:at,committedAt:at,
+ rows:data.delegates.filter(d=>d.committeeId===ids.ga1).map(d=>({delegateId:d.id,status:d.id===ids.france?'Present & Voting':'Present'}))});
 data=await transport.read();const before=data.events.filter(e=>e.delegateId===ids.france&&!e.voidedAt);const points=before.reduce((n,e)=>n+e.points,0);
-const speech=await send({type:'participation',delegateId:ids.france,sessionId:ids.session,resolutionId:ids.resolution,categoryId:'speech',points:2});
+const speech=await send({type:'participation',delegateId:ids.france,committeeId:ids.ga1,resolutionId:ids.resolution,categoryId:'speech',points:2});
 await transport.send(speech);data=await transport.read();const after=data.events.filter(e=>e.delegateId===ids.france&&!e.voidedAt);
 assert.equal(after.length,before.length+1);assert.equal(after.reduce((n,e)=>n+e.points,0),points+2);marks.push('speech +2, opportunity +1, duplicate retry exactly once');
-await send({type:'queue',sessionId:ids.session,delegateId:ids.japan});marks.push('speaker queue');
+await send({type:'queue',committeeId:ids.ga1,delegateId:ids.japan});marks.push('speaker queue');
 for(const doc of data.documents.filter(d=>d.committeeId===ids.ga1&&d.status==='In Debate'))await send({type:'document',id:doc.id,status:'Closed',outcome:'Withdrawn'});
-const created=await send({type:'newDocument',committeeId:ids.ga1,sessionId:ids.session,title:'Development verification · civilian safeguards',submitterId:ids.france});
+const created=await send({type:'newDocument',committeeId:ids.ga1,title:'Development verification · civilian safeguards',submitterId:ids.france});
 const docId=created.id.slice(0,24)+'000000000001';
 await send({type:'document',id:docId,status:'Submitted'});
 await send({type:'document',id:docId,status:'Review'},'approval');
 await send({type:'document',id:docId,status:'Approved',comment:'Development workflow verified.'},'approval');
 await send({type:'document',id:docId,status:'Printed'},'logistics');
 await send({type:'document',id:docId,status:'In Debate'});marks.push('submitted → review → approved → printed → in debate');
-data=await transport.read();const eligible=data.attendance.filter(a=>a.sessionId===ids.session && a.status!=='Absent');
-for(const [i,a] of eligible.entries())await send({type:'vote',sessionId:ids.session,resolutionId:docId,delegateId:a.delegateId,choice:i===1?'Against':i===2&&a.status==='Present'?'Abstain':'For'});
+// Opening the ballot snapshots the roll call in force; the snapshot decides who may vote and who may abstain.
+await send({type:'voteMode',committeeId:ids.ga1,resolutionId:docId,mode:'normal',voteType:'substantive'});
+data=await transport.read();const eligible=data.ballots!.filter(b=>b.resolutionId===docId && b.status!=='Absent');
+for(const [i,b] of eligible.entries())await send({type:'vote',committeeId:ids.ga1,resolutionId:docId,delegateId:b.delegateId,choice:i===1?'Against':i===2&&b.status==='Present'?'Abstain':'For'});
 await send({type:'document',id:docId,status:'Closed',outcome:'Passed'});
-data=await transport.read();assert.equal(data.documents.find(d=>d.id===docId)?.outcome,'Passed');assert.ok(data.audit.some(a=>a.entityId===docId));marks.push('attendance-fed voting, configured majority, closure and audit');
+data=await transport.read();assert.equal(data.documents.find(d=>d.id===docId)?.outcome,'Passed');assert.ok(data.audit.some(a=>a.entityId===docId));marks.push('roll-call-fed ballot snapshot, configured majority, closure and audit');
 // A fresh transport represents a fresh process/browser read, with no local demo snapshot.
 const fresh=await new SupabaseTransport(clientFor(),ids.conference,session.user.id).read();assert.equal(fresh.documents.find(d=>d.id===docId)?.outcome,'Passed');marks.push('fresh repository read persists');
 const report={date:new Date().toISOString(),project:ref,passed:marks,documentId:docId};

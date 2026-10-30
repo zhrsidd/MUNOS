@@ -41,7 +41,7 @@ test('revocation/sign-out stops a committed-response race without losing queued 
  const key='supabase:conference:chair-account';
  let repo=new DurableRepository(key,createSeed,store,new AccessGatedTransport(server,()=>allowed));
  await repo.ready();await tick();const initial=data.events.length;
- await repo.execute({type:'participation',delegateId:'d0',sessionId:'s1',resolutionId:'r1',categoryId:'speech',points:2},'chair');await tick();
+ await repo.execute({type:'participation',delegateId:'d0',committeeId:'ga1',resolutionId:'r1',categoryId:'speech',points:2},'chair');await tick();
  const savedId=repo.getPending()[0].id;online=true;await repo.flush();
  assert.equal(receipts.size,1);assert.equal(repo.getPending().length,1);
  await repo.flush();assert.equal(sends,1,'blocked identity cannot send again');
@@ -53,7 +53,7 @@ test('revocation/sign-out stops a committed-response race without losing queued 
 test('an access gate cannot send another identity’s saved mutations',async()=>{
  let sends=0;const server:Transport={actorId:'new-user',read:async()=>createSeed(),send:async()=>{sends++;}};
  const gate=new AccessGatedTransport(server,()=>true);
- await assert.rejects(gate.send({id:'uuid',actorId:'previous-user',role:'chair',createdAt:new Date().toISOString(),expected:null,state:'pending',command:{type:'queue',sessionId:'s1',advance:true}}),/another staff identity/);
+ await assert.rejects(gate.send({id:'uuid',actorId:'previous-user',role:'chair',createdAt:new Date().toISOString(),expected:null,state:'pending',command:{type:'queue',committeeId:'ga1',advance:true}}),/another staff identity/);
  assert.equal(sends,0);
 });
 
@@ -73,7 +73,7 @@ test('prepared legacy device reopens offline; expired lease retains exportable o
   await store.savePreferences(`last-authorized:${conf}`,{key,actorId:actor,roles:'["chair"]',committeeIds:'["ga1"]',validUntil:String(Date.now()+48*3600000)});
   const first=new RepositoryController();controllers.push(first);await first.retryAccess();
   assert.equal(first.getAccess().status,'active');assert.ok(first.getSnapshot());
-  await first.execute({type:'participation',delegateId:'d0',sessionId:'s1',resolutionId:'r1',categoryId:'speech',points:2},'chair');
+  await first.execute({type:'participation',delegateId:'d0',committeeId:'ga1',resolutionId:'r1',categoryId:'speech',points:2},'chair');
   await tick();const pending=first.getPending()[0];assert.ok(pending);Reflect.get(first,'stop').call(first);
   await store.savePreferences(`staff-authorized:${conf}:${actor}`,{validUntil:String(Date.now()-1)});
   const expired=new RepositoryController();controllers.push(expired);await expired.retryAccess();

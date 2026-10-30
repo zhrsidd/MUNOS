@@ -39,64 +39,54 @@ test('committee archive refuses active debate, then atomically revokes Chair cre
  }finally{await f.db.close();}
 });
 
-test('slot archive refuses In Debate until Chair closes it, preserving document/session consistency',async()=>{
+// Sessions are labels now (docs/SESSION_MODEL.md section 8): live work belongs to the committee, so archiving a slot never stops it.
+test('slot archive leaves the committee-level debate, floor and records untouched',async()=>{
  const f=await fixture();try{
-  const {slot,session}=await f.slot();const doc=(await f.snapshot()).documents.find(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate')!;
-  await f.asOwner();await f.query('update public.committees set "currentSessionId"=$2 where id=$1',[f.ids.ga1,session.id]);await f.as(executive);
-  await assert.rejects(()=>f.mutate({type:'sessionSlot',action:'archive',id:slot.id}),/Close the current resolution debate/,'also protects an active debate on an earlier session when current selection would be cleared');
-  await f.asOwner();await f.query('update public.documents set "sessionId"=$2 where id=$1',[doc.id,session.id]);await f.query('update public.committees set "currentSessionId"=$2 where id=$1',[f.ids.ga1,session.id]);
-  await f.as(executive);await assert.rejects(()=>f.mutate({type:'sessionSlot',action:'archive',id:slot.id}),/Close the current resolution debate/);
-  let data=await f.snapshot();assert.equal(data.sessions.find(s=>s.id===session.id)?.archived,false);assert.equal(data.committees.find(c=>c.id===f.ids.ga1)?.currentSessionId,session.id);
-  await f.as(chair);await f.mutate({type:'document',id:doc.id,status:'Closed',outcome:'Withdrawn'},'chair');
-  await f.as(executive);await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});data=await f.snapshot();assert.equal(data.documents.find(d=>d.id===doc.id)?.status,'Closed');assert.ok(data.sessions.find(s=>s.id===session.id)?.archived);assert.equal(data.committees.find(c=>c.id===f.ids.ga1)?.currentSessionId,null);
+  const {slot}=await f.slot();const doc=(await f.snapshot()).documents.find(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate')!;
+  await f.as(chair);await f.mutate({type:'queueAdd',committeeId:f.ids.ga1,delegateId:f.ids.france,lane:'open'},'chair');
+  await f.as(executive);await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});
+  const data=await f.snapshot();
+  assert.equal(data.documents.find(d=>d.id===doc.id)?.status,'In Debate','the debate continues');
+  assert.ok(data.queue.some(q=>q.delegateId===f.ids.france&&q.committeeId===f.ids.ga1&&!q.sessionId),'the speaker queue persists');
  }finally{await f.db.close();}
 });
 
-test('live core/procedure paths reject archived sessions while historical event corrections remain possible',async t=>{
+test('after a slot is archived, live work continues; an older saved action naming its session still identifies the committee',async()=>{
  const f=await fixture();try{
   const {slot,session}=await f.slot();let data=await f.snapshot();const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;
-  await f.as(chair);await f.mutate({type:'participation',sessionId:session.id,delegateId:delegate.id,categoryId:'speech',points:1,resolutionId:null},'chair');
-  await f.mutate({type:'newDocument',committeeId:f.ids.ga1,sessionId:session.id,title:'Archived draft',submitterId:delegate.id},'chair');data=await f.snapshot();
-  const event=data.events.find(e=>e.sessionId===session.id)!;const doc=data.documents.find(d=>d.sessionId===session.id)!;
   await f.as(executive);await f.mutate({type:'sessionSlot',id:slot.id,action:'archive'});await f.as(chair);
-  const kinds=['attendance','participation','queue','vote','timer','newDocument','currentSession','debateMode','queueAdd','queueOrder','queueRemove','speechStart','speechYield','speechScore','speechFinish','poiAllowance','poiAdd','poiOrder','poiRecognize','voteMode'];
-  for(const kind of kinds)await t.test(kind,async()=>{
-   const command={type:kind,sessionId:session.id,committeeId:f.ids.ga1,delegateId:delegate.id,resolutionId:doc.id,points:1};
-   await assert.rejects(()=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,crypto.randomUUID(),command,'chair',null,new Date().toISOString()]),sqlCode('PT409'));
-  });
+  await f.mutate({type:'participation',committeeId:f.ids.ga1,delegateId:delegate.id,categoryId:'speech',points:1,resolutionId:null},'chair');
+  await f.mutate({type:'participation',sessionId:session.id,delegateId:delegate.id,categoryId:'speech',points:1,resolutionId:null} as unknown as Command,'chair');
+  data=await f.snapshot();
+  const events=data.events.filter(e=>e.delegateId===delegate.id&&e.committeeId===f.ids.ga1&&!e.sessionId);
+  assert.ok(events.length>=2,'both recorded, committee-keyed, without a session');
+  const event=events[0];
   await f.mutate({type:'event',id:event.id,points:2},'chair');
   await f.mutate({type:'event',id:event.id,undo:true},'chair');
   assert.deepEqual(await f.query('select points,voided from public.participation_corrections where event_id=$1 order by created_at,id',[event.id]),[{points:2,voided:false},{points:null,voided:true}]);
-  assert.equal((await f.query<{points:number}>('select points from public.participation_events where id=$1',[event.id]))[0].points,1,'original event remains unchanged');
-  assert.equal((await f.snapshot()).events.filter(e=>e.sessionId===session.id).length,1);
+  // Retired commands are refused as conflicts (22023), never applied.
+  for(const command of [{type:'attendance',sessionId:session.id,delegateId:delegate.id,status:'Present'},{type:'timer',sessionId:session.id,duration:60,remaining:60,startedAt:null},{type:'currentSession',committeeId:f.ids.ga1,sessionId:session.id}])
+   await assert.rejects(()=>f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,crypto.randomUUID(),command,'chair',null,new Date().toISOString()]),sqlCode('22023'),command.type);
  }finally{await f.db.close();}
 });
 
-test('resolution workflow survives its archived origin and enters debate only in an active current session',async()=>{
+test('a resolution outlives its session: it is debated without any session being selected',async()=>{
  const f=await fixture();const approval=crypto.randomUUID(),logistics=crypto.randomUUID();try{
   await f.grant(approval,'approval');await f.grant(logistics,'logistics');await f.as(executive);
-  const {slot,session}=await f.slot();await f.as(chair);
+  const {slot}=await f.slot();await f.as(chair);
   const seeded=(await f.snapshot()).documents.find(d=>d.committeeId===f.ids.ga1&&d.status==='In Debate')!;
   await f.mutate({type:'document',id:seeded.id,status:'Closed',outcome:'Withdrawn'},'chair');
-  await f.mutate({type:'currentSession',committeeId:f.ids.ga1,sessionId:session.id},'chair');
-  await f.mutate({type:'newDocument',committeeId:f.ids.ga1,sessionId:session.id,title:'Cross-session resolution',submitterId:f.ids.france},'chair');
+  await f.mutate({type:'newDocument',committeeId:f.ids.ga1,title:'Cross-session resolution',submitterId:f.ids.france},'chair');
   const doc=(await f.snapshot()).documents.find(d=>d.title==='Cross-session resolution')!;
+  assert.equal(doc.sessionId,null,'a resolution belongs to its committee, not a session');
   await f.as(executive);await f.mutate({type:'sessionSlot',id:slot.id,action:'archive'});
   await f.as(chair);await f.mutate({type:'version',id:doc.id,fileName:'revision.txt',text:'Revised after session closure'},'chair');
-  assert.equal((await f.query<{n:number}>('select count(*)::int n from public.document_versions where "documentId"=$1',[doc.id]))[0].n,2);
   await f.mutate({type:'document',id:doc.id,status:'Submitted'},'chair');
   await f.as(approval);await f.mutate({type:'document',id:doc.id,status:'Review'},'approval');
   await f.mutate({type:'document',id:doc.id,status:'Approved'},'approval');
   await f.as(logistics);await f.mutate({type:'document',id:doc.id,status:'Printed'},'logistics');
-  await f.as(chair);await assert.rejects(()=>f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair'),/Select the current session first/);
-  // Direct setup simulates a stale archived selection; even this cannot bypass the DB guard.
-  await f.asOwner();await f.query('update public.committees set "currentSessionId"=$2 where id=$1',[f.ids.ga1,session.id]);await f.as(chair);
-  await assert.rejects(()=>f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair'),sqlCode('PT409'));
-  assert.equal((await f.snapshot()).documents.find(d=>d.id===doc.id)?.status,'Printed');
-  await f.as(executive);const next=await f.slot();await f.as(chair);
-  await f.mutate({type:'currentSession',committeeId:f.ids.ga1,sessionId:next.session.id},'chair');
-  await f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair');
-  const debated=(await f.snapshot()).documents.find(d=>d.id===doc.id)!;assert.equal(debated.status,'In Debate');assert.equal(debated.sessionId,next.session.id);
+  await f.as(chair);await f.mutate({type:'document',id:doc.id,status:'In Debate'},'chair');
+  const debated=(await f.snapshot()).documents.find(d=>d.id===doc.id)!;assert.equal(debated.status,'In Debate');assert.equal(debated.sessionId,null);
   await f.mutate({type:'document',id:doc.id,status:'Closed',outcome:'Withdrawn'},'chair');
   assert.equal((await f.snapshot()).documents.find(d=>d.id===doc.id)?.status,'Closed');
  }finally{await f.db.close();}
@@ -127,15 +117,18 @@ test('committee archive closes resolution QR without removing history or breakin
  }finally{await f.db.close();}
 });
 
-test('offline queued attendance remains a retained PT409 conflict after slot archive',async()=>{
- const f=await fixture();const store=new DurableStore('archived-replay-'+crypto.randomUUID());let repo:DurableRepository|undefined;
+test('an attendance action saved offline by an older build is retained as a conflict, never applied or lost',async()=>{
+ const f=await fixture();const store=new DurableStore('retired-replay-'+crypto.randomUUID());let repo:DurableRepository|undefined;
  try{
-  const {slot,session}=await f.slot();await f.as(chair);const data=await f.snapshot();const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;let online=false;
-  const transport:Transport={actorId:chair,read:async()=>{if(!online)throw Error('Offline');return f.snapshot();},send:async m=>{if(!online)throw Error('Offline');try{await f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,m.id,m.command,m.role,m.expected,m.createdAt]);}catch(e){if((e as {code:string}).code==='PT409')throw new ConflictError((e as Error).message);throw e;}}};
-  repo=new DurableRepository('archive-offline',()=>data,store,transport);await repo.ready();await new Promise(r=>setTimeout(r,20));await repo.execute({type:'attendance',sessionId:session.id,delegateId:delegate.id,status:'Present'},'chair');await new Promise(r=>setTimeout(r,20));const uuid=repo.getPending()[0].id;
-  await f.as(executive);await f.mutate({type:'sessionSlot',id:slot.id,action:'archive'});await f.as(chair);online=true;await repo.flush();
-  assert.equal(repo.getPending()[0].id,uuid);assert.equal(repo.getPending()[0].state,'conflict');assert.equal((await f.snapshot()).attendance.filter(a=>a.sessionId===session.id).length,0);
-  await f.asOwner();assert.equal((await f.query<{n:number}>('select count(*)::int n from private.mutation_receipts where id=$1',[uuid]))[0].n,0);
+  const {session}=await f.slot();await f.as(chair);const data=await f.snapshot();const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;
+  const transport:Transport={actorId:chair,read:async()=>f.snapshot(),send:async m=>{try{await f.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[f.ids.conference,m.id,m.command,m.role,m.expected,m.createdAt]);}catch(e){if(/^(PT409|22)/.test((e as {code:string}).code))throw new ConflictError((e as Error).message);throw e;}}};
+  // The saved action as an older build wrote it, already in the outbox.
+  const saved={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:chair,role:'chair' as const,command:{type:'attendance',sessionId:session.id,delegateId:delegate.id,status:'Present'} as unknown as Command,expected:'0',state:'pending' as const};
+  await store.update('archive-offline',()=>({key:'archive-offline',base:data,pending:[saved],savedAt:saved.createdAt}));
+  repo=new DurableRepository('archive-offline',()=>data,store,transport);await repo.ready();await repo.flush();
+  for(let i=0;i<100&&repo.getPending()[0]?.state==='pending';i++){await new Promise(r=>setTimeout(r,50));await repo.flush();} // bounded wait for the refusal, not a fixed pause
+  assert.equal(repo.getPending()[0].id,saved.id);assert.equal(repo.getPending()[0].state,'conflict');assert.match(repo.getPending()[0].message??'',/roll calls/);
+  await f.asOwner();assert.equal((await f.query<{n:number}>('select count(*)::int n from private.mutation_receipts where id=$1',[saved.id]))[0].n,0);
  }finally{repo?.dispose();await store.close();await f.db.close();}
 });
 

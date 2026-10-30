@@ -10,6 +10,8 @@ import type {OperationsData} from '../operations/types';
 // same as the previous client-side merge). Only when that bundled function is missing (PGRST202/42883, e.g. a
 // database without the 20261006211039 migration) does it fall back to the previous parallel two-RPC read.
 // send() routes extension commands to apply_operations_mutation. Same idempotency contract.
+/** The saved command plus its device protocol block. The stored command is never modified, so a retry sends identical JSON. */
+const withDevice=(m:Mutation)=>m.deviceId&&m.deviceSeq!==undefined?{...m.command,_device:{deviceId:m.deviceId,deviceSeq:m.deviceSeq,...(m.displayedLabel!==undefined?{displayedLabel:m.displayedLabel}:{})}}:m.command;
 const missingFunction=(e:{code?:string})=>e.code==='PGRST202'||e.code==='42883';
 export class SupabaseTransport implements Transport {
  constructor(private client:SupabaseClient,private conferenceId:string,public actorId:string,private committeeIds:string[]=[],private recoveryOnly=false,private authenticatedRoles:readonly Role[]=[]){ }
@@ -47,11 +49,17 @@ export class SupabaseTransport implements Transport {
    const {data:{session}}=await this.client.auth.getSession();
    if(session && session.user.id!==this.actorId)throw new ConflictError("Device identity changed. Export saved actions for recovery.");
   }
-  const {error,status}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:m.command,requested_role:m.role,expected:m.expected,client_time:m.createdAt});
+  const {error,status}=await this.client.rpc(isOperationsCommand(m.command)?'apply_operations_mutation':'apply_conference_mutation',{conf:this.conferenceId,mutation:m.id,command:withDevice(m),requested_role:m.role,expected:m.expected,client_time:m.createdAt});
   if(error){
    if(error.code === 'PT409' || error.code === '40001' || error.code === '42501' || /^(22|23)/.test(error.code))throw new ConflictError(error.code==='42501'?'Access has changed. Ask an administrator to review this saved change.':error.message);
    throw transportError(error,status);
   }
+ }
+ async syncClock(deviceId:string){
+  if(this.recoveryOnly)return;
+  const {error}=await this.client.rpc('record_device_clock',{conf:this.conferenceId,device:deviceId,device_time:new Date().toISOString()});
+  // Missing on a database without the session-model migration, or no grant: the clock call is evidence only, never a reason to fail a sync.
+  if(error&&!missingFunction(error))return;
  }
  subscribe(refresh:()=>void,state:(connected:boolean)=>void){
   if(this.recoveryOnly){state(false);return ()=>{};}

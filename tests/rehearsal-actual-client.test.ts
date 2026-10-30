@@ -10,7 +10,7 @@ import { MAX_BATCH } from '../lib/sync/backoff';
 import type { SimUser } from '../scripts/rehearsal/scenario';
 const pause = () => new Promise<void>(r => setImmediate(r));
 async function until(check: () => boolean) { for (let i = 0; i < 1000; i++) { if (check()) return; await pause(); } assert.ok(check(), 'actual core did not settle'); }
-const mutation = (): Mutation => ({ id: crypto.randomUUID(), actorId: 'chair-test', createdAt: new Date().toISOString(), role: 'chair', expected: null, state: 'pending', command: { type: 'participation', sessionId: 's1', delegateId: 'd0', resolutionId: 'r1', categoryId: 'speech', points: 2 } });
+const mutation = (): Mutation => ({ id: crypto.randomUUID(), actorId: 'chair-test', createdAt: new Date().toISOString(), role: 'chair', expected: null, state: 'pending', command: { type: 'participation', committeeId:'ga1', delegateId: 'd0', resolutionId: 'r1', categoryId: 'speech', points: 2 } });
 function gate() { let release!: () => void; const promise = new Promise<void>(r => { release = r; }); return { promise, release }; }
 class Server implements Transport {
   actorId = 'chair-test'; data = createSeed(); reads = 0; sends = 0; receipts = new Set<string>(); held?: ReturnType<typeof gate>; readError?: unknown; conflict = false;
@@ -109,7 +109,7 @@ test('synthetic fixture SQL replays with valid sessions, workflow documents and 
     await asOwner(); for (const user of users) await db.query('insert into auth.users(id) values($1)', [user]);
     await db.exec(fixture.sql);
     const c = fixture.committees[0];
-    assert.equal((await query<{ id: string }>('select "currentSessionId" id from public.committees where id=$1',[c.id]))[0].id,c.session);
+    assert.equal((await query<{ n: number }>('select count(*)::int n from public.roll_call where committee_id=$1 and state=$2',[c.id,'committed']))[0].n,1,'a committed roll call: presence without a selected session');
     assert.deepEqual((await query<{status:string}>('select status from public.documents where conference_id=$1 order by status',[conf])).map(d=>d.status),['Draft','Review','Approved','In Debate']);
     assert.equal((await query('select * from public.resolution_links where conference_id=$1',[conf])).length,4);
     await as(users[0]);
@@ -117,15 +117,15 @@ test('synthetic fixture SQL replays with valid sessions, workflow documents and 
     const { fingerprint } = await import('../lib/sync/repository');
     const send = async (command: import('../lib/commands').Command) => { const data = await snapshot(); await db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[conf,crypto.randomUUID(),JSON.stringify(command),'chair',fingerprint(data,command),new Date().toISOString()]); };
     const [speaker,asker] = fixture.delegates;
-    await send({type:'speechStart',sessionId:c.session,delegateId:speaker.id,resolutionId:fixture.workflowDocuments.find(d=>d.status==='In Debate')!.id,classification:'Other'});
+    await send({type:'speechStart',committeeId:c.id,delegateId:speaker.id,resolutionId:fixture.workflowDocuments.find(d=>d.status==='In Debate')!.id,classification:'Other'});
     const speech = (await snapshot()).speeches!.find(s=>s.state==='speaking')!;
-    await send({type:'poiAllowance',sessionId:c.session,speechId:speech.id,limit:2});
+    await send({type:'poiAllowance',committeeId:c.id,speechId:speech.id,limit:2});
     assert.equal((await snapshot()).speeches!.find(s=>s.id===speech.id)!.state,'pois');
-    await send({type:'poiAdd',sessionId:c.session,speechId:speech.id,delegateId:asker.id});
+    await send({type:'poiAdd',committeeId:c.id,speechId:speech.id,delegateId:asker.id});
     const entry = (await snapshot()).poiQueue![0];
-    await send({type:'poiRecognize',sessionId:c.session,speechId:speech.id,entryId:entry.id});
+    await send({type:'poiRecognize',committeeId:c.id,speechId:speech.id,entryId:entry.id});
     assert.ok((await snapshot()).poiQueue![0].recognizedAt);
-    await send({type:'poiScore',sessionId:c.session,speechId:speech.id,entryId:entry.id,points:2});
+    await send({type:'poiScore',committeeId:c.id,speechId:speech.id,entryId:entry.id,points:2});
     assert.equal((await snapshot()).events.filter(e=>e.categoryId==='poi').length,1);
     const draft=fixture.workflowDocuments.find(d=>d.status==='Draft')!;
     await send({type:'document',id:draft.id,status:'Submitted'});

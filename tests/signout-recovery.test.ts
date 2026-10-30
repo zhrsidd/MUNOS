@@ -7,7 +7,7 @@ import {createSeed} from '../lib/seed';
 import type {browserClient} from '../lib/supabase/client';
 import type {StaffAccess} from '../lib/access';
 
-function mutation(state:Mutation['state']='pending'):Mutation{return {id:crypto.randomUUID(),actorId:'old-device',role:'chair',state,createdAt:new Date().toISOString(),expected:null,command:{type:'queue',sessionId:'s1',advance:true}};}
+function mutation(state:Mutation['state']='pending'):Mutation{return {id:crypto.randomUUID(),actorId:'old-device',role:'chair',state,createdAt:new Date().toISOString(),expected:null,command:{type:'queue',committeeId:'ga1',advance:true}};}
 async function fixture(pending:Mutation[],status:StaffAccess['status']='active',validUntil=Date.now()+3600000){
  const store=new DurableStore('signout-'+crypto.randomUUID()),key=`supabase:${process.env.NEXT_PUBLIC_CONFERENCE_ID}:old-device`;
  const checkpoint=await store.update(key,()=>({key,base:createSeed(),pending,savedAt:new Date().toISOString()}));
@@ -66,7 +66,7 @@ test('sign-out waits for an already-started save and blocks new work while check
  Reflect.set(f.controller,'writes',new Set([writing]));
  try{
   const signingOut=f.controller.signOut();
-  await assert.rejects(f.controller.execute({type:'queue',sessionId:'s1',advance:true},'chair'),/Sign-out is being checked/);
+  await assert.rejects(f.controller.execute({type:'queue',committeeId:'ga1',advance:true},'chair'),/Sign-out is being checked/);
   await f.store.update(f.key,old=>({...old!,pending:[mutation()]}));release();
   await assert.rejects(signingOut,/Sync or resolve/);assert.equal(f.signouts(),0);
  }finally{release();await f.store.close();}

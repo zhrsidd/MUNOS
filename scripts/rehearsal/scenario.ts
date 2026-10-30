@@ -22,7 +22,8 @@ export function parseStaffProfile(raw?: string): StaffProfile {
 export type Role = StaffRole | "delegate";
 export type Action =
   | "open" | "read" | "refocus" | "health"
-  | "currentSession" | "attendance" | "queueAdd" | "queueOrder"
+  /** draft: marking a delegate in a roll call draft on the device (no network); rollCall: committing the whole roll call. */
+  | "draft" | "rollCall" | "queueAdd" | "queueOrder"
   | "speechStart" | "speechScore" | "poiAllowance" | "poiAdd" | "poiRecognize" | "poiScore" | "speechFinish"
   | "timer" | "photoAck" | "sendToApproval" | "approve" | "print"
   | "submitPage" | "submit";
@@ -52,6 +53,10 @@ export const HUMAN_FLOOR_SECONDS = 3;
 /** Staff mix, e.g. 14 committees × 2–3 Chair devices + ~4 Approval + ~4 Admins + ~3 Executive ≈ 45–55 devices. */
 export const STAFF_MIX: Record<StaffRole, number> = { chair: 0.7, approval: 0.1, admins: 0.1, executive: 0.1 };
 export const READS: Action[] = ["open", "read", "refocus", "health", "submitPage"];
+/** Device-local steps: a roll call draft and the timer never leave the device (no mutation, no retry, no Realtime event). */
+export const LOCAL_ACTIONS: Action[] = ["draft", "timer"];
+/** A step the server receives as a mutation. */
+export const isWrite = (action: Action) => !READS.includes(action) && !LOCAL_ACTIONS.includes(action);
 /** LEGACY upper-bound model (kept for before/after comparison only): every write = 3 writer reads + one refresh on every
  *  other subscribed device, with no one-in-flight limit. The run-time model is scripts/rehearsal/client-model.ts. */
 export const WRITER_READS_PER_WRITE = 3;
@@ -60,7 +65,7 @@ export const WRITER_READS_PER_WRITE = 3;
 // ---- Realtime topics -------------------------------------------------------------------------------------------
 // operational_changes.topic emitted by the server for each simulated write, from the function definitions:
 //  * private.apply_procedure (20261006023111_chair_procedure.sql): every procedure command → 'chair'.
-//  * private.apply_mutation (20261006073442_staff_chair_contacts.sql): default 'chair' (attendance, participation,
+//  * private.apply_mutation (20261006073442_staff_chair_contacts.sql, rekeyed 20261031090000): default 'chair' (rollCallCommit, participation,
 //    queue, vote …); document/version/newDocument → 'documents'; setup/staff commands → 'configuration';
 //    kind = 'timer' emits NOTHING (`if kind<>'timer' then insert …`).
 //  * private.apply_operations_mutation (20261006023108_operations_review_hardening.sql): photoAck → 'chair',
@@ -69,7 +74,7 @@ export const WRITER_READS_PER_WRITE = 3;
 // The committee_id of the event is the writer's committee (documents: the document's committee).
 export type Topic = "chair" | "documents" | "configuration";
 export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
-  currentSession: "chair", attendance: "chair", queueAdd: "chair", queueOrder: "chair",
+  rollCall: "chair", draft: null, queueAdd: "chair", queueOrder: "chair",
   speechStart: "chair", speechScore: "chair", poiAllowance: "chair", poiAdd: "chair", poiRecognize: "chair", poiScore: "chair", speechFinish: "chair",
   photoAck: "chair", timer: null,
   sendToApproval: "documents", approve: "documents", print: "documents", submit: "documents",
@@ -127,13 +132,17 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
     const push = (gapMs: number, action: Action) => {
       t += Math.max(HUMAN_FLOOR_SECONDS * 1000, gapMs);
       if (t >= end) return false;
-      steps.push({ at: t, action, retry: !READS.includes(action) && random() < (o.retryFraction ?? 0.1) ? true : undefined });
+      // The retry draw is kept for local steps too, so the random stream (and the public burst) is unchanged; a local step is never re-sent.
+      const lost = !READS.includes(action) && random() < (o.retryFraction ?? 0.1);
+      steps.push({ at: t, action, retry: lost && isWrite(action) ? true : undefined });
       return true;
     };
     if (role === "chair") {
-      if (floor && !push(between(3, 6), "currentSession")) return { id, role, committee, floor, start, steps };
-      // Roll call at the start of the session: a handful of delegates, a few seconds apart.
-      for (let i = 0; i < 8 && push(between(3, 8), "attendance"); i++);
+      // Sessions follow the schedule: no Chair selects one. Steps keep the earlier timing and random stream (a draft is not a READ, so
+      // it draws the same retry number the session selection and attendance writes did), so the public burst stays stable.
+      if (floor && !push(between(3, 6), "draft")) return { id, role, committee, floor, start, steps };
+      // Roll call at the start of the session: delegates marked in a draft a few seconds apart, then ONE commit.
+      for (let i = 0; i < 8 && push(between(3, 8), i === 7 ? "rollCall" : "draft"); i++);
       if (floor) {
         // The floor: add speakers, call them from the queue, score, sometimes POIs, finish. Speeches last 30–90 s.
         let ok = true;
@@ -144,7 +153,7 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
           if (ok && random() < 0.4) ok = push(between(20, 40), "poiAllowance") && push(between(3, 10), "poiAdd") && push(between(10, 30), "poiRecognize");
           ok = ok && push(between(30, 60), "speechScore") && push(between(3, 8), "speechFinish");
         }
-      } else while (push(between(20, 60), pick<Action>([["queueAdd", 45], ["attendance", 20], ["refocus", 25], ["timer", 5], ["photoAck", 5]])));
+      } else while (push(between(20, 60), pick<Action>([["queueAdd", 45], ["draft", 18], ["rollCall", 2], ["refocus", 25], ["timer", 5], ["photoAck", 5]])));
     } else if (role === "approval") while (push(between(30, 90), pick<Action>([["read", 70], ["approve", 30]])));
     else if (role === "admins") while (push(between(45, 120), pick<Action>([["read", 70], ["print", 30]])));
     else while (push(between(45, 90), pick<Action>([["read", 60], ["health", 40]])));
@@ -179,7 +188,7 @@ export function summarize(users: SimUser[], minutes: number) {
   for (const u of users) {
     roles[u.role] = (roles[u.role] ?? 0) + 1;
     for (const s of u.steps) counts[s.action] = (counts[s.action] ?? 0) + 1 + (s.retry ? 1 : 0);
-    const w = u.role === "delegate" ? 0 : u.steps.filter((s) => !READS.includes(s.action)).length;
+    const w = u.role === "delegate" ? 0 : u.steps.filter((s) => isWrite(s.action)).length;
     writes += w;
     if (w) fanoutReads += w * subscribers(users, u).length;
     maxPerUserPerMinute = Math.max(maxPerUserPerMinute, w / Math.max(1, minutes));

@@ -4,6 +4,8 @@ import type { Health } from "../sync/repository";
 import { committeePhotoReminders, type PhotoStage } from "../operations/photo-reminders";
 import { sentBack } from "../resolution-view";
 import { resolutionIdentities, resolutionLabel } from "../resolution-identity";
+import { displayedResolution } from "../sessions/display";
+import { before, isLive, rollCallAt } from "../sessions/presence";
 
 /** A group photo that needs the Chair's attention right now (already derived by the Chair's photo banner rules). */
 export type FelixPhoto = { slotId: string; revision: number; stage: PhotoStage; school: string; location: string; minutesUntil: number; delegates: number };
@@ -24,15 +26,18 @@ export type FelixContext = {
   chair?: {
     committeeId: string;
     committeeCode?: string;
+    /** The session the published schedule gives the committee now (display only: Chairs never choose a session). */
     sessionId?: string;
     sessionName?: string;
-    /** The committee has at least one non-archived session to choose from. */
-    hasSessions: boolean;
+    /** The Executive has published a schedule for this committee. */
+    schedulePublished: boolean;
     /** Delegates in this committee. */
     delegates: number;
-    /** Attendance marks recorded for the current session. */
+    /** Delegations in the live roll call (0: no roll call yet) and how many of them are present. */
     marked: number;
     present: number;
+    /** No roll call is live, or the live one was taken before the current session began. */
+    rollCallDue: boolean;
     /** A speech (or its POIs) currently holds the floor. */
     speaking: boolean;
     queued: number;
@@ -59,9 +64,12 @@ export function felixContext(data: ConferenceData, role: Role, committeeId?: str
   if (role !== "chair") return { role, documents: data.documents, delegates: data.delegates, amendments: data.amendments ?? [] };
   const id = committeeId ?? "";
   const committee = data.committees.find(c => c.id === id);
-  const session = committee?.currentSessionId ? data.sessions.find(s => s.id === committee.currentSessionId && s.committeeId === id && !s.archived) : undefined;
+  // Sessions follow the published schedule (docs/SESSION_MODEL.md section 7); presence is the live roll call (section 6).
+  const schedule = id ? displayedResolution(data, id, new Date(now).toISOString()) : null;
+  const session = schedule?.sessionId ? data.sessions.find(s => s.id === schedule.sessionId) : undefined;
   const delegates = data.delegates.filter(d => d.committeeId === id);
-  const marks = session ? data.attendance.filter(a => a.sessionId === session.id && delegates.some(d => d.id === a.delegateId)) : [];
+  const live = rollCallAt(data, id);
+  const marks = live ? live.rows.filter(r => delegates.some(d => d.id === r.delegateId)) : [];
   const documents = data.documents.filter(d => d.committeeId === id);
   const amendments = (data.amendments ?? []).filter(a => a.committeeId === id);
   const links = data.resolutionLinks ?? [];
@@ -80,12 +88,13 @@ export function felixContext(data: ConferenceData, role: Role, committeeId?: str
       committeeCode: committee?.code,
       sessionId: session?.id,
       sessionName: session?.name,
-      hasSessions: data.sessions.some(s => s.committeeId === id && !s.archived),
+      schedulePublished: !!schedule,
       delegates: delegates.length,
       marked: marks.length,
       present: marks.filter(a => a.status !== "Absent").length,
-      speaking: !!session && (data.speeches ?? []).some(s => s.sessionId === session.id && s.state !== "finished"),
-      queued: session ? data.queue.filter(q => q.sessionId === session.id).length : 0,
+      rollCallDue: !live || (!!session && !!schedule?.windowStart && before(live.effectiveAt, schedule.windowStart)),
+      speaking: (data.speeches ?? []).some(s => isLive(s, id) && s.state !== "finished"),
+      queued: data.queue.filter(q => isLive(q, id)).length,
       inDebate: inDebate && labelOf(inDebate).text,
       submissions,
       changesRequested: documents.filter(d => sentBack(d)).map(d => ({ id: d.id, label: labelOf(d).text })),
