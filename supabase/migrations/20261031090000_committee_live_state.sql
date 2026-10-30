@@ -124,6 +124,15 @@ language sql stable set search_path='' as $$
          or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
              and e.command->>'speechId' = p_command->>'speechId')
          or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
+         -- Repeated corrections of one event, and repeated votes of one delegate on one resolution, carry optimistically incremented revisions:
+         -- keep that device's order (an earlier held one must be decided first).
+         or (p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq and e.command->>'type' = p_command->>'type' and (
+              (p_command->>'type' = 'event' and e.command->>'id' = p_command->>'id')
+           or (p_command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'resolutionId' and e.command->>'delegateId' = p_command->>'delegateId')))
+         -- A counted close must include unresolved vote changes for its ballot, even from another device.
+         or (p_command->>'type' = 'document' and p_command->>'status' = 'Closed'
+             and coalesce(p_command->>'method', '') <> 'observed' and coalesce(p_command->>'outcome', '') <> 'Withdrawn'
+             and e.command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'id')
          -- A correction of an event waits for the held command that creates that event (ids derive from the creating command's key).
          or (p_command->>'type' = 'event' and (substr(e.id::text, 1, 24) || '000000000001' = p_command->>'id' or substr(e.id::text, 1, 24) || '000000000002' = p_command->>'id'))
          -- Whatever names a record by id waits for the held command that creates it, from any device (the id derives from that command's key):

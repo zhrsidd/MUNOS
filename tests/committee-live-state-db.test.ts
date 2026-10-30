@@ -396,3 +396,85 @@ test('real PostgreSQL: anything that names a record by id waits for the held com
   assert.equal(await count(`select 1 from public.speeches where id=$1 and state='finished'`,[speechId]),1,'the finish applied to the approved speech');
  }finally{await db.close();}
 });
+
+for(const approval of ['single','bulk'] as const)test(`held event corrections preserve revision order through ${approval} approval`,async()=>{
+ const f=await fixture();const {db,now,send,delegates,roll,ops,one,count,verify}=f;
+ try{
+  await send(roll(present(delegates[0])),now);
+  const source=await send({type:'participation',...f.c,delegateId:delegates[0],categoryId:'speech',points:2,resolutionId:null},now);
+  const id=source.slice(0,24)+'000000000001',deviceId=U(192);
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const first=await send({type:'event',id,points:3,_device:{deviceId,deviceSeq:1}},now-3*H,'chair',chair,crypto.randomUUID(),'0');
+  await verify(deviceId,now);
+  const second=await send({type:'event',id,points:0,undo:true,_device:{deviceId,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),'1');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[second])).reason,'behind_held');
+  const decide=(heldId:string)=>ops(exec,{type:'heldDecide',heldId,decision:'approve',reason:'Reviewed'});
+  if(approval==='single'){
+   await assert.rejects(()=>decide(second),/Decide the earlier held action/);
+   await decide(first);await decide(second);
+  }else{
+   await ops(exec,{type:'clockConfirm',deviceId,offsetMs:0,reason:'Clock checked'});
+   await ops(exec,{type:'heldBulkApprove',deviceId,reason:'Reviewed'});
+  }
+  assert.equal(await count('select 1 from public.participation_corrections where event_id=$1',[id]),2);
+  assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[second])).state,'applied');
+ }finally{await db.close();}
+});
+
+for(const approval of ['single','bulk'] as const)test(`counted close waits for held votes through ${approval} approval`,async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ try{
+  const [delegateId]=delegates;
+  await send(roll(present(delegateId)),now);
+  const revision=async()=>String((await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision);
+  await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'},now,'chair',chair,crypto.randomUUID(),await revision());
+  const vote={type:'vote',...f.c,resolutionId:ids.resolution,delegateId};
+  await send({...vote,choice:'For'},now,'chair',chair,crypto.randomUUID(),'0');
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const heldVote=await send({...vote,choice:'Against',_device:{deviceId:U(193),deviceSeq:1}},now-3*H,'chair',chair,crypto.randomUUID(),'1');
+  const deviceId=U(194);await verify(deviceId,now);
+  const close=await send({type:'document',id:ids.resolution,status:'Closed',outcome:'Failed',_device:{deviceId,deviceSeq:1}},now,'chair',chair,crypto.randomUUID(),await revision());
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[close])).reason,'behind_held');
+  const decide=(heldId:string)=>ops(exec,{type:'heldDecide',heldId,decision:'approve',reason:'Reviewed'});
+  if(approval==='single')await assert.rejects(()=>decide(close),/Decide the earlier held action/);
+  else{
+   await ops(exec,{type:'clockConfirm',deviceId,offsetMs:0,reason:'Clock checked'});
+   await ops(exec,{type:'heldBulkApprove',deviceId,reason:'Reviewed'});
+   assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[close])).state,'held');
+  }
+  assert.equal(await count(`select 1 from public.documents where id=$1 and status='In Debate'`,[ids.resolution]),1);
+  await decide(heldVote);
+  if(approval==='single')await decide(close);else await ops(exec,{type:'heldBulkApprove',deviceId,reason:'Reviewed'});
+  assert.equal(await count(`select 1 from public.documents where id=$1 and status='Closed' and outcome='Failed'`,[ids.resolution]),1);
+ }finally{await db.close();}
+});
+
+for(const approval of ['single','bulk'] as const)test(`held vote changes preserve revision order through ${approval} approval`,async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ try{
+  const [delegateId]=delegates;
+  await send(roll(present(delegateId)),now);
+  const revision=async()=>String((await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision);
+  await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'},now,'chair',chair,crypto.randomUUID(),await revision());
+  const vote={type:'vote',...f.c,resolutionId:ids.resolution,delegateId};
+  await send({...vote,choice:'For'},now,'chair',chair,crypto.randomUUID(),'0');
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const deviceId=U(194);
+  // An older offline change is held for its clock; the change that follows it on the same device carries the incremented revision.
+  const first=await send({...vote,choice:'Against',_device:{deviceId,deviceSeq:1}},now-3*H,'chair',chair,crypto.randomUUID(),'1');
+  await verify(deviceId,now);
+  const second=await send({...vote,choice:'For',_device:{deviceId,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),'2');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[second])).reason,'behind_held');
+  const decide=(heldId:string)=>ops(exec,{type:'heldDecide',heldId,decision:'approve',reason:'Reviewed'});
+  if(approval==='single'){
+   await assert.rejects(()=>decide(second),/Decide the earlier held action/);
+   await decide(first);await decide(second);
+  }else{
+   await ops(exec,{type:'clockConfirm',deviceId,offsetMs:0,reason:'Clock checked'});
+   await ops(exec,{type:'heldBulkApprove',deviceId,reason:'Reviewed'});
+  }
+  const final=await one<{choice:string;revision:number}>(`select choice,revision from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null`,[ids.resolution,delegateId]);
+  assert.equal(final.choice,'For');assert.equal(Number(final.revision),3,'both held changes applied in order');
+  assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[second])).state,'applied');
+ }finally{await db.close();}
+});
