@@ -2,7 +2,7 @@
 // This is NOT the current actual-core live runner and provides no current H3 rate prediction. Upper bound on writes: every
 // scheduled write step is assumed to produce a write (the live run skips some when its precondition is not met).
 import { SimClient, sumStats, type Clock, type RefreshSource } from "./client-model";
-import { READS, TOPIC_OF, recipients, type RealtimeModel, type SimUser, type Step } from "./scenario";
+import { TOPIC_OF, isWrite, recipients, type RealtimeModel, type SimUser, type Step } from "./scenario";
 /** Snapshot RPCs per logical refresh on current core: one bundled state-snapshot RPC (PR #11). The run harness measures
  *  the real count instead (rpc-counter.ts); 2 would apply only if core fell back to the separate snapshot RPCs. */
 export const SNAPSHOT_RPCS_PER_REFRESH = 1;
@@ -77,7 +77,7 @@ export function estimate(users: SimUser[], o: EstimateOptions) {
     if (step.action === "open") client.open();
     else if (step.action === "refocus" || (step.action === "read" && !step.periodic)) client.focus();
     else if (step.action === "read" || step.action === "health") return; // periodic recovery is the client's own timer
-    else if (!READS.includes(step.action)) client.execute({ user, step });
+    else if (isWrite(step.action)) client.execute({ user, step }); // draft and timer stay on the device
   }, step.at);
   return clock.run(end).then(() => {
     const total = sumStats([...clients.values()].map((c) => c.stats));
