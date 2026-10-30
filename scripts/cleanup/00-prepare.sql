@@ -50,7 +50,6 @@ insert into cleanup_rules(seq, tbl, kind, scope, setsql, exact, why) values
  (17, 'public.participation_adjustments','delete','t.conference_id in (select id from pg_temp.cleanup_targets)', null, true, 'self-reference (reverses) is satisfied within one statement'),
  (18, 'public.attendance',             'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),
  (19, 'public.speaker_queue',          'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),
- (20, 'public.timers',                 'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),
  (21, 'public.debate_states',          'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),
  (22, 'public.award_scores',           'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),
  (23, 'public.award_criteria',         'delete', 't.conference_id in (select id from pg_temp.cleanup_targets)', null, true, null),

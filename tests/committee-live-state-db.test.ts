@@ -365,6 +365,38 @@ for(const approval of ['single','bulk'] as const)test(`real PostgreSQL: restorat
  }finally{await db.close();}
 });
 
+test('real PostgreSQL: anything that names a record by id waits for the held command that creates it, even from another device',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,one,count,ops,verify}=f;
+ try{
+  const [pv,other]=delegates;
+  const rollDev=U(242);await verify(rollDev,now-30*M);
+  await send(roll(present(pv,other),{committed:now-30*M,device:rollDev,seq:1}),now-30*M);
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev1=U(240),dev2=U(241);await verify(dev1,now-10*M);await verify(dev1,now);await verify(dev2,now);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  const reason=async(id:string)=>(await one<{reason:string}>('select reason from public.held_action where id=$1',[id])).reason;
+  const held=async(command:Record<string,unknown>,at:number,expected:string|null)=>send(command,at,'chair',chair,crypto.randomUUID(),expected);
+  // Device 1 queues a delegate and starts a speech offline (stale, so both are held); device 2 acts on them with a good clock.
+  const qadd=await held({type:'queueAdd',...f.c,delegateId:other,lane:'open',_device:{deviceId:dev1,deviceSeq:1}},now-10*M,null);
+  const entryId=qadd.slice(0,24)+'000000000001';
+  assert.equal(await reason(qadd),'stale');
+  const qrem=await held({type:'queueRemove',...f.c,entryId,_device:{deviceId:dev2,deviceSeq:1}},now,null);
+  assert.equal(await reason(qrem),'behind_held','a removal from another device waits for the held queue entry');
+  const start=await held({type:'speechStart',...f.c,delegateId:pv,resolutionId:ids.resolution,classification:'Other',_device:{deviceId:dev1,deviceSeq:2}},now-10*M,'empty');
+  const speechId=start.slice(0,24)+'000000000001';
+  const poi=await held({type:'poiAdd',...f.c,speechId,delegateId:other,_device:{deviceId:dev1,deviceSeq:3}},now-10*M,null);
+  const poiId=poi.slice(0,24)+'000000000001';
+  const prem=await held({type:'poiRemove',...f.c,speechId,entryId:poiId,_device:{deviceId:dev2,deviceSeq:2}},now,'1');
+  assert.equal(await reason(prem),'behind_held','removing a POI entry waits for the held poiAdd');
+  const fin=await held({type:'speechFinish',...f.c,speechId,_device:{deviceId:dev2,deviceSeq:3}},now,'2');
+  assert.equal(await reason(fin),'behind_held','finishing a speech from another device waits for the held start');
+  for(const id of [qadd,qrem,start,poi,prem,fin])assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[id])).state,'held');
+  await assert.rejects(()=>decide(fin),/Decide the earlier held action/);
+  for(const [n,id] of Object.entries({qadd,qrem,start,poi,prem,fin}))try{await decide(id)}catch(e){throw new Error(n+": "+(e as Error).message)}
+  assert.equal(await count(`select 1 from public.speeches where id=$1 and state='finished'`,[speechId]),1,'the finish applied to the approved speech');
+ }finally{await db.close();}
+});
+
 for(const approval of ['single','bulk'] as const)test(`held event corrections preserve revision order through ${approval} approval`,async()=>{
  const f=await fixture();const {db,now,send,delegates,roll,ops,one,count,verify}=f;
  try{

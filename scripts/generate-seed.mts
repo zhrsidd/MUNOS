@@ -32,7 +32,6 @@ for(const e of seed.events){const{committeeId,sessionId,...rest}=e;void committe
  for(const [to,sid] of [[current,sessionId],[legacy,sessionId??legacySession[cid]]] as const)insert('participation_events',{...rest,id:uuid(e.id),conference_id:conf,committee_id:uuid(cid),sessionId:sid?uuid(sid):null,delegateId:uuid(e.delegateId),resolutionId:e.resolutionId?uuid(e.resolutionId):null,chairId:null},to);}
 for(const q of seed.queue){const{position,committeeId,sessionId,...rest}=q;void position;void committeeId;const cid=committeeOf(q);
  for(const [to,sid] of [[current,sessionId],[legacy,sessionId??legacySession[cid]]] as const)insert('speaker_queue',{...rest,id:uuid(q.id),conference_id:conf,committee_id:uuid(cid),sessionId:sid?uuid(sid):null,delegateId:uuid(q.delegateId)},to);}
-insert('timers',{duration:90,remaining:90,startedAt:null,id:uuid('timer-s1'),conference_id:conf,committee_id:uuid('ga1'),sessionId:uuid('s1')},legacy);
 out.push(`do $seed$ begin
 if exists(select 1 from information_schema.columns where table_schema='public' and table_name='roll_call' and column_name='effective_at') then
 ${current.join('\n')}

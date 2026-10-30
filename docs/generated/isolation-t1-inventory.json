@@ -35,9 +35,10 @@
   "20261030090000_record_labelling.sql",
   "20261030100000_session_holds.sql",
   "20261030110000_session_schedules_snapshot.sql",
-  "20261031090000_committee_live_state.sql"
+  "20261031090000_committee_live_state.sql",
+  "20261031100000_attendance_to_roll_calls.sql"
  ],
- "migrationsSha256": "09bd41f61e03d9a51fd34e16ee9cd58fc8bac980c687c25980e41a84a86850e2",
+ "migrationsSha256": "8ac1bdb676b4376fb7581861a186c2f6390390754df0ee976c4fd3121d72a956",
  "supabase-model": {
   "fns": [
    {
@@ -4870,34 +4871,6 @@
    },
    {
     "schema": "public",
-    "name": "timers",
-    "kind": "r",
-    "owner": "postgres",
-    "rls": true,
-    "forceRls": false,
-    "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
-    "privs": {
-     "anon": [],
-     "authenticated": [
-      "SELECT"
-     ],
-     "service_role": [],
-     "authenticator": [],
-     "postgres": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER",
-      "MAINTAIN"
-     ]
-    }
-   },
-   {
-    "schema": "public",
     "name": "user_access",
     "kind": "r",
     "owner": "postgres",
@@ -5412,15 +5385,6 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
-    "check": ""
-   },
-   {
-    "table": "public.timers",
-    "name": "read_authorized",
-    "cmd": "SELECT",
-    "roles": "authenticated",
-    "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
@@ -10469,34 +10433,6 @@
    },
    {
     "schema": "public",
-    "name": "timers",
-    "kind": "r",
-    "owner": "postgres",
-    "rls": true,
-    "forceRls": false,
-    "options": "",
-    "aclRaw": "postgres=arwdDxtm/postgres,authenticated=r/postgres",
-    "privs": {
-     "anon": [],
-     "authenticated": [
-      "SELECT"
-     ],
-     "service_role": [],
-     "authenticator": [],
-     "postgres": [
-      "SELECT",
-      "INSERT",
-      "UPDATE",
-      "DELETE",
-      "TRUNCATE",
-      "REFERENCES",
-      "TRIGGER",
-      "MAINTAIN"
-     ]
-    }
-   },
-   {
-    "schema": "public",
     "name": "user_access",
     "kind": "r",
     "owner": "postgres",
@@ -11011,15 +10947,6 @@
     "roles": "authenticated",
     "permissive": true,
     "using": "(private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role]))",
-    "check": ""
-   },
-   {
-    "table": "public.timers",
-    "name": "read_authorized",
-    "cmd": "SELECT",
-    "roles": "authenticated",
-    "permissive": true,
-    "using": "private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role])",
     "check": ""
    },
    {
