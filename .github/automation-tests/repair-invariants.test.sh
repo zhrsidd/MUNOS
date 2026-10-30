@@ -49,9 +49,18 @@ check(claude["with"].get("github_token") == "${{ github.token }}",
       "Claude gets the read-only workflow token, not the push token or the app token exchange")
 check("--disallowedTools" in claude["with"].get("claude_args", "") and "git push" in claude["with"].get("claude_args", ""),
       "Claude's tool list disallows git push")
-check(set(repair["outputs"].keys()) == {"has_patch"}, "repair job exposes only whether a patch exists")
+check(set(repair["outputs"].keys()) == {"has_patch", "thread_ids"}, "repair job exposes only whether a patch exists and the captured thread IDs")
 check("Resolve each review thread" not in claude["with"].get("prompt", "") and "Do not resolve or dismiss" in claude["with"].get("prompt", ""),
       "Claude's prompt tells it not to resolve or dismiss reviews and threads")
+
+# The threads to resolve are captured before Claude runs, and Claude does not run without them.
+rnames = [st.get("name", "") for st in repair["steps"]]
+cap_i = rnames.index("Capture the Codex threads of the review being repaired")
+claude_i = next(i for i, st in enumerate(repair["steps"]) if str(st.get("uses", "")).startswith("anthropics/claude-code-action"))
+check(cap_i < claude_i, "the Codex threads are captured before Claude runs")
+check("steps.capture.outcome == 'success'" in str(claude.get("if", "")), "Claude runs only when the thread capture succeeded")
+check(repair["steps"][cap_i]["env"].get("GH_TOKEN") == "${{ github.token }}" and "REVIEW_ID" in repair["steps"][cap_i]["env"],
+      "the capture uses the read-only token and the review that triggered the run")
 
 # The push job holds the push token, and only after the changed-file check.
 steps = push["steps"]
@@ -78,6 +87,11 @@ check("pulls/$PR" not in rereview["run"] and ".head.sha" not in rereview["run"],
       "the re-review request never reads the pull request's head, which GitHub refreshes a moment after a push")
 check("echo \"sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\"" in steps[push_i]["run"],
       "the push step reports the commit it pushed")
+resolver = steps[resolve_i]
+check(resolver["env"].get("THREAD_IDS") == "${{ needs.repair.outputs.thread_ids }}" and resolver["env"].get("REVIEW_ID") == "${{ github.event.review.id }}",
+      "the resolver takes the captured thread IDs and the repaired review's ID")
+check("$captured" in resolver["run"] and "pull_request_review_id == $review" in resolver["run"],
+      "the resolver closes only captured threads that belong to the repaired review")
 check("secrets." not in blob(steps[apply_i]), "the changed-file check holds no secret")
 pushers = [s.get("name", "") for s in steps if "git push" in str(s.get("run", ""))]
 check(pushers == ["Push the checked repair"], "git push appears only in the guarded push step")

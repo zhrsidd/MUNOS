@@ -175,7 +175,10 @@ from editing the workflows, which is the trust model the rest of this document a
   against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
   executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
   go through. `bash .github/automation-tests/repair-resolve.test.sh` runs the thread-resolution step against a fake `gh`:
-  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-rereview.test.sh` runs the re-review
+  the repair job records the open Codex threads of the review being repaired before Claude runs, and the push job resolves
+  only those, after checking each again (still open, opened by the pinned Codex App in that same review). A newer or older
+  Codex review, a human's thread, an impostor and anything unverifiable stay open, and a bad list resolves nothing.
+  `bash .github/automation-tests/repair-rereview.test.sh` runs the re-review
   request against a fake `gh` that serves a stale pull request head, as GitHub does for a moment after a push: a push that
   created a commit yields exactly one `@codex review` for that commit, and nothing else yields one. The push step reports the
   pushed commit and the request uses it, because reading the pull request's head right after a push once skipped the
