@@ -14,7 +14,7 @@ Status: **not yet proven end to end.** The decision logic and the shell wrapper 
    read from that summary state, never from a single comment or reaction.
 2. **`claude-review-repair.yml` (Claude repair).** After a Codex review on the current head that leaves unresolved Codex
    threads, Claude edits files to fix what is actionable. Claude cannot push and cannot resolve threads. A separate job
-   checks the changed files, makes one `fix(review):` commit (at most three per PR), pushes it, requests a fresh Codex
+   checks the changed files, makes one `fix(review):` commit (at most five per PR), pushes it, requests a fresh Codex
    review with `@codex review` once per new head, and resolves Codex's own open threads. See "Write safety for repairs".
 3. **`codex-reviewed-automerge.yml` (gate).** Enables squash auto-merge only when **all** of these hold:
    - the head branch is in this repository, the base is `main`, and the PR is not a draft;
@@ -85,7 +85,7 @@ the workflow enforces them even if Claude ignores `CLAUDE.md`.
    - a patch over 2 MB, a patch that does not apply cleanly (including paths outside the repository), or a checkout that is
      not the reviewed commit.
 3. **Push.** Only after that check passes, one step holds `CLAUDE_AUTOMATION_TOKEN`. The job itself makes the single
-   `fix(review):` commit, so Claude cannot choose the message that the three-repair cap counts. It confirms the branch is
+   `fix(review):` commit, so Claude cannot choose the message that the five-repair cap counts. It confirms the branch is
    still at the reviewed commit, then pushes without force, so a moved branch fails closed.
 4. **Threads.** After a successful push, the `push` job resolves the open review threads whose first comment was written by
    the pinned Codex App (matched by numeric ID, login and type, as the gate does). Human threads and impostors stay open.
@@ -121,6 +121,11 @@ Residual risks:
 - `git add -A` in the `repair` job collects whatever the action or `npm` writes into the checkout. A stray file under a
   protected path, such as a `.claude/` file, would make every repair fail closed. That is safe but would stop the feature
   working, so check the patch artifact's file list on the first live run.
+- Dependencies for Claude's typecheck, lint and test commands are installed from the committed lockfile with `npm ci
+  --ignore-scripts`, in a step that holds no secret and runs before the Claude step, with Node 22 and the npm cache as in
+  `ci.yml`. No lifecycle script of the pull request's code or its dependencies runs in that step. The OAuth token is passed
+  to the Claude step only. Claude still has a shell and can run the project's scripts; the push job's checks, not this
+  step, are what bound what it can publish. If the install fails the repair does not run.
 
 ## One-time bootstrap (before the gate is on main)
 
@@ -154,7 +159,7 @@ from editing the workflows, which is the trust model the rest of this document a
 
 ## Behaviour and limits
 
-- At most three `fix(review):` commits are created per PR. A fourth request posts `NEEDS_DECISION` and stops.
+- At most five `fix(review):` commits are created per PR. The cap counts those commits on the pull request, not workflow attempts, so a failed run does not use one up. A sixth request posts `NEEDS_DECISION` and stops.
 - A repair runs only for a review on the **current** head. A review for an older commit is skipped.
 - Until the required `codex-review-gate` status exists on a head, GitHub blocks that head. A new PR therefore needs its
   first gate run before it can merge, which the `opened` trigger provides.
@@ -180,6 +185,8 @@ from editing the workflows, which is the trust model the rest of this document a
   Codex review, a human's thread, an impostor and anything unverifiable stay open, and a bad list resolves nothing. The threads
   are resolved before the re-review is requested: resolving fires no event the gate listens to, so a clean re-review that
   arrived first would leave the gate red on threads about to be closed.
+  `bash .github/automation-tests/repair-cap.test.sh` runs the repair cap against a fake `gh`: four `fix(review):` commits let a
+  fifth run, five stop it with `NEEDS_DECISION`, and only commits whose message starts with the prefix count.
   `bash .github/automation-tests/repair-rereview.test.sh` runs the re-review
   request against a fake `gh` that serves a stale pull request head, as GitHub does for a moment after a push: a push that
   created a commit yields exactly one `@codex review` for that commit, and nothing else yields one. The push step reports the

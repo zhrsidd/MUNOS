@@ -58,7 +58,22 @@ rnames = [st.get("name", "") for st in repair["steps"]]
 cap_i = rnames.index("Capture the Codex threads of the review being repaired")
 claude_i = next(i for i, st in enumerate(repair["steps"]) if str(st.get("uses", "")).startswith("anthropics/claude-code-action"))
 check(cap_i < claude_i, "the Codex threads are captured before Claude runs")
-check("steps.capture.outcome == 'success'" in str(claude.get("if", "")), "Claude runs only when the thread capture succeeded")
+check("steps.install.outcome == 'success'" in str(claude.get("if", "")), "Claude runs only when the dependency install succeeded")
+install_i = next(i for i, st in enumerate(repair["steps"]) if st.get("id") == "install")
+node_i = next(i for i, st in enumerate(repair["steps"]) if str(st.get("uses", "")).startswith("actions/setup-node@"))
+head_i = next(i for i, st in enumerate(repair["steps"]) if str(st.get("uses", "")).startswith("actions/checkout@") and "head.sha" in str(st.get("with", {})))
+check(head_i < node_i < install_i < claude_i, "the head is checked out, Node is set up and dependencies are installed before Claude runs")
+check(repair["steps"][node_i]["with"].get("node-version") == 22, "Node 22 is set up, as in ci.yml")
+check(repair["steps"][install_i]["run"].strip() == "npm ci --ignore-scripts --no-audit --no-fund",
+      "dependencies come from the lockfile with lifecycle scripts disabled")
+check("secrets." not in blob(repair["steps"][install_i]) and "secrets." not in blob(repair["steps"][node_i]) and "env" not in repair["steps"][install_i],
+      "the install and Node setup steps hold no secret or injected environment")
+check("steps.capture.outcome == 'success'" in str(repair["steps"][install_i].get("if", "")), "the install runs only after the thread capture succeeded")
+patch_step = next(st for st in repair["steps"] if st.get("name") == "Collect Claude's edits as a patch")
+check("steps.install.outcome == 'success'" in str(patch_step.get("if", "")), "the patch is collected only when Claude had its dependencies")
+cap_step = next(st for st in repair["steps"] if st.get("id") == "cap")
+check("-ge 5" in cap_step["run"] and "-ge 3" not in cap_step["run"] and "five automated review-repair commits" in cap_step["run"],
+      "the repair cap is five and its NEEDS_DECISION notice says so")
 check(repair["steps"][cap_i]["env"].get("GH_TOKEN") == "${{ github.token }}" and "REVIEW_ID" in repair["steps"][cap_i]["env"],
       "the capture uses the read-only token and the review that triggered the run")
 
