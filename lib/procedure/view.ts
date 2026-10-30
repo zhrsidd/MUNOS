@@ -34,5 +34,5 @@ export const FLOOR_NOT_WITH_CHAIR='Finish the current speech and return the floo
 /** True while someone has the floor (a speech or its POIs) in the amendment's committee. An amendment may not start, nor close once
  *  In Debate, until the floor is with the Chair. */
 export function amendmentFloorTaken(d:Pick<ConferenceData,'speeches'>,a:{committeeId:string}){
- return !!d.speeches?.some(s=>s.state!=='finished'&&s.committeeId===a.committeeId);
+ return !!d.speeches?.some(s=>s.state!=='finished'&&isLive(s,a.committeeId));
 }
