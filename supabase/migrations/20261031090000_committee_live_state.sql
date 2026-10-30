@@ -124,16 +124,17 @@ language sql stable set search_path='' as $$
          or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
              and e.command->>'speechId' = p_command->>'speechId')
          or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
-         -- A restoration waits for the held deduction whose adjustment id derives from its mutation key (any device).
-         or (p_command->>'type' = 'pointAdjustment' and p_command->>'action' = 'restore'
-             and e.command->>'type' = 'pointAdjustment' and e.command->>'action' = 'deduct'
-             and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'adjustmentId')
          -- A correction of an event waits for the held command that creates that event (ids derive from the creating command's key).
          or (p_command->>'type' = 'event' and (substr(e.id::text, 1, 24) || '000000000001' = p_command->>'id' or substr(e.id::text, 1, 24) || '000000000002' = p_command->>'id'))
-         -- A speech or POI score waits for the held command that creates its speech or POI entry (the id is derived from that command's key).
-         or (p_command->>'type' in ('speechScore', 'poiScore') and e.command->>'type' in ('speechStart', 'speechYield')
-             and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'speechId')
-         or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiAdd' and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'entryId'))
+         -- Whatever names a record by id waits for the held command that creates it, from any device (the id derives from that command's key):
+         -- a speech by speechStart or speechYield, a queue entry by queueAdd or queue, a POI entry by poiAdd, a deduction by pointAdjustment.
+         or (p_command->>'speechId' = substr(e.id::text, 1, 24) || '000000000001' and e.command->>'type' in ('speechStart', 'speechYield'))
+         or (p_command->>'entryId' = substr(e.id::text, 1, 24) || '000000000001' and (
+              (p_command->>'type' in ('queueRemove', 'speechStart') and e.command->>'type' in ('queueAdd', 'queue'))
+           or (p_command->>'type' in ('poiRecognize', 'poiScore', 'poiRemove') and e.command->>'type' = 'poiAdd')))
+         or (jsonb_typeof(p_command->'ids') = 'array' and p_command->>'type' in ('queueOrder', 'poiOrder') and e.command->>'type' in ('queueAdd', 'queue', 'poiAdd')
+             and (substr(e.id::text, 1, 24) || '000000000001') in (select jsonb_array_elements_text(p_command->'ids')))
+         or (p_command->>'type' = 'pointAdjustment' and e.command->>'type' = 'pointAdjustment' and p_command->>'adjustmentId' = substr(e.id::text, 1, 24) || '000000000001'))
   )
 $$;
 
@@ -161,8 +162,8 @@ begin
   if not found then raise exception 'Held action unavailable' using errcode = '22023'; end if;
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
   -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
-  -- decide that one first. Dependent records (including restorations) obey the same prerequisite rule.
-  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore', 'event', 'pointAdjustment')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+  -- decide that one first. Records are independent.
+  if decision = 'approve' and private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
     raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
   end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
@@ -185,7 +186,7 @@ begin
             order by device_seq nulls last, received_at, id for update loop
     -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
     -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
-    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore', 'event', 'pointAdjustment')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    continue when private.command_class(h.command->>'type') is not null and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
     end if;
@@ -1068,7 +1069,7 @@ begin
   elsif kind = 'vote' and not exists (select 1 from public.documents d where d.id = private.uuid_or_null(command->>'resolutionId') and d.status = 'In Debate') then
     -- A ballot that arrives after its result was declared is held: closed results are immutable (section 6).
     why := 'ballot_closed';
-  elsif kind in ('vote', 'speechScore', 'poiScore', 'event', 'pointAdjustment') and private.waits_for_held(cid, device, seq, command) then
+  elsif cls = 'record' and private.waits_for_held(cid, device, seq, command) then
     why := 'behind_held';
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';
