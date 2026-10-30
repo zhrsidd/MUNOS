@@ -216,3 +216,40 @@ test('real PostgreSQL: a Control that cites a held roll call is held with it and
   assert.deepEqual((await queue()).map(r=>r.d),[who]);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a vote waits for its held ballot restart, and a roll call revision or copy waits for the held roll call it builds on',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,one,count,ops,verify,asOwner}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  const docRev=async()=>String((await one<{r:string}>('select revision::text r from public.documents where id=$1',[ids.resolution])).r);
+  const voteRev=async()=>{return String((await one<{r:string}>(`select coalesce((select revision from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null),0)::text r`,[ids.resolution,pv])).r);};
+  await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'},now,'chair',chair,crypto.randomUUID(),await docRev());
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(220);await verify(dev,now-10*M);await verify(dev,now);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  // Restart the ballot offline; it reaches the server after the staleness limit, so it is held. The vote after it must be held too.
+  const restart=await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural',_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),await docRev());
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[restart])).reason,'stale');
+  const voteKey=await send({type:'vote',...f.c,resolutionId:ids.resolution,delegateId:pv,choice:'For',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),await voteRev());
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[voteKey])).reason,'behind_held');
+  assert.equal(await count(`select 1 from public.votes where "resolutionId"=$1 and "sessionId" is null`,[ids.resolution]),0,'the vote did not reach the old ballot');
+  await assert.rejects(()=>decide(voteKey),/Decide the earlier held action/);
+  await decide(restart);await decide(voteKey);
+  assert.equal(await count(`select 1 from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null`,[ids.resolution,pv]),1,'the vote survived the approved restart');
+
+  // A correction (next revision) of a roll call held as outside the schedule is held with it; so is a copy of it.
+  const early=now-270*M;await verify(dev,early);
+  const rcId=crypto.randomUUID(),copy=crypto.randomUUID();
+  const first=await send(roll(present(pv),{id:rcId,committed:early,device:dev,seq:3}),early);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[first])).reason,'outside_window');
+  const correction=await send(roll(present(pv),{id:rcId,revision:2,committed:now-60_000,device:dev,seq:4}),now);
+  const copied=await send(roll(present(pv),{id:copy,copiedFrom:rcId,committed:now-30_000,device:dev,seq:5}),now);
+  for(const k of [correction,copied])assert.equal((await one<{reason:string;state:string}>('select reason,state from public.held_action where id=$1',[k])).state,'held','held, not a permanent conflict');
+  await assert.rejects(()=>decide(correction),/Decide the earlier held action/);
+  await decide(first);await decide(correction);await decide(copied);
+  await asOwner();
+  assert.equal(await count('select 1 from public.roll_call where id=$1',[rcId]),2,'both revisions are committed after approval');
+  assert.equal(await count('select 1 from public.roll_call where id=$1',[copy]),1);
+ }finally{await db.close();}
+});

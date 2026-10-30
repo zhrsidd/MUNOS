@@ -98,17 +98,28 @@ begin
     'displayedReported', (dev ? 'displayedLabel') and (jsonb_typeof(dev->'displayedLabel') = 'null' or private.uuid_or_null(dev->>'displayedLabel') is not null))::text, true);
 end $$;
 
--- A held Control waits for what it depends on (section 5): an earlier held Control OR roll call from the same device and committee, and the
--- held roll call it cites (from any device). Without this a queue action that cites a held roll call reaches private.eligible, fails because
+-- A held command waits for what it depends on (section 5): a Control for an earlier held Control or roll call from the same device and committee,
+-- anything citing a held roll call, a roll call revision or copy for the roll call it builds on, and a vote for its resolution's held ballot restart. Without this a queue action that cites a held roll call reaches private.eligible, fails because
 -- the cited revision was never applied, and becomes a permanent client conflict that blocks the rest of the outbox.
 create function private.waits_for_held(committee uuid, device uuid, seq bigint, command jsonb) returns boolean
 language sql stable set search_path='' as $$
   select exists (
     select 1 from public.held_action e
      where e.state = 'held' and e.committee_id = committee
-       and ((device is not null and seq is not null and e.device_id = device and e.device_seq < seq
-             and private.command_class(e.command->>'type') in ('control', 'rollcall'))
-         or (e.command->>'type' = 'rollCallCommit' and e.command->>'rollCallId' = command#>>'{rollCall,id}')))
+       and (
+         -- Same device, earlier: a Control waits for any earlier held Control or roll call; a roll call waits for an earlier held roll call.
+         (device is not null and seq is not null and e.device_id = device and e.device_seq < seq and (
+              (private.command_class(command->>'type') = 'control' and private.command_class(e.command->>'type') in ('control', 'rollcall'))
+           or (private.command_class(command->>'type') = 'rollcall' and private.command_class(e.command->>'type') = 'rollcall')))
+         -- Whatever cites a held roll call waits for it (from any device).
+         or (e.command->>'type' = 'rollCallCommit' and e.command->>'rollCallId' = command#>>'{rollCall,id}')
+         -- A roll call revision waits for the held earlier revision of the same roll call, and a copy for the roll call it copies.
+         or (command->>'type' = 'rollCallCommit' and e.command->>'type' = 'rollCallCommit' and (
+              (e.command->>'rollCallId' = command->>'rollCallId' and (e.command->>'revision')::int < (command->>'revision')::int)
+           or e.command->>'rollCallId' = command->>'copiedFrom'))
+         -- A vote waits for the held ballot-opening command (voteMode) of its resolution: approving that restart later clears the ballot's votes.
+         or (command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = command->>'resolutionId'))
+  )
 $$;
 
 -- Same bodies as 20261030100000, except that the ordering rule uses private.waits_for_held (Controls wait for held roll calls too).
@@ -127,7 +138,7 @@ begin
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
   -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
   -- decide that one first. Records are independent.
-  if decision = 'approve' and private.command_class(h.command->>'type') = 'control' and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' = 'vote') and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
     raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
   end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
@@ -150,7 +161,7 @@ begin
             order by device_seq nulls last, received_at, id for update loop
     -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
     -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
-    continue when private.command_class(h.command->>'type') = 'control' and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' = 'vote') and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
     end if;
@@ -1029,10 +1040,12 @@ begin
   elsif kind = 'vote' and not exists (select 1 from public.documents d where d.id = private.uuid_or_null(command->>'resolutionId') and d.status = 'In Debate') then
     -- A ballot that arrives after its result was declared is held: closed results are immutable (section 6).
     why := 'ballot_closed';
+  elsif kind = 'vote' and private.waits_for_held(cid, device, seq, command) then
+    why := 'behind_held';
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';
     elsif cls = 'control' and received - client_time > make_interval(mins => st.control_stale_minutes) then why := 'stale';
-    elsif cls = 'control' and private.waits_for_held(cid, device, seq, command) then why := 'behind_held';
+    elsif private.waits_for_held(cid, device, seq, command) then why := 'behind_held';
     end if;
   end if;
   if why is null then return false; end if;

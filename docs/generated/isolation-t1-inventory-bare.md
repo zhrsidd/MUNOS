@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `d6a08b61b208a296`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `fb33a4cb96bc7b47`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
