@@ -54,6 +54,10 @@ check "clean summary for an older commit does not count" false false \
   "$(with_summary '{"commit_sha":"dc72afa6ad4a6c7aa2f0e957328b8790a2744e82","status":"completed","has_any_findings":false,"has_unresolved_findings":false}' \
     | jq '.pr.draft = false | .threads |= map(.isResolved = true)')"
 
+check "active findings block a non-draft with all threads resolved" false true \
+  "$(with_summary "{\"commit_sha\":\"$head\",\"status\":\"completed\",\"has_any_findings\":true,\"has_unresolved_findings\":true}" \
+    | jq '.pr.draft = false | .threads |= map(.isResolved = true)')"
+
 check "clean summary still in progress does not count" false false \
   "$(with_summary "{\"commit_sha\":\"$head\",\"status\":\"in_progress\",\"has_any_findings\":false,\"has_unresolved_findings\":false}" \
     | jq '.pr.draft = false | .threads |= map(.isResolved = true)')"
