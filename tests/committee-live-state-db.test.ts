@@ -334,3 +334,33 @@ test('real PostgreSQL: a correction of an event waits for the held score that cr
   await assert.rejects(()=>send({type:'event',id:crypto.randomUUID(),points:3},now,'chair',chair,crypto.randomUUID(),'0'),(e:{code?:string})=>e.code==='42501');
  }finally{await db.close();}
 });
+
+for(const approval of ['single','bulk'] as const)test(`real PostgreSQL: restoration waits for its held deduction through ${approval} approval`,async()=>{
+ const f=await fixture();const {db,ids,now,delegates,ops,one,count,verify,as}=f;
+ try{
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const send=async(command:unknown,time:number)=>{const key=crypto.randomUUID();await as(chair);await db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,key,JSON.stringify(command),'chair',null,iso(time)]);return key;};
+  const sourceDevice=U(190),restoreDevice=U(191),delegateId=delegates[0];
+  const deduction=await send({type:'pointAdjustment',...f.c,delegateId,action:'deduct',amount:2,reason:'Offline deduction',_device:{deviceId:sourceDevice,deviceSeq:1}},now-3*H);
+  const adjustmentId=deduction.slice(0,24)+'000000000001';
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[deduction])).reason,'uncertain_time');
+  await verify(restoreDevice,now);
+  const restore=await send({type:'pointAdjustment',...f.c,delegateId,action:'restore',adjustmentId,_device:{deviceId:restoreDevice,deviceSeq:1}},now);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[restore])).reason,'behind_held');
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  const bulk=()=>ops(exec,{type:'heldBulkApprove',deviceId:restoreDevice,reason:'Reviewed'});
+  if(approval==='single')await assert.rejects(()=>decide(restore),/Decide the earlier held action/);
+  else{
+   await ops(exec,{type:'clockConfirm',deviceId:restoreDevice,offsetMs:0,reason:'Clock checked'});
+   await bulk();
+   assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[restore])).state,'held','bulk skips an unresolved dependency on another device');
+  }
+  assert.equal(await count('select 1 from public.participation_adjustments'),0);
+  await decide(deduction);
+  if(approval==='single')await decide(restore);else await bulk();
+  assert.equal(await count('select 1 from public.participation_adjustments where reverses=$1',[adjustmentId]),1);
+  assert.equal((await one<{total:number}>('select sum(points)::int total from public.participation_adjustments where "delegateId"=$1',[delegateId])).total,0);
+  assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[restore])).state,'applied');
+  await assert.rejects(()=>send({type:'pointAdjustment',...f.c,delegateId,action:'restore',adjustmentId:crypto.randomUUID()},now),/Adjustment unavailable/);
+ }finally{await db.close();}
+});
