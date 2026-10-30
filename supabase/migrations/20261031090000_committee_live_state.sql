@@ -119,6 +119,11 @@ language sql stable set search_path='' as $$
            or e.command->>'rollCallId' = command->>'copiedFrom'))
          -- A vote waits for the held ballot-opening command (voteMode) of its resolution: approving that restart later clears the ballot's votes.
          or (command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = command->>'resolutionId')
+         -- Anything on a speech waits for an earlier held command on the same speech from the same device (its revision and state depend on it);
+         -- a POI score also waits for the held recognition of its entry from any device.
+         or (command->>'speechId' is not null and device is not null and seq is not null and e.device_id = device and e.device_seq < seq
+             and e.command->>'speechId' = command->>'speechId')
+         or (command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = command->>'entryId')
          -- A speech or POI score waits for the held command that creates its speech or POI entry (the id is derived from that command's key).
          or (command->>'type' in ('speechScore', 'poiScore') and e.command->>'type' in ('speechStart', 'speechYield')
              and substr(e.id::text, 1, 24) || '000000000001' = command->>'speechId')
@@ -732,7 +737,8 @@ begin
  'speeches','[]'::jsonb,
  'poiQueue','[]'::jsonb,
  'timers','{}'::jsonb,
- 'rollCalls','[]'::jsonb,
+ 'rollCalls',(select coalesce(jsonb_agg(jsonb_build_object('id',r.id,'revision',r.revision,'committeeId',r.committee_id,'copiedFrom',r.copied_from,'observedAt',r.observed_at,'committedAt',r.local_committed_at,'effectiveAt',r.effective_at,'timeConfidence',r.time_confidence,'legacy',r.legacy,'rows',(select coalesce(jsonb_agg(jsonb_build_object('delegateId',x.delegate_id,'status',x.status) order by x.delegate_id),'[]') from public.roll_call_row x where x.roll_call_id=r.id and x.revision=r.revision)) order by r.committee_id),'[]')
+   from (select distinct on (l.committee_id) l.* from public.roll_call l where l.conference_id=conf and l.state='committed' and l.effective_at is not null order by l.committee_id, l.effective_at desc, l.id desc, l.revision desc) r),
  'ballots','[]'::jsonb
  );
 end; $function$;

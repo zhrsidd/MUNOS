@@ -274,3 +274,40 @@ test('real PostgreSQL: a speech score waits for the held speech start that creat
   assert.equal(await count(`select 1 from public.participation_events where "speechId"=$1`,[speechId]),1,'the score was recorded against the approved speech');
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a POI score waits for the held recognition of its entry; the Executive snapshot carries each committee\'s live roll call',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,one,count,ops,verify,asOwner,query}=f;
+ try{
+  const [pv,asker]=delegates;
+  // The roll call predates the (backdated) offline actions below, so it is the one in force for them.
+  const rollDev=U(241);await verify(rollDev,now-20*M);
+  await send(roll(present(pv,asker),{committed:now-20*M,device:rollDev,seq:1}),now-20*M);
+  const speechKey=await send({type:'speechStart',...f.c,delegateId:pv,resolutionId:ids.resolution,classification:'Other'},now,'chair',chair,crypto.randomUUID(),'empty');
+  const speechId=speechKey.slice(0,24)+'000000000001';
+  const rev=async()=>String((await one<{r:string}>('select revision::text r from public.speeches where id=$1',[speechId])).r);
+  await send({type:'poiAllowance',...f.c,speechId,limit:2},now,'chair',chair,crypto.randomUUID(),await rev());
+  const addKey=await send({type:'poiAdd',...f.c,speechId,delegateId:asker},now,'chair',chair,crypto.randomUUID(),await rev());
+  const entryId=addKey.slice(0,24)+'000000000001';
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(240);await verify(dev,now-10*M);await verify(dev,now);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  // Recognised offline and held as stale; the score of that POI must be held with it.
+  const r0=await rev();
+  const recognize=await send({type:'poiRecognize',...f.c,speechId,entryId,_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),r0);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[recognize])).reason,'stale');
+  const score=await send({type:'poiScore',...f.c,speechId,entryId,points:2,_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),String(Number(r0)+1));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[score])).reason,'behind_held');
+  await assert.rejects(()=>decide(score),/Decide the earlier held action/);
+  await decide(recognize);
+  await decide(score);
+  assert.equal(await count(`select 1 from public.participation_events where "speechId"=$1 and "categoryId"='poi'`,[speechId]),1,'the POI score was recorded');
+
+  // The Executive snapshot holds one live roll call per committee, with its rows, for the readiness view.
+  await asOwner();
+  const snapshot=(await query<{s:{rollCalls:{committeeId:string;rows:{delegateId:string;status:string}[]}[]}}>('select public.executive_snapshot($1) s',[ids.conference]))[0].s;
+  const committees=await count('select 1 from public.roll_call where state=\'committed\' group by committee_id');
+  assert.equal(snapshot.rollCalls.length,committees,'one per committee that has a roll call');
+  const ga1=snapshot.rollCalls.find(r=>r.committeeId===ids.ga1)!;
+  assert.deepEqual(ga1.rows.filter(r=>r.status!=='Absent').map(r=>r.delegateId).sort(),[pv,asker].sort(),'the live roll call, not an earlier one');
+ }finally{await db.close();}
+});
