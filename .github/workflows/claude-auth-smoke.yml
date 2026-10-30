@@ -1,0 +1,22 @@
+name: Claude auth smoke test
+on:
+  push:
+    branches: [test/claude-auth-smoke]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: "Reply with the single word OK. Do not use any tools."
+          claude_args: '--max-turns 2 --allowedTools "Read"'
