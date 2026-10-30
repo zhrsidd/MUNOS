@@ -175,7 +175,11 @@ from editing the workflows, which is the trust model the rest of this document a
   against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
   executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
   go through. `bash .github/automation-tests/repair-resolve.test.sh` runs the thread-resolution step against a fake `gh`:
-  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-patch.test.sh` runs the patch step in a
+  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-rereview.test.sh` runs the re-review
+  request against a fake `gh` that serves a stale pull request head, as GitHub does for a moment after a push: a push that
+  created a commit yields exactly one `@codex review` for that commit, and nothing else yields one. The push step reports the
+  pushed commit and the request uses it, because reading the pull request's head right after a push once skipped the
+  request. `bash .github/automation-tests/repair-patch.test.sh` runs the patch step in a
   workspace that looks like the action left it: protected paths are dropped and real edits kept.
   `bash .github/automation-tests/repair-invariants.test.sh` checks that the job
   running Claude holds no push credential or pull-request write access, that no job can request an OIDC token, and that only

@@ -37,4 +37,5 @@ jobs:
           bash .github/automation-tests/repair-patch.test.sh
           bash .github/automation-tests/repair-push.test.sh
           bash .github/automation-tests/repair-resolve.test.sh
+          bash .github/automation-tests/repair-rereview.test.sh
           bash .github/automation-tests/repair-invariants.test.sh

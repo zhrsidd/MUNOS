@@ -68,6 +68,16 @@ check(holders == ["Push the checked repair", "Request a fresh Codex review of th
 resolve_i = names.index("Resolve the Codex review threads")
 check(resolve_i > push_i and "steps.push.outcome == 'success'" in str(steps[resolve_i].get("if", "")),
       "threads are resolved only after a successful push")
+rereview_i = names.index("Request a fresh Codex review of the repaired head")
+rereview = steps[rereview_i]
+check(rereview_i > push_i and "steps.push.outcome == 'success'" in str(rereview.get("if", "")),
+      "the re-review request runs only after a successful push")
+check(rereview["env"].get("PUSHED_SHA") == "${{ steps.push.outputs.sha }}",
+      "the re-review request takes the commit from the push step's output")
+check("pulls/$PR" not in rereview["run"] and ".head.sha" not in rereview["run"],
+      "the re-review request never reads the pull request's head, which GitHub refreshes a moment after a push")
+check("echo \"sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\"" in steps[push_i]["run"],
+      "the push step reports the commit it pushed")
 check("secrets." not in blob(steps[apply_i]), "the changed-file check holds no secret")
 pushers = [s.get("name", "") for s in steps if "git push" in str(s.get("run", ""))]
 check(pushers == ["Push the checked repair"], "git push appears only in the guarded push step")

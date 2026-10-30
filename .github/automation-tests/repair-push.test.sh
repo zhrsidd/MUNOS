@@ -133,7 +133,8 @@ run_case() {
     fi
     local head_ref=$branch
     if [ "$option" = main ]; then head_ref=main; fi
-    out+=$'\n'$(cd "$dir/work" && BASE="$base" HEAD_REF="$head_ref" GH_TOKEN=tok GITHUB_REPOSITORY=o/r \
+    : > "$dir/push-out"
+    out+=$'\n'$(cd "$dir/work" && BASE="$base" HEAD_REF="$head_ref" GH_TOKEN=tok GITHUB_REPOSITORY=o/r GITHUB_OUTPUT="$dir/push-out" \
       GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.file://$origin.insteadOf" \
       GIT_CONFIG_VALUE_0="https://x-access-token:tok@github.com/o/r.git" bash -e "$scratch/push.sh" 2>&1) || push_rc=$?
   fi
@@ -146,6 +147,8 @@ run_case() {
   if [ "$want" = pushed ]; then
     if [ "$ok" -eq 1 ] && [ "$(git -C "$origin" rev-parse "$tip^")" != "$base" ]; then ok=0; why="pushed commit is not a child of the reviewed commit"; fi
     if [ "$ok" -eq 1 ] && [[ "$(git -C "$origin" log -1 --format=%s "$tip")" != "fix(review):"* ]]; then ok=0; why="pushed subject lacks the fix(review): prefix"; fi
+    # The re-review step relies on this output instead of reading the pull request's head after the push.
+    if [ "$ok" -eq 1 ] && [ "$(grep '^sha=' "$dir/push-out")" != "sha=$tip" ]; then ok=0; why="the push step did not report the pushed commit as sha=$tip"; fi
     if [ "$ok" -eq 1 ]; then
       other=$(git -C "$origin" diff --name-only "$base" "$tip" | sort | tr '\n' ' ')
       if [ "$other" != "$files " ]; then ok=0; why="pushed files '$other', want '$files '"; fi
@@ -155,6 +158,7 @@ run_case() {
     if [ "$option" = moved ]; then
       if [ "$tip" = "$base" ] || [ "$push_rc" -eq 0 ]; then ok=0; why="a moved branch must make the push fail and keep the other commit"; fi
     elif [ "$tip" != "$base" ]; then ok=0; why="the remote branch changed"; fi
+    if [ "$ok" -eq 1 ] && [ -s "$dir/push-out" ] && grep -q '^sha=' "$dir/push-out"; then ok=0; why="a refused push still reported a pushed sha"; fi
     if [ "$ok" -eq 1 ] && ! grep -q '::error::' <<<"$out"; then ok=0; why="refused without the step's own ::error::"; fi
   fi
   if [ "$ok" -eq 1 ]; then
