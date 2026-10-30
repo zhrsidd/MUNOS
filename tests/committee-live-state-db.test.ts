@@ -311,3 +311,26 @@ test('real PostgreSQL: a POI score waits for the held recognition of its entry; 
   assert.deepEqual(ga1.rows.filter(r=>r.status!=='Absent').map(r=>r.delegateId).sort(),[pv,asker].sort(),'the live roll call, not an earlier one');
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a correction of an event waits for the held score that creates it',async()=>{
+ const f=await fixture();const {db,now,send,delegates,roll,one,count,ops}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  // A score recorded offline with an unverified clock (3 hours stale) is Uncertain, so it is held...
+  const score=await send({type:'participation',...f.c,delegateId:pv,categoryId:'speech',points:2,resolutionId:null},now-3*H);
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[score])).reason,'uncertain_time');
+  const eventId=score.slice(0,24)+'000000000001';
+  assert.equal(await count('select 1 from public.participation_events where id=$1',[eventId]),0);
+  // ...and the edit that follows it must be held with it, not refused for a source event that does not exist yet.
+  const edit=await send({type:'event',id:eventId,points:3},now,'chair',chair,crypto.randomUUID(),'0');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[edit])).reason,'behind_held');
+  await assert.rejects(()=>decide(edit),/Decide the earlier held action/);
+  await decide(score);await decide(edit);
+  assert.equal(await count('select 1 from public.participation_corrections where event_id=$1',[eventId]),1,'the correction applied to the approved score');
+  // With nothing holding it, a correction of an unknown event is still refused.
+  await assert.rejects(()=>send({type:'event',id:crypto.randomUUID(),points:3},now,'chair',chair,crypto.randomUUID(),'0'),(e:{code?:string})=>e.code==='42501');
+ }finally{await db.close();}
+});

@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "8db6eea40b91d131615d4d9834ab73d205132f736e4038729d913ff330cb6513",
+ "migrationsSha256": "8ac4ca47df1ae587d6a81069e5a0b9ec6c3dd105bdfd27731c1543e87c771233",
  "supabase-model": {
   "fns": [
    {
@@ -724,6 +724,36 @@
     "exec": {
      "anon": false,
      "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "held_event_committee",
+    "args": "conf uuid, event_id text",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -2743,7 +2773,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "committee uuid, device uuid, seq bigint, command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",
@@ -6271,6 +6301,36 @@
    },
    {
     "schema": "private",
+    "name": "held_event_committee",
+    "args": "conf uuid, event_id text",
+    "result": "uuid",
+    "kind": "f",
+    "security": "invoker",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
     "name": "held_replay",
     "args": "conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text, client_time timestamp with time zone",
     "result": "boolean",
@@ -8282,7 +8342,7 @@
    {
     "schema": "private",
     "name": "waits_for_held",
-    "args": "committee uuid, device uuid, seq bigint, command jsonb",
+    "args": "p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb",
     "result": "boolean",
     "kind": "f",
     "security": "invoker",

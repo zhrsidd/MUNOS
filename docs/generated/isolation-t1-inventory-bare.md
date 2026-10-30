@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `8db6eea40b91d131`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `8ac4ca47df1ae587`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -48,7 +48,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-109 functions (98 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+110 functions (99 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -75,6 +75,7 @@ Executed in the disposable database after the inventory was read:
 | `private.final_label(table_name text, rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.guard_lifecycle_transition()` (trigger) | function | definer | postgres | volatile | search_path="" | postgres | n/a | writes |
 | `private.has_access(conf uuid, committee uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
+| `private.held_event_committee(conf uuid, event_id text)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.held_replay(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | postgres | - | reads/none |
 | `private.hold_gate(conf uuid, cid uuid, mutation uuid, command jsonb, requested_role conference_role, expe...)` | function | invoker | postgres | volatile | search_path="" | postgres | - | writes |
 | `private.hold_settings(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
@@ -142,7 +143,7 @@ Executed in the disposable database after the inventory was read:
 | `private.uuid_or_null(value text)` | function | invoker | postgres | immutable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.valid_flag(value text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.veto_delegates(rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
-| `private.waits_for_held(committee uuid, device uuid, seq bigint, command jsonb)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `public.access_code_status(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.amendment_link_info(link_token text)` | function | definer | postgres | stable | search_path="" | service_role, postgres | service_role | reads/none |
 | `public.apply_conference_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)` | function | invoker | postgres | volatile | search_path="" | authenticated, postgres | authenticated | writes (via callee) |

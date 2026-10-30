@@ -101,34 +101,45 @@ end $$;
 -- A held command waits for what it depends on (section 5): a Control for an earlier held Control or roll call from the same device and committee,
 -- anything citing a held roll call, a roll call revision or copy for the roll call it builds on, a vote for its resolution's held ballot restart, and a speech or POI score for the held command that creates its speech or POI entry. Without this a queue action that cites a held roll call reaches private.eligible, fails because
 -- the cited revision was never applied, and becomes a permanent client conflict that blocks the rest of the outbox.
-create function private.waits_for_held(committee uuid, device uuid, seq bigint, command jsonb) returns boolean
+create function private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb) returns boolean
 language sql stable set search_path='' as $$
   select exists (
     select 1 from public.held_action e
-     where e.state = 'held' and e.committee_id = committee
+     where e.state = 'held' and e.committee_id = p_committee
        and (
          -- Same device, earlier: a Control waits for any earlier held Control or roll call; a roll call waits for an earlier held roll call.
-         (device is not null and seq is not null and e.device_id = device and e.device_seq < seq and (
-              (private.command_class(command->>'type') = 'control' and private.command_class(e.command->>'type') in ('control', 'rollcall'))
-           or (private.command_class(command->>'type') = 'rollcall' and private.command_class(e.command->>'type') = 'rollcall')))
+         (p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq and (
+              (private.command_class(p_command->>'type') = 'control' and private.command_class(e.command->>'type') in ('control', 'rollcall'))
+           or (private.command_class(p_command->>'type') = 'rollcall' and private.command_class(e.command->>'type') = 'rollcall')))
          -- Whatever cites a held roll call waits for it (from any device).
-         or (e.command->>'type' = 'rollCallCommit' and e.command->>'rollCallId' = command#>>'{rollCall,id}')
+         or (e.command->>'type' = 'rollCallCommit' and e.command->>'rollCallId' = p_command#>>'{rollCall,id}')
          -- A roll call revision waits for the held earlier revision of the same roll call, and a copy for the roll call it copies.
-         or (command->>'type' = 'rollCallCommit' and e.command->>'type' = 'rollCallCommit' and (
-              (e.command->>'rollCallId' = command->>'rollCallId' and (e.command->>'revision')::int < (command->>'revision')::int)
-           or e.command->>'rollCallId' = command->>'copiedFrom'))
+         or (p_command->>'type' = 'rollCallCommit' and e.command->>'type' = 'rollCallCommit' and (
+              (e.command->>'rollCallId' = p_command->>'rollCallId' and (e.command->>'revision')::int < (p_command->>'revision')::int)
+           or e.command->>'rollCallId' = p_command->>'copiedFrom'))
          -- A vote waits for the held ballot-opening command (voteMode) of its resolution: approving that restart later clears the ballot's votes.
-         or (command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = command->>'resolutionId')
+         or (p_command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = p_command->>'resolutionId')
          -- Anything on a speech waits for an earlier held command on the same speech from the same device (its revision and state depend on it);
          -- a POI score also waits for the held recognition of its entry from any device.
-         or (command->>'speechId' is not null and device is not null and seq is not null and e.device_id = device and e.device_seq < seq
-             and e.command->>'speechId' = command->>'speechId')
-         or (command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = command->>'entryId')
+         or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
+             and e.command->>'speechId' = p_command->>'speechId')
+         or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
+         -- A correction of an event waits for the held command that creates that event (ids derive from the creating command's key).
+         or (p_command->>'type' = 'event' and (substr(e.id::text, 1, 24) || '000000000001' = p_command->>'id' or substr(e.id::text, 1, 24) || '000000000002' = p_command->>'id'))
          -- A speech or POI score waits for the held command that creates its speech or POI entry (the id is derived from that command's key).
-         or (command->>'type' in ('speechScore', 'poiScore') and e.command->>'type' in ('speechStart', 'speechYield')
-             and substr(e.id::text, 1, 24) || '000000000001' = command->>'speechId')
-         or (command->>'type' = 'poiScore' and e.command->>'type' = 'poiAdd' and substr(e.id::text, 1, 24) || '000000000001' = command->>'entryId'))
+         or (p_command->>'type' in ('speechScore', 'poiScore') and e.command->>'type' in ('speechStart', 'speechYield')
+             and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'speechId')
+         or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiAdd' and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'entryId'))
   )
+$$;
+
+-- The committee of the held command that will create the event with this id (ids derive from the creating command's key), else null.
+create function private.held_event_committee(conf uuid, event_id text) returns uuid
+language sql stable set search_path='' as $$
+  select h.committee_id from public.held_action h
+   where h.conference_id = conf and h.state = 'held'
+     and (substr(h.id::text, 1, 24) || '000000000001' = event_id or substr(h.id::text, 1, 24) || '000000000002' = event_id)
+   limit 1
 $$;
 
 -- Same bodies as 20261030100000, except that the ordering rule uses private.waits_for_held (Controls wait for held roll calls too).
@@ -147,7 +158,7 @@ begin
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
   -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
   -- decide that one first. Records are independent.
-  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore', 'event')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
     raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
   end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
@@ -170,7 +181,7 @@ begin
             order by device_seq nulls last, received_at, id for update loop
     -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
     -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
-    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore', 'event')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
     end if;
@@ -495,8 +506,10 @@ begin
    cid:=rec.committee_id; sid:=rec."sessionId";
  elsif kind='event' then
    select * into ev from public.participation_events where id=(command->>'id')::uuid and conference_id=conf;
-   if not found then raise exception 'Event unavailable' using errcode='42501'; end if;
-   cid:=ev.committee_id; sid:=ev."sessionId";
+   if not found then
+     cid:=private.held_event_committee(conf, command->>'id');
+     if cid is null then raise exception 'Event unavailable' using errcode='42501'; end if;
+   else cid:=ev.committee_id; sid:=ev."sessionId"; end if;
  elsif command ? 'sessionId' then
    sid:=(command->>'sessionId')::uuid;
    select committee_id into cid from public.sessions where id=sid and conference_id=conf;
@@ -514,6 +527,7 @@ begin
  if cid is not null then perform 1 from public.committees where id=cid and conference_id=conf for update;
  else perform 1 from public.conferences where id=conf for update; end if;
  if private.hold_gate(conf, cid, mutation, command, requested_role, expected, client_time) then return; end if;
+ if kind='event' and ev.id is null then raise exception 'Event unavailable' using errcode='42501'; end if;
  -- An archived committee is history: no new Chair work (it replaces the per-session archive check; sessions are labels now).
  if kind in ('participation','queue','vote','newDocument','rollCallCommit') or (kind='document' and target='In Debate') then perform private.require_operational_committee(conf,cid); end if;
  if command ? 'delegateId' then
@@ -1050,7 +1064,7 @@ begin
   elsif kind = 'vote' and not exists (select 1 from public.documents d where d.id = private.uuid_or_null(command->>'resolutionId') and d.status = 'In Debate') then
     -- A ballot that arrives after its result was declared is held: closed results are immutable (section 6).
     why := 'ballot_closed';
-  elsif kind in ('vote', 'speechScore', 'poiScore') and private.waits_for_held(cid, device, seq, command) then
+  elsif kind in ('vote', 'speechScore', 'poiScore', 'event') and private.waits_for_held(cid, device, seq, command) then
     why := 'behind_held';
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';
@@ -1094,6 +1108,6 @@ language sql immutable set search_path='' as $$
   end
 $$;
 
-revoke all on function private.waits_for_held(uuid, uuid, bigint, jsonb), private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
+revoke all on function private.held_event_committee(uuid, text), private.waits_for_held(uuid, uuid, bigint, jsonb), private.command_device_time(jsonb, timestamptz), private.require_operational_committee(uuid, uuid), private.action_time(uuid), private.presence_at(uuid, uuid, timestamptz),
   private.eligible(uuid, uuid, uuid, jsonb), private.open_ballot(uuid, uuid, uuid), private.commit_roll_call(uuid, uuid, uuid, jsonb)
   from public, anon, authenticated, service_role;
