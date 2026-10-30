@@ -12,3 +12,7 @@ supabase/.branches/
 sources/
 coverage/
 *.log
+
+# Local load-window evidence folder (docs/LOAD_RUN_SHEET_2026-10-31.md). Never committed by default; only reviewed, secret-free
+# summaries are copied into docs/evidence by a person.
+/evidence/

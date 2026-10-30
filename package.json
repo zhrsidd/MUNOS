@@ -22,6 +22,7 @@
     "rehearsal:identities": "tsx scripts/rehearsal-identities.mts",
     "smoke:project": "tsx scripts/smoke-project.mts",
     "cleanup:synthetic": "tsx scripts/cleanup-synthetic.mts",
+    "check:load-evidence": "tsx scripts/load-evidence-check.mts",
     "test:rehearsal:offline": "node --import tsx scripts/rehearsal/offline-multi-device.mjs",
     "typecheck:rehearsal": "tsc --noEmit -p tsconfig.rehearsal.json"
   },
