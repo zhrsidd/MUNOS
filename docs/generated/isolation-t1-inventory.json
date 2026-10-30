@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "8fddcd390f752009eaf304cfdfffe4e7ed8288b85013194571318a9b983281c6",
+ "migrationsSha256": "c829f2d52c07b1e546b1ca7c07f0f8c9cc93889b924730667848bbc94fcfdc12",
  "supabase-model": {
   "fns": [
    {

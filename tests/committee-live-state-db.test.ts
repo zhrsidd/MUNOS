@@ -416,3 +416,33 @@ for(const approval of ['single','bulk'] as const)test(`counted close waits for h
   assert.equal(await count(`select 1 from public.documents where id=$1 and status='Closed' and outcome='Failed'`,[ids.resolution]),1);
  }finally{await db.close();}
 });
+
+for(const approval of ['single','bulk'] as const)test(`held vote changes preserve revision order through ${approval} approval`,async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ try{
+  const [delegateId]=delegates;
+  await send(roll(present(delegateId)),now);
+  const revision=async()=>String((await one<{revision:number}>('select revision from public.documents where id=$1',[ids.resolution])).revision);
+  await send({type:'voteMode',...f.c,resolutionId:ids.resolution,mode:'normal',voteType:'procedural'},now,'chair',chair,crypto.randomUUID(),await revision());
+  const vote={type:'vote',...f.c,resolutionId:ids.resolution,delegateId};
+  await send({...vote,choice:'For'},now,'chair',chair,crypto.randomUUID(),'0');
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const deviceId=U(194);
+  // An older offline change is held for its clock; the change that follows it on the same device carries the incremented revision.
+  const first=await send({...vote,choice:'Against',_device:{deviceId,deviceSeq:1}},now-3*H,'chair',chair,crypto.randomUUID(),'1');
+  await verify(deviceId,now);
+  const second=await send({...vote,choice:'For',_device:{deviceId,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),'2');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[second])).reason,'behind_held');
+  const decide=(heldId:string)=>ops(exec,{type:'heldDecide',heldId,decision:'approve',reason:'Reviewed'});
+  if(approval==='single'){
+   await assert.rejects(()=>decide(second),/Decide the earlier held action/);
+   await decide(first);await decide(second);
+  }else{
+   await ops(exec,{type:'clockConfirm',deviceId,offsetMs:0,reason:'Clock checked'});
+   await ops(exec,{type:'heldBulkApprove',deviceId,reason:'Reviewed'});
+  }
+  const final=await one<{choice:string;revision:number}>(`select choice,revision from public.votes where "resolutionId"=$1 and "delegateId"=$2 and "sessionId" is null`,[ids.resolution,delegateId]);
+  assert.equal(final.choice,'For');assert.equal(Number(final.revision),3,'both held changes applied in order');
+  assert.equal((await one<{state:string}>('select state from public.held_action where id=$1',[second])).state,'applied');
+ }finally{await db.close();}
+});

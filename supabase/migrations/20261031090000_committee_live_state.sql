@@ -124,9 +124,11 @@ language sql stable set search_path='' as $$
          or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
              and e.command->>'speechId' = p_command->>'speechId')
          or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
-         -- Repeated edits/undo of one event use optimistically incremented revisions, so preserve that device's correction order.
-         or (p_command->>'type' = 'event' and e.command->>'type' = 'event' and e.command->>'id' = p_command->>'id'
-             and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq)
+         -- Repeated corrections of one event, and repeated votes of one delegate on one resolution, use optimistically incremented revisions,
+         -- so preserve that device's order (an earlier held one must be decided first).
+         or (p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq and e.command->>'type' = p_command->>'type' and (
+              (p_command->>'type' = 'event' and e.command->>'id' = p_command->>'id')
+           or (p_command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'resolutionId' and e.command->>'delegateId' = p_command->>'delegateId')))
          -- A counted close must include unresolved vote changes for its ballot, even from another device.
          or (p_command->>'type' = 'document' and p_command->>'status' = 'Closed'
              and coalesce(p_command->>'method', '') <> 'observed' and coalesce(p_command->>'outcome', '') <> 'Withdrawn'
