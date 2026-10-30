@@ -99,7 +99,7 @@ begin
 end $$;
 
 -- A held command waits for what it depends on (section 5): a Control for an earlier held Control or roll call from the same device and committee,
--- anything citing a held roll call, a roll call revision or copy for the roll call it builds on, and a vote for its resolution's held ballot restart. Without this a queue action that cites a held roll call reaches private.eligible, fails because
+-- anything citing a held roll call, a roll call revision or copy for the roll call it builds on, a vote for its resolution's held ballot restart, and a speech or POI score for the held command that creates its speech or POI entry. Without this a queue action that cites a held roll call reaches private.eligible, fails because
 -- the cited revision was never applied, and becomes a permanent client conflict that blocks the rest of the outbox.
 create function private.waits_for_held(committee uuid, device uuid, seq bigint, command jsonb) returns boolean
 language sql stable set search_path='' as $$
@@ -118,7 +118,11 @@ language sql stable set search_path='' as $$
               (e.command->>'rollCallId' = command->>'rollCallId' and (e.command->>'revision')::int < (command->>'revision')::int)
            or e.command->>'rollCallId' = command->>'copiedFrom'))
          -- A vote waits for the held ballot-opening command (voteMode) of its resolution: approving that restart later clears the ballot's votes.
-         or (command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = command->>'resolutionId'))
+         or (command->>'type' = 'vote' and e.command->>'type' = 'voteMode' and e.command->>'resolutionId' = command->>'resolutionId')
+         -- A speech or POI score waits for the held command that creates its speech or POI entry (the id is derived from that command's key).
+         or (command->>'type' in ('speechScore', 'poiScore') and e.command->>'type' in ('speechStart', 'speechYield')
+             and substr(e.id::text, 1, 24) || '000000000001' = command->>'speechId')
+         or (command->>'type' = 'poiScore' and e.command->>'type' = 'poiAdd' and substr(e.id::text, 1, 24) || '000000000001' = command->>'entryId'))
   )
 $$;
 
@@ -138,7 +142,7 @@ begin
   if h.state <> 'held' then raise exception 'This action has already been decided' using errcode = '22023'; end if;
   -- A Control cannot overtake an earlier held Control or roll call from the same device and committee, nor the held roll call it cites:
   -- decide that one first. Records are independent.
-  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' = 'vote') and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
+  if decision = 'approve' and (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command) then
     raise exception 'Decide the earlier held action from this device first' using errcode = '22023';
   end if;
   if decision = 'approve' and private.run_held(h, null) is not null then return array[h.committee_id]; end if;
@@ -161,7 +165,7 @@ begin
             order by device_seq nulls last, received_at, id for update loop
     -- A Control never overtakes an earlier UNRESOLVED Control or roll call from this device and committee (whatever it was held for, including
     -- reasons this batch does not approve, and a failure earlier in this batch or a previous attempt), nor the held roll call it cites.
-    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' = 'vote') and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
+    continue when (private.command_class(h.command->>'type') in ('control', 'rollcall') or h.command->>'type' in ('vote', 'speechScore', 'poiScore')) and private.waits_for_held(h.committee_id, h.device_id, h.device_seq, h.command);
     if private.run_held(h, off) is null then
       update public.held_action set state = 'applied', decided_by = actor, decided_at = now(), decision_reason = why where id = h.id;
     end if;
@@ -1040,7 +1044,7 @@ begin
   elsif kind = 'vote' and not exists (select 1 from public.documents d where d.id = private.uuid_or_null(command->>'resolutionId') and d.status = 'In Debate') then
     -- A ballot that arrives after its result was declared is held: closed results are immutable (section 6).
     why := 'ballot_closed';
-  elsif kind = 'vote' and private.waits_for_held(cid, device, seq, command) then
+  elsif kind in ('vote', 'speechScore', 'poiScore') and private.waits_for_held(cid, device, seq, command) then
     why := 'behind_held';
   elsif cls in ('control', 'rollcall') then
     if private.committee_session_at(conf, cid, acted)->>'flag' is not null then why := 'outside_window';

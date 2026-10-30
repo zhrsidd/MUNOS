@@ -253,3 +253,24 @@ test('real PostgreSQL: a vote waits for its held ballot restart, and a roll call
   assert.equal(await count('select 1 from public.roll_call where id=$1',[copy]),1);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: a speech score waits for the held speech start that creates its speech',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,one,count,ops,verify}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(230);await verify(dev,now-10*M);await verify(dev,now);
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  // Started offline, reconnected after the staleness limit: the start is held, so the score that follows must be held too.
+  const start=await send({type:'speechStart',...f.c,delegateId:pv,resolutionId:ids.resolution,classification:'Other',_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),'empty');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[start])).reason,'stale');
+  const speechId=start.slice(0,24)+'000000000001';
+  const score=await send({type:'speechScore',...f.c,speechId,points:3,_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),'1');
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[score])).reason,'behind_held');
+  assert.equal(await count('select 1 from public.speeches where id=$1',[speechId]),0);
+  await assert.rejects(()=>decide(score),/Decide the earlier held action/);
+  await decide(start);await decide(score);
+  assert.equal(await count(`select 1 from public.participation_events where "speechId"=$1`,[speechId]),1,'the score was recorded against the approved speech');
+ }finally{await db.close();}
+});
