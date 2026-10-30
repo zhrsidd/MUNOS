@@ -124,6 +124,13 @@ language sql stable set search_path='' as $$
          or (p_command->>'speechId' is not null and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq
              and e.command->>'speechId' = p_command->>'speechId')
          or (p_command->>'type' = 'poiScore' and e.command->>'type' = 'poiRecognize' and e.command->>'entryId' = p_command->>'entryId')
+         -- Repeated edits/undo of one event use optimistically incremented revisions, so preserve that device's correction order.
+         or (p_command->>'type' = 'event' and e.command->>'type' = 'event' and e.command->>'id' = p_command->>'id'
+             and p_device is not null and p_seq is not null and e.device_id = p_device and e.device_seq < p_seq)
+         -- A counted close must include unresolved vote changes for its ballot, even from another device.
+         or (p_command->>'type' = 'document' and p_command->>'status' = 'Closed'
+             and coalesce(p_command->>'method', '') <> 'observed' and coalesce(p_command->>'outcome', '') <> 'Withdrawn'
+             and e.command->>'type' = 'vote' and e.command->>'resolutionId' = p_command->>'id')
          -- A restoration waits for the held deduction whose adjustment id derives from its mutation key (any device).
          or (p_command->>'type' = 'pointAdjustment' and p_command->>'action' = 'restore'
              and e.command->>'type' = 'pointAdjustment' and e.command->>'action' = 'deduct'
