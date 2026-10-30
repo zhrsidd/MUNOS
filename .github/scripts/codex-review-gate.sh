@@ -7,6 +7,11 @@
 set -euo pipefail
 
 pr=${1:?usage: codex-review-gate.sh <pull-number>}
+if [[ ! "$pr" =~ ^[1-9][0-9]{0,9}$ ]] || (( pr > 2147483647 )); then
+  echo "::error::Invalid PR identifier: expected a positive GraphQL integer." >&2
+  exit 1
+fi
+trap 'echo "::error::GitHub API/authentication or gate data evaluation failed; refusing to clear the gate." >&2' ERR
 repo=${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be owner/name}
 dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 owner=${repo%%/*}

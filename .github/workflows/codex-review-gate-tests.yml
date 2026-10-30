@@ -31,6 +31,7 @@ jobs:
           persist-credentials: false
       - name: Run gate tests
         run: |
+          python3 .github/automation-tests/gate-dispatch.test.py
           bash .github/scripts/test/codex-review-gate.test.sh
           bash .github/automation-tests/stage-step.test.sh
           bash .github/automation-tests/repair-patch.test.sh
