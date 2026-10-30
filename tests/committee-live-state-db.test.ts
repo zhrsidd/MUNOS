@@ -523,3 +523,29 @@ test('real PostgreSQL: approving a held vote after its ballot was restarted is r
   assert.equal(await count(`select 1 from public.votes where "resolutionId"=$1 and "sessionId" is null`,[ids.resolution]),0);
  }finally{await db.close();}
 });
+
+test('real PostgreSQL: an amendment transition waits for the held speech finish that clears the floor',async()=>{
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify,asOwner}=f;
+ try{
+  const [pv]=delegates;
+  await send(roll(present(pv)),now);
+  const speechKey=await send({type:'speechStart',...f.c,delegateId:pv,resolutionId:ids.resolution,classification:'Other'},now,'chair',chair,crypto.randomUUID(),'empty');
+  const speechId=speechKey.slice(0,24)+'000000000001';
+  await asOwner();
+  const amendmentId=crypto.randomUUID();
+  await db.query(`insert into public.amendments(id,conference_id,committee_id,"resolutionId","submitterId",type,clause,wording,status) values($1,$2,$3,$4,$5,'Add','1','New clause','Accepted for Debate')`,[amendmentId,ids.conference,ids.ga1,ids.resolution,ids.france]);
+  const amendmentRev=(await one<{revision:number}>('select revision from public.amendments where id=$1',[amendmentId])).revision;
+  const speechRev=(await one<{revision:number}>('select revision from public.speeches where id=$1',[speechId])).revision;
+  await ops(exec,{type:'holdSettings',enforce:true});
+  const dev=U(253);await verify(dev,now-10*M);await verify(dev,now);
+  // The Chair finishes the speech offline (stale, so held), then starts the amendment debate with the floor optimistically clear.
+  const finish=await send({type:'speechFinish',...f.c,speechId,_device:{deviceId:dev,deviceSeq:1}},now-10*M,'chair',chair,crypto.randomUUID(),String(speechRev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[finish])).reason,'stale');
+  const start=await send({type:'amendmentStatus',id:amendmentId,status:'In Debate',_device:{deviceId:dev,deviceSeq:2}},now,'chair',chair,crypto.randomUUID(),String(amendmentRev));
+  assert.equal((await one<{reason:string}>('select reason from public.held_action where id=$1',[start])).reason,'behind_held');
+  const decide=(id:string)=>ops(exec,{type:'heldDecide',heldId:id,decision:'approve',reason:'Reviewed'});
+  await assert.rejects(()=>decide(start),/Decide the earlier held action/);
+  await decide(finish);await decide(start);
+  assert.equal(await count(`select 1 from public.amendments where id=$1 and status='In Debate'`,[amendmentId]),1,'the amendment debate started once the floor was clear');
+ }finally{await db.close();}
+});

@@ -144,6 +144,10 @@ language sql stable set search_path='' as $$
          or (p_command->>'type' = 'pointAdjustment' and p_command->>'action' = 'restore'
              and e.command->>'type' = 'pointAdjustment' and e.command->>'action' = 'deduct'
              and substr(e.id::text, 1, 24) || '000000000001' = p_command->>'adjustmentId')
+         -- An amendment transition waits for the held floor changes (speech start, yield, finish) of its committee that reached the server before it:
+         -- it may start or close an amendment debate only with the floor at the Chair.
+         or (p_command->>'type' = 'amendmentStatus' and e.command->>'type' in ('speechStart', 'speechYield', 'speechFinish')
+             and e.received_at <= coalesce(p_received, 'infinity'::timestamptz))
          -- A correction of an event waits for the held command that creates that event (ids derive from the creating command's key).
          or (p_command->>'type' = 'event' and (substr(e.id::text, 1, 24) || '000000000001' = p_command->>'id' or substr(e.id::text, 1, 24) || '000000000002' = p_command->>'id'))
          -- A speech or POI score waits for the held command that creates its speech or POI entry (the id is derived from that command's key).
@@ -967,6 +971,7 @@ declare
  topic text:='configuration';target text:=command->>'status';outcome_value text:=command->>'outcome';
 begin
  perform private.lock_lifecycle();
+ perform private.set_mutation_context(conf, mutation, client_time, command);
  if actor is null then raise exception 'Session required' using errcode='42501';end if;
  if pg_column_size(command)>16384 then raise exception 'Command too large' using errcode='22023';end if;
  perform pg_advisory_xact_lock(hashtextextended(mutation::text,0));
@@ -984,6 +989,8 @@ begin
  if cid is not null then select * into committee from public.committees where id=cid and conference_id=conf for update;
   if not found then raise exception 'Committee unavailable' using errcode='42501';end if;
  else perform 1 from public.committees where conference_id=conf order by id for update;end if;
+ -- An amendment transition is a Control: with hold enforcement on it waits behind the held floor changes it depends on (private.waits_for_held).
+ if kind='amendmentStatus' and private.hold_gate(conf, cid, mutation, command, requested_role, expected, client_time) then return; end if;
  if kind='amendmentStatus' then
   select * into amend from public.amendments where id=(command->>'id')::uuid and conference_id=conf for update;actual:=amend.revision::text;
  elsif kind in ('committeeUpdate','committeeLifecycle') then actual:=committee.revision::text;
@@ -1133,7 +1140,7 @@ language sql immutable set search_path='' as $$
   select case
     when kind in ('participation', 'event', 'vote', 'speechScore', 'poiScore', 'pointAdjustment') then 'record'
     when kind in ('queue', 'queueAdd', 'queueOrder', 'queueRemove', 'debateMode', 'speechStart', 'speechYield', 'speechFinish', 'poiAllowance', 'poiAdd',
-                  'poiOrder', 'poiRecognize', 'poiRemove', 'voteMode', 'document') then 'control'
+                  'poiOrder', 'poiRecognize', 'poiRemove', 'voteMode', 'document', 'amendmentStatus') then 'control'
     when kind = 'rollCallCommit' then 'rollcall'
   end
 $$;

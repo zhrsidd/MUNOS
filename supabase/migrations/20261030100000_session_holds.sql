@@ -153,6 +153,8 @@ begin
   begin
     if kind = 'pointAdjustment' then
       perform private.apply_operations_mutation(h.conference_id, h.id, h.command, h.requested_role, h.expected, h.client_time);
+    elsif kind = 'amendmentStatus' then
+      perform private.apply_staff_batch(h.conference_id, h.id, h.command, h.requested_role, h.expected, h.client_time);
     elsif kind in ('currentSession', 'debateMode', 'queueAdd', 'queueOrder', 'queueRemove', 'speechStart', 'speechYield', 'speechScore', 'speechFinish', 'poiAllowance',
                    'poiAdd', 'poiOrder', 'poiRecognize', 'poiScore', 'poiRemove', 'voteMode', 'vetoRules') then
       perform private.apply_procedure(h.conference_id, h.id, h.command, h.requested_role, h.expected, h.client_time);
