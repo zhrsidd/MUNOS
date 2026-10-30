@@ -1,4 +1,7 @@
 :root {
+  /* Opt-in loading art only; operational typography and motion stay unchanged. */
+  --loading-title: clamp(32px, 5vw, 80px);
+  --loading-status: clamp(24px, 3vw, 48px);
   /* DCMUN brand tokens: see docs/BRAND.md. Roles never swap. */
   --paper: #f7f8fa;
   --surface: #fff;
@@ -39,6 +42,79 @@
   --radius: var(--radius-container);
   font-synthesis: none;
   color-scheme: light;
+}
+
+/* Committee loading screen: see docs/COMMITTEE_LOADING_SCREEN.md. */
+.committee-loading {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-7);
+  padding: var(--space-7);
+  color: var(--surface);
+  background: var(--ink);
+}
+.committee-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--ink), transparent 40%, var(--ink));
+  opacity: .85;
+}
+.committee-loading-art { object-fit: cover; object-position: center; z-index: -2; }
+.committee-loading-heading { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.committee-loading-heading strong {
+  font-family: var(--font-manrope), Arial, sans-serif;
+  font-size: var(--loading-title);
+  line-height: 1;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -.04em;
+}
+.committee-loading-heading > span { font-weight: 700; font-size: 18px; }
+.committee-loading-tag {
+  position: absolute;
+  top: var(--space-7);
+  right: var(--space-7);
+  transform: rotate(-3deg);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--attention-soft);
+}
+.committee-loading-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-7); align-items: end; }
+.committee-loading-label { font: italic 800 var(--loading-status)/1.1 var(--font-manrope), Arial, sans-serif; text-transform: uppercase; overflow-wrap: anywhere; }
+.committee-loading-dots { display: inline-block; width: 1em; white-space: nowrap; }
+.committee-loading-dots > span:nth-child(2) { animation: loading-dot-two 1.5s step-end infinite; }
+.committee-loading-dots > span:nth-child(3) { animation: loading-dot-three 1.5s step-end infinite; }
+@keyframes loading-dot-two { 0%, 100% { opacity: 0; } 33.333%, 99.999% { opacity: 1; } }
+@keyframes loading-dot-three { 0%, 100% { opacity: 0; } 66.666%, 99.999% { opacity: 1; } }
+.committee-loading[data-motion="paused"] .committee-loading-dots > span { animation-play-state: paused; }
+.committee-loading-tip { background: var(--action); padding: var(--space-5) var(--space-6); clip-path: polygon(0 0, 96% 0, 97% 8%, 98% 0, 100% 0, 100% 100%, 2% 100%); }
+.committee-loading-tip > span { font-size: 12px; letter-spacing: .08em; }
+.committee-loading-tip p { font-size: 18px; font-weight: 700; margin: var(--space-2) 0 0; color: inherit; }
+.modal:has(.committee-loading) { width: min(1100px, 95vw); max-width: min(1100px, 95vw); }
+.modal .committee-loading { min-height: 480px; aspect-ratio: 16 / 9; padding: var(--space-5); }
+.modal .committee-loading-tag { top: var(--space-5); right: var(--space-5); }
+.modal .committee-loading-heading strong { font-size: 32px; }
+.modal .committee-loading-label { font-size: 24px; }
+.modal .committee-loading-tip p { font-size: 18px; margin: var(--space-2) 0 0; }
+@media (max-width: 720px) {
+  .committee-loading { padding: var(--space-5); }
+  .committee-loading-heading { padding-bottom: var(--space-7); }
+  .committee-loading-tag { position: static; align-self: flex-start; margin-top: calc(-1 * var(--space-7)); }
+  .committee-loading-bottom { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); margin-top: auto; }
+  .committee-loading-tip { padding: var(--space-4) var(--space-5); }
+  .modal .committee-loading { aspect-ratio: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .committee-loading-dots > span { animation: none !important; opacity: 1; }
 }
 * {
   box-sizing: border-box;
