@@ -33,7 +33,29 @@ export const isPresent = (d: Pick<ConferenceData, "rollCalls">, committeeId: str
   (presenceAt(d, committeeId, delegateId, at) ?? "Absent") !== "Absent";
 
 /** Commands that need their delegate present: the server checks them against the roll call effective at the action's time. */
-const presenceGated = new Set(["queueAdd", "speechStart", "speechYield", "poiAdd"]);
+const presenceGated = new Set(["queueAdd", "speechStart", "speechYield", "poiAdd", "poiRecognize"]);
+
+/** The roll call an action cited, `{id, revision}`; absent when the action cites none. */
+export const citedRollCall = (c: object): { id: string; revision: number } | undefined => {
+  const cited = (c as { rollCall?: { id?: unknown; revision?: unknown } }).rollCall;
+  return cited && typeof cited.id === "string" && Number.isInteger(cited.revision) ? { id: cited.id, revision: cited.revision as number } : undefined;
+};
+
+/**
+ * Mirrors private.eligible: a presence-gated action is checked against the roll call it cited, so projection, reload and replay show what
+ * the server will accept, unless a LATER Trusted revision effective at or before the action supersedes it (then, as on the server, the roll
+ * call in force at the action's time decides). A cited roll call this device does not hold is refused, as on the server.
+ */
+export function isEligible(d: Pick<ConferenceData, "rollCalls">, committeeId: string, delegateId: string, cited: { id: string; revision: number } | undefined, at: string): boolean {
+  if (cited) {
+    const calls = (d.rollCalls ?? []).filter((r) => r.committeeId === committeeId);
+    const call = calls.find((r) => r.id === cited.id && r.revision === cited.revision);
+    if (!call) return false;
+    const superseded = calls.some((r) => r.timeConfidence === "trusted" && order(r, call) > 0 && instant(r.effectiveAt) <= instant(at));
+    if (!superseded) return (call.rows.find((r) => r.delegateId === delegateId)?.status ?? "Absent") !== "Absent";
+  }
+  return isPresent(d, committeeId, delegateId, at);
+}
 
 /**
  * The roll call a presence-gated action relied on, saved with the action (docs/SESSION_MODEL.md section 6). Offline work that reaches the

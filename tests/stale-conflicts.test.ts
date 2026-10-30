@@ -85,7 +85,8 @@ for(const code of ['PT409','40001'])test(`SupabaseTransport maps ${code} to reta
   assert.deepEqual(saved.base.events,data.events,'no duplicate participation event');
   repo.dispose();await store.close();
   const reopened=new DurableStore(name);repo=new DurableRepository(name,()=>data,reopened,transport);
-  await repo.ready();await new Promise(r=>setTimeout(r,20));await repo.flush();
+  await repo.ready();await repo.flush();
+  for(let i=0;i<100&&repo.getHealth().conflicts!==1;i++){await new Promise(r=>setTimeout(r,50));await repo.flush();} // bounded wait, not a fixed pause
   assert.equal(repo.getHealth().conflicts,1);assert.equal(repo.getHealth().pending,2);assert.deepEqual(calls,[first.id]);
   repo.dispose();await reopened.close();
  }finally{repo.dispose();await store.close();}

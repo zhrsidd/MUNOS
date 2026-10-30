@@ -802,7 +802,6 @@ begin
   if not found then raise exception 'Adjustment unavailable' using errcode = '22023'; end if;
   if orig.points >= 0 or orig."delegateId" <> delegate_id then raise exception 'Only a deduction for this delegate can be restored.' using errcode = '22023'; end if;
   -- Same archive boundary as a new deduction: an archived session or committee is history and its totals do not move.
-  perform private.require_operational_session(conf, orig."sessionId");
   perform private.require_operational_committee(conf, cid);
   if exists (select 1 from public.participation_adjustments where reverses = orig.id) then
    raise sqlstate 'PT409' using message = 'This deduction was already restored on another device.';
@@ -919,7 +918,7 @@ begin
   update public.amendment_links set revoked_at=now() where committee_id=cid and revoked_at is null;
   if action<>'revoke' then insert into public.amendment_links(id,conference_id,committee_id,token) values(new_id,conf,cid,command->>'token');end if;
  when 'amendmentStatus' then
-  entity:=amend.id;topic:='documents';perform private.require_operational_session(conf,amend."sessionId");perform private.require_operational_committee(conf,cid);
+  entity:=amend.id;topic:='documents';perform private.require_operational_committee(conf,cid);
   if committee.archived or not exists(select 1 from public.documents where id=amend."resolutionId" and status='In Debate') then raise exception 'Amendments are not currently open in this committee.' using errcode='22023';end if;
   if not coalesce((amend.status='Submitted' and target='Accepted for Debate' and outcome_value is null) or (amend.status='Accepted for Debate' and target='In Debate' and outcome_value is null) or (amend.status<>'Closed' and target='Closed' and (outcome_value in ('Ruled Out','Withdrawn') or (amend.status='In Debate' and outcome_value in ('Passed','Failed')))),false) then raise exception 'Invalid amendment transition' using errcode='22023';end if;
   if target='In Debate' and exists(select 1 from public.amendments where committee_id=cid and status='In Debate' and id<>amend.id) then raise exception 'Close the current amendment debate first' using errcode='22023';end if;

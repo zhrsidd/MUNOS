@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DurableRepository} from '../lib/sync/repository';
+import {DurableRepository,project} from '../lib/sync/repository';
 import {DurableStore} from '../lib/sync/store';
 import {createSeed} from '../lib/seed';
 import {applyCommand} from '../lib/commands';
@@ -80,5 +80,51 @@ test('the saved action in the outbox carries the roll call, so offline work is j
  await repo.execute({type:'queueAdd',committeeId:'ga1',delegateId:'d3',lane:'open'},'chair');
  const [m]=repo.getPending();
  assert.deepEqual((m.command as {rollCall?:unknown}).rollCall,{id:live.id,revision:live.revision});
+ repo.dispose();await store.close();
+});
+
+// ---- replay honours the saved citation (mirrors private.eligible) ----------------------------------------------------------
+const trusted=(c:RollCall,t:'trusted'|'uncertain'):RollCall=>({...c,timeConfidence:t});
+const queueAdd={type:'queueAdd' as const,committeeId:'ga1',delegateId:'d0',lane:'open' as const};
+const queued=(d:ConferenceData,c:object)=>applyCommand(structuredClone(d),c as never,'chair',{id:'m',createdAt:'2026-10-05T10:45:00.000Z'} as never).queue.some(q=>q.delegateId==='d0');
+
+test('a saved citation keeps a queued action valid after a later Uncertain roll call arrives; a later Trusted one supersedes it',()=>{
+ const cited=trusted(rc('a','2026-10-05T10:00:00.000Z','Present'),'trusted');
+ const laterUncertain=trusted(rc('b','2026-10-05T10:30:00.000Z','Absent'),'uncertain');
+ const laterTrusted=trusted(rc('b','2026-10-05T10:30:00.000Z','Absent'),'trusted');
+ const ref={rollCall:{id:'a',revision:1}};
+ const withUncertain=withCalls([cited,laterUncertain]);withUncertain.queue=[];
+ assert.throws(()=>queued(withUncertain,queueAdd),/present/i,'by time alone the later roll call (Absent) is live');
+ assert.equal(queued(withUncertain,{...queueAdd,...ref}),true,'the citation is honoured, as on the server');
+ const withTrusted=withCalls([cited,laterTrusted]);withTrusted.queue=[];
+ assert.throws(()=>queued(withTrusted,{...queueAdd,...ref}),/present/i,'a later Trusted revision effective before the action supersedes the citation');
+ const missing=withCalls([laterUncertain]);missing.queue=[];
+ assert.throws(()=>queued(missing,{...queueAdd,...ref}),/present/i,'a roll call this device does not hold is refused, as on the server');
+});
+
+test('reload: a pending cited action stays projected over a base that holds a later Uncertain roll call',()=>{
+ const base=withCalls([trusted(rc('a','2026-10-05T10:00:00.000Z','Present'),'trusted'),trusted(rc('b','2026-10-05T10:30:00.000Z','Absent'),'uncertain')]);base.queue=[];
+ const pending=(command:object)=>({id:crypto.randomUUID(),createdAt:'2026-10-05T10:45:00.000Z',actorId:'t',role:'chair' as const,command,expected:'',state:'pending' as const});
+ const cp=(m:object)=>({key:'k',base,pending:[m],savedAt:'x'} as never);
+ assert.equal(project(cp(pending({...queueAdd,rollCall:{id:'a',revision:1}}))).queue.some(q=>q.delegateId==='d0'),true,'projection shows the action the server accepts');
+ assert.equal(project(cp(pending(queueAdd))).queue.some(q=>q.delegateId==='d0'),false,'without a citation the later roll call decides');
+});
+
+test('POI recognition saves its citation and is accepted locally and in replay',async()=>{
+ const data=createSeed();
+ data.rollCalls=[trusted(rc('a','2026-10-05T10:00:00.000Z','Present'),'trusted')];
+ data.rollCalls[0].rows=[{delegateId:'d1',status:'Present'},{delegateId:'d2',status:'Present'}] as never;
+ data.speeches=[{id:'sp1',committeeId:'ga1',delegateId:'d1',resolutionId:'r1',amendmentId:null,classification:'Other',yieldedFrom:null,state:'pois',poiLimit:null,poiCount:0,revision:2,createdAt:'2026-10-05T10:00:00.000Z'}] as never;
+ data.poiQueue=[{id:'p1',speechId:'sp1',delegateId:'d2',position:0,recognizedAt:null}] as never;
+ const store=new DurableStore('poi-ref-'+crypto.randomUUID());
+ const server={actorId:'t',read:async()=>{throw Error('offline');},send:async()=>{},syncClock:async()=>{}};
+ const repo=new DurableRepository('ga1',()=>structuredClone(data),store,server as never);await repo.ready();await new Promise(r=>setTimeout(r,15));
+ await repo.execute({type:'poiRecognize',committeeId:'ga1',speechId:'sp1',entryId:'p1'},'chair');
+ const [m]=repo.getPending();
+ assert.deepEqual((m.command as {rollCall?:unknown}).rollCall,{id:'a',revision:1});
+ // Replay over a base that now holds a later Uncertain Absent roll call still projects the recognition.
+ const later=structuredClone(data);later.rollCalls!.push(trusted({...rc('b','2026-10-05T10:30:00.000Z','Absent'),rows:[]} as RollCall,'uncertain'));
+ const shown=project({key:'k',base:later,pending:[m],savedAt:'x'} as never);
+ assert.ok(shown.poiQueue!.find(p=>p.id==='p1')!.recognizedAt,'recognized in the projection');
  repo.dispose();await store.close();
 });

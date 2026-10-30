@@ -5,7 +5,7 @@ import { nextResolutionCode } from "./resolution-number";
 import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
-import { ballotStatus, eligibleBallots, isLive, isPresent, rollCallAt } from "./sessions/presence";
+import { ballotStatus, citedRollCall, eligibleBallots, isEligible, isLive, isPresent, rollCallAt } from "./sessions/presence";
 import {
   AttendanceStatus,
   ConferenceData,
@@ -480,7 +480,7 @@ export function applyCommand(
     }
     case "queue": {
       const committeeId = commandCommittee ?? "";
-      if (c.delegateId && !isPresent(d, committeeId, c.delegateId, now))
+      if (c.delegateId && !isEligible(d, committeeId, c.delegateId, citedRollCall(c), now))
         throw Error("Only present delegates may join the queue.");
       const q = d.queue
         .filter((q) => isLive(q, committeeId))

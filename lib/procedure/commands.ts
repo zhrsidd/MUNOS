@@ -1,7 +1,7 @@
 import type {ConferenceData, ParticipationEvent} from '../domain';
 import type {ProcedureCommand, Speech} from './types';
 import {activeAmendment,activeLane,laneEntries,poiEntries} from './view';
-import {isLive,isPresent,openBallot} from '../sessions/presence';
+import {citedRollCall,isEligible,isLive,openBallot} from '../sessions/presence';
 import {MAIN_SUBMITTER_POINTS,mainSubmitterPoints,scoringValues} from '../scoring';
 export const SUBMITTER_POINTS_CHANGED='The Main Submitter points changed. Review the Debate Console.';
 /** A speech score as the Debate Console saves it: a Main Submitter speech carries the credit this device awards. */
@@ -14,7 +14,8 @@ export function applyProcedure(d:ConferenceData,c:ProcedureCommand,nextId:()=>st
  const committee=d.committees.find(x=>x.id===(('committeeId' in c&&c.committeeId)||d.sessions.find(s=>s.id===legacySession)?.committeeId));
  if(!committee)throw Error('Committee unavailable.');
  const cid=committee.id;
- const present=(id:string)=>isPresent(d,cid,id,now);
+ const cited=citedRollCall(c);
+ const present=(id:string)=>isEligible(d,cid,id,cited,now);
  const requirePresent=(id:string)=>{if(!present(id))throw Error('Delegate must be present.');};
  const speeches=d.speeches??=[]; const pois=d.poiQueue??=[];
  const speech='speechId' in c?speeches.find(s=>s.id===c.speechId&&s.committeeId===cid):undefined;

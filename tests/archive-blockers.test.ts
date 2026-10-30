@@ -125,7 +125,8 @@ test('an attendance action saved offline by an older build is retained as a conf
   // The saved action as an older build wrote it, already in the outbox.
   const saved={id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:chair,role:'chair' as const,command:{type:'attendance',sessionId:session.id,delegateId:delegate.id,status:'Present'} as unknown as Command,expected:'0',state:'pending' as const};
   await store.update('archive-offline',()=>({key:'archive-offline',base:data,pending:[saved],savedAt:saved.createdAt}));
-  repo=new DurableRepository('archive-offline',()=>data,store,transport);await repo.ready();await new Promise(r=>setTimeout(r,20));await repo.flush();
+  repo=new DurableRepository('archive-offline',()=>data,store,transport);await repo.ready();await repo.flush();
+  for(let i=0;i<100&&repo.getPending()[0]?.state==='pending';i++){await new Promise(r=>setTimeout(r,50));await repo.flush();} // bounded wait for the refusal, not a fixed pause
   assert.equal(repo.getPending()[0].id,saved.id);assert.equal(repo.getPending()[0].state,'conflict');assert.match(repo.getPending()[0].message??'',/roll calls/);
   await f.asOwner();assert.equal((await f.query<{n:number}>('select count(*)::int n from private.mutation_receipts where id=$1',[saved.id]))[0].n,0);
  }finally{repo?.dispose();await store.close();await f.db.close();}
