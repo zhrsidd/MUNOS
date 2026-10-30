@@ -10,7 +10,7 @@ export interface EvidenceResult { ok: boolean; findings: Finding[]; missing: str
 export const STAGES = ['S0', 'R1', 'R2', 'R3', 'H3'] as const;
 /** Files that must exist before the evidence folder is called complete (relative to the evidence root). */
 export const REQUIRED_FILES = [
-  'SUMMARY.md', 'preflight/preflight-record.md', 'preflight/target-guard.json', 'preflight/fingerprint-before.txt',
+  'SUMMARY.md', 'preflight/preflight-record.md', 'preflight/target-guard.json', 'preflight/fingerprint-before.txt', 'preflight/migrations.txt',
   ...STAGES.flatMap(s => [`stage-${s}/command.txt`, `stage-${s}/report.json`, `stage-${s}/go-no-go.md`, `stage-${s}/fingerprint-after.txt`]),
   'dashboard/metrics-log.csv', 'incidents/incident-log.md',
   'cleanup/fixture-A-revoke-verify.txt', 'cleanup/fixture-B-revoke-verify.txt', 'cleanup/retirement-pending.md',

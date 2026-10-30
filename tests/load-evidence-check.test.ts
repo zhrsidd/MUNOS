@@ -89,4 +89,5 @@ test('a missing required file fails unless incomplete evidence is explicitly all
 test('the checker is local only and the required layout names every run stage and both fixtures', () => {
   for (const stage of ['S0', 'R1', 'R2', 'R3', 'H3']) for (const name of ['command.txt', 'report.json', 'go-no-go.md', 'fingerprint-after.txt']) assert.ok(REQUIRED_FILES.includes(`stage-${stage}/${name}`));
   for (const fixture of ['A', 'B']) assert.ok(REQUIRED_FILES.includes(`cleanup/fixture-${fixture}-revoke-verify.txt`));
+  assert.ok(REQUIRED_FILES.includes('preflight/migrations.txt'), 'the session-model schema check (PF3b) is part of the evidence');
 });
