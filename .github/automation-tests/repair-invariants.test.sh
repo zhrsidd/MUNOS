@@ -73,6 +73,20 @@ pushers = [s.get("name", "") for s in steps if "git push" in str(s.get("run", ""
 check(pushers == ["Push the checked repair"], "git push appears only in the guarded push step")
 check("git push" not in "".join(str(s.get("run", "")) for s in repair["steps"]), "no git push in the repair job's scripts")
 
+# The repair job drops protected paths with a copy of the push job's protected() function. The copies must not drift: the
+# convenience filter has to agree with the real guard, or repairs would fail closed (or the filter would hide changes).
+import re as _re
+def protected_fn(step_name, jobs_):
+    for job in jobs_.values():
+        for step in job["steps"]:
+            if step.get("name") == step_name:
+                m = _re.search(r"protected\(\) \{\n.*?\n\s*\}\n", step["run"], _re.S)
+                return None if m is None else "\n".join(line.strip() for line in m.group(0).splitlines())
+    return None
+filter_fn = protected_fn("Collect Claude's edits as a patch", jobs)
+guard_fn = protected_fn("Apply the patch and check every changed file", jobs)
+check(filter_fn is not None and filter_fn == guard_fn, "the patch step and the push job use the same protected() function")
+
 # Secrets used anywhere in the workflow are the two expected ones.
 import re
 secrets_used = sorted(set(re.findall(r"secrets\.([A-Z_]+)", text)))
@@ -81,7 +95,7 @@ check(secrets_used == ["CLAUDE_AUTOMATION_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"], "t
 # CLAUDE.md states what the workflow enforces.
 check("## Protected paths in automated review repairs" in claude_md, "CLAUDE.md has the protected-paths section")
 section = claude_md.split("## Protected paths in automated review repairs", 1)[1]
-for needle in [".github/", ".claude/", ".mcp.json", ".env", "CLAUDE.md", "AGENTS.md", "package.json", "supabase/",
+for needle in [".github/", ".claude/", ".mcp.json", ".env", "CLAUDE.md", "AGENTS.md", "package.json", "npm-shrinkwrap.json", "supabase/",
                "target-guard.ts", "NEEDS_DECISION", "symlinks", "Do not commit or push", "resolve or dismiss"]:
     check(needle in section, f"CLAUDE.md protected-paths section mentions {needle}")
 

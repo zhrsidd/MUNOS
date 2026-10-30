@@ -73,7 +73,11 @@ the workflow enforces them even if Claude ignores `CLAUDE.md`.
    obtain the write-capable Claude App token, and the action is also given the workflow token explicitly.
    `CLAUDE_AUTOMATION_TOKEN` is never referenced in this job. Claude edits files only; the job collects the edits as a
    patch and uploads it. `git push` and the action's file-commit tools are also disallowed, as defence in depth.
+   The action restores `CLAUDE.md`, `.claude`, `.mcp.json` and similar files from `main` and writes `.claude-pr/` before
+   Claude runs, so the patch step drops every protected path from the patch with a `::warning::`. This filter is a
+   convenience, not the guard: Claude has a shell in this job, so the next job does not trust it.
 2. **`push` job (fresh runner).** It applies the patch to the reviewed commit and judges the result, not the patch headers.
+   It is the real guard: a protected path that still reaches it is not dropped but refused.
    It reads every changed path from `git diff --cached --raw -z --no-renames`, so a rename counts as a delete plus an add
    and both paths are checked. It refuses the whole patch, with an `::error::` that names the path, on any of:
    - a protected path (table below), compared case-insensitively;
@@ -95,7 +99,7 @@ Protected paths (the `protected()` function in the `push` job; keep this table a
 | --- | --- |
 | Any path with a segment starting with a dot: `.github/`, `.claude/`, `.mcp.json`, `.env*`, `.gitattributes`, `.gitignore` | Automation, agent configuration, secrets and git behaviour |
 | `CLAUDE.md`, `AGENTS.md` at any depth | The instructions that steer Claude and Codex |
-| `package.json`, `package-lock.json`, `vercel.json`, `next.config.*`, `eslint.config.*`, `tsconfig*.json`, `scripts/vercel-ignore-build.sh` | Dependencies, build, deploy and check configuration: supply chain, and the ability to weaken `verify` |
+| `package.json`, every lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock*`), `vercel.json`, `next.config.*`, `eslint.config.*`, `tsconfig*.json`, `scripts/vercel-ignore-build.sh` | Dependencies, build, deploy and check configuration: supply chain, and the ability to weaken `verify`. `npm ci` prefers `npm-shrinkwrap.json` over `package-lock.json`, so every lockfile is protected |
 | `supabase/`, `scripts/isolation-inventory/`, `lib/platform/target-guard.ts`, `config/project-lifecycle.json` | Schema, access control and production-target guards (the protected areas in `AGENTS.md`) |
 | `docs/AGENT_AUTOMATION.md` | This document |
 
@@ -171,7 +175,9 @@ from editing the workflows, which is the trust model the rest of this document a
   against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
   executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
   go through. `bash .github/automation-tests/repair-resolve.test.sh` runs the thread-resolution step against a fake `gh`:
-  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-invariants.test.sh` checks that the job
+  only Codex's own open threads are resolved. `bash .github/automation-tests/repair-patch.test.sh` runs the patch step in a
+  workspace that looks like the action left it: protected paths are dropped and real edits kept.
+  `bash .github/automation-tests/repair-invariants.test.sh` checks that the job
   running Claude holds no push credential or pull-request write access, that no job can request an OIDC token, and that only
   the guarded steps use the push token. Each suite was mutation-tested: weakening the guard makes the matching cases fail.
 - Workflow syntax and expressions: `actionlint .github/workflows/*.yml`.

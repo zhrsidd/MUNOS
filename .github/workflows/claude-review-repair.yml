@@ -156,6 +156,32 @@ jobs:
         run: |
           set -euo pipefail
           git add -A
+
+          # The action itself restores CLAUDE.md, .claude, .mcp.json and similar files from main and writes .claude-pr/, so a
+          # plain diff would carry those changes and the push job would refuse every repair. Drop every protected path here
+          # and say so. This is a convenience, not the guard: Claude has a shell in this job, so the push job re-checks the
+          # patch on a fresh runner and refuses the whole patch if a protected path still arrives.
+          # Paths are compared in lower case with a leading slash, so a dot segment is "/." and a basename is "/name".
+          protected() {
+            local p="/${1,,}"
+            case "$p" in
+              */.*|*/claude.md|*/agents.md) return 0 ;;
+              /supabase/*|/scripts/isolation-inventory/*|/scripts/vercel-ignore-build.sh) return 0 ;;
+              /vercel.json|/package.json|/package-lock.json|/npm-shrinkwrap.json|/yarn.lock|/pnpm-lock.yaml|/bun.lock|/bun.lockb) return 0 ;;
+              /next.config.*|/eslint.config.*|/tsconfig*.json) return 0 ;;
+              /lib/platform/target-guard.ts|/config/project-lifecycle.json|/docs/agent_automation.md) return 0 ;;
+            esac
+            return 1
+          }
+          mapfile -d '' changed < <(git diff --cached --name-only -z --no-renames "$BASE")
+          for path in "${changed[@]}"; do
+            if protected "$path"; then
+              git reset -q "$BASE" -- "$path"
+              printf -v shown '%q' "$path"
+              echo "::warning::Dropped the change to protected path $shown; it will not be pushed."
+            fi
+          done
+
           git diff --cached --binary --no-renames "$BASE" > "$RUNNER_TEMP/repair.patch"
           if [ -s "$RUNNER_TEMP/repair.patch" ]; then
             echo "has_patch=true" >> "$GITHUB_OUTPUT"
@@ -223,7 +249,8 @@ jobs:
             case "$p" in
               */.*|*/claude.md|*/agents.md) return 0 ;;
               /supabase/*|/scripts/isolation-inventory/*|/scripts/vercel-ignore-build.sh) return 0 ;;
-              /vercel.json|/package.json|/package-lock.json|/next.config.*|/eslint.config.*|/tsconfig*.json) return 0 ;;
+              /vercel.json|/package.json|/package-lock.json|/npm-shrinkwrap.json|/yarn.lock|/pnpm-lock.yaml|/bun.lock|/bun.lockb) return 0 ;;
+              /next.config.*|/eslint.config.*|/tsconfig*.json) return 0 ;;
               /lib/platform/target-guard.ts|/config/project-lifecycle.json|/docs/agent_automation.md) return 0 ;;
             esac
             return 1

@@ -34,6 +34,7 @@ jobs:
           bash .github/scripts/test/codex-review-gate.test.sh
           bash .github/scripts/test/stage-gate.test.sh
           bash .github/automation-tests/stage-step.test.sh
+          bash .github/automation-tests/repair-patch.test.sh
           bash .github/automation-tests/repair-push.test.sh
           bash .github/automation-tests/repair-resolve.test.sh
           bash .github/automation-tests/repair-invariants.test.sh

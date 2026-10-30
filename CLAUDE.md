@@ -19,14 +19,16 @@ Fall back to grep or file reads only for what the graph does not model: literal 
 ## Protected paths in automated review repairs
 
 The GitHub Actions workflow "Claude review repair" runs you without any push credential. It turns your edits into a patch,
-and a separate job checks every changed file before anything is pushed. A patch that touches any protected path is rejected
-whole, including the changes to other files in it. When you run as that workflow, do not change:
+and a separate job checks every changed file before anything is pushed. A change to a protected path is dropped from the
+patch with a warning and never pushed; if one still reaches the push job, that job rejects the whole patch. When you run as
+that workflow, do not change:
 
 - Any path with a segment that starts with a dot: `.github/` (workflows and gate scripts), `.claude/`, `.mcp.json`, `.env*`,
   `.gitignore`, `.gitattributes`.
 - `CLAUDE.md` and `AGENTS.md` at any depth.
-- Dependency, build and check configuration: `package.json`, `package-lock.json`, `vercel.json`, `next.config.*`,
-  `eslint.config.*`, `tsconfig*.json`, `scripts/vercel-ignore-build.sh`.
+- Dependency, build and check configuration: `package.json`, every lockfile (`package-lock.json`, `npm-shrinkwrap.json`,
+  `yarn.lock`, `pnpm-lock.yaml`, `bun.lock*`), `vercel.json`, `next.config.*`, `eslint.config.*`, `tsconfig*.json`,
+  `scripts/vercel-ignore-build.sh`.
 - Database and access-control configuration: everything under `supabase/`, `scripts/isolation-inventory/`,
   `lib/platform/target-guard.ts`, `config/project-lifecycle.json`.
 - `docs/AGENT_AUTOMATION.md`.

@@ -82,6 +82,10 @@ m_env()              { echo "A=1" > .env.local; }
 m_gitattributes()    { echo "* text=auto" > .gitattributes; }
 m_package()          { echo ' ' >> package.json; }
 m_lock()             { echo ' ' >> package-lock.json; }
+m_shrinkwrap()       { echo '{"lockfileVersion":3}' > npm-shrinkwrap.json; }
+m_yarn_lock()        { echo "# yarn" > yarn.lock; }
+m_pnpm_lock()        { echo "lockfileVersion: 9" > pnpm-lock.yaml; }
+m_bun_lock()         { echo "x" > bun.lockb; }
 m_vercel()           { echo ' ' >> vercel.json; }
 m_tsconfig()         { echo ' ' >> tsconfig.json; }
 m_eslint()           { echo "// x" >> eslint.config.mjs; }
@@ -183,6 +187,10 @@ run_case ".env.local is refused" refused m_env
 run_case ".gitattributes is refused" refused m_gitattributes
 run_case "package.json is refused" refused m_package
 run_case "package-lock.json is refused" refused m_lock
+run_case "a new npm-shrinkwrap.json, which npm prefers over package-lock.json, is refused" refused m_shrinkwrap
+run_case "a new yarn.lock is refused" refused m_yarn_lock
+run_case "a new pnpm-lock.yaml is refused" refused m_pnpm_lock
+run_case "a new bun.lockb is refused" refused m_bun_lock
 run_case "vercel.json is refused" refused m_vercel
 run_case "tsconfig.json is refused" refused m_tsconfig
 run_case "eslint.config.mjs is refused" refused m_eslint
