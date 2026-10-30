@@ -57,7 +57,7 @@ test('retired Drive archive table is gone and no function depends on it',async()
   assert.equal((await query('select to_regclass($1) t',['public.archive_jobs']))[0].t,null);
  }finally{await db.close();}
 });
-test('an archived session is history: neither a new deduction nor a restore moves its totals',async()=>{
+test('an archived committee is history: neither a new deduction nor a restore moves its totals',async()=>{
  const {db,ids,query,as,asOwner,grant}=await freshDatabase();
  try{
   await grant(chair,'chair',ids.ga1);
@@ -65,13 +65,13 @@ test('an archived session is history: neither a new deduction nor a restore move
   const deduct={type:'pointAdjustment',action:'deduct',delegateId:ids.france,sessionId:ids.session,amount:4,reason:'Disrupted the session'};
   await send(deduct);
   await asOwner();const original=(await query<{id:string}>('select id from public.participation_adjustments'))[0].id;
-  await db.query('update public.sessions set archived=true where id=$1',[ids.session]);
+  await db.query('update public.committees set archived=true where id=$1',[ids.ga1]);
   await assert.rejects(()=>send({...deduct,amount:1}),/archived/);
   await assert.rejects(()=>send({type:'pointAdjustment',action:'restore',delegateId:ids.france,adjustmentId:original}),/archived/,'restore uses the same boundary');
   await asOwner();assert.equal((await query('select * from public.participation_adjustments')).length,1,'the historical total did not move');
-  await db.query('update public.sessions set archived=false where id=$1',[ids.session]);
+  await db.query('update public.committees set archived=false where id=$1',[ids.ga1]);
   await send({type:'pointAdjustment',action:'restore',delegateId:ids.france,adjustmentId:original});
-  await asOwner();assert.equal((await query('select * from public.participation_adjustments')).length,2,'an active session can still restore');
+  await asOwner();assert.equal((await query('select * from public.participation_adjustments')).length,2,'an active committee can still restore');
  }finally{await db.close();}
 });
 test('the archive_jobs retirement locks the table before it checks it, in one statement',async()=>{

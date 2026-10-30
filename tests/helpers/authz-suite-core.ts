@@ -51,6 +51,8 @@ export const HOSTED_AUDIT = {
  ]),
  serviceRole: new Set(['public.submission_link_info', 'public.amendment_link_info', 'public.submit_resolution', 'public.submit_amendment']),
 };
+/** Reviewed session-model additions (docs/SESSION_MODEL.md): the device clock call and its private implementation, executable by signed-in users only. */
+const SESSION_MODEL_DELTA = ['public.record_device_clock', 'private.record_device_clock', 'private.session_schedules', 'private.hold_settings', 'private.day_closes'];
 const nameOf = (key: string) => key.slice(0, key.indexOf('('));
 
 export async function privilegeSection(t: TestContext, {engine}: Ctx) {
@@ -71,18 +73,18 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
   assertNone('functions missing from the inventory (regenerate docs/generated and review)', Object.keys(live).filter(k => !inventoried.has(k)));
  });
 
- await t.test('hosted-audit baseline plus reviewed lifecycle delta: one anon metadata RPC, two additional authenticated helpers, service_role unchanged', () => {
+ await t.test('hosted-audit baseline plus reviewed lifecycle and session-model deltas: one anon metadata RPC, additional authenticated helpers, service_role unchanged', () => {
   const problems: string[] = [];
   for (const [key, got] of Object.entries(live)) {
    const name = nameOf(key);
    if (got.anon !== (name==='public.preproduction_status')) problems.push(`${key}: unexpected anon EXECUTE=${got.anon}`);
    if (got.public) problems.push(`${key}: PUBLIC has EXECUTE`);
-   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows'].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
+   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows',...SESSION_MODEL_DELTA].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
    if (got.service_role !== HOSTED_AUDIT.serviceRole.has(name)) problems.push(`${key}: service_role=${got.service_role}, audit says ${HOSTED_AUDIT.serviceRole.has(name)}`);
   }
   assertNone('privilege matrix vs hosted audit', problems);
   assert.equal(HOSTED_AUDIT.authenticated.size, 23);
-  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25, 'the audited baseline plus two lifecycle functions exists exactly once');
+  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25 + SESSION_MODEL_DELTA.length, 'the audited baseline, two lifecycle functions and the reviewed session-model delta exist exactly once');
   assert.equal(Object.keys(live).filter(k => live[k].service_role).length, 4);
  });
 
@@ -207,12 +209,12 @@ const q = (v: string) => `'${v.replaceAll("'", "''")}'`;
 export async function crossReferenceSection(t: TestContext, {engine, f}: Ctx) {
  const WHO_AMENDMENT = '7d000000-0000-4000-8000-0000000000aa';
  const cases: Case[] = [
-  {name: 'attendance: own session, delegate of ANOTHER committee', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '22023',
-   command: f => ({type: 'attendance', delegateId: f.brazilWho, sessionId: f.session, status: 'Absent'})},
-  {name: 'attendance: another committee\'s session', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '42501',
-   command: f => ({type: 'attendance', delegateId: f.brazilWho, sessionId: f.sessionWho, status: 'Absent'})},
-  {name: 'vote: own session, resolution of ANOTHER committee', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '22023',
-   command: f => ({type: 'vote', delegateId: f.france, sessionId: f.session, resolutionId: f.docApproved, choice: 'For'})},
+  {name: 'rollCallCommit: own committee, delegate of ANOTHER committee', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '22023',
+   command: f => ({type: 'rollCallCommit', committeeId: f.committee.ga1, rollCallId: '7d000000-0000-4000-8000-0000000000ab', revision: 1, observedAt: '2026-11-05T08:59:00Z', committedAt: '2026-11-05T09:00:00Z', rows: [{delegateId: f.brazilWho, status: 'Absent'}]})},
+  {name: 'rollCallCommit: another committee', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '42501',
+   command: f => ({type: 'rollCallCommit', committeeId: f.committee.who, rollCallId: '7d000000-0000-4000-8000-0000000000ac', revision: 1, observedAt: '2026-11-05T08:59:00Z', committedAt: '2026-11-05T09:00:00Z', rows: [{delegateId: f.brazilWho, status: 'Absent'}]})},
+  {name: 'vote: own committee, resolution of ANOTHER committee', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '22023',
+   command: f => ({type: 'vote', delegateId: f.france, committeeId: f.committee.ga1, resolutionId: f.docApproved, choice: 'For'})},
   {name: 'document: another committee\'s resolution (Approved -> Printed as Chair)', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '42501',
    command: f => ({type: 'document', id: f.docApproved, status: 'Printed'})},
   {name: 'newDocument: own session, ANOTHER committee in the body', actor: 'chairGa1', role: 'chair', target: 'public.apply_conference_mutation', code: '22023',

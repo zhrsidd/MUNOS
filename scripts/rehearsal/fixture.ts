@@ -73,10 +73,12 @@ insert into public.sessions(id,conference_id,committee_id,name,"startsAt",state)
 ${sessionRows.join(",\n")};
 insert into public.delegates(id,conference_id,committee_id,"schoolId",country,name,email) values
 ${delegates.map((d, i) => ` (${q(d.id)},${q(conference)},${q(d.committee)},${q(school)},'Country ${i}','Simulated delegate ${i}','load${i}@example.com')`).join(",\n")};
--- Current session and valid synthetic workflow states are prerequisites, not events invented by the load runner.
-update public.committees set "currentSessionId"=s.id from public.sessions s where committees.id=s.committee_id and s.conference_id=${q(conference)} and s.id in (${committees.map(c=>q(c.session)).join(',')});
-insert into public.attendance(conference_id,committee_id,"sessionId","delegateId",status) values
-${delegates.map(d=>` (${q(conference)},${q(d.committee)},${q(d.session)},${q(d.id)},'Present')`).join(",\n")};
+-- A committed roll call per committee (everyone present) and valid synthetic workflow states are prerequisites, not events invented by the
+-- load runner. Sessions follow the schedule and live state is keyed by committee (docs/SESSION_MODEL.md sections 6 and 8): no session is selected.
+insert into public.roll_call(id,revision,conference_id,committee_id,state,observed_at,local_committed_at,server_committed_at,time_confidence,effective_at,created_by) values
+${committees.map(c=>` (${q(c.session)},1,${q(conference)},${q(c.id)},'committed',now()-interval '1 hour',now()-interval '1 hour',now(),'trusted',now()-interval '1 hour',${q(o.users.executive)})`).join(",\n")};
+insert into public.roll_call_row(roll_call_id,revision,conference_id,committee_id,delegate_id,status) values
+${delegates.map(d=>` (${q(committees.find(c=>c.id===d.committee)!.session)},1,${q(conference)},${q(d.committee)},${q(d.id)},'Present')`).join(",\n")};
 insert into public.documents(id,conference_id,committee_id,"sessionId","submitterId",code,title,status) values
 ${workflowDocuments.map(d=>` (${q(d.id)},${q(conference)},${q(d.committee)},${q(d.session)},${q(d.submitter)},${q(d.code)},'Synthetic load-test document',${q(d.status)})`).join(",\n")};
 insert into public.document_versions(id,conference_id,committee_id,"documentId",number,"fileName",text) values

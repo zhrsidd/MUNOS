@@ -15,6 +15,7 @@ import {grantAccess} from '../lib/access';
 import {createSeed} from '../lib/seed';
 import {freshDatabase} from './helpers/database';
 import {VotingConsole} from '../components/voting-console';
+import {openBallot as snapshotBallot} from '../lib/sessions/presence';
 import {ConflictError,DurableRepository,type Transport} from '../lib/sync/repository';
 import {DurableStore,type Checkpoint,type Mutation} from '../lib/sync/store';
 
@@ -36,11 +37,12 @@ const text=(html:string)=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').rep
 
 // Clear majority For / Against (20261021110000_clear_majority): a declared, observed result with no invented ballots.
 const meta=()=>({id:crypto.randomUUID(),createdAt:'2026-11-05T10:00:00.000Z',actorId:'chair-1'});
-const inDebate=(committee='ga1')=>{const d=createSeed();const r=d.documents.find(x=>x.committeeId===committee)!;r.status='In Debate';d.votes=d.votes.filter(v=>v.resolutionId!==r.id);return {d,r};};
-// An observed close names the ballot session the Chair confirmed: the resolution's own unless given (null omits it).
+// In debate with its ballot open: eligibility is snapshotted from the committee's roll call (docs/SESSION_MODEL.md section 6).
+const inDebate=(committee='ga1')=>{const d=createSeed();const r=d.documents.find(x=>x.committeeId===committee)!;r.status='In Debate';d.votes=d.votes.filter(v=>v.resolutionId!==r.id);snapshotBallot(d,committee,r.id,'2026-11-05T09:00:00.000Z');return {d,r};};
+const presentVoter=(d:ConferenceData,r:{id:string})=>d.ballots!.find(b=>b.resolutionId===r.id&&b.status==='Present')!;
 // The declaration is bound to the ballot revision the Chair opened it on; by default that is the current one.
-const close=(d:ConferenceData,id:string,outcome:'Passed'|'Failed'|'Withdrawn'|undefined,method?:string,sessionId:string|null|undefined=d.documents.find(x=>x.id===id)?.sessionId,ballotRevision:number|null=d.documents.find(x=>x.id===id)?.revision??0)=>
- applyCommand(d,{type:'document',id,status:'Closed',outcome,method,...(method&&sessionId!==null?{sessionId}:{}),...(method&&ballotRevision!==null?{ballotRevision}:{})} as Command,'chair',meta());
+const close=(d:ConferenceData,id:string,outcome:'Passed'|'Failed'|'Withdrawn'|undefined,method?:string,ballotRevision:number|null=d.documents.find(x=>x.id===id)?.revision??0)=>
+ applyCommand(d,{type:'document',id,status:'Closed',outcome,method,...(method&&ballotRevision!==null?{ballotRevision}:{})} as Command,'chair',meta());
 
 test('client: clear majority is available only where an observation can establish the result',()=>{
  let {d,r}=inDebate();
@@ -58,8 +60,8 @@ test('client: clear majority is available only where an observation can establis
 test('client: an observed close records the declared result only; earlier ballots are kept, not counted',()=>{
  const {d,r}=inDebate();
  // One ballot recorded before the Chair switched to a declared majority.
- const voter=d.attendance.find(a=>a.sessionId===r.sessionId&&a.status==='Present')!;
- d.votes.push({id:'v-early',delegateId:voter.delegateId,sessionId:r.sessionId!,resolutionId:r.id,choice:'Against',createdAt:'2026-11-05'});
+ const voter=presentVoter(d,r);
+ d.votes.push({id:'v-early',delegateId:voter.delegateId,committeeId:'ga1',resolutionId:r.id,choice:'Against',createdAt:'2026-11-05'});
  assert.throws(()=>close(d,r.id,'Passed'),/every eligible ballot/,'the counted path still needs every ballot');
  assert.throws(()=>close(d,r.id,undefined,'observed'),/Choose an outcome|Passed or Failed/);
  assert.throws(()=>close(d,r.id,'Passed','guess'),/Unknown voting method/);
@@ -76,64 +78,54 @@ test('client: an observed close records the declared result only; earlier ballot
  assert.throws(()=>applyCommand(after,{type:'document',id:r.id,status:'Closed',outcome:'Failed',method:'observed',ballotRevision:closed.revision??0},'chair',meta()),/./,'Closed is final');
 });
 
-test('client: an observed close keeps a nonzero eligible attendance and the ballot session; ballots stay optional',()=>{
- // Reproduced before the fix: with no attendance, or everyone Absent, an observed Passed was accepted.
+test('client: an observed close needs at least one eligible delegation in the ballot snapshot; ballots stay optional',()=>{
+ // Reproduced before the fix: with nobody present, an observed Passed was accepted.
  let {d,r}=inDebate();
- d.attendance=d.attendance.filter(a=>a.sessionId!==r.sessionId);
- assert.match(observedContextProblem(d,r.id,r.sessionId)!,/No delegation is present/);
- assert.throws(()=>close(d,r.id,'Passed','observed'),/No delegation is present/,'no attendance');
+ d.ballots=d.ballots!.filter(b=>b.resolutionId!==r.id);
+ assert.match(observedContextProblem(d,r.id)!,/No delegation is present/,'the ballot is not open');
+ assert.throws(()=>close(d,r.id,'Passed','observed'),/No delegation is present/);
  ({d,r}=inDebate());
- for(const a of d.attendance)if(a.sessionId===r.sessionId)a.status='Absent';
+ for(const b of d.ballots!)if(b.resolutionId===r.id)b.status='Absent';
  assert.throws(()=>close(d,r.id,'Failed','observed'),/No delegation is present/,'everyone Absent');
- d.attendance.find(a=>a.sessionId===r.sessionId)!.status='Present';
- assert.equal(close(d,r.id,'Passed','observed').documents.find(x=>x.id===r.id)!.outcomeMethod,'observed','one delegation present, no ballots: allowed');
- // The session the Chair confirmed must still be the resolution's ballot session.
- ({d,r}=inDebate());
- d.sessions.push({...d.sessions.find(s=>s.id===r.sessionId)!,id:'s-other',name:'Session 3'});
- assert.equal(observedContextProblem(d,r.id,r.sessionId),null);
- assert.match(observedContextProblem(d,r.id,'s-other')!,/different session/,'the console moved to another session');
- assert.throws(()=>close(d,r.id,'Passed','observed','s-other'),/different session/);
- assert.throws(()=>close(d,r.id,'Passed','observed',null),/different session/,'no confirmed session');
- assert.throws(()=>close(d,r.id,'Passed','observed','missing'),/valid session/,'unknown session');
+ d.ballots!.find(b=>b.resolutionId===r.id)!.status='Present';
+ assert.equal(close(d,r.id,'Passed','observed').documents.find(x=>x.id===r.id)!.outcomeMethod,'observed','one delegation eligible, no ballots: allowed');
 });
 
 test('history: an observed result names the declaring Chair and time; earlier ballots are kept, not counted',()=>{
  const {d,r}=inDebate();
  assert.equal(observedDeclaration(d,r.id),null,'an open vote has no declaration');
- const voter=d.attendance.find(a=>a.sessionId===r.sessionId&&a.status==='Present')!;
- d.votes.push({id:'v-early',delegateId:voter.delegateId,sessionId:r.sessionId!,resolutionId:r.id,choice:'For',createdAt:'2026-11-05'});
- const named=applyCommand(d,{type:'document',id:r.id,status:'Closed',outcome:'Failed',method:'observed',sessionId:r.sessionId!,ballotRevision:r.revision??0},'chair',{...meta(),actorId:'chair-demo'});
+ const voter=presentVoter(d,r);
+ d.votes.push({id:'v-early',delegateId:voter.delegateId,committeeId:'ga1',resolutionId:r.id,choice:'For',createdAt:'2026-11-05'});
+ const named=applyCommand(d,{type:'document',id:r.id,status:'Closed',outcome:'Failed',method:'observed',ballotRevision:r.revision??0},'chair',{...meta(),actorId:'chair-demo'});
  assert.deepEqual(observedDeclaration(named,r.id),{by:'Alex Morgan',at:'2026-11-05T10:00:00.000Z',keptBallots:1});
  assert.deepEqual(observedDeclaration(close(d,r.id,'Failed','observed'),r.id),{by:'the committee Chair',at:'2026-11-05T10:00:00.000Z',keptBallots:1},'an unresolved Chair is not invented');
  const counted=inDebate();
- for(const a of counted.d.attendance.filter(a=>a.sessionId===counted.r.sessionId&&a.status!=='Absent'))counted.d.votes.push({id:`v-${a.delegateId}`,delegateId:a.delegateId,sessionId:counted.r.sessionId!,resolutionId:counted.r.id,choice:'For',createdAt:'2026-11-05'});
+ for(const a of counted.d.ballots!.filter(b=>b.resolutionId===counted.r.id&&b.status!=='Absent'))counted.d.votes.push({id:`v-${a.delegateId}`,delegateId:a.delegateId,committeeId:'ga1',resolutionId:counted.r.id,choice:'For',createdAt:'2026-11-05'});
  assert.equal(observedDeclaration(close(counted.d,counted.r.id,'Passed'),counted.r.id),null,'a counted result is not a declaration');
 });
 
-test('Voting console: Clear majority keeps the counted close’s session safeguard and attendance floor',async t=>{
- const live=(d:ConferenceData,session='s1')=>{d.committees.find(c=>c.id==='ga1')!.currentSessionId=session;return d;};
- const ok=await render(t,live(createSeed()),'chair/voting');
- assert.match(ok,/<button>Clear majority For<\/button><button>Clear majority Against<\/button>/,'enabled on the ballot session');
+test('Voting console: Clear majority needs an open ballot with at least one eligible delegation',async t=>{
+ const ok=await render(t,inDebate().d,'chair/voting');
+ assert.match(ok,/<button>Clear majority For<\/button><button>Clear majority Against<\/button>/,'enabled once the ballot is open');
  assert.match(text(ok),/Obvious result\?/);
- // The committee moved to another session: both Clear majority actions are disabled, like Close voting.
- const moved=createSeed();moved.sessions.push({...moved.sessions.find(s=>s.id==='s1')!,id:'s-next',name:'Session 3 · Voting'});
- const raw=await render(t,live(moved,'s-next'),'chair/voting');
+ // The ballot is not open yet: both Clear majority actions are disabled, like Close voting, and the Chair is told how to open it.
+ const closed=inDebate();closed.d.ballots=[];
+ const raw=await render(t,closed.d,'chair/voting');
  assert.match(raw,/<button disabled="">Clear majority For<\/button><button disabled="">Clear majority Against<\/button>/);
- assert.match(text(raw),/Clear majority unavailable: This ballot belongs to a different session/);
- assert.match(text(raw),/ballot belongs to Session 2 · General debate\. Select that session/,'names the ballot session');
+ assert.match(text(raw),/Choose Normal vote or Divide the House to open the ballot/);
  assert.doesNotMatch(raw,/Confirm clear majority/);
- // Nobody present in the ballot session.
- const absent=live(createSeed());for(const a of absent.attendance)if(a.sessionId==='s1')a.status='Absent';
- const none=await render(t,absent,'chair/voting');
+ // Nobody eligible in the snapshot.
+ const absent=inDebate();for(const b of absent.d.ballots!)b.status='Absent';
+ const none=await render(t,absent.d,'chair/voting');
  assert.match(none,/<button disabled="">Clear majority For<\/button>/);
- assert.match(text(none),/No delegation is present in this ballot’s session/);
+ assert.match(text(none),/No delegation is present in this ballot/);
 });
 
 test('History: Documents and the Executive overview name the declaring Chair and time',async t=>{
- const {d,r}=inDebate();d.committees.find(c=>c.id==='ga1')!.currentSessionId='s1';
- const voter=d.attendance.find(a=>a.sessionId===r.sessionId&&a.status==='Present')!;
- d.votes.push({id:'v-early',delegateId:voter.delegateId,sessionId:r.sessionId!,resolutionId:r.id,choice:'Against',createdAt:'2026-11-05'});
- const closed=applyCommand(d,{type:'document',id:r.id,status:'Closed',outcome:'Passed',method:'observed',sessionId:r.sessionId!,ballotRevision:r.revision??0},'chair',{...meta(),actorId:'chair-demo'});
+ const {d,r}=inDebate();
+ const voter=presentVoter(d,r);
+ d.votes.push({id:'v-early',delegateId:voter.delegateId,committeeId:'ga1',resolutionId:r.id,choice:'Against',createdAt:'2026-11-05'});
+ const closed=applyCommand(d,{type:'document',id:r.id,status:'Closed',outcome:'Passed',method:'observed',ballotRevision:r.revision??0},'chair',{...meta(),actorId:'chair-demo'});
  const docs=text(await render(t,closed,'chair/documents'));
  assert.match(docs,/Clear majority declared by Alex Morgan · 5 Nov 2026, 13:00 Qatar time\. No country votes or totals recorded; 1 earlier ballot kept, not counted\./);
  const executive=text(await render(t,closed,'admin/resolution-status','admin'));
@@ -166,21 +158,21 @@ function consoles(t:test.TestContext){
  const savedWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
  Object.defineProperty(globalThis,'window',{configurable:true,value:{confirm:()=>true,addEventListener(){},removeEventListener(){}}});
  t.after(()=>{if(savedWindow)Object.defineProperty(globalThis,'window',savedWindow);else Reflect.deleteProperty(globalThis,'window');});
- return (repo:DurableRepository,sessionId='s1'):Console=>{
+ return (repo:DurableRepository):Console=>{
   const h={states:[] as unknown[],cursor:0,ctx:undefined as unknown};
   // The provider's act(): true when the save was accepted, false when it was refused.
   // Handlers such as the restart button do not await act(), so the harness waits for every save it started.
   const saves:Promise<unknown>[]=[];
   const act=(c:Command,role:Role)=>{const save=repo.execute(c,role).then(()=>true,()=>false);saves.push(save);return save;};
-  const view=()=>{active=h;h.cursor=0;h.ctx={data:repo.getSnapshot()!,act};return elements(VotingConsole({committeeId:'ga1',sessionId}));};
+  const view=()=>{active=h;h.cursor=0;h.ctx={data:repo.getSnapshot()!,act};return elements(VotingConsole({committeeId:'ga1'}));};
   const button=(label:string)=>view().find(e=>e.type==='button'&&labelOf(e.props.children)===label);
   return {view,button,lastSave:()=>saves[saves.length-1],click:async label=>{const b=button(label);assert.ok(b,`no "${label}" button`);assert.equal(b.props.disabled??false,false,`"${label}" is disabled`);const result=await b.props.onClick!();await Promise.all(saves);await tick();return result;}};
  };
 }
 const alertText=(c:Console)=>c.view().filter(e=>e.props.role==='alert'||e.props.role==='alertdialog').map(e=>labelOf(e.props.children)).join(' | ');
-const openBallot=()=>{const {d}=inDebate();d.committees.find(c=>c.id==='ga1')!.currentSessionId='s1';return d;};
-const castOne=async(repo:DurableRepository)=>{const d=repo.getSnapshot()!;const a=d.attendance.find(a=>a.sessionId==='s1'&&a.status==='Present')!;
- await repo.execute({type:'vote',sessionId:'s1',resolutionId:'r1',delegateId:a.delegateId,choice:'For'},'chair');};
+const openBallot=()=>inDebate().d;
+const castOne=async(repo:DurableRepository)=>{const d=repo.getSnapshot()!;const a=d.ballots!.find(b=>b.resolutionId==='r1'&&b.status==='Present')!;
+ await repo.execute({type:'vote',committeeId:'ga1',resolutionId:'r1',delegateId:a.delegateId,choice:'For'},'chair');};
 const resolution=(d:ConferenceData|null)=>d!.documents.find(x=>x.id==='r1')!;
 
 test('Voting console: restarting the ballot on this Chair device withdraws an open Clear majority; a fresh declaration still works',async t=>{
@@ -206,8 +198,8 @@ test('Voting console: restarting the ballot on this Chair device withdraws an op
   const open=resolution(repo.getSnapshot());
   assert.deepEqual([open.status,open.outcome,open.outcomeMethod],['In Debate',undefined,undefined],'nothing was closed');
   // The command layer refuses it on its own, whatever the UI does.
-  await assert.rejects(()=>repo.execute({type:'document',id:'r1',status:'Closed',outcome:'Passed',method:'observed',sessionId:'s1',ballotRevision:openedRevision},'chair'),/restarted or changed/);
-  await assert.rejects(()=>repo.execute({type:'document',id:'r1',status:'Closed',outcome:'Passed',method:'observed',sessionId:'s1'},'chair'),/restarted or changed/,'no revision at all');
+  await assert.rejects(()=>repo.execute({type:'document',id:'r1',status:'Closed',outcome:'Passed',method:'observed',ballotRevision:openedRevision},'chair'),/restarted or changed/);
+  await assert.rejects(()=>repo.execute({type:'document',id:'r1',status:'Closed',outcome:'Passed',method:'observed'},'chair'),/restarted or changed/,'no revision at all');
   // A fresh declaration after the restart works.
   await chair.click('Dismiss');
   assert.equal(alertText(chair),'');
@@ -284,7 +276,9 @@ test('real PostgreSQL: observed close parity, refusals, stale revisions and comm
   // An observed close carries the ballot revision the Chair opened it on; by default the current one.
   const send=async(user:string,c:unknown,expected?:string)=>{const value=expected??await revision();const cmd=c as {method?:string;ballotRevision?:number};if(cmd.method==='observed'&&!('ballotRevision' in cmd))c={...cmd,ballotRevision:Number(value)};await as(user);return db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),JSON.stringify(c),'chair',value,'2026-11-05T10:00:00Z']);};
   const reset=async(set:string)=>{await asOwner();await db.query(`update public.documents set status='In Debate',outcome=null,"outcomeMethod"='counted',"declaredBy"=null,"declaredByName"=null,"declaredAt"=null,"voteMode"='normal',"voteType"='substantive' where id=$1`,[ids.resolution]);await db.query(`update public.committees set voting_rule=null,"vetoEnabled"=false where id=$1`,[ids.ga1]);if(set)await db.query(set,[ids.resolution,ids.ga1]);};
-  const observed=(outcome:string,method='observed',sessionId:string|null=ids.session)=>({type:'document',id:ids.resolution,status:'Closed',outcome,method,...(sessionId===null?{}:{sessionId})});
+  const observed=(outcome:string,method='observed')=>({type:'document',id:ids.resolution,status:'Closed',outcome,method});
+  // The ballot snapshot (section 6) from the seeded roll call, as voteMode would take it.
+  const openBallot=async()=>{await asOwner();await db.query('select private.open_ballot($1,$2,$3)',[ids.conference,ids.ga1,ids.resolution]);};
   const row=async()=>{await asOwner();return (await query<{status:string;outcome:string;outcomeMethod:string;declaredBy:string|null;declaredByName:string|null;declaredAt:Date|null}>('select status,outcome,"outcomeMethod","declaredBy","declaredByName","declaredAt" from public.documents where id=$1',[ids.resolution]))[0];};
 
   // Refusals mirror the client rule.
@@ -306,7 +300,7 @@ test('real PostgreSQL: observed close parity, refusals, stale revisions and comm
   // declaration opened before a restart closed the new ballot.
   await reset('');
   const opened=Number(await revision());
-  await send(chair,{type:'voteMode',sessionId:ids.session,resolutionId:ids.resolution,mode:'normal',voteType:'substantive'});
+  await send(chair,{type:'voteMode',committeeId:ids.ga1,resolutionId:ids.resolution,mode:'normal',voteType:'substantive'});
   assert.equal(Number(await revision()),opened+1,'a restart bumps the revision');
   await assert.rejects(()=>send(chair,observed('Passed'),String(opened)),/changed|another chair/i,'stale expected revision');
   await assert.rejects(()=>send(chair,{...observed('Passed'),ballotRevision:opened}),/restarted or changed/,'stale ballotRevision with a fresh expected revision');
@@ -317,18 +311,17 @@ test('real PostgreSQL: observed close parity, refusals, stale revisions and comm
   assert.deepEqual([(await row()).status,(await row()).outcome,(await row()).outcomeMethod],['Closed','Passed','observed'],'a fresh declaration after the restart works');
   await reset('');
 
-  // The ballot/session context: the session the Chair confirmed must be the resolution's ballot session.
-  await assert.rejects(()=>send(chair,observed('Passed','observed',crypto.randomUUID())),/different session/,'another session');
-  await assert.rejects(()=>send(chair,observed('Passed','observed',null)),/different session/,'no confirmed session');
-  await assert.rejects(()=>send(chair,observed('Passed','observed','not-a-uuid')),/different session/,'malformed session');
+  // The ballot must be open with someone eligible: before any snapshot, nobody is.
+  await asOwner();await db.query('delete from public.ballot_eligibility where resolution_id=$1',[ids.resolution]);
+  await assert.rejects(()=>send(chair,observed('Passed')),/No delegation is present/,'the ballot is not open');
+  await openBallot();
 
   // One ballot already recorded: kept, not counted, not required. The declaring Chair's staff name is recorded.
   await asOwner();
   await db.query(`update public.staff set auth_user_id=$1 where name='Alex Morgan' and conference_id=$2`,[chair,ids.conference]);
-  const voter=(await query<{delegateId:string}>(`select "delegateId" from public.attendance where "sessionId"=$1 and status='Present' limit 1`,[ids.session]))[0].delegateId;
-  await db.query(`update public.documents set "sessionId"=$1 where id=$2`,[ids.session,ids.resolution]);
+  const voter=(await query<{delegateId:string}>(`select delegate_id "delegateId" from public.ballot_eligibility where resolution_id=$1 and status='Present' limit 1`,[ids.resolution]))[0].delegateId;
   await db.query('delete from public.votes where "resolutionId"=$1',[ids.resolution]);
-  await db.query(`insert into public.votes(conference_id,committee_id,"delegateId","sessionId","resolutionId",choice) values($1,$2,$3,$4,$5,'Against')`,[ids.conference,ids.ga1,voter,ids.session,ids.resolution]);
+  await db.query(`insert into public.votes(conference_id,committee_id,"delegateId","sessionId","resolutionId",choice) values($1,$2,$3,null,$4,'Against')`,[ids.conference,ids.ga1,voter,ids.resolution]);
   await send(chair,observed('Passed'));
   const closed=await row();
   assert.deepEqual([closed.status,closed.outcome,closed.outcomeMethod,closed.declaredBy,closed.declaredByName],['Closed','Passed','observed',chair,'Alex Morgan']);
@@ -356,20 +349,20 @@ test('real PostgreSQL: observed close parity, refusals, stale revisions and comm
   await reset('');
   await assert.rejects(()=>send(chair,{type:'document',id:ids.resolution,status:'Closed',outcome:'Passed'}),/every eligible ballot|configured voting rule/,'counted close still needs ballots');
 
-  // Attendance floor. Reproduced before the fix: both closes were accepted with nobody present.
+  // Eligibility floor, from the ballot snapshot. Reproduced before the fix: both closes were accepted with nobody present.
   await reset('');
   await asOwner();
   await db.query('delete from public.votes where "resolutionId"=$1',[ids.resolution]);
-  await db.query(`update public.attendance set status='Absent' where "sessionId"=$1`,[ids.session]);
+  await db.query(`update public.ballot_eligibility set status='Absent' where resolution_id=$1`,[ids.resolution]);
   await assert.rejects(()=>send(chair,observed('Passed')),/No delegation is present/,'everyone Absent');
   await asOwner();
-  await db.query(`update public.attendance set status='Present' where "sessionId"=$1 and "delegateId"=$2`,[ids.session,voter]);
+  await db.query(`update public.ballot_eligibility set status='Present' where resolution_id=$1 and delegate_id=$2`,[ids.resolution,voter]);
   await send(chair,observed('Failed'));
-  assert.deepEqual([(await row()).outcome,(await row()).outcomeMethod],['Failed','observed'],'one delegation present, no ballots: allowed');
+  assert.deepEqual([(await row()).outcome,(await row()).outcomeMethod],['Failed','observed'],'one delegation eligible, no ballots: allowed');
   await reset('');
   await asOwner();
-  await db.query('delete from public.attendance where "sessionId"=$1',[ids.session]);
-  await assert.rejects(()=>send(chair,observed('Passed')),/No delegation is present/,'no attendance at all');
+  await db.query('delete from public.ballot_eligibility where resolution_id=$1',[ids.resolution]);
+  await assert.rejects(()=>send(chair,observed('Passed')),/No delegation is present/,'no ballot snapshot at all');
 
   await asOwner();
   await assert.rejects(()=>db.query(`update public.documents set "outcomeMethod"='observed' where id=$1`,[ids.resolution]),/documents_observed_declared/,'an observed outcome always names who declared it');

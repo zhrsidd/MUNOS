@@ -14,8 +14,8 @@ const json = (o: Outcome): Record<string, unknown> => { try { return JSON.parse(
 
 interface Rep {cmd: string; actor: ActorKey; role: ConfRole; stranger: ActorKey; strangerRole: ConfRole}
 export const REPS: Rep[] = [
- {cmd: 'attendance', actor: 'chairGa1', role: 'chair', stranger: 'chairWho', strangerRole: 'chair'},
- {cmd: 'currentSession', actor: 'chairGa1', role: 'chair', stranger: 'chairWho', strangerRole: 'chair'},
+ {cmd: 'vote', actor: 'chairGa1', role: 'chair', stranger: 'chairWho', strangerRole: 'chair'},
+ {cmd: 'debateMode', actor: 'chairGa1', role: 'chair', stranger: 'chairWho', strangerRole: 'chair'},
  {cmd: 'committeeUpdate', actor: 'exec', role: 'admin', stranger: 'approval', strangerRole: 'approval'},
  {cmd: 'resolutionLink', actor: 'chairGa1', role: 'chair', stranger: 'chairWho', strangerRole: 'chair'},
  {cmd: 'photoSlot:update', actor: 'exec', role: 'admin', stranger: 'approval', strangerRole: 'approval'},
@@ -66,17 +66,18 @@ export async function idempotencySection(t: TestContext, ctx: Ctx) {
 
  await t.test('a replay is a no-op: exactly one receipt, one audit row and one effect however many times it is retried', async () => {
   const {engine, f} = ctx;
-  const cmd = COMMANDS.find(c => c.id === 'attendance')!;
+  const cmd = COMMANDS.find(c => c.id === 'vote')!;
   const results: string[] = [];
   await sequence(engine, async (step, owner) => {
+   await owner(cmd.pre!(f));
    const exp0 = await owner(`select (${cmd.expected!(f)})::text`);
    for (let i = 0; i < 4; i++) {
     const o = await step({actor: ACTORS.chairGa1, call: mutationCall(targetFor(cmd), f.confA, mutationId(77), cmd.command(f), 'chair', {literal: exp0}),
-     afterSql: `(select count(*) from private.mutation_receipts where id=${q(mutationId(77))})||'/'||(select count(*) from public.audit_log where mutation_id=${q(mutationId(77))})||'/'||(select revision from public.attendance where "sessionId"=${q(f.session)} and "delegateId"=${q(f.japan)})`});
+     afterSql: `(select count(*) from private.mutation_receipts where id=${q(mutationId(77))})||'/'||(select count(*) from public.audit_log where mutation_id=${q(mutationId(77))})||'/'||(select revision from public.votes where "sessionId" is null and "delegateId"=${q(f.france)} and "resolutionId"=${q(f.resolution)})`});
     results.push(`${o.code}:${o.after}`);
    }
   });
-  assert.deepEqual(results, ['ok:1/1/2', 'ok:1/1/2', 'ok:1/1/2', 'ok:1/1/2']);
+  assert.deepEqual(results, ['ok:1/1/1', 'ok:1/1/1', 'ok:1/1/1', 'ok:1/1/1']);
  });
 }
 
@@ -229,7 +230,7 @@ export async function accessCodeSection(t: TestContext, ctx: Ctx) {
     const cmd = COMMANDS.find(c => c.id === id)!;
     return step({actor: d, pre: cmd.pre?.(f), expectedSql: cmd.expected?.(f), call: mutationCall(targetFor(cmd), f.confA, mutationId(600 + n), cmd.command(f), role, 'valid')});
    };
-   const own = (role: ConfRole, n: number) => as('attendance', role, n);
+   const own = (role: ConfRole, n: number) => as('debateMode', role, n);
    run('before redeeming', await own('chair', 1));
    assert.equal(json(await step({actor: d, call: `public.redeem_access_code(${q(f.confA)}::uuid, ${q(CODE.chair)})`})).status, 'ok');
    run('own committee', await own('chair', 2));

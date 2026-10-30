@@ -17,7 +17,7 @@ const ROLES: Role[] = ["chair", "approval", "logistics", "admin"];
 const doc = (id: string, status: Resolution["status"], title = `Resolution ${id}`, extra: Partial<Resolution> = {}): Resolution => ({ id, committeeId: "ga1", sessionId: "s1", code: id, title, submitterId: "d1", status, versionIds: [], copies: 3, comments: [], ...extra });
 const amendment = (id: string, status: Amendment["status"], extra: Partial<Amendment> = {}): Amendment => ({ id, committeeId: "ga1", resolutionId: "r1", sessionId: "s1", submitterId: "d1", type: "Add", clause: `Clause ${id}`, wording: "x", status, outcome: null, createdAt: "2026-11-05T08:00:00Z", revision: 1, ...extra });
 const synced: FelixContext["health"] = { mode: "supabase", state: "saved", pending: 0, conflicts: 0, latency: 200 };
-const chairBase: NonNullable<FelixContext["chair"]> = { committeeId: "ga1", committeeCode: "GA1", sessionId: "s1", sessionName: "Committee Session 1", hasSessions: true, delegates: 20, marked: 20, present: 18, speaking: false, queued: 0, submissions: [], changesRequested: [], passedToApply: [], photos: [] };
+const chairBase: NonNullable<FelixContext["chair"]> = { committeeId: "ga1", committeeCode: "GA1", sessionId: "s1", sessionName: "Committee Session 1", schedulePublished: true, rollCallDue: false, delegates: 20, marked: 20, present: 18, speaking: false, queued: 0, submissions: [], changesRequested: [], passedToApply: [], photos: [] };
 const chairCtx = (over: Partial<NonNullable<FelixContext["chair"]>> = {}, extra: Partial<FelixContext> = {}): FelixContext => ({ role: "chair", documents: [], amendments: [], health: synced, chair: { ...chairBase, ...over }, ...extra });
 const ctxFor = (role: Role, extra: Partial<FelixContext> = {}): FelixContext => role === "chair" ? chairCtx({}, extra) : { role, documents: [], amendments: [], health: synced, ...extra };
 const ask = (q: string, ctx: FelixContext = chairCtx()) => answerQuestion(q, ctx, buildReminders(ctx));
@@ -131,7 +131,7 @@ test("every href Felix can return is a real navigation destination of that role"
   const contexts: FelixContext[] = [
     ...ROLES.map(role => ctxFor(role)),
     ...ROLES.map(role => ({ ...felixContext(data, role, "ga1"), health: { ...synced!, conflicts: 1 } })),
-    chairCtx({ sessionName: undefined, sessionId: undefined, hasSessions: false, photos: [{ slotId: "p", revision: 1, stage: "due", school: "Doha College", location: "Courtyard", minutesUntil: 0, delegates: 2 }] }, { documents: [doc("a", "Draft"), doc("b", "Printed")], amendments: [amendment("x", "Submitted")] }),
+    chairCtx({ sessionName: undefined, sessionId: undefined, schedulePublished: false, rollCallDue: true, photos: [{ slotId: "p", revision: 1, stage: "due", school: "Doha College", location: "Courtyard", minutesUntil: 0, delegates: 2 }] }, { documents: [doc("a", "Draft"), doc("b", "Printed")], amendments: [amendment("x", "Submitted")] }),
   ];
   for (const role of ROLES) {
     const hrefs = destinationHrefs(role);
@@ -187,13 +187,16 @@ test("retired and unimplemented features are not described", () => {
 });
 
 // ---------------------------------------------------------------- context and reminders
-test("Chair guidance uses the current session, roll call and debate state", () => {
-  const none = chairCtx({ sessionId: undefined, sessionName: undefined });
-  assert.equal(buildReminders(none)[0].key, "chair:no-session:ga1");
-  assert.equal(buildReminders(chairCtx({ sessionId: undefined, sessionName: undefined, hasSessions: false }))[0].key, "chair:no-sessions:ga1");
-  const notCalled = chairCtx({ marked: 0, present: 0 });
-  assert.match(buildReminders(notCalled)[0].text, /Roll call hasn’t started for Committee Session 1/);
-  assert.match(ask("how do I take roll call", chairCtx({ marked: 12, present: 10 })).text, /12 of 20 delegations marked, 10 present/);
+test("Chair guidance uses the schedule's session, the live roll call and debate state", () => {
+  // Chairs never choose a session: no reminder asks them to.
+  const unpublished = buildReminders(chairCtx({ sessionId: undefined, sessionName: undefined, schedulePublished: false }));
+  assert.deepEqual(unpublished.filter(r => r.kind.startsWith("chair:no-")).map(r => [r.key, r.priority]), [["chair:no-schedule:ga1", "info"]]);
+  assert.ok(buildReminders(chairCtx({})).every(r => !/Current session|choose/i.test(r.text)));
+  const due = chairCtx({ rollCallDue: true });
+  assert.match(buildReminders(due)[0].text, /Committee Session 1 has started\. Take a roll call/);
+  assert.match(buildReminders(chairCtx({ sessionId: undefined, sessionName: undefined, rollCallDue: true, marked: 0, present: 0 }))[0].text, /No roll call has been committed yet/);
+  assert.match(ask("how do I take roll call", chairCtx({ marked: 12, present: 10 })).text, /10 of 20 delegations present/);
+  assert.match(situation(chairCtx({ sessionId: undefined, sessionName: undefined, marked: 0, present: 0 })), /^GA1: no roll call yet;/);
   const delegates = [{ id: "d1", committeeId: "ga1", country: "France" }];
   const debating = chairCtx({ inDebate: "r1 — France", speaking: true, queued: 3 }, { delegates, documents: [doc("r1", "In Debate", "Water security"), doc("r2", "Approved", "Clean air")] });
   assert.match(situation(debating), /a speaker has the floor; 3 queued to speak; r1 — France is in debate/);
@@ -257,8 +260,11 @@ test("reminders are built from representative seed data: approvals, print queue,
   assert.ok(ctx.documents.every(d => d.committeeId === "ga1"));
   assert.ok(ctx.amendments.every(a => a.committeeId === "ga1"));
   assert.equal(ctx.chair?.delegates, data.delegates.filter(d => d.committeeId === "ga1").length);
-  assert.equal(ctx.chair?.sessionName, undefined, "the seed has no current session until a Chair chooses one");
-  assert.equal(buildReminders(ctx).find(r => r.priority !== "info")?.kind, "chair:no-session");
+  assert.equal(ctx.chair?.sessionName, undefined, "the seed publishes no schedule");
+  assert.equal(ctx.chair?.schedulePublished, false);
+  assert.equal(ctx.chair?.marked, ctx.chair?.delegates, "the seeded roll call is live");
+  assert.equal(ctx.chair?.rollCallDue, false);
+  assert.ok(buildReminders(ctx).some(r => r.kind === "chair:no-schedule"));
   const admin = felixContext(data, "admin");
   assert.equal(admin.documents.length, data.documents.length);
   assert.equal(admin.chair, undefined);

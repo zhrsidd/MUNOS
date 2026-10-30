@@ -14,7 +14,7 @@ import type {HealthReport} from '../lib/platform/health-probe';
 // lockstep retries, and passive triggers (focus / Realtime / peer tabs / writes) that ignored backoff.
 const pause=()=>new Promise<void>(resolve=>setImmediate(resolve));
 async function until(check:()=>boolean){for(let n=0;n<500;n++){if(check())return;await pause();}assert.ok(check(),'repository did not settle');}
-const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
+const mutation=():Mutation=>({id:crypto.randomUUID(),actorId:'chair-test',createdAt:new Date().toISOString(),role:'chair',state:'pending',expected:null,command:{type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2}});
 class Server implements Transport {
  actorId='chair-test';data=createSeed();reads=0;sends=0;receipts=new Set<string>();readError:unknown=undefined;subscribe?:(refresh:()=>void,state:(connected:boolean)=>void)=>()=>void;conflictOn=new Set<string>();order:string[]=[];unconfirmed=0;maxConfirmed=0;
  async read(){this.reads++;await pause();if(this.readError)throw this.readError;this.maxConfirmed=Math.max(this.maxConfirmed,this.unconfirmed);this.unconfirmed=0;return structuredClone(this.data);}

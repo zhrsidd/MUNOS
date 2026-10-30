@@ -7,21 +7,21 @@ import {createSeed} from '../lib/seed';
 
 const transactionEvents = () => new Promise(resolve => setTimeout(resolve, 20));
 
-test('a stale local tab rejects once, keeps the newer attendance, and leaves storage usable', async () => {
+test('a stale local tab rejects once, keeps the newer debate state, and leaves storage usable', async () => {
   const store = new DurableStore(`stale-tab-${crypto.randomUUID()}`);
   const first = new DurableRepository('ga1', createSeed, store);
   const stale = new DurableRepository('ga1', createSeed, store);
   try {
     await first.ready(); await stale.ready();
-    await first.execute({type: 'attendance', delegateId: 'd0', sessionId: 's1', status: 'Absent'}, 'chair');
-    await assert.rejects(stale.execute({type: 'attendance', delegateId: 'd0', sessionId: 's1', status: 'Present & Voting'}, 'chair'), /Another tab updated this item/);
+    await first.execute({type: 'debateMode', committeeId: 'ga1', mode: 'closed', phase: 'for'}, 'chair');
+    await assert.rejects(stale.execute({type: 'debateMode', committeeId: 'ga1', mode: 'open', phase: 'for'}, 'chair'), /Another tab updated this item/);
     // A rejected transaction must not emit a second, unhandled AbortError after the handled save failure.
     await transactionEvents();
     const saved = await store.read('ga1');
-    assert.equal(saved?.base.attendance.find(a => a.delegateId === 'd0' && a.sessionId === 's1')?.status, 'Absent');
+    assert.equal(saved?.base.debateStates?.find(x => x.committeeId === 'ga1' && !x.sessionId)?.mode, 'closed');
     assert.deepEqual(saved?.pending, []);
-    await first.execute({type: 'attendance', delegateId: 'd1', sessionId: 's1', status: 'Absent'}, 'chair');
-    assert.equal((await store.read('ga1'))?.base.attendance.find(a => a.delegateId === 'd1' && a.sessionId === 's1')?.status, 'Absent');
+    await first.execute({type: 'debateMode', committeeId: 'ga1', mode: 'closed', phase: 'against'}, 'chair');
+    assert.equal((await store.read('ga1'))?.base.debateStates?.find(x => x.committeeId === 'ga1' && !x.sessionId)?.phase, 'against');
   } finally {first.dispose(); stale.dispose(); await store.close();}
 });
 

@@ -33,7 +33,8 @@ test('central slots preserve local identities and history; committee/session del
   await assert.rejects(()=>f.mutate({type:'committeeUpdate',id:f.ids.ga1,code:original.committees.find(c=>c.id!==f.ids.ga1)!.code,name:'Duplicate',room:'A'}),code('23505'));
   await assert.rejects(()=>f.mutate({type:'committeeLifecycle',id:f.ids.ga1,action:'delete'}),/linked records/);
   const local=copies.find(s=>s.committeeId===f.ids.ga1)!;const delegate=data.delegates.find(d=>d.committeeId===f.ids.ga1)!;
-  await f.as(chair);await f.mutate({type:'attendance',delegateId:delegate.id,sessionId:local.id,status:'Present'},'chair');
+  // Session-keyed history written before roll calls (attendance is no longer a command) still marks the session as used.
+  await f.asOwner();await f.db.query(`insert into public.attendance(conference_id,committee_id,"delegateId","sessionId",status) values($1,$2,$3,$4,'Present')`,[f.ids.conference,f.ids.ga1,delegate.id,local.id]);await f.as(chair);
   await assert.rejects(()=>f.mutate({...create,name:'unauthorized'},'admin'),code('42501'));
   await f.as(admin);await assert.rejects(()=>f.mutate({type:'sessionSlot',action:'delete',id:slot.id}),/operational history/);
   await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});data=await f.snapshot();assert.ok(data.sessionSlots!.find(s=>s.id===slot.id)?.archived);assert.equal(data.attendance.find(a=>a.sessionId===local.id)?.status,'Present');assert.ok(data.sessions.filter(s=>s.slotId===slot.id).every(s=>s.archived&&s.state==='closed'));
@@ -77,4 +78,52 @@ test('amendment links, public submission, limits, lifecycle, RLS and token-safe 
   await f.asOwner();assert.ok(!(await f.query<{details:unknown}>('select details from public.audit_log')).some(a=>JSON.stringify(a.details).includes(token)));
   await f.query(`update public.documents set status='Closed',outcome='Passed' where id=$1`,[doc.id]);await f.as(chair);assert.deepEqual((await f.snapshot()).amendments,[]);assert.equal((await f.query<{n:number}>('select count(*)::int n from public.amendments'))[0].n,20,'closed resolution history stays stored');
  }finally{await f.db.close();}
+});
+
+test('a slot can be archived while a resolution is in debate: retained document and session pointers are history, not a guard',async()=>{
+ const f=await setup();
+ try{
+  await f.as(admin);
+  const create:Command={type:'sessionSlot',action:'create',name:'Pointer slot',startsAt:'2026-11-06T06:00:00Z',endsAt:'2026-11-06T09:00:00Z'};
+  await (await f.mutate(create)).run;
+  const data=await f.snapshot();const slot=data.sessionSlots!.find(x=>x.name==='Pointer slot')!;
+  const local=data.sessions.find(x=>x.slotId===slot.id&&x.committeeId===f.ids.ga1)!;
+  await f.asOwner();
+  await f.db.query(`update public.committees set "currentSessionId"=$1 where id=$2`,[local.id,f.ids.ga1]);
+  await f.db.query(`update public.documents set "sessionId"=$1 where id=$2`,[local.id,f.ids.resolution]);
+  assert.equal((await f.query<{n:number}>(`select count(*)::int n from public.documents where id=$1 and status='In Debate'`,[f.ids.resolution]))[0].n,1);
+  await f.as(admin);
+  await f.mutate({type:'sessionSlot',action:'archive',id:slot.id});
+  assert.ok((await f.snapshot()).sessionSlots!.find(x=>x.id===slot.id)?.archived);
+ }finally{await f.db.close();}
+});
+
+test('populated upgrade: amendments and deductions labelled by an archived session keep working in an active committee, and keep their label',async()=>{
+ const f=await freshDatabase({upgradeAt:'20261031090000_committee_live_state.sql'});
+ const {db,ids,query,as,asOwner,grant,upgrade}=f;
+ try{
+  await grant(chair,'chair',ids.ga1);
+  const amendment='72000000-0000-4000-8000-0000000000f1',deduction='72000000-0000-4000-8000-0000000000f2';
+  // Before the upgrade, as the previous build left them: session-linked rows, then the session is archived.
+  await asOwner();
+  await db.query(`insert into public.amendments(id,conference_id,committee_id,"resolutionId","sessionId","submitterId",type,clause,wording,status) values($1,$2,$3,$4,$5,$6,'Add','Clause 9','Old wording.','Accepted for Debate')`,[amendment,ids.conference,ids.ga1,ids.resolution,ids.session,ids.japan]);
+  await db.query(`insert into public.participation_adjustments(id,conference_id,committee_id,"delegateId","sessionId",points,reason,"chairId") values($1,$2,$3,$4,$5,-3,'Earlier deduction',$6)`,[deduction,ids.conference,ids.ga1,ids.france,ids.session,chair]);
+  await db.query('update public.sessions set archived=true where id=$1',[ids.session]);
+  await upgrade();
+  await asOwner();
+  assert.equal((await query<{archived:boolean}>('select archived from public.committees where id=$1',[ids.ga1]))[0].archived,false,'the committee stays active');
+  await as(chair);
+  const revision=String((await query<{r:number}>('select revision r from public.amendments where id=$1',[amendment]))[0].r);
+  await f.db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),{type:'amendmentStatus',id:amendment,status:'In Debate'},'chair',revision,new Date().toISOString()]);
+  await f.db.query('select public.apply_operations_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),{type:'pointAdjustment',action:'restore',delegateId:ids.france,adjustmentId:deduction},'chair',null,new Date().toISOString()]);
+  await asOwner();
+  const a=(await query<{status:string;s:string}>('select status,"sessionId" s from public.amendments where id=$1',[amendment]))[0];
+  assert.equal(a.status,'In Debate');assert.equal(a.s,ids.session,'the historical label is preserved');
+  const restore=(await query<{s:string;points:number}>('select "sessionId" s,points from public.participation_adjustments where reverses=$1',[deduction]))[0];
+  assert.equal(restore.points,3);assert.equal(restore.s,ids.session,'the restore keeps the original session label');
+  // The committee guard remains: once the committee is archived the same work is a stale conflict.
+  await db.query('update public.committees set archived=true where id=$1',[ids.ga1]);
+  const current=String((await query<{r:number}>('select revision r from public.amendments where id=$1',[amendment]))[0].r);await as(chair);
+  await assert.rejects(()=>f.db.query('select public.apply_conference_mutation($1,$2,$3,$4,$5,$6)',[ids.conference,crypto.randomUUID(),{type:'amendmentStatus',id:amendment,status:'Closed',outcome:'Withdrawn'},'chair',current,new Date().toISOString()]),(e:{code?:string})=>e.code==='PT409');
+ }finally{await db.close();}
 });

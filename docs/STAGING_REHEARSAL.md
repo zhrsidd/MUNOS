@@ -39,7 +39,7 @@ Previews have Vercel Authentication on; scripts use a *Protection Bypass for Aut
 - [ ] Preview URL opens; `npm run verify:deployment -- <preview-url> <commit>` passes.
 - [ ] System health: GREEN, *Running version* = the Preview commit, environment `preview`, Supabase reachable, Storage `ok`.
 - [ ] Each role on a separate browser, signed in **with a staff access code** (Executive → Access codes): Chair (two committees), Approval, Admins, Executive.
-- [ ] Executive → Sessions: one central session exists and appears in every active committee; each Chair selects it as the current session.
+- [ ] Executive → Sessions: one central session exists and appears in every active committee; the Executive publishes the schedule, and each Chair sees that session's label (Chairs do not choose sessions; docs/SESSION_MODEL.md).
 - [ ] Google-Doc submission end to end: QR page → Delegate submissions → Open Google Doc → Submit to Approval → Approve → Print → In Debate.
 - [ ] Amendment QR end to end: amendment page shows the resolution in debate → submit → Chair amendment inbox → Accepted for Debate → In Debate → Closed (Passed) → Chair edits the Google Doc by hand.
 - [ ] Public form shows only committee, delegation selector, link, checkbox and fallback (no title field) — no staff navigation; browser storage shows no Conference OS database and no Supabase session after submitting.
@@ -67,7 +67,7 @@ The harness (`scripts/rehearsal-run.mts`) simulates **people, not requests**, in
 
 | Simulated role | Share of staff | Behaviour |
 | --- | --- | --- |
-| Chair | 70% | one *floor* device per committee sets the Current session, adds to lane queues, starts speeches from the queue, scores, runs POIs, finishes; other Chair devices take roll call, add to queues and refocus |
+| Chair | 70% | one *floor* device per committee takes roll call (marks a draft on the device, then commits it once), adds to lane queues, starts speeches from the queue, scores, runs POIs, finishes; other Chair devices mark roll call drafts (occasionally committing one), add to queues and refocus |
 | Approval | 10% | returns to the tab every 30–90 s (window focus); approves a Submitted resolution occasionally |
 | Admins | 10% | returns to the tab; marks Approved as Printed |
 | Executive | 10% | returns to the tab; `/api/health` |
@@ -126,12 +126,12 @@ Run with 25–50 simulated staff devices in the background and real people on th
 | E5 | Google Docs unreachable on a Chair laptop (block `docs.google.com`) | Conference OS fully usable; *Open Google Doc* fails in Google's tab only |
 | E6 | Chair refreshes mid-debate (timer running, queue populated) | State restored from device storage; timer continues from its stored start; no duplicate entries |
 | E7 | Double-click / repeated retries (rapid clicks, harness retries) | Exactly one record per action |
-| E8 | Second Chair opens the same committee and edits the same delegate's attendance | One succeeds, the other shows a conflict to review; nothing silently overwritten |
+| E8 | Second Chair opens the same committee and records the same delegate's vote | One succeeds, the other shows a conflict to review; nothing silently overwritten. (Two roll calls never conflict: each is committed whole, and the one with the latest effective time is live.) |
 | E9 | Chair laptop "disappears" (close lid with unsynced changes, take a spare) | Spare shows only synced work; recovery procedure from the runbook works (export before reconnecting) |
 | E10 | Browser closed and reopened (online and offline) | Reopens to the same committee; offline reopen works within the 48-hour lease |
 | E11 | Supabase unreachable for the Preview (temporarily wrong URL on a test device, or network block) | Health YELLOW "database unreachable"; device keeps saving; QR submissions show "NOT submitted" |
 | E12 | Photo reminder while offline / after refresh / device time zone changed | Reminder appears on time from cached data; wrong *clock* shifts it (documented) |
-| E13 | Chair offline records attendance; meanwhile the Executive archives that central session | On reconnect the change returns `PT409` and shows "needs review" (kept, not lost); export → keep conference value |
+| E13 | Chair offline records a score; meanwhile the Executive archives the committee | On reconnect the change returns `PT409` and shows "needs review" (kept, not lost); export → keep conference value |
 | E14 | Executive revokes a Chair's access code **with** device revocation while the Chair has unsynced work | Device loses access; pending work is retained; sign-out is refused until a recovery export is downloaded; the export contains the pending changes |
 | E15 | Executive rotates the amendment link while a delegate has the old QR open | Old link → "not valid"; new printed sheet works; no duplicate amendment from a retried submit |
 
@@ -139,16 +139,16 @@ Run with 25–50 simulated staff devices in the background and real people on th
 
 1. Chair opens the committee online (status GREEN).
 2. Disconnect the network.
-3. Change attendance for three delegates.
+3. Take a roll call that changes three delegates' status, and commit it.
 4. Add two speakers; advance the queue once.
 5. Log two participation points (one Speech, one POI).
 6. Check the UI: status strip "Internet unavailable — N changes saved on this device"; System health shows the same N unsynced.
 7. Refresh the page while still offline: the Chair Console reopens with the changes.
 8. Reconnect.
 9. Within ~1 minute: status GREEN, 0 unsynced.
-10. On a **second device**: attendance, queue and participation match exactly; participation count increased by exactly 2 (no duplicates).
+10. On a **second device**: the roll call, queue and participation match exactly; participation count increased by exactly 2 (no duplicates).
 11. Idempotency check: repeat with the network dropping **during** a sync (toggle off right after reconnect) — still exactly one record per action.
-12. Conflict check: while device A is offline, device B changes the same delegate's attendance; reconnect A → A shows "need review"; export, keep the conference value, confirm nothing else was lost.
+12. Conflict check: while device A is offline and has recorded a delegate's vote, device B records the same delegate's vote; reconnect A → A shows "need review"; export, keep the conference value, confirm nothing else was lost.
 
 ## Realtime
 

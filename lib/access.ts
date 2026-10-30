@@ -45,5 +45,6 @@ export class AccessGatedTransport implements Transport {
  private assertAccess(){if(!this.allowed())throw Error('Staff access is unavailable. Saved changes are retained for recovery.');}
  async read(){this.assertAccess();const data=await this.delegate.read();this.assertAccess();return data;}
  async send(m:Mutation){this.assertAccess();if(m.actorId!==this.actorId)throw Error('Saved action belongs to another staff identity.');await this.delegate.send(m);this.assertAccess();}
+ async syncClock(deviceId:string){this.assertAccess();await this.delegate.syncClock?.(deviceId);this.assertAccess();}
  subscribe(refresh:()=>void,state:(connected:boolean)=>void){this.assertAccess();return this.delegate.subscribe?.(()=>{if(this.allowed())refresh();},connected=>state(this.allowed()&&connected))??(()=>{});}
 }

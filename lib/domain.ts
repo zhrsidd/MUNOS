@@ -147,28 +147,50 @@ export interface ParticipationEvent {
   categoryId: ID;
   points: number;
   createdAt: string;
-  sessionId: ID;
+  /** Legacy: the session a Chair had selected when the event was recorded. New events carry none; the server's label gives the session. */
+  sessionId?: ID | null;
+  committeeId?: ID;
   resolutionId: ID | null;
   chairId: ID;
   voidedAt?: string;
   updatedAt?: string;
 }
+/** Live state is keyed by committee (docs/SESSION_MODEL.md section 8): a live row has committeeId and no sessionId. A row with a
+ *  sessionId was written under the old session-keyed model and is history. */
 export interface SpeakerQueueEntry {
   lane?: Lane;
   id: ID;
   delegateId: ID;
-  sessionId: ID;
+  committeeId?: ID;
+  sessionId?: ID | null;
   position: number;
 }
 export interface Vote {
   revision?: number;
   id: ID;
   resolutionId: ID;
-  sessionId: ID;
+  committeeId?: ID;
+  sessionId?: ID | null;
   delegateId: ID;
   choice: "For" | "Against" | "Abstain";
   createdAt: string;
 }
+/** A committed roll call revision (section 6). Drafts stay on the device; the server only ever sees a whole commit. */
+export interface RollCall {
+  id: ID;
+  revision: number;
+  committeeId: ID;
+  copiedFrom?: ID | null;
+  observedAt: string;
+  committedAt: string;
+  /** Device commit time when the server trusted it, otherwise server receipt. Live presence is the roll call with the latest one. */
+  effectiveAt: string;
+  timeConfidence?: "trusted" | "uncertain" | null;
+  legacy?: boolean;
+  rows: { delegateId: ID; status: AttendanceStatus }[];
+}
+/** A ballot's eligibility snapshot, taken when the ballot opened. Every vote on the resolution is checked against it. */
+export interface BallotEntry { resolutionId: ID; delegateId: ID; status: AttendanceStatus; committeeId?: ID }
 export interface AwardCriterion {
   committeeId?: ID | null;
   id: ID;
@@ -202,6 +224,8 @@ import type { OperationsData } from "./operations/types";
 export interface ConferenceData extends OperationsData, BatchData {
   debateStates?: DebateState[];
   speeches?: Speech[];
+  rollCalls?: RollCall[];
+  ballots?: BallotEntry[];
   poiQueue?: PoiEntry[];
   conference: Conference;
   committees: Committee[];

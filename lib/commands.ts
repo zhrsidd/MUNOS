@@ -5,6 +5,7 @@ import { nextResolutionCode } from "./resolution-number";
 import {isBatchCommand,type BatchCommand} from './batch/types';
 import {applyProcedure} from "./procedure/commands";
 import {isProcedureCommand, type ProcedureCommand} from "./procedure/types";
+import { ballotStatus, citedRollCall, eligibleBallots, isEligible, isLive, isPresent, rollCallAt } from "./sessions/presence";
 import {
   AttendanceStatus,
   ConferenceData,
@@ -25,18 +26,37 @@ export type Command =
   | BatchCommand
   | OperationsCommand
   | ProcedureCommand
+  /** Retired: presence comes from roll calls. Kept so an action saved by an older build can be shown and refused. */
   | {
       type: "attendance";
       delegateId: string;
       sessionId: string;
       status: AttendanceStatus;
     }
+  /** Retired: sessions follow the published schedule. Kept so an action saved by an older build can be shown and refused. */
+  | { type: "currentSession"; committeeId: string; sessionId: string }
+  /**
+   * A whole roll call, committed once (docs/SESSION_MODEL.md section 6). The id is made on the device, so a roll call taken offline
+   * has its identity before it reaches the server; a correction is the next revision of the same id. Drafts never leave the device.
+   */
+  | {
+      type: "rollCallCommit";
+      committeeId: string;
+      rollCallId: string;
+      revision: number;
+      copiedFrom?: string | null;
+      observedAt: string;
+      committedAt: string;
+      rows: { delegateId: string; status: AttendanceStatus }[];
+    }
   | {
       type: "participation";
       delegateId: string;
       categoryId: string;
       points: number;
-      sessionId: string;
+      committeeId: string;
+      /** Legacy: saved by an older build; only identifies the committee. */
+      sessionId?: string;
       resolutionId: string | null;
     }
   | { type: "event"; id: string; points?: number; undo?: boolean }
@@ -48,7 +68,7 @@ export type Command =
       outcome?: "Passed" | "Failed" | "Withdrawn";
       /** Close with a declared clear majority instead of counted ballots. */
       method?: "observed";
-      /** Observed close only: the ballot session the Chair confirmed. It must still be the resolution's session. */
+      /** Legacy: older builds sent the ballot session the Chair confirmed. Ignored: the ballot's eligibility snapshot is authoritative. */
       sessionId?: string;
       /** Observed close only: the document revision the Chair saw when opening the declaration. A restarted ballot
        *  (this Chair or another) bumps the revision, so a stale declaration is refused as a conflict. */
@@ -58,7 +78,8 @@ export type Command =
   | {
       type: "newDocument";
       committeeId: string;
-      sessionId: string;
+      /** Legacy: saved by an older build. A resolution belongs to its committee, not a session. */
+      sessionId?: string;
       /**
        * Legacy compatibility value only (`documents.title` is not null and the SQL rejects a command without it). New
        * resolutions are not named: the client sends `compatResolutionTitle()` and nothing displays it. REQUIRED, so
@@ -68,11 +89,13 @@ export type Command =
       title: string;
       submitterId: string;
     }
-  | { type: "queue"; delegateId?: string; sessionId: string; advance?: boolean }
+  | { type: "queue"; delegateId?: string; committeeId: string; sessionId?: string; advance?: boolean }
   | {
       type: "vote";
       delegateId: string;
-      sessionId: string;
+      committeeId: string;
+      /** Legacy: saved by an older build; only identifies the committee. */
+      sessionId?: string;
       resolutionId: string;
       choice: Vote["choice"];
     }
@@ -183,23 +206,14 @@ export function participationSummary(data: ConferenceData, delegateId: string) {
     speeches: events.filter((e) => e.categoryId === "speech").length,
   };
 }
-export function suggestedDelegates(data: ConferenceData, sessionId: string) {
-  const committeeId = data.sessions.find(
-    (s) => s.id === sessionId,
-  )?.committeeId;
+/** Present delegates of the committee who are not yet queued, fewest contributions first. */
+export function suggestedDelegates(data: ConferenceData, committeeId: string) {
   return data.delegates
     .filter(
       (d) =>
         d.committeeId === committeeId &&
-        data.attendance.some(
-          (a) =>
-            a.delegateId === d.id &&
-            a.sessionId === sessionId &&
-            a.status !== "Absent",
-        ) &&
-        !data.queue.some(
-          (q) => q.delegateId === d.id && q.sessionId === sessionId,
-        ),
+        isPresent(data, committeeId, d.id) &&
+        !data.queue.some((q) => q.delegateId === d.id && isLive(q, committeeId)),
     )
     .sort(
       (a, b) =>
@@ -210,6 +224,7 @@ export function suggestedDelegates(data: ConferenceData, sessionId: string) {
 }
 const allowed: Record<Command["type"], Role[]> = {
   attendance: ["chair"],
+  rollCallCommit: ["chair"],
   participation: ["chair"],
   event: ["chair"],
   document: ["chair", "approval", "logistics"],
@@ -245,61 +260,42 @@ export function applyCommand(
   const nextId = () => metadata ? `${metadata.id.slice(0, 24)}${(++sequence).toString(16).padStart(12, "0")}` : id();
   const d = structuredClone(previous),
     now = metadata?.createdAt ?? new Date().toISOString();
-  if ("sessionId" in c) {
-    const session = d.sessions.find((s) => s.id === c.sessionId);
-    if (!session) throw Error("Choose a valid session.");
-    if (
-      "delegateId" in c &&
-      c.delegateId &&
-      !d.delegates.some(
-        (x) => x.id === c.delegateId && x.committeeId === session.committeeId,
-      )
-    )
+  // Live state is keyed by committee. A command names its committee; one saved by an older build names a session instead.
+  const scoped = c as { committeeId?: string; sessionId?: string; delegateId?: string; resolutionId?: string | null };
+  const commandCommittee = scoped.committeeId ?? (scoped.sessionId ? d.sessions.find((s) => s.id === scoped.sessionId)?.committeeId : undefined);
+  if (scoped.sessionId && !scoped.committeeId && !commandCommittee) throw Error("Choose a valid committee.");
+  if (commandCommittee && c.type !== "document" && c.type !== "event") {
+    if (!d.committees.some((x) => x.id === commandCommittee)) throw Error("Choose a valid committee.");
+    if (scoped.delegateId && !d.delegates.some((x) => x.id === scoped.delegateId && x.committeeId === commandCommittee))
       throw Error("Delegate is outside this committee.");
-    if (
-      "resolutionId" in c &&
-      c.resolutionId &&
-      !d.documents.some(
-        (r) => r.id === c.resolutionId && r.committeeId === session.committeeId,
-      )
-    )
+    if (scoped.resolutionId && !d.documents.some((r) => r.id === scoped.resolutionId && r.committeeId === commandCommittee))
       throw Error("Resolution is outside this committee.");
   }
   switch (c.type) {
-    case "attendance": {
-      const a = d.attendance.find(
-        (a) => a.delegateId === c.delegateId && a.sessionId === c.sessionId,
-      );
-      if (a) {
-        a.revision = (a.revision ?? 0) + 1;
-        a.status = c.status;
-        a.updatedAt = now;
-      } else
-        d.attendance.push({
-          id: nextId(),
-          delegateId: c.delegateId,
-          sessionId: c.sessionId,
-          status: c.status,
-          revision: 1,
-          updatedAt: now,
-        });
-      d.votes = d.votes.filter(
-        (v) =>
-          d.documents.find(r=>r.id===v.resolutionId)?.status === "Closed" ||
-          v.delegateId !== c.delegateId ||
-          v.sessionId !== c.sessionId ||
-          (c.status !== "Absent" &&
-            (c.status !== "Present & Voting" || v.choice !== "Abstain")),
-      );
-      if (c.status === "Absent")
-        d.queue = d.queue.filter(
-          (q) => q.delegateId !== c.delegateId || q.sessionId !== c.sessionId,
-        );
+    case "attendance":
+      throw Error("Attendance is taken with roll calls now.");
+    case "currentSession":
+      throw Error("Sessions follow the published schedule; Chairs no longer choose them.");
+    case "rollCallCommit": {
+      // Mirrors private.commit_roll_call: one whole roll call; a correction is the next revision of the same id.
+      const list = (d.rollCalls ??= []);
+      if (!c.rollCallId || !Number.isInteger(c.revision) || c.revision < 1) throw Error("A roll call needs an id and a revision.");
+      if (list.some((r) => r.id === c.rollCallId && r.committeeId !== c.committeeId)) throw Error("Roll call unavailable.");
+      if (list.some((r) => r.id === c.rollCallId && r.revision === c.revision)) throw Error("This roll call revision is already committed.");
+      if (c.revision > 1 && !list.some((r) => r.id === c.rollCallId && r.revision === c.revision - 1)) throw Error("Commit the previous revision first.");
+      if (new Set(c.rows.map((r) => r.delegateId)).size !== c.rows.length) throw Error("Each delegate appears once in a roll call.");
+      if (c.rows.some((r) => !["Present", "Present & Voting", "Absent"].includes(r.status) || !d.delegates.some((x) => x.id === r.delegateId && x.committeeId === c.committeeId)))
+        throw Error("Every row needs a delegate of this committee and a status.");
+      const call = { id: c.rollCallId, revision: c.revision, committeeId: c.committeeId, copiedFrom: c.copiedFrom ?? null, observedAt: c.observedAt, committedAt: c.committedAt, effectiveAt: c.committedAt, rows: c.rows };
+      list.push(call);
+      // Only the live roll call changes the floor: absent delegates leave the speaker queue.
+      if (rollCallAt(d, c.committeeId) === call)
+        d.queue = d.queue.filter((q) => !isLive(q, c.committeeId) || (call.rows.find((r) => r.delegateId === q.delegateId)?.status ?? "Absent") !== "Absent");
       break;
     }
     case "participation": {
       if(c.categoryId==="submitter" && (!c.resolutionId || d.documents.find(r=>r.id===c.resolutionId)?.submitterId!==c.delegateId || d.events.some(e=>e.categoryId==="submitter" && e.resolutionId===c.resolutionId))) throw Error("Main Submitter credit requires a resolution and may only be recorded once.");
-      const committeeId = d.sessions.find((s) => s.id === c.sessionId)?.committeeId ?? "";
+      const committeeId = commandCommittee ?? "";
       if (!scoringValues(d, committeeId, c.categoryId).includes(c.points))
         throw Error("Choose a configured point value.");
       d.events.push({
@@ -307,7 +303,7 @@ export function applyCommand(
         delegateId: c.delegateId,
         categoryId: c.categoryId,
         points: c.points,
-        sessionId: c.sessionId,
+        committeeId,
         resolutionId: c.resolutionId,
         chairId: metadata?.actorId ?? "chair-demo",
         createdAt: now,
@@ -320,7 +316,7 @@ export function applyCommand(
         e.revision = (e.revision ?? 0) + 1;
         if (c.undo) e.voidedAt = now;
         else {
-          const committeeId = d.sessions.find((s) => s.id === e.sessionId)?.committeeId ?? "";
+          const committeeId = e.committeeId ?? d.sessions.find((s) => s.id === e.sessionId)?.committeeId ?? "";
           if (!scoringValues(d, committeeId, e.categoryId).includes(c.points ?? -1))
             throw Error("Invalid points.");
           e.points = c.points!;
@@ -385,15 +381,15 @@ export function applyCommand(
         // session context and a nonzero eligible attendance are not.
         if(c.outcome!=='Passed'&&c.outcome!=='Failed')throw Error('Choose Passed or Failed.');
         if(c.ballotRevision!==openedRevision)throw Error(OBSERVED_STALE);
-        const problem=observedMajorityProblem(d,r.id) ?? observedContextProblem(d,r.id,c.sessionId);
+        const problem=observedMajorityProblem(d,r.id) ?? observedContextProblem(d,r.id);
         if(problem)throw Error(problem);
       } else if(c.status==='Closed' && c.outcome!=='Withdrawn') {
-        const eligible=d.attendance.filter(a=>a.sessionId===r.sessionId && a.status!=='Absent');
-        const ballots=d.votes.filter(v=>v.sessionId===r.sessionId && v.resolutionId===r.id);
+        // Counted against the ballot's eligibility snapshot (section 6).
+        const eligible=eligibleBallots(d,r.id);
+        const ballots=d.votes.filter(v=>v.resolutionId===r.id && !v.sessionId && eligible.some(b=>b.delegateId===v.delegateId));
         if(!eligible.length || ballots.length!==eligible.length)throw Error('Record every eligible ballot before closing.');
         if(c.outcome!==votingOutcome(d,r.id))throw Error('Outcome differs from configured voting rule.');
       }
-      if(c.status==="In Debate") {const current=d.committees.find(x=>x.id===r.committeeId)?.currentSessionId;if(current)r.sessionId=current;}
       r.status = c.status;
       r.outcome = c.outcome;
       if(c.status === "Closed") r.vetoedBy=c.outcome==="Withdrawn"?[]:vetoDelegates(d,r.id);
@@ -456,7 +452,7 @@ export function applyCommand(
       d.documents.push({
         id: documentId,
         committeeId: c.committeeId,
-        sessionId: c.sessionId,
+        sessionId: null,
         code: nextResolutionCode(
           d.committees.find((x) => x.id === c.committeeId)?.code ?? "",
           d.documents.filter((r) => r.committeeId === c.committeeId),
@@ -483,55 +479,39 @@ export function applyCommand(
       break;
     }
     case "queue": {
-      if (
-        c.delegateId &&
-        !d.attendance.some(
-          (a) =>
-            a.sessionId === c.sessionId &&
-            a.delegateId === c.delegateId &&
-            a.status !== "Absent",
-        )
-      )
+      const committeeId = commandCommittee ?? "";
+      if (c.delegateId && !isEligible(d, committeeId, c.delegateId, citedRollCall(c), now))
         throw Error("Only present delegates may join the queue.");
       const q = d.queue
-        .filter((q) => q.sessionId === c.sessionId)
+        .filter((q) => isLive(q, committeeId))
         .sort((a, b) => a.position - b.position);
       if (c.advance && q[0]) {
         d.queue = d.queue.filter((x) => x.id !== q[0].id);
       } else if (c.delegateId && !q.some((x) => x.delegateId === c.delegateId))
         d.queue.push({
           id: nextId(),
-          sessionId: c.sessionId,
+          committeeId,
           delegateId: c.delegateId,
           position: (q.at(-1)?.position ?? -1) + 1,
         });
       break;
     }
     case "vote": {
-      const a = d.attendance.find(
-        (a) => a.delegateId === c.delegateId && a.sessionId === c.sessionId,
-      );
       if(c.choice==="Abstain" && d.documents.find(r=>r.id===c.resolutionId)?.voteMode==="divide") throw Error("Divide the House does not permit abstentions.");
-      if (
-        !a ||
-        a.status === "Absent" ||
-        (a.status === "Present & Voting" && c.choice === "Abstain")
-      )
-        throw Error("Attendance does not permit this vote.");
       if (
         d.documents.find((r) => r.id === c.resolutionId)?.status !== "In Debate"
       )
         throw Error("Voting requires a resolution in debate.");
-      const revision = (d.votes.find(v=>v.delegateId===c.delegateId && v.sessionId===c.sessionId && v.resolutionId===c.resolutionId)?.revision ?? 0) + 1;
-      d.votes = d.votes.filter(
-        (v) =>
-          !(
-            v.delegateId === c.delegateId &&
-            v.resolutionId === c.resolutionId &&
-            v.sessionId === c.sessionId
-          ),
-      );
-      d.votes.push({ id: nextId(), ...c, createdAt: now, revision });
+      // Eligibility is the snapshot taken when the ballot opened, not whoever is present now (section 6).
+      const status = ballotStatus(d, c.resolutionId, c.delegateId);
+      if (!status) throw Error("Open the ballot before recording votes.");
+      if (status === "Absent" || (status === "Present & Voting" && c.choice === "Abstain"))
+        throw Error("Attendance does not permit this vote.");
+      const committeeId = commandCommittee ?? "";
+      const same = (v: Vote) => v.delegateId === c.delegateId && v.resolutionId === c.resolutionId && !v.sessionId;
+      const revision = (d.votes.find(same)?.revision ?? 0) + 1;
+      d.votes = d.votes.filter((v) => !same(v));
+      d.votes.push({ id: nextId(), delegateId: c.delegateId, resolutionId: c.resolutionId, committeeId, choice: c.choice, createdAt: now, revision });
       break;
     }
     case "committee":
@@ -661,7 +641,7 @@ export function applyCommand(
 
 export function votingOutcome(data: ConferenceData, resolutionId: string): "Passed" | "Failed" {
  const resolution=data.documents.find(r=>r.id===resolutionId);
- const votes=data.votes.filter(v=>v.resolutionId===resolutionId && v.sessionId===resolution?.sessionId);
+ const votes=data.votes.filter(v=>v.resolutionId===resolutionId && !v.sessionId);
  if(vetoDelegates(data,resolutionId).length)return "Failed";
  const yes=votes.filter(v=>v.choice==='For').length, no=votes.filter(v=>v.choice==='Against').length;
  const rule=data.committees.find(c=>c.id===resolution?.committeeId)?.votingRule ?? data.conference.votingRule ?? 'simple_majority';
@@ -679,12 +659,11 @@ export function observedMajorityProblem(data:ConferenceData,resolutionId:string)
  if((r.voteType ?? 'substantive')==='substantive' && committee?.vetoEnabled)return 'Only counted ballots can show that no veto was cast.';
  return null;
 }
-/** Why an observed close cannot be declared from a console on `sessionId`, or null. Mirrors private.apply_mutation:
- *  the console must be on the ballot's session, and at least one delegation must be present in it. */
-export function observedContextProblem(data:ConferenceData,resolutionId:string,sessionId:string|null|undefined):string|null{
+/** Why an observed close cannot be declared, or null. Mirrors private.apply_mutation: the ballot must be open, and at least one
+ *  delegation must be eligible in its snapshot. */
+export function observedContextProblem(data:ConferenceData,resolutionId:string):string|null{
  const r=data.documents.find(r=>r.id===resolutionId);if(!r)return 'Resolution not found.';
- if(!sessionId || !r.sessionId || sessionId!==r.sessionId)return 'This ballot belongs to a different session. Select that session first.';
- if(!data.attendance.some(a=>a.sessionId===r.sessionId&&a.status!=='Absent'))return 'No delegation is present in this ballot’s session. Take roll call first.';
+ if(!eligibleBallots(data,r.id).length)return 'No delegation is present in this ballot. Take a roll call, then open the ballot.';
  return null;
 }
 /** How a declared (observed) result reads in history, or null for a counted or open vote. */
@@ -697,7 +676,8 @@ export function vetoDelegates(data:ConferenceData,resolutionId:string):string[]{
  const r=data.documents.find(r=>r.id===resolutionId); if(!r)return []; if(r.status==="Closed")return r.vetoedBy??[];
  const c=data.committees.find(c=>c.id===r.committeeId);
  if(!c?.vetoEnabled || r.voteType==="procedural")return [];
- return data.votes.filter(v=>v.resolutionId===r.id && v.sessionId===r.sessionId && v.choice==="Against" && c.vetoDelegateIds?.includes(v.delegateId) && data.attendance.some(a=>a.delegateId===v.delegateId&&a.sessionId===v.sessionId&&a.status!=="Absent")).map(v=>v.delegateId);
+ const eligible=eligibleBallots(data,r.id);
+ return data.votes.filter(v=>v.resolutionId===r.id && !v.sessionId && v.choice==="Against" && c.vetoDelegateIds?.includes(v.delegateId) && eligible.some(b=>b.delegateId===v.delegateId)).map(v=>v.delegateId);
 }
 
 function cleanStaffEmail(value: string): string | null {

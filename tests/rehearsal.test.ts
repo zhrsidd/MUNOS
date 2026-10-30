@@ -31,10 +31,13 @@ test('chair procedure: one floor device per committee drives speeches; others ne
  const users=buildScenario({staff:50,minutes:20,committees:14,seed:11});
  const chairs=users.filter(u=>u.role==='chair');
  for(let c=0;c<14;c++)assert.equal(chairs.filter(u=>u.floor&&u.committee===c).length,1,`committee ${c} has exactly one floor device`);
- const floorOnly=['currentSession','speechStart','speechScore','speechFinish','poiAllowance','poiAdd','poiRecognize','queueOrder'];
+ const floorOnly=['speechStart','speechScore','speechFinish','poiAllowance','poiAdd','poiRecognize','queueOrder'];
  for(const u of users.filter(u=>!u.floor))assert.ok(u.steps.every(s=>!floorOnly.includes(s.action)),'only the floor device runs the floor');
  for(const u of chairs.filter(u=>u.floor)){
-  assert.equal(u.steps.find(s=>s.action!=='open')?.action,'currentSession','floor sets the shared Current session first');
+  // Sessions follow the schedule: the floor device starts with a roll call (drafted on the device, committed once).
+  assert.equal(u.steps.find(s=>s.action!=='open')?.action,'draft','the floor starts drafting the roll call; nobody selects a session');
+  assert.ok(u.steps.some(s=>s.action==='rollCall'),'the floor commits a roll call');
+  assert.ok(u.steps.every(s=>(s.action as string)!=='currentSession'&&(s.action as string)!=='attendance'),'no session selection, no per-delegate attendance writes');
   const seq=u.steps.map(s=>s.action).filter(a=>['speechStart','speechScore','speechFinish'].includes(a));
   for(let i=0;i<seq.length;i++)if(seq[i]==='speechScore')assert.equal(seq[i-1],'speechStart','score follows a start');
  }
@@ -128,7 +131,8 @@ test('historical client model: Realtime notifications use a trailing 350 ms debo
 // ---- Realtime topics --------------------------------------------------------------------------------------------
 const dev=(id:number,role:SimUser['role'],committee:number):SimUser=>({id,role,committee,start:0,steps:[]});
 test('topics: the server emits chair/documents events per the function definitions; timer emits none',()=>{
- for(const a of ['currentSession','attendance','queueAdd','queueOrder','speechStart','speechScore','poiAllowance','poiAdd','poiRecognize','speechFinish','photoAck'] as const)assert.equal(TOPIC_OF[a],'chair',a);
+ for(const a of ['rollCall','queueAdd','queueOrder','speechStart','speechScore','poiAllowance','poiAdd','poiRecognize','speechFinish','photoAck'] as const)assert.equal(TOPIC_OF[a],'chair',a);
+ assert.equal(TOPIC_OF.draft,null,'a roll call draft stays on the device');
  for(const a of ['sendToApproval','approve','print','submit'] as const)assert.equal(TOPIC_OF[a],'documents',a);
  assert.equal(TOPIC_OF.timer,null,'apply_mutation skips operational_changes for timer');
 });

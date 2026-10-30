@@ -53,30 +53,32 @@ test("retries must carry the same mutation uuid and full payload", () => {
 });
 
 const fixture = () => ({
-  committees: [{ id: "c1", code: "TST", currentSessionId: "s1", sessionRevision: 1 }],
+  committees: [{ id: "c1", code: "TST" }],
   delegates: [{ id: "d1", committeeId: "c1" }, { id: "d2", committeeId: "c1" }],
   documents: [{ id: "r1", committeeId: "c1", status: "In Debate" }],
-  attendance: [{ delegateId: "d1", sessionId: "s1", status: "Present", revision: 1 }],
-  events: [{ id: "e1", delegateId: "d1", categoryId: "speech", points: 2, sessionId: "s1", resolutionId: null, createdAt: "t1" }],
-  votes: [{ id: "v1", delegateId: "d1", resolutionId: "r1", sessionId: "s1", choice: "For", revision: 0, createdAt: "t1" }],
-  queue: [{ id: "q1", delegateId: "d1", sessionId: "s1", position: 1 }, { id: "q2", delegateId: "d2", sessionId: "s1", position: 2 }],
-  speeches: [{ id: "sp1", sessionId: "s1", delegateId: "d1", resolutionId: null, classification: "Other", yieldedFrom: null, state: "finished", poiLimit: null, poiCount: 0, revision: 2, createdAt: "t1" }],
+  rollCalls: [{ id: "rc1", revision: 1, committeeId: "c1", observedAt: "t0", committedAt: "t0", effectiveAt: "t0", rows: [{ delegateId: "d1", status: "Present" }, { delegateId: "d2", status: "Present & Voting" }] }],
+  events: [{ id: "e1", delegateId: "d1", categoryId: "speech", points: 2, committeeId: "c1", resolutionId: null, createdAt: "t1" }],
+  votes: [{ id: "v1", delegateId: "d1", resolutionId: "r1", committeeId: "c1", choice: "For", revision: 0, createdAt: "t1" }],
+  queue: [{ id: "q1", delegateId: "d1", committeeId: "c1", position: 1 }, { id: "q2", delegateId: "d2", committeeId: "c1", position: 2 }],
+  speeches: [{ id: "sp1", committeeId: "c1", delegateId: "d1", resolutionId: null, classification: "Other", yieldedFrom: null, state: "finished", poiLimit: null, poiCount: 0, revision: 2, createdAt: "t1" }],
 });
 const digest = (d: unknown) => stateDigest(d, "TST");
 
 test("stateDigest ignores timestamps and key order but detects every meaningful divergence", () => {
   const base = digest(fixture());
   const reordered = fixture();
-  reordered.events[0] = { createdAt: "other", points: 2, categoryId: "speech", delegateId: "d1", id: "e1", sessionId: "s1", resolutionId: null } as never;
+  reordered.events[0] = { createdAt: "other", points: 2, categoryId: "speech", delegateId: "d1", id: "e1", committeeId: "c1", resolutionId: null } as never;
   reordered.queue.reverse();
+  reordered.rollCalls[0].rows.reverse();
   assert.equal(digest(reordered), base, "timestamps, key order and row order are not divergence");
   const mutate = (change: (d: ReturnType<typeof fixture>) => void) => { const d = fixture(); change(d); return digest(d); };
   assert.notEqual(mutate(d => { d.votes[0].choice = "Against"; }), base, "vote For -> Against, same ids");
   assert.notEqual(mutate(d => { d.queue[0].position = 2; d.queue[1].position = 1; }), base, "queue order reversed, same ids");
   assert.notEqual(mutate(d => { d.speeches[0].state = "speaking"; }), base, "speech finished -> speaking");
-  assert.notEqual(mutate(d => { d.attendance[0].status = "Absent"; }), base, "attendance status change");
+  assert.notEqual(mutate(d => { d.rollCalls[0].rows[0].status = "Absent"; }), base, "roll call status change");
   assert.notEqual(mutate(d => { d.events[0].points = 3; }), base, "points change");
-  assert.notEqual(mutate(d => { d.attendance[0].revision = 2; }), base, "attendance revision");
+  assert.notEqual(mutate(d => { d.rollCalls.push({ ...d.rollCalls[0], revision: 2 }); }), base, "a roll call correction");
+  assert.equal(mutate(d => { d.queue.push({ id: "old", delegateId: "d2", committeeId: "c1", sessionId: "s-old", position: 9 } as never); }), base, "a pre-rekey row is history, not live state");
 });
 
 test("allowedRequest admits only the app origin and the validated Supabase origin", () => {

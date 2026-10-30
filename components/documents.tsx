@@ -144,7 +144,7 @@ function ResolutionRow({ resolution }: { resolution: Resolution }) {
   );
 }
 /** The Chair's "New resolution" form. No title: only the Main Submitter, and the number is assigned on creation. */
-export function NewResolutionForm({ committeeId, sessionId, onDone }: { committeeId: string; sessionId: string; onDone: () => void }) {
+export function NewResolutionForm({ committeeId, onDone }: { committeeId: string; onDone: () => void }) {
   const { data, act } = useConference();
   const [submitterId, setSubmitterId] = useState(data.delegates.find((d) => d.committeeId === committeeId)?.id || "");
   return (
@@ -156,7 +156,6 @@ export function NewResolutionForm({ committeeId, sessionId, onDone }: { committe
             {
               type: "newDocument",
               committeeId,
-              sessionId,
               // Not asked for or shown: only fills the legacy not-null column (lib/resolution-title.ts).
               title: compatResolutionTitle(),
               submitterId,
@@ -186,7 +185,7 @@ export function NewResolutionForm({ committeeId, sessionId, onDone }: { committe
     </form>
   );
 }
-export function Documents({ committeeId, sessionId }: { committeeId: string; sessionId: string }) {
+export function Documents({ committeeId }: { committeeId: string }) {
   const { data } = useConference();
   const [modal, setModal] = useState<"new" | null>(null);
   const documents = data.documents.filter((r) => r.committeeId === committeeId).sort(resolutionOrder);
@@ -197,7 +196,7 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
         title="Resolutions"
         description={documents.some((r) => r.status === "Draft") ? "Resolutions that need you are listed first." : "Each resolution with its document, feedback and next step."}
         action={
-          <button className="primary" disabled={!sessionId || !data.delegates.some((d) => d.committeeId === committeeId)} onClick={() => setModal("new")}>
+          <button className="primary" disabled={!data.delegates.some((d) => d.committeeId === committeeId)} onClick={() => setModal("new")}>
             + New resolution
           </button>
         }
@@ -213,7 +212,7 @@ export function Documents({ committeeId, sessionId }: { committeeId: string; ses
       )}
       {modal === "new" && (
         <Modal title="New resolution" onClose={() => setModal(null)}>
-          <NewResolutionForm committeeId={committeeId} sessionId={sessionId} onDone={() => setModal(null)} />
+          <NewResolutionForm committeeId={committeeId} onDone={() => setModal(null)} />
         </Modal>
       )}
     </>

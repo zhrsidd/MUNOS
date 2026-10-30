@@ -58,21 +58,22 @@ export const pointsOf = (d, id) => d.events.filter(e => e.delegateId === id && !
 export function stateDigest(d, committeeCode) {
   const committee = d.committees.find(c => c.code === committeeCode);
   assert.ok(committee, `committee ${committeeCode} not found`);
-  const sessionId = committee.currentSessionId;
+  // Live state is keyed by committee: a live row carries the committee and no session (docs/SESSION_MODEL.md section 8).
+  const live = row => row.committeeId === committee.id && !row.sessionId;
   const delegates = d.delegates.filter(x => x.committeeId === committee.id);
   const resolution = d.documents.find(r => r.committeeId === committee.id && r.status === 'In Debate');
-  const speeches = (d.speeches ?? []).filter(s => s.sessionId === sessionId);
+  const speeches = (d.speeches ?? []).filter(live);
   const speechIds = new Set(speeches.map(s => s.id));
   return JSON.stringify({
-    current: [committee.currentSessionId, committee.sessionRevision ?? 0],
-    attendance: byKey(d.attendance.filter(a => a.sessionId === sessionId), a => a.delegateId).map(a => [a.delegateId, a.status, a.revision ?? 0]),
-    events: byKey(d.events.filter(e => e.sessionId === sessionId), e => e.id).map(e => [e.id, e.delegateId, e.categoryId, e.points, e.sessionId, e.resolutionId ?? null, e.speechId ?? null, e.classification ?? null, Boolean(e.voidedAt), e.revision ?? 0]),
+    rollCalls: byKey((d.rollCalls ?? []).filter(r => r.committeeId === committee.id), r => `${r.id}/${String(r.revision).padStart(6, '0')}`)
+      .map(r => [r.id, r.revision, byKey(r.rows, x => x.delegateId).map(x => [x.delegateId, x.status])]),
+    events: byKey(d.events.filter(e => e.committeeId === committee.id && !e.sessionId), e => e.id).map(e => [e.id, e.delegateId, e.categoryId, e.points, e.resolutionId ?? null, e.speechId ?? null, e.classification ?? null, Boolean(e.voidedAt), e.revision ?? 0]),
     points: byKey(delegates, x => x.id).map(x => [x.id, pointsOf(d, x.id)]),
-    votes: byKey(d.votes.filter(v => v.resolutionId === resolution?.id && v.sessionId === sessionId), v => v.id).map(v => [v.id, v.delegateId, v.resolutionId, v.sessionId, v.choice, v.revision ?? 0]),
-    queue: byKey(d.queue.filter(q => q.sessionId === sessionId), q => `${q.lane ?? 'open'}/${String(q.position).padStart(8, '0')}/${q.id}`).map(q => [q.id, q.delegateId, q.lane ?? 'open', q.position]),
+    votes: byKey(d.votes.filter(v => v.resolutionId === resolution?.id && !v.sessionId), v => v.id).map(v => [v.id, v.delegateId, v.resolutionId, v.choice, v.revision ?? 0]),
+    queue: byKey(d.queue.filter(live), q => `${q.lane ?? 'open'}/${String(q.position).padStart(8, '0')}/${q.id}`).map(q => [q.id, q.delegateId, q.lane ?? 'open', q.position]),
     speeches: byKey(speeches, s => s.id).map(s => [s.id, s.delegateId, s.state, s.classification, s.resolutionId ?? null, s.amendmentId ?? null, s.yieldedFrom ?? null, s.poiLimit ?? null, s.poiCount ?? 0, s.revision ?? 0]),
     pois: byKey((d.poiQueue ?? []).filter(p => speechIds.has(p.speechId)), p => p.id).map(p => [p.id, p.speechId, p.delegateId, p.position, Boolean(p.recognizedAt)]),
-    debate: (d.debateStates ?? []).filter(s => s.sessionId === sessionId).map(s => [s.mode, s.phase, s.revision ?? 0]),
+    debate: (d.debateStates ?? []).filter(live).map(s => [s.mode, s.phase, s.revision ?? 0]),
   });
 }
 

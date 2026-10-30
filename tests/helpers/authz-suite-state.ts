@@ -15,11 +15,12 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
   step({actor: ACTORS[actor], pre: `${cmd.pre?.(f) ?? ''}${extraPre}`, expectedSql: cmd.expected?.(f), call: mutationCall(targetFor(cmd), f.confA, mutationId(1000 + n), cmd.command(f), role, 'valid')});
 
  await t.test('archived committee or session with the Chair grant still live (a late offline replay): every operational Chair write is a PT409 stale conflict, never silently applied', async () => {
-  const ids = ['attendance', 'participation', 'queue', 'queueAdd', 'speechStart', 'speechScore', 'poiAllowance', 'voteMode', 'pointAdjustment', 'amendmentStatus'];
+  const ids = ['rollCallCommit', 'participation', 'queue', 'queueAdd', 'speechStart', 'speechScore', 'poiAllowance', 'voteMode', 'pointAdjustment', 'amendmentStatus'];
   const problems: string[] = [];
+  // Live state is keyed by committee (docs/SESSION_MODEL.md section 8), so the committee is the archive boundary for live work;
+  // a session is a schedule label and archiving one does not stop the committee.
   for (const [label, sql] of [
    ['committee archived', `update public.committees set archived=true where id=${q(f.committee.ga1)};`],
-   ['session archived', `update public.sessions set archived=true where id=${q(f.session)};`],
   ] as const) {
    for (const id of ids) {
     const cmd = cmdOf(id);
@@ -35,12 +36,12 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
   await sequence(engine, async (step, owner) => {
    await owner(`update public.documents set status='Closed', outcome='Withdrawn' where id=${q(f.resolution)};
     insert into private.access_credentials(conference_id,committee_id,role,credential_hash,expires_at) values (${q(f.confA)},${q(f.committee.ga1)},'chair',encode(sha256(convert_to('A1B2C3D4E5F6A1B2C3D4E5F6','UTF8')),'hex'),now() + interval '2 days');`);
-   const attendance = cmdOf('attendance');
-   seen.before = (await send(step, 'chairGa1', attendance, 'chair', 1)).code;
+   const write_ = cmdOf('debateMode');
+   seen.before = (await send(step, 'chairGa1', write_, 'chair', 1)).code;
    const archive = cmdOf('committeeLifecycle');
    const archiveGa1 = {...archive, command: () => ({type: 'committeeLifecycle', id: f.committee.ga1, action: 'archive'}), expected: () => `(select revision::text from public.committees where id=${q(f.committee.ga1)})`};
    seen.archive = (await send(step, 'exec', archiveGa1, 'admin', 2)).code;
-   seen.afterArchive = (await send(step, 'chairGa1', attendance, 'chair', 3)).code;
+   seen.afterArchive = (await send(step, 'chairGa1', write_, 'chair', 3)).code;
    const redeem = await step({actor: ACTORS.noGrant, call: `public.redeem_access_code(${q(f.confA)}::uuid, 'A1B2C3D4E5F6A1B2C3D4E5F6')`});
    seen.redeemOldCode = String((JSON.parse(redeem.message) as {status: string}).status);
    const rotate = await step({actor: ACTORS.exec, call: `public.rotate_access_code(${q(f.confA)}::uuid, 'chair', ${q(f.committee.ga1)}::uuid, now() + interval '1 day')`});
@@ -52,10 +53,10 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
 
  await t.test('a grant that is revoked, expires, changes role or is re-scoped stops working in the very next call (no cache, no grace period)', async () => {
   const seen: string[] = [];
-  const attendance = cmdOf('attendance');
+  const write_ = cmdOf('debateMode');
   await sequence(engine, async (step, owner) => {
    const chair = ACTORS.chairGa1.sub!;
-   const write = async (n: number) => (await send(step, 'chairGa1', attendance, 'chair', n)).code;
+   const write = async (n: number) => (await send(step, 'chairGa1', write_, 'chair', n)).code;
    seen.push(await write(1));
    await owner(`update public.user_access set role='observer' where user_id=${q(chair)}`);
    seen.push(await write(2));
@@ -125,10 +126,10 @@ export async function stateSection(t: TestContext, ctx: Ctx) {
   assert.equal(o.after, '1');
  });
 
- await t.test('OBSERVATION O5: a session whose state is "closed" is not a write barrier in the database (only archiving is); the Chair can still record attendance in it', async () => {
-  const cmd = cmdOf('attendance');
-  const o = await attempt(engine, {actor: ACTORS.chairGa1, pre: `update public.sessions set state='closed' where id=${q(f.session)};`, expectedSql: cmd.expected!(f),
-   call: mutationCall(targetFor(cmd), f.confA, mutationId(1300), cmd.command(f), 'chair', 'valid')});
+ await t.test('OBSERVATION O5: a session whose state is "closed" is not a write barrier in the database (only archiving is); the Chair can still record a score that names it', async () => {
+  const cmd = cmdOf('participation');
+  const o = await attempt(engine, {actor: ACTORS.chairGa1, pre: `update public.sessions set state='closed' where id=${q(f.session)};`,
+   call: mutationCall(targetFor(cmd), f.confA, mutationId(1300), {...cmd.command(f), sessionId: f.session}, 'chair', 'valid')});
   assert.equal(o.code, 'ok');
  });
 

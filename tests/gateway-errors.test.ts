@@ -14,7 +14,7 @@ const failureOf=async(fetch:typeof globalThis.fetch,op:'read'|'send')=>{
  const transport=new SupabaseTransport(clientFor(fetch),'conference','chair-test');
  try{
   if(op==='read')await transport.read();
-  else await transport.send({id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:'chair-test',role:'chair',command:{type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},expected:null,state:'pending'});
+  else await transport.send({id:crypto.randomUUID(),createdAt:new Date().toISOString(),actorId:'chair-test',role:'chair',command:{type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},expected:null,state:'pending'});
  }catch(error){return error;}
  throw Error('Expected the transport to fail');
 };
@@ -98,7 +98,7 @@ test('end to end: during a gateway-overload wait a new action is saved locally a
   assert.equal(repo.getHealth().errorKind,'overload');
   const before=requests;
   assert.ok(Date.parse(repo.getHealth().retryAt!)>Date.now()+5000,'overload ladder starts at 8 s or more, not 2 s');
-  await repo.execute({type:'participation',sessionId:'s1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},'chair');
+  await repo.execute({type:'participation',committeeId:'ga1',delegateId:'d0',resolutionId:'r1',categoryId:'speech',points:2},'chair');
   for(let i=0;i<50;i++)await new Promise(r=>setImmediate(r));
   assert.equal(requests,before,'no request was made while the overload retry was still in the future');
   assert.equal(repo.getPending().length,1,'the action stays durably queued');
