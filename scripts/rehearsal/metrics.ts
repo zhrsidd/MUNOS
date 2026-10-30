@@ -36,7 +36,7 @@ export function report(samples: Sample[]) {
 }
 /** Readiness thresholds from docs/STAGING_REHEARSAL.md (the required 50-staff C2 gate; also applied to optional stress runs). */
 export function evaluate(r: ReturnType<typeof report>, duplicates: number, lostWrites: number) {
-  const writeActions = ["rollCall", "queueAdd", "queueOrder", "speechStart", "speechScore", "poiAllowance", "poiAdd", "poiRecognize", "poiScore", "speechFinish", "timer", "approve", "print", "photoAck", "sendToApproval", "submit"];
+  const writeActions = ["rollCall", "queueAdd", "queueOrder", "speechStart", "speechScore", "poiAllowance", "poiAdd", "poiRecognize", "poiScore", "speechFinish", "approve", "print", "photoAck", "sendToApproval", "submit"];
   const writeP95 = Math.max(0, ...writeActions.map((a) => r.actions[a]?.p95_ms ?? 0));
   // Every full refresh a device makes: explicit reads, reads after its own writes, and Realtime-triggered refreshes.
   const readP95 = Math.max(0, ...READ_ACTIONS.map((a) => r.actions[a]?.p95_ms ?? 0));

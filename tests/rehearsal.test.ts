@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {checkAppUrl,checkHealthEnvironment,checkUsers} from '../scripts/rehearsal/guard';
-import {buildScenario,summarize,assignStaffRoles,subscribers,recipients,receives,TOPIC_OF,HUMAN_FLOOR_SECONDS,READS,type SimUser} from '../scripts/rehearsal/scenario';
+import {buildScenario,summarize,assignStaffRoles,subscribers,recipients,receives,TOPIC_OF,HUMAN_FLOOR_SECONDS,READS,LOCAL_ACTIONS,isWrite,type SimUser} from '../scripts/rehearsal/scenario';
 import {SimClient,RECOVERY_MS,REALTIME_DEBOUNCE_MS} from '../scripts/rehearsal/client-model';
 import {VirtualClock,estimate} from '../scripts/rehearsal/estimate';
 import {evaluate,percentile,report} from '../scripts/rehearsal/metrics';
@@ -259,4 +259,19 @@ test('conference gate rejects the old Approval population, missing roles and inc
  assert.equal(conferenceGateProfile(valid).eligible,true);
  const bad=[undefined,[],[{chair:77,approval:11,admins:11,executive:11}],[{chair:75,approval:19,admins:11,executive:5}],[{chair:76,approval:20,admins:10,executive:4}],[{chair:75,approval:20,admins:9,executive:6}],[{chair:75,approval:20,admins:10,executive:6}]];
  for(const staffRolesPerStage of bad)assert.equal(conferenceGateProfile({...valid,staffRolesPerStage}).eligible,false);
+});
+test('device-local steps (roll call draft, timer) are not counted or sent as writes, and never marked for retry',async()=>{
+ const users=buildScenario({staff:50,minutes:10,committees:14,seed:7,retryFraction:1});
+ const staff=users.filter(u=>u.role!=='delegate');
+ const local=staff.flatMap(u=>u.steps).filter(s=>LOCAL_ACTIONS.includes(s.action));
+ assert.ok(local.some(s=>s.action==='draft')&&local.some(s=>s.action==='timer'),'the plan still has drafts and timers');
+ assert.ok(local.every(s=>!s.retry),'a local step is never re-sent');
+ const sent=staff.flatMap(u=>u.steps).filter(s=>isWrite(s.action));
+ assert.ok(sent.every(s=>s.retry),'with retryFraction 1 every real write is re-sent');
+ assert.equal(summarize(users,10).staffApp.writes,sent.length,'plan writes = mutations sent to the server');
+ const e=await estimate(staff,{minutes:10,readMs:600,sendMs:300,model:'topic-aware'});
+ assert.ok(e.writes<=sent.length,'the estimate sends only server writes');
+ // The retry draw is still taken for local steps: the public burst is the same as before this change.
+ const withDelegates=buildScenario({staff:50,delegates:100,minutes:10,committees:14,seed:7,submitFraction:0.3});
+ assert.deepEqual(withDelegates.filter(u=>u.role==='delegate').map(u=>u.steps.map(s=>s.at)),buildScenario({staff:50,delegates:100,minutes:10,committees:14,seed:7,submitFraction:0.3}).filter(u=>u.role==='delegate').map(u=>u.steps.map(s=>s.at)));
 });

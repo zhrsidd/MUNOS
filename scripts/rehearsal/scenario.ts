@@ -53,6 +53,10 @@ export const HUMAN_FLOOR_SECONDS = 3;
 /** Staff mix, e.g. 14 committees × 2–3 Chair devices + ~4 Approval + ~4 Admins + ~3 Executive ≈ 45–55 devices. */
 export const STAFF_MIX: Record<StaffRole, number> = { chair: 0.7, approval: 0.1, admins: 0.1, executive: 0.1 };
 export const READS: Action[] = ["open", "read", "refocus", "health", "submitPage"];
+/** Device-local steps: a roll call draft and the timer never leave the device (no mutation, no retry, no Realtime event). */
+export const LOCAL_ACTIONS: Action[] = ["draft", "timer"];
+/** A step the server receives as a mutation. */
+export const isWrite = (action: Action) => !READS.includes(action) && !LOCAL_ACTIONS.includes(action);
 /** LEGACY upper-bound model (kept for before/after comparison only): every write = 3 writer reads + one refresh on every
  *  other subscribed device, with no one-in-flight limit. The run-time model is scripts/rehearsal/client-model.ts. */
 export const WRITER_READS_PER_WRITE = 3;
@@ -128,7 +132,9 @@ export function buildScenario(o: ScenarioOptions): SimUser[] {
     const push = (gapMs: number, action: Action) => {
       t += Math.max(HUMAN_FLOOR_SECONDS * 1000, gapMs);
       if (t >= end) return false;
-      steps.push({ at: t, action, retry: !READS.includes(action) && random() < (o.retryFraction ?? 0.1) ? true : undefined });
+      // The retry draw is kept for local steps too, so the random stream (and the public burst) is unchanged; a local step is never re-sent.
+      const lost = !READS.includes(action) && random() < (o.retryFraction ?? 0.1);
+      steps.push({ at: t, action, retry: lost && isWrite(action) ? true : undefined });
       return true;
     };
     if (role === "chair") {
@@ -182,7 +188,7 @@ export function summarize(users: SimUser[], minutes: number) {
   for (const u of users) {
     roles[u.role] = (roles[u.role] ?? 0) + 1;
     for (const s of u.steps) counts[s.action] = (counts[s.action] ?? 0) + 1 + (s.retry ? 1 : 0);
-    const w = u.role === "delegate" ? 0 : u.steps.filter((s) => !READS.includes(s.action)).length;
+    const w = u.role === "delegate" ? 0 : u.steps.filter((s) => isWrite(s.action)).length;
     writes += w;
     if (w) fanoutReads += w * subscribers(users, u).length;
     maxPerUserPerMinute = Math.max(maxPerUserPerMinute, w / Math.max(1, minutes));
