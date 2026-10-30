@@ -72,7 +72,7 @@ check(push["permissions"] == {"contents": "read"}, "push job has contents: read 
 check(apply_i < push_i, "the changed-file check runs before the push")
 check("steps.apply.outputs.changed == 'true'" in str(steps[push_i].get("if", "")), "the push runs only when the check passed and left changes")
 holders = [s.get("name", "") for s in steps if "CLAUDE_AUTOMATION_TOKEN" in blob(s)]
-check(holders == ["Push the checked repair", "Request a fresh Codex review of the repaired head", "Resolve the Codex review threads"],
+check(holders == ["Push the checked repair", "Resolve the Codex review threads", "Request a fresh Codex review of the repaired head"],
       "only the push, the re-review request and the Codex-thread resolver hold the push token")
 resolve_i = names.index("Resolve the Codex review threads")
 check(resolve_i > push_i and "steps.push.outcome == 'success'" in str(steps[resolve_i].get("if", "")),
@@ -81,6 +81,9 @@ rereview_i = names.index("Request a fresh Codex review of the repaired head")
 rereview = steps[rereview_i]
 check(rereview_i > push_i and "steps.push.outcome == 'success'" in str(rereview.get("if", "")),
       "the re-review request runs only after a successful push")
+check(rereview_i > names.index("Resolve the Codex review threads"),
+      "the re-review is requested after the threads are resolved, so a clean re-review cannot reach the gate while they are open")
+check("always()" in str(rereview.get("if", "")), "a failed thread resolution does not stop the re-review request")
 check(rereview["env"].get("PUSHED_SHA") == "${{ steps.push.outputs.sha }}",
       "the re-review request takes the commit from the push step's output")
 check("pulls/$PR" not in rereview["run"] and ".head.sha" not in rereview["run"],

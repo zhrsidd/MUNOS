@@ -177,7 +177,9 @@ from editing the workflows, which is the trust model the rest of this document a
   go through. `bash .github/automation-tests/repair-resolve.test.sh` runs the thread-resolution step against a fake `gh`:
   the repair job records the open Codex threads of the review being repaired before Claude runs, and the push job resolves
   only those, after checking each again (still open, opened by the pinned Codex App in that same review). A newer or older
-  Codex review, a human's thread, an impostor and anything unverifiable stay open, and a bad list resolves nothing.
+  Codex review, a human's thread, an impostor and anything unverifiable stay open, and a bad list resolves nothing. The threads
+  are resolved before the re-review is requested: resolving fires no event the gate listens to, so a clean re-review that
+  arrived first would leave the gate red on threads about to be closed.
   `bash .github/automation-tests/repair-rereview.test.sh` runs the re-review
   request against a fake `gh` that serves a stale pull request head, as GitHub does for a moment after a push: a push that
   created a commit yields exactly one `@codex review` for that commit, and nothing else yields one. The push step reports the
