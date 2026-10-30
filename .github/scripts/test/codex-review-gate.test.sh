@@ -150,6 +150,13 @@ else
   echo "FAIL  repair must authenticate with CLAUDE_CODE_OAUTH_TOKEN and no workflow may read ANTHROPIC_API_KEY"
   failures=$((failures + 1))
 fi
+# The one-time bootstrap is gone: nothing may read its variables or stage scripts from a pull request head again.
+if grep -rqE 'CODEX_GATE_BOOTSTRAP|stage-gate\.sh' "$workflows" "$scripts"/*.sh "$scripts"/*.jq; then
+  echo "FAIL  bootstrap code is still present"
+  failures=$((failures + 1))
+else
+  echo "ok    no workflow or gate script carries the retired bootstrap"
+fi
 if grep -rq CODEX_REVIEWER_LOGIN "$workflows"; then
   echo "FAIL  workflows still read CODEX_REVIEWER_LOGIN, which cannot distinguish a bot from a spoofed name"
   failures=$((failures + 1))

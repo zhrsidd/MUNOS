@@ -41,9 +41,8 @@ jobs:
        github.event.comment.user.type == 'Bot' &&
        contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
     steps:
-      # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate.
-      # The gate comes from main once main has it. Before that, stage-gate.sh allows only the owner-pinned bootstrap PR at
-      # its pinned tree (see docs/AGENT_AUTOMATION.md). Either way the gate never comes from an arbitrary pull request.
+      # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate. If main has no gate
+      # scripts the workflow fails closed.
       - name: Check out gate scripts from main
         uses: actions/checkout@v4
         with:
@@ -51,37 +50,16 @@ jobs:
           sparse-checkout: .github/scripts
           path: trusted
           persist-credentials: false
-      - name: Check out the pull request head for bootstrap staging only
-        uses: actions/checkout@v4
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}/head
-          sparse-checkout: .github/scripts
-          path: head
-          persist-credentials: false
       - name: Stage gate scripts outside the workspace
-        env:
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
-          CODEX_GATE_BOOTSTRAP_PR: ${{ vars.CODEX_GATE_BOOTSTRAP_PR }}
-          CODEX_GATE_BOOTSTRAP_TREE: ${{ vars.CODEX_GATE_BOOTSTRAP_TREE }}
         run: |
           set -euo pipefail
-          if [ -f trusted/.github/scripts/stage-gate.sh ]; then
-            stager=trusted/.github/scripts/stage-gate.sh
-          else
-            # Bootstrap: verify the head's gate tree here, before any head-supplied script runs.
-            if [ -z "$CODEX_GATE_BOOTSTRAP_PR" ] || [ -z "$CODEX_GATE_BOOTSTRAP_TREE" ] || [ "$PR" != "$CODEX_GATE_BOOTSTRAP_PR" ]; then
-              echo "::error::main has no gate scripts and no bootstrap is pinned for pull request $PR." >&2
-              exit 1
-            fi
-            tree=$(git -C head rev-parse "HEAD:.github/scripts")
-            if [ "$tree" != "$CODEX_GATE_BOOTSTRAP_TREE" ]; then
-              echo "::error::Gate tree $tree is not the pinned bootstrap tree; refusing to run the pull request's gate." >&2
-              exit 1
-            fi
-            stager=head/.github/scripts/stage-gate.sh
+          if [ ! -f trusted/.github/scripts/codex-review-gate.sh ]; then
+            echo "::error::main has no gate scripts; refusing to run." >&2
+            exit 1
           fi
-          bash "$stager" trusted head "$PR" "$RUNNER_TEMP/gate"
-          rm -rf trusted head
+          rm -rf "$RUNNER_TEMP/gate"
+          cp -r trusted/.github/scripts "$RUNNER_TEMP/gate"
+          rm -rf trusted
 
       - name: Decide from Codex's structured state on the current head
         id: gate

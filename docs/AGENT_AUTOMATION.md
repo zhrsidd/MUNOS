@@ -113,8 +113,8 @@ Residual risks:
 - After any successful push, every open Codex thread is resolved, including one that Claude chose not to fix. Codex's next
   review of the new head decides: an unfixed finding comes back as a new thread and blocks the gate.
 - The check is path-based. It does not judge whether an allowed change is correct; Codex's review and `verify` do.
-- The workflow files themselves still come from the pull request head, as for any pull request (see the bootstrap trust
-  limits). Someone with write access can edit this guard in a PR, so changes under `.github/` need the owner's review.
+- The workflow files themselves still come from the pull request head, as for any pull request. Someone with write
+  access can edit this guard in a PR, so changes under `.github/` need the owner's review.
 - Not proven live: that the action runs with the read-only token and the tool list in `claude_args`, and that it cannot push
   with it. The action's documentation does not say how it pushes, so the guarantee rests on the token and permissions,
   not on the action's internals. Run the acceptance test before relying on this.
@@ -127,35 +127,16 @@ Residual risks:
   to the Claude step only. Claude still has a shell and can run the project's scripts; the push job's checks, not this
   step, are what bound what it can publish. If the install fails the repair does not run.
 
-## One-time bootstrap (before the gate is on main)
+## Where the gate scripts come from
 
-The workflows read the gate from `main`. Until this pull request merges, `main` has no gate, so both workflows fail closed.
-A bootstrap lets this pull request supply the gate from its own head, under three conditions, and only once:
+Both workflows check out `main` and stage `.github/scripts` from it into the runner's temporary directory before anything
+else. If `main` has no gate scripts they refuse to run, so a pull request cannot supply or weaken its own gate. Nothing is
+read from the pull request head. A change to `.github/scripts` takes effect only after it merges.
 
-1. The repository variable `CODEX_GATE_BOOTSTRAP_PR` is set to the pull request number (`79`).
-2. The repository variable `CODEX_GATE_BOOTSTRAP_TREE` is set to the git tree of `.github/scripts` at the commit the
-   owner has reviewed. Any later change to the gate changes the tree, and the workflow refuses to run.
-3. `main` still lacks `.github/scripts/codex-review-gate.sh`. Once main carries the gate, the head path is unreachable.
-
-Verification steps for the owner, in order:
-
-1. Confirm the reviewed tree: `git rev-parse <reviewed-commit>:.github/scripts`. Set both variables under Settings →
-   Secrets and variables → Actions → Variables. Variables are not secrets, but the owner should still set them.
-2. Confirm the secrets exist: `CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_AUTOMATION_TOKEN`. The repair workflow reads only
-   these, and no workflow reads `ANTHROPIC_API_KEY`. A secret's value cannot be read back from the repository, so the
-   OAuth token is proven only by a repair run that authenticates.
-3. Confirm the `main` ruleset requires `verify` and `codex-review-gate`, and that auto-merge is enabled.
-4. Keep the pull request as a draft. Let the gate run on the head, and check that `evaluate` reports the gate
-   status without enabling auto-merge. Then check that the merge workflow still refuses while the PR is a draft.
-5. Do not mark the PR ready or merge it until steps 1–4 pass and the owner approves the merge.
-
-After this pull request merges, delete `CODEX_GATE_BOOTSTRAP_PR` and `CODEX_GATE_BOOTSTRAP_TREE`. The head path in
-`stage-gate.sh` then has no effect. Remove that path in a follow-up change so no bootstrap code remains.
-
-Trust limits of the bootstrap: the workflow files still come from the pull request head, as they do for any pull
-request. The workflow checks the pinned tree before it runs any script from the head, so editing the staging script
-cannot skip the check. The pinned tree stops drift in the gate scripts after review. It does not stop someone with write access
-from editing the workflows, which is the trust model the rest of this document already assumes.
+History: pull request #79 added these scripts while `main` had none, so it was merged under a one-time bootstrap that let
+that pull request supply the gate from its head, pinned by two repository variables. The bootstrap has been removed from the
+workflows and scripts, and the variables (`CODEX_GATE_BOOTSTRAP_PR`, `CODEX_GATE_BOOTSTRAP_TREE`) are no longer read. A test
+fails if any workflow or gate script mentions them again.
 
 ## Behaviour and limits
 
@@ -174,8 +155,9 @@ from editing the workflows, which is the trust model the rest of this document a
 - Offline (also run by `codex-review-gate-tests.yml` on any change to the automation):
   `bash .github/scripts/test/codex-review-gate.test.sh`. It runs 15 decision cases against a snapshot of PR #79 captured
   from the GitHub API on 2026-10-29, plus the shell wrapper through a fake `gh`, plus the pinned-identity checks.
-- Bootstrap staging: `bash .github/scripts/test/stage-gate.test.sh` and `bash .github/automation-tests/stage-step.test.sh`
-  (the second runs each workflow's real staging step).
+- Gate staging: `bash .github/automation-tests/stage-step.test.sh` runs each workflow's real staging step. The scripts come
+  from the `main` checkout; with none there the step refuses with its own error; a pull request checkout next to it is
+  never staged or run; and the retired bootstrap variables have no effect.
 - Repair write safety: `bash .github/automation-tests/repair-push.test.sh` runs the `push` job's real check and push steps
   against a local bare repository. It covers an edit in every protected class, renames, deletions, symlinks, submodules,
   executable bits, path traversal, an oversized patch, a moved branch, pushing to `main`, and ordinary edits that must still
