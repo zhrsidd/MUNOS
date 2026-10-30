@@ -122,9 +122,16 @@ e2e() { # $1 name, $2 snapshot file, $3 want ready, $4 want needs_repair
     failures=$((failures + 1))
   fi
 }
+# A conversation larger than Linux's 128 KiB single-argument limit, which once made jq fail with "Argument list too long".
+filler=$(jq -n '[range(8000)] | map("x") | join("")')
+printf '%s' "$clean" | jq --argjson filler "$filler" '
+  .issue_comments += [range(60) | {id: (9000 + .), body: $filler, updated_at: "2026-10-29T00:00:00Z",
+    user: {login: "zhrsidd", id: 326150552, type: "User"}}]' > "$scratch/big.json"
+if [ "$(wc -c < "$scratch/big.json")" -le 300000 ]; then echo "FAIL  the large fixture is too small to exercise the argument limit"; failures=$((failures + 1)); fi
 printf '%s' "$(cat "$snapshot")" > "$scratch/current.json"
 e2e "PR #79 as captured" "$scratch/current.json" false true
 e2e "clean head, threads resolved" "$scratch/clean.json" true false
+e2e "clean head with a conversation over 300 KB" "$scratch/big.json" true false
 
 # Every workflow and the decision logic must pin the same Codex App ID; a stale copy would silently skip Codex.
 for file in "$scripts/codex-review-gate.jq" "$workflows/claude-review-repair.yml" "$workflows/codex-reviewed-automerge.yml"; do

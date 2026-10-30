@@ -12,14 +12,19 @@ dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 owner=${repo%%/*}
 name=${repo##*/}
 
-# REST list endpoints: gh --paginate emits one array per page, so flatten them into a single array.
-list() { gh api --paginate "$1" --jq '.[]' | jq -s '.'; }
+# The PR data goes through files, never through command-line arguments: Linux caps a single argument at 128 KiB, and a
+# long review conversation is larger than that (jq fails with "Argument list too long").
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
 
-pull=$(gh api "repos/$repo/pulls/$pr")
-reviews=$(list "repos/$repo/pulls/$pr/reviews?per_page=100")
-issue_comments=$(list "repos/$repo/issues/$pr/comments?per_page=100")
-review_comments=$(list "repos/$repo/pulls/$pr/comments?per_page=100")
-rules=$(list "repos/$repo/rules/branches/main?per_page=100")
+# REST list endpoints: gh --paginate emits one array per page, so flatten them into a single array in a file.
+list() { gh api --paginate "$1" --jq '.[]' | jq -s '.' > "$2"; }
+
+gh api "repos/$repo/pulls/$pr" > "$work/pr.json"
+list "repos/$repo/pulls/$pr/reviews?per_page=100" "$work/reviews.json"
+list "repos/$repo/issues/$pr/comments?per_page=100" "$work/issue_comments.json"
+list "repos/$repo/pulls/$pr/comments?per_page=100" "$work/review_comments.json"
+list "repos/$repo/rules/branches/main?per_page=100" "$work/rules.json"
 branch_protected=$(gh api "repos/$repo/branches/main" --jq '.protected')
 
 # Review threads (resolution state) exist only in GraphQL. first_comment_id joins each thread to its REST comment,
@@ -35,28 +40,29 @@ thread_query='query($owner: String!, $name: String!, $number: Int!, $cursor: Str
     }
   }
 }'
-threads='[]'
+echo '[]' > "$work/threads.json"
 cursor=''
 while :; do
   args=(-f "query=$thread_query" -F "owner=$owner" -F "name=$name" -F "number=$pr")
   if [ -n "$cursor" ]; then args+=(-F "cursor=$cursor"); fi
-  page=$(gh api graphql "${args[@]}")
-  threads=$(jq -n --argjson acc "$threads" --argjson page "$page" '
-    $acc + [$page.data.repository.pullRequest.reviewThreads.nodes[]
-      | {id, isResolved, isOutdated, first_comment_id: .comments.nodes[0].databaseId}]')
-  jq -e '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"$page" >/dev/null || break
-  cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"$page")
+  gh api graphql "${args[@]}" > "$work/page.json"
+  jq -s '.[0] + [.[1].data.repository.pullRequest.reviewThreads.nodes[]
+      | {id, isResolved, isOutdated, first_comment_id: .comments.nodes[0].databaseId}]' \
+    "$work/threads.json" "$work/page.json" > "$work/threads.next"
+  mv "$work/threads.next" "$work/threads.json"
+  jq -e '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' "$work/page.json" >/dev/null || break
+  cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' "$work/page.json")
 done
 
 jq -n \
   --arg repo "$repo" \
-  --argjson pr "$pull" \
-  --argjson reviews "$reviews" \
-  --argjson issue_comments "$issue_comments" \
-  --argjson review_comments "$review_comments" \
-  --argjson threads "$threads" \
-  --argjson rules "$rules" \
   --argjson branch_protected "$branch_protected" \
-  '{repo: $repo, pr: $pr, reviews: $reviews, issue_comments: $issue_comments, review_comments: $review_comments,
-    threads: $threads, rules: $rules, branch_protected: $branch_protected}' \
+  --slurpfile pr "$work/pr.json" \
+  --slurpfile reviews "$work/reviews.json" \
+  --slurpfile issue_comments "$work/issue_comments.json" \
+  --slurpfile review_comments "$work/review_comments.json" \
+  --slurpfile threads "$work/threads.json" \
+  --slurpfile rules "$work/rules.json" \
+  '{repo: $repo, pr: $pr[0], reviews: $reviews[0], issue_comments: $issue_comments[0],
+    review_comments: $review_comments[0], threads: $threads[0], rules: $rules[0], branch_protected: $branch_protected}' \
   | jq -f "$dir/codex-review-gate.jq"
