@@ -16,7 +16,7 @@
 | 8 | Roll call is prompted at each session start, with an option to copy the last roll call | **Owner**: "yes with option to copy last sessions roll call" |
 | 9 | Timers are local-only and not audited; the projector page is removed | **Owner**: timers "not necessary to audit and save"; projector: "6. Remove" |
 | 10 | Amendments and votes belong to the resolution, not the session | Follows from decision 1; owner approved the restructure |
-| 11 | Lead default 5 minutes; close grace 20 minutes | **Lead 5 minutes: confirmed by the owner, 29 Oct 2026** ("the previous 5 minute structure is ideal"). The previous session holds through the break and switches 5 minutes before the next session starts, never before the previous session ends. **Close grace 20 minutes: still proposed**, a parameter, not a rule |
+| 11 | Lead default 5 minutes; close grace 20 minutes | **Lead 5 minutes: confirmed by the owner, 29 Oct 2026** ("the previous 5 minute structure is ideal"). The previous session holds through the break and switches 5 minutes before the next session starts, never before the previous session ends. **Close grace 20 minutes: confirmed by the owner, 30 Oct 2026**, a parameter, not a rule |
 
 ## 2. Four labels for one record (resolves the "nearest session" contradiction)
 
@@ -176,7 +176,7 @@ Shared vectors for the window function, identical in TypeScript and SQL: all of 
 
 ## 11. Open items
 
-- Owner: confirm or replace the 20-minute grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance. **All three are proposals, not approved release settings.** The 5-minute lead is confirmed (decision 11).
+- Settings: the 20-minute close grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance are **confirmed by the owner (30 Oct 2026)** as the release settings; the migration defaults already hold these values. The 5-minute lead is confirmed (decision 11).
 - Reports, exports and awards that group by session are **not yet audited** for the four-label model.
 - Every UI use of `currentSessionId` is not yet inventoried; the Executive archive and "session used" checks need design. (Archive: settled in the committee live state bundle, §12.13. "Session used" still counts session-linked history and published schedules.)
 - Whether `Present` (non-voting) may abstain exactly as today when snapshot-based; confirm with the procedure rules. (Owner: keep the rule as today; implemented on the ballot snapshot.)
@@ -282,7 +282,7 @@ Do the phases in this order. Each one must pass its tests before the next starts
 
 ### 12.11 Open questions to settle before the relevant phase
 
-- **Close grace (20 minutes):** still proposed. Confirm it, or confirm the last session of the day closes at midnight.
+- **Close grace (20 minutes):** confirmed by the owner (30 Oct 2026); the last session of the day closes 20 minutes after its end, not at midnight.
 - **Attendance conversion (§12.8):** implemented as migration `20261031100000_attendance_to_roll_calls` (unapplied): one committed, legacy roll call per session with attendance, effective at the session start, every delegate a row (never marked reads as Absent), no time confidence, idempotent. The rule is the one in §12.8; confirm it before the migration runs on real data (none exists yet).
 - **Roll call during a break:** the design labels it with the previous session. Confirmed by the owner (previous session); implemented.
 - **Reports and exports** that group by session (§11): audited. No report or export in the application groups by session today (the only CSV paths are imports), so nothing needs the four-label model yet. Any report added later must read the final label from `record_label` / `label_correction`, not `sessionId`.
