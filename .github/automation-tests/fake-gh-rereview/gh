@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Test double for the gh CLI used by repair-rereview.test.sh. It models the race behind the silent skip: GET /pulls/N keeps
+# returning the old head ($FAKE_DIR/stale-head) the way GitHub does for a moment after a push. Issue comments live in
+# $FAKE_DIR/comments.json, a POST appends to it and to $FAKE_DIR/posts.log (one JSON body per line), so a repeat run sees them.
+set -euo pipefail
+
+dir=${FAKE_DIR:?FAKE_DIR must name the fixture directory}
+jqexpr=""
+method=GET
+body=""
+args=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --jq) jqexpr=$2; shift 2 ;;
+    --paginate) shift ;;
+    -X) method=$2; shift 2 ;;
+    -f) body=${2#body=}; shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+if [ "${args[0]:-}" != api ]; then
+  echo "fake gh: only the api subcommand is supported" >&2
+  exit 2
+fi
+endpoint=${args[1]:?fake gh: missing endpoint}
+endpoint=${endpoint%%\?*}
+
+case "$method $endpoint" in
+  "GET repos/o/r/pulls/"*)
+    echo "$(date +%s) GET $endpoint" >> "$dir/calls.log"
+    jq -rc --arg sha "$(cat "$dir/stale-head")" -n '{head: {sha: $sha}}' | jq -r "${jqexpr:-.}"
+    ;;
+  "GET repos/o/r/issues/"*"/comments")
+    jq -rc "${jqexpr:-.}" "$dir/comments.json"
+    ;;
+  "POST repos/o/r/issues/"*"/comments")
+    jq -n --arg b "$body" '$b' >> "$dir/posts.log"
+    jq --arg b "$body" '. + [{body: $b}]' "$dir/comments.json" > "$dir/comments.next"
+    mv "$dir/comments.next" "$dir/comments.json"
+    echo '{}'
+    ;;
+  *)
+    echo "fake gh: unexpected request $method $endpoint" >&2
+    exit 1
+    ;;
+esac

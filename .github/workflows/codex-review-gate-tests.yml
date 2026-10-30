@@ -1,0 +1,41 @@
+name: Codex review gate tests
+# Offline checks for the Claude–Codex gate: decision logic, the shell wrapper against a fake gh, pinned identities, the
+# gate-script staging and the repair workflow's write safety (protected-path check and push invariants).
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/**"
+      - ".github/automation-tests/**"
+      - "CLAUDE.md"
+      - ".github/workflows/claude-review-repair.yml"
+      - ".github/workflows/codex-reviewed-automerge.yml"
+      - ".github/workflows/codex-review-gate-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/**"
+      - ".github/automation-tests/**"
+      - "CLAUDE.md"
+      - ".github/workflows/claude-review-repair.yml"
+      - ".github/workflows/codex-reviewed-automerge.yml"
+      - ".github/workflows/codex-review-gate-tests.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run gate tests
+        run: |
+          bash .github/scripts/test/codex-review-gate.test.sh
+          bash .github/automation-tests/stage-step.test.sh
+          bash .github/automation-tests/repair-patch.test.sh
+          bash .github/automation-tests/repair-push.test.sh
+          bash .github/automation-tests/repair-resolve.test.sh
+          bash .github/automation-tests/repair-rereview.test.sh
+          bash .github/automation-tests/repair-cap.test.sh
+          bash .github/automation-tests/repair-invariants.test.sh

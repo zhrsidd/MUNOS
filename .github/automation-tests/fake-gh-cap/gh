@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Test double for the gh CLI used by repair-cap.test.sh. It serves the pull request's commits from $FAKE_DIR/commits.json
+# (applying --jq the way gh does), records every `gh pr comment` body in $FAKE_DIR/comments.log, and refuses any other
+# request, so the cap cannot quietly start counting something else (workflow runs, for instance).
+set -euo pipefail
+
+dir=${FAKE_DIR:?FAKE_DIR must name the fixture directory}
+jqexpr=""
+body=""
+args=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --jq) jqexpr=$2; shift 2 ;;
+    --paginate) shift ;;
+    --body) body=$2; shift 2 ;;
+    --repo) shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+case "${args[0]:-} ${args[1]:-}" in
+  "api repos/o/r/pulls/"*"/commits?per_page=100")
+    jq -rc "${jqexpr:-.}" "$dir/commits.json"
+    ;;
+  "pr comment")
+    jq -n --arg b "$body" '$b' >> "$dir/comments.log"
+    ;;
+  *)
+    echo "fake gh: unexpected request ${args[*]}" >&2
+    exit 1
+    ;;
+esac
