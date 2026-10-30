@@ -1,15 +1,17 @@
 name: Claude auth smoke test
 on:
-  push:
-    branches: [test/claude-auth-smoke]
+  pull_request:
+    types: [opened, synchronize, reopened]
 permissions:
   contents: read
 jobs:
   smoke:
+    if: github.event.pull_request.head.ref == 'test/claude-auth-smoke' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,5 +20,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          show_full_output: true
           prompt: "Reply with the single word OK. Do not use any tools."
           claude_args: '--max-turns 2 --allowedTools "Read"'
