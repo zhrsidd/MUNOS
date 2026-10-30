@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `17fdd87a566f1e16`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 36 files, combined SHA-256 `099d736fbc848931`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -281,7 +281,6 @@ Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t
 | `public.speeches` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.submission_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
-| `public.timers` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.user_access` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.votes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 
@@ -299,7 +298,7 @@ Column-level privileges: none.
 
 ## RLS policies
 
-55 policies.
+54 policies.
 
 | Table | Policy | Command | Roles | Permissive | USING | WITH CHECK |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -354,7 +353,6 @@ Column-level privileges: none.
 | `public.speeches` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) | - |
 | `public.staff` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role]) | - |
 | `public.submission_links` | read_authorized | SELECT | authenticated | yes | (private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])) | - |
-| `public.timers` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.user_access` | read_authorized | SELECT | authenticated | yes | ((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()) AND private.lifecycle_allows(test_only)) | - |
 | `public.votes` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `storage.objects` | resolutions_staff_read | SELECT | authenticated | yes | ((bucket_id = 'resolutions'::text) AND (EXISTS ( SELECT 1 FROM document_versions v WHERE ((v."storageKey" = objects.name) AND private.has_access(v.conference... | - |

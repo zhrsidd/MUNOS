@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `17fdd87a566f1e16`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 36 files, combined SHA-256 `099d736fbc848931`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -275,7 +275,6 @@ Privilege letters: r=SELECT a=INSERT w=UPDATE d=DELETE D=TRUNCATE x=REFERENCES t
 | `public.speeches` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.staff` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.submission_links` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
-| `public.timers` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.user_access` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 | `public.votes` | table | postgres | yes | no | - | - | r | - | - | rawdDxtm |
 
@@ -293,7 +292,7 @@ Column-level privileges: none.
 
 ## RLS policies
 
-54 policies.
+53 policies.
 
 | Table | Policy | Command | Roles | Permissive | USING | WITH CHECK |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -348,7 +347,6 @@ Column-level privileges: none.
 | `public.speeches` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['chair'::conference_role, 'admin'::conference_role, 'observer'::conference_role]) | - |
 | `public.staff` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, NULL::uuid, ARRAY['admin'::conference_role]) | - |
 | `public.submission_links` | read_authorized | SELECT | authenticated | yes | (private.lifecycle_allows(test_only) AND private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role])) | - |
-| `public.timers` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 | `public.user_access` | read_authorized | SELECT | authenticated | yes | ((user_id = ( SELECT auth.uid() AS uid)) AND (revoked_at IS NULL) AND (expires_at > now()) AND private.lifecycle_allows(test_only)) | - |
 | `public.votes` | read_authorized | SELECT | authenticated | yes | private.has_access(conference_id, committee_id, ARRAY['admin'::conference_role, 'chair'::conference_role, 'observer'::conference_role]) | - |
 

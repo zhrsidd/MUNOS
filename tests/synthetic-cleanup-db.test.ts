@@ -234,9 +234,9 @@ for(const [label,make,skip] of backends){
   await refused(dry(b,[S],[R]),/without a cleanup rule.*private\.unclassified/);
   await b.exec('drop table private.unclassified; create schema extra; create table extra.t(c uuid references public.conferences(id));');
   await refused(dry(b,[S],[R]),/unreviewed incoming foreign keys.*extra\.t/);
-  await b.exec('drop schema extra cascade; alter table public.timers rename to timers_gone;');
+  await b.exec('drop schema extra cascade; alter table public.speaker_queue rename to speaker_queue_gone;');
   await refused(dry(b,[S],[R]),/(do not exist|without a cleanup rule)/);
-  await b.exec('alter table public.timers_gone rename to timers;');
+  await b.exec('alter table public.speaker_queue_gone rename to speaker_queue;');
   assert.equal((await dry(b,[S],[R])).status,'ready');
   assert.deepEqual(await snapshot(b,S),before);
  });

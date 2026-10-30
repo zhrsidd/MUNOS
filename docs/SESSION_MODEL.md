@@ -283,10 +283,10 @@ Do the phases in this order. Each one must pass its tests before the next starts
 ### 12.11 Open questions to settle before the relevant phase
 
 - **Close grace (20 minutes):** still proposed. Confirm it, or confirm the last session of the day closes at midnight.
-- **Attendance conversion (§12.8):** confirm the rule before it touches real data.
+- **Attendance conversion (§12.8):** implemented as migration `20261031100000_attendance_to_roll_calls` (unapplied): one committed, legacy roll call per session with attendance, effective at the session start, every delegate a row (never marked reads as Absent), no time confidence, idempotent. The rule is the one in §12.8; confirm it before the migration runs on real data (none exists yet).
 - **Roll call during a break:** the design labels it with the previous session. Confirmed by the owner (previous session); implemented.
-- **Reports and exports** that group by session (§11) need a separate design before the four-label model is used in reports.
-- **Timer table:** dropping it is left to the schema owner (§8).
+- **Reports and exports** that group by session (§11): audited. No report or export in the application groups by session today (the only CSV paths are imports), so nothing needs the four-label model yet. Any report added later must read the final label from `record_label` / `label_correction`, not `sessionId`.
+- **Timer table:** dropped by the same migration; saved timers are retired and nothing read or wrote the table. Seed, cleanup rules and fixtures no longer mention it.
 
 ### 12.12 Done means
 
@@ -376,3 +376,5 @@ Choices to review, because §12.3 did not settle them:
 
 - **Review fix (Codex review of `c8979fe`).** A point restoration waits for its held deduction, identified by `adjustmentId` and the creating mutation's derived record id, including across devices. Admission holds it as `behind_held`; single approval refuses it before the deduction is applied and bulk approval skips an unresolved dependency. Regression tests reproduce `Adjustment unavailable` without the fix, then verify ordered single/bulk approval restores exactly once with net zero points; unknown deductions remain refused. This changes only the new, unapplied committee-live-state migration; no hosted database is touched.
 - **Dependency audit of held commands (owner-directed, after the Codex review of `3370ef3` found nothing).** The one-at-a-time fixes of §12.13 are replaced by a single rule in `private.waits_for_held`: any command that names a record by id waits for the held command that creates it, from any device (ids derive from the creating command's key). Covered: a speech (`speechId`) by `speechStart` or `speechYield`; a queue entry (`entryId` of `queueRemove` and `speechStart`) by `queueAdd` or `queue`; a POI entry (`entryId` of `poiRecognize`, `poiScore`, `poiRemove`) by `poiAdd`; the id lists of `queueOrder` and `poiOrder`; a deduction restore (`adjustmentId`) by the held `pointAdjustment`. Records are checked in `hold_gate`, `heldDecide` and `heldBulkApprove` by command class instead of a fixed list of kinds. Regression: a removal, finish and POI removal from a second device wait for the held queue add, speech start and `poiAdd` of the first, and apply in order on approval. Still unapplied; grants inventories regenerated.
+
+- **Attendance conversion and timers (owner-directed close of §12.11 items).** Migration `20261031100000_attendance_to_roll_calls` converts saved attendance to legacy roll calls and drops `timers`; the seed, the synthetic cleanup rules (a table that no longer exists needs no rule) and their fixtures drop the table, and the two cleanup guard tests use `speaker_queue` as the probe table. Regression: `tests/attendance-conversion-db.test.ts`. Unapplied; grants inventories regenerated.

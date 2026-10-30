@@ -55,7 +55,6 @@ insert into public.clock_confirmation(id,conference_id,device_id,offset_ms,reaso
 insert into public.conference_day_close(id,conference_id,conference_day,closed_at,closed_by,reason) values (${u('dayclose')},${C},'2026-10-06',now(),${u('user-exec')},'Fixture');
 insert into public.ballot_eligibility(resolution_id,delegate_id,conference_id,committee_id,status) values (${u('doc')},${u('del-1')},${C},${u('committee-a')},'Present & Voting');
 insert into public.speaker_queue(id,conference_id,committee_id,"delegateId","sessionId","position") values (${u('queue')},${C},${u('committee-a')},${u('del-1')},${u('session')},1);
-insert into public.timers(id,conference_id,committee_id,"sessionId",duration,remaining) values (${u('timer')},${C},${u('committee-a')},${u('session')},60,60);
 insert into public.debate_states("sessionId",conference_id,committee_id) values (${u('session')},${C},${u('committee-a')});
 insert into public.votes(id,conference_id,committee_id,"delegateId","sessionId","resolutionId",choice) values (${u('vote')},${C},${u('committee-a')},${u('del-1')},${u('session')},${u('doc')},'For');
 insert into public.award_criteria(id,conference_id,committee_id,name,description,max) values (${u('crit')},${C},${u('committee-a')},'Diplomacy','desc',10);

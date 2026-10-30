@@ -198,7 +198,6 @@ insert into public.participation_events ("id","delegateId","categoryId","points"
 insert into public.speaker_queue ("id","delegateId","conference_id","committee_id","sessionId") values ('afe9a6cd-f53d-49bf-a0d2-e729db663898','1f2af9b4-b2b3-4122-aded-e3b656812297','10000000-0000-4000-8000-000000000001','f31e2dcb-30c6-4186-a2eb-d2a29218adb5','62ff15d0-b686-4b6b-a673-517135d18536') on conflict do nothing;
 insert into public.speaker_queue ("id","delegateId","conference_id","committee_id","sessionId") values ('243a73b0-331a-4f45-a7df-5f54143f1bb5','7d2ff710-9274-4d96-adc8-d2b7802f2e2d','10000000-0000-4000-8000-000000000001','f31e2dcb-30c6-4186-a2eb-d2a29218adb5','62ff15d0-b686-4b6b-a673-517135d18536') on conflict do nothing;
 insert into public.speaker_queue ("id","delegateId","conference_id","committee_id","sessionId") values ('5a5d21f6-b4d2-451c-a33a-4571be5952f1','490357f5-75f4-4085-a2e4-13ed2c63f34b','10000000-0000-4000-8000-000000000001','f31e2dcb-30c6-4186-a2eb-d2a29218adb5','62ff15d0-b686-4b6b-a673-517135d18536') on conflict do nothing;
-insert into public.timers ("duration","remaining","startedAt","id","conference_id","committee_id","sessionId") values (90,90,null,'0625e43e-08a7-4046-a64f-863f58d2e56b','10000000-0000-4000-8000-000000000001','f31e2dcb-30c6-4186-a2eb-d2a29218adb5','62ff15d0-b686-4b6b-a673-517135d18536') on conflict do nothing;
 end if;
 end $seed$;
 insert into public.staff ("id","conference_id","name") values ('c63bb044-9b54-44fd-a002-7ea23e5477d5','10000000-0000-4000-8000-000000000001','Alex Morgan') on conflict do nothing;

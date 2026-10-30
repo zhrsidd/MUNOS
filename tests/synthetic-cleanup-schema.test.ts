@@ -83,9 +83,9 @@ test('the coverage check fails when a new conference-scoped table is added witho
   assert.deepEqual((await uncovered(q,rules)).missing,[]);
   await d.db.exec('create table public.future_scoped(id uuid primary key, conference_id uuid not null references public.conferences(id)); create table private.future_secret(x int);');
   assert.deepEqual((await uncovered(q,rules)).missing,['private.future_secret','public.future_scoped']);
-  await d.db.exec('drop table public.future_scoped; drop table private.future_secret; alter table public.timers rename to timers_renamed;');
+  await d.db.exec('drop table public.future_scoped; drop table private.future_secret; alter table public.speaker_queue rename to speaker_queue_renamed;');
   const r=await uncovered(q,rules);
-  assert.deepEqual(r.missing,['public.timers_renamed']);assert.deepEqual(r.stale,['public.timers']);
+  assert.deepEqual(r.missing,['public.speaker_queue_renamed']);assert.deepEqual(r.stale,['public.speaker_queue']);
  }finally{await d.db.close();}
 });
 
