@@ -337,6 +337,19 @@ begin
   execute definition;
 end $patch$;
 
+-- The Executive's close-day instants cap the last window of a day, so every committee's displayed session depends on them: readable by anyone with a
+-- grant in the conference (the table itself stays Executive-only). The Executive's reason is theirs alone.
+create function private.day_closes(conf uuid) returns jsonb
+language sql stable security definer set search_path='' as $$
+  select case when exists (select 1 from jsonb_array_elements(private.access_grants()) g where (g->>'conference_id')::uuid = conf)
+              then (select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('day', c.conference_day, 'closedAt', c.closed_at,
+                       'reason', case when private.has_access(conf, null, array['admin']::public.conference_role[]) then c.reason end)) order by c.conference_day), '[]'::jsonb)
+                      from public.conference_day_close c where c.conference_id = conf)
+              else '[]'::jsonb end
+$$;
+revoke all on function private.day_closes(uuid) from public, anon, service_role;
+grant execute on function private.day_closes(uuid) to authenticated;
+
 -- ---- Read model: held actions travel with the operations snapshot (RLS applies: Executive and the committee's Chair) ----------
 do $patch$
 declare
@@ -350,8 +363,7 @@ begin
       ''role'',h.requested_role,''command'',h.command,''reason'',h.reason,''state'',h.state,''timeConfidence'',h.time_confidence,''receivedAt'',h.received_at,''clientTime'',h.client_time,
       ''decidedBy'',h.decided_by,''decidedAt'',h.decided_at,''decisionReason'',h.decision_reason,''lastError'',h.last_error) order by h.received_at, h.id),''[]''::jsonb)
     from public.held_action h where h.conference_id = conf and (h.state = ''held'' or h.decided_at > now() - interval ''2 days'')),
-  ''dayCloses'', (select coalesce(jsonb_agg(jsonb_build_object(''day'',c.conference_day,''closedAt'',c.closed_at,''reason'',c.reason) order by c.conference_day),''[]''::jsonb)
-    from public.conference_day_close c where c.conference_id = conf)');
+  ''dayCloses'', private.day_closes(conf)');
 end $patch$;
 
 revoke all on function private.reject_published_session_delete(), private.command_class(text), private.payload_hash(jsonb, public.conference_role, text, timestamptz),

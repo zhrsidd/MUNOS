@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **supabase-model**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 35 files, combined SHA-256 `8224599cc9aa4bf5`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 35 files, combined SHA-256 `a004709d5e690ecc`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **This is a model.** Roles and schemas are reconstructed from documented Supabase behaviour; the default privileges are calibrated to the read-only hosted audit of 2026-10-22 (`docs/HOSTED_PRIVILEGE_AUDIT_2026-10-22.md`) as they stood BEFORE migration 20261022090000_privilege_hardening, which this replay then applies (`scripts/isolation-inventory/bootstrap-supabase-model.sql`). The audit did not cover exposed schemas, Storage/auth objects or supabase_admin objects; re-run the same queries on the hosted project before relying on any row beyond it.
 
@@ -54,7 +54,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-110 functions (99 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+111 functions (100 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -73,6 +73,7 @@ Executed in the disposable database after the inventory was read:
 | `private.committee_session_at(conf uuid, committee uuid, at timestamp with time zone)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.committees_for_schools(schools uuid[])` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `private.conference_time_zone(conf uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.day_closes(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.decision_history(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.document_round()` (trigger) | function | invoker | postgres | volatile | search_path="" | postgres | n/a | reads/none |
 | `private.document_submitter_countries(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
@@ -201,7 +202,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 - none
 
-### `private` functions callable by a Data API role (15)
+### `private` functions callable by a Data API role (16)
 
 `private` is not an exposed PostgREST schema (hosted exposure is assumption A3), so these are reachable only from SQL, policies and other functions, but the role privileges below are what a SQL-level caller would have.
 
@@ -210,6 +211,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 - `private.apply_operations_mutation(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)`: authenticated (writes)
 - `private.apply_procedure(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)`: authenticated (writes)
 - `private.apply_staff_batch(conf uuid, mutation uuid, command jsonb, requested_role conference_role, expected text,...)`: authenticated (writes)
+- `private.day_closes(conf uuid)`: authenticated (reads/none)
 - `private.decision_history(conf uuid)`: authenticated (reads/none)
 - `private.document_submitter_countries(conf uuid)`: authenticated (reads/none)
 - `private.has_access(conf uuid, committee uuid, roles conference_role[])`: authenticated (reads/none)
@@ -361,5 +363,5 @@ Column-level privileges: none.
 
 ## Effect of the hosted default-privilege model
 
-Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 110.
+Functions whose Data API callers differ between this baseline and the bare test bootstrap: **0** of 111.
 

@@ -131,7 +131,7 @@ export interface SessionSchedule {
   overrides: SessionOverride[];
 }
 export interface HoldSettings { enforce: boolean; trustMinutes: number; staleMinutes: number }
-export interface DayClose { day: string; closedAt: string; reason: string }
+export interface DayClose { day: string; closedAt: string; /** Only the Executive receives the reason. */ reason?: string }
 export interface OperationsData {
   heldActions?: HeldAction[];
   sessionSchedules?: SessionSchedule[];

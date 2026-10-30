@@ -37,7 +37,7 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql"
  ],
- "migrationsSha256": "8224599cc9aa4bf50d392e9201f91203c2b66954e49f04670a2291219d7682d9",
+ "migrationsSha256": "a004709d5e690ecc89948bb4e9f314da370af1ff0cc0f77da6ada4831ca39d71",
  "supabase-model": {
   "fns": [
    {
@@ -484,6 +484,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -6053,6 +6083,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "day_closes",
+    "args": "conf uuid",
+    "result": "jsonb",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true

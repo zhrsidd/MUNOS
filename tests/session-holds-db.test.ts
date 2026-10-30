@@ -105,7 +105,7 @@ test('real PostgreSQL: Control commands - held outside a window, when stale, beh
 });
 
 test('real PostgreSQL: an Executive-closed day holds everything that arrives afterwards, Record and Control alike',async()=>{
- const {db,ids,now,ops,send,score,eventOf,one,count,debateRevision}=await setupSessions();
+ const {db,ids,now,ops,send,score,eventOf,one,count,debateRevision,as}=await setupSessions();
  try{
   await ops(exec,{type:'holdSettings',enforce:true});
   const before=await send(score,now);
@@ -117,6 +117,13 @@ test('real PostgreSQL: an Executive-closed day holds everything that arrives aft
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[rec])).reason,'day_closed');
   const ctl=await send({type:'debateMode',committeeId:ids.ga1,mode:'open',phase:'against'},now,'chair',chair,crypto.randomUUID(),await debateRevision());
   assert.equal((await one<Held>('select * from public.held_action where id=$1',[ctl])).reason,'day_closed');
+  // The close time reaches the Chair's snapshot (it caps the displayed session), without the Executive's reason.
+  type Closes={s:{dayCloses:{day:string;closedAt:string;reason?:string}[]}};
+  await as(chair);
+  const forChair=(await db.query<Closes>('select public.operations_snapshot($1) s',[ids.conference])).rows[0].s.dayCloses;
+  assert.equal(forChair.length,1);assert.ok(forChair[0].closedAt);assert.equal(forChair[0].reason,undefined);
+  await as(exec);
+  assert.equal((await db.query<Closes>('select public.operations_snapshot($1) s',[ids.conference])).rows[0].s.dayCloses[0].reason,'Day finished');
  }finally{await db.close();}
 });
 
