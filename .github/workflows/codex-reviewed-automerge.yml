@@ -12,27 +12,23 @@ on:
     types: [created, edited]
   pull_request:
     types: [opened, synchronize, ready_for_review]
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
   workflow_dispatch:
     inputs:
       pr:
         description: Pull request number to re-evaluate
         required: true
-        type: number
+        type: string
 permissions:
   contents: read
   pull-requests: write
-concurrency:
-  group: codex-merge-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
-  cancel-in-progress: false
 jobs:
-  evaluate:
+  select:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Enabling auto-merge needs contents write as well as pull-request write.
-    permissions:
-      contents: write
-      pull-requests: write
-      statuses: write
+    timeout-minutes: 5
+    outputs:
+      prs: ${{ steps.select.outputs.prs }}
     # Codex's summary comment is the only comment that counts, and only from its pinned identity.
     if: >-
       github.event_name != 'issue_comment' ||
@@ -40,6 +36,52 @@ jobs:
        github.event.comment.user.id == 199175422 &&
        github.event.comment.user.type == 'Bot' &&
        contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
+    steps:
+      - name: Validate event target or discover reconciliation candidates
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANUAL_PR: ${{ github.event.inputs.pr }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import json, os, re, subprocess
+          event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          if os.environ['GITHUB_EVENT_NAME'] == 'schedule':
+              result = subprocess.run(['gh', 'api', '--paginate', '--jq', '.[]',
+                  'repos/' + os.environ['GITHUB_REPOSITORY'] + '/pulls?state=open&base=main&per_page=100'],
+                  check=True, capture_output=True, text=True)
+              prs = [p['number'] for p in map(json.loads, result.stdout.splitlines())
+                  if not p['draft'] and p['head']['repo']
+                  and p['head']['repo']['full_name'] == os.environ['GITHUB_REPOSITORY']]
+          else:
+              raw = (os.environ.get('MANUAL_PR', '') if os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+                  else str(event.get('pull_request', {}).get('number') or event.get('issue', {}).get('number', '')))
+              if not re.fullmatch(r'[0-9]{1,10}', raw) or not 0 < int(raw) <= 2147483647:
+                  raise SystemExit('::error::Invalid manual input or event PR identifier: use a positive integer (for example 84).')
+              prs = [int(raw)]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('prs=' + json.dumps(sorted(set(prs))) + '\n')
+          PYTHON
+
+  evaluate:
+    needs: select
+    if: needs.select.outputs.prs != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        pr: ${{ fromJSON(needs.select.outputs.prs) }}
+    # Both event and scheduled evaluations use the NORMALISED PR number and the same lock.
+    concurrency:
+      group: codex-merge-gate-${{ matrix.pr }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
     steps:
       # The gate logic comes from main, not from the pull request, so a PR cannot weaken its own gate. If main has no gate
       # scripts the workflow fails closed.
@@ -65,11 +107,13 @@ jobs:
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          PR: ${{ matrix.pr }}
         run: |
           set -euo pipefail
           state=$("$RUNNER_TEMP/gate/codex-review-gate.sh" "$PR")
           echo "$state"
+          echo "### PR $PR gate evaluation" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.reasons[] | "- " + .' <<<"$state" >> "$GITHUB_STEP_SUMMARY"
           jq -r '"ready=\(.ready_to_merge)\nhead=\(.head_sha)"' <<<"$state" >> "$GITHUB_OUTPUT"
 
       # The ruleset requires this status on the head, so GitHub itself blocks a merge of any head Codex has not cleared,
@@ -79,16 +123,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           READY: ${{ steps.gate.outputs.ready }}
           HEAD: ${{ steps.gate.outputs.head }}
+          PR: ${{ matrix.pr }}
         run: |
           set -euo pipefail
+          current=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          if [ "$current" != "$HEAD" ]; then
+            echo "::error::Stale evaluation: head changed; reconciliation will retry."
+            exit 1
+          fi
           if [ "$READY" = true ]; then state=success; else state=failure; fi
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD/status" \
+            --jq '[.statuses[] | select(.context == "codex-review-gate")][0].state // "missing"')
+          if [ "$previous" = "$state" ]; then
+            echo "Gate status already $state on $HEAD; no duplicate status needed."
+            exit 0
+          fi
           gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD" -f state="$state" \
-            -f context=codex-review-gate -f "description=Codex review gate: $state" >/dev/null
+            -f context=codex-review-gate -f "description=Codex gate: $state; see Actions diagnostics" \
+            -f "target_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
 
       - name: Enable auto-merge only for a clear head, otherwise cancel it
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          PR: ${{ matrix.pr }}
           READY: ${{ steps.gate.outputs.ready }}
           HEAD: ${{ steps.gate.outputs.head }}
         run: |
@@ -100,11 +157,20 @@ jobs:
               echo "Auto-merge is already enabled for $HEAD."
             else
               # --match-head-commit makes GitHub refuse the enable if the head moved after the check above.
-              gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch --match-head-commit "$HEAD"
+              if ! gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch --match-head-commit "$HEAD"; then
+                echo "::error::Failed to enable guarded squash auto-merge; check token permissions and repository settings."
+                exit 1
+              fi
               echo "Enabled auto-merge for $HEAD. Branch protection still requires verify to pass."
             fi
+          elif [ "$current" != "$HEAD" ]; then
+            echo "::error::Stale evaluation before auto-merge; reconciliation required."
+            exit 1
           elif [ "$enabled" = true ]; then
-            gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --disable-auto
+            if ! gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --disable-auto; then
+              echo "::error::Failed to cancel auto-merge; owner intervention required."
+              exit 1
+            fi
             echo "Cancelled auto-merge: the gate is not clear on the current head."
           else
             echo "Not ready; auto-merge stays off."
@@ -115,8 +181,9 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          PR: ${{ matrix.pr }}
         run: |
+          echo "::error::Gate evaluation, GitHub API/authentication, or auto-merge operation failed. See the failed step; gate remains blocking."
           head=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid || echo "")
           if [ -n "$head" ]; then
             gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$head" -f state=failure \
