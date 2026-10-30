@@ -28,4 +28,14 @@ select r.id, 1, r.conference_id, r.committee_id, d.id, coalesce(a.status::text, 
  where r.legacy and r.revision = 1
 on conflict do nothing;
 
+-- Each converted roll call keeps its source session as its assigned label (the label trigger only runs inside a mutation), marked legacy so
+-- reports can tell it apart; without it final_label is null and an Executive label correction could not find the record.
+insert into public.record_label (record_table, record_id, conference_id, committee_id, assigned_label, legacy, assigned_at)
+select 'roll_call', r.id, r.conference_id, r.committee_id, s.id, true, r.effective_at
+  from public.roll_call r
+  join public.sessions s on r.id = (substr(md5('legacy-roll-call:' || s.id::text), 1, 8) || '-' || substr(md5('legacy-roll-call:' || s.id::text), 9, 4) || '-4' || substr(md5('legacy-roll-call:' || s.id::text), 14, 3)
+        || '-a' || substr(md5('legacy-roll-call:' || s.id::text), 18, 3) || '-' || substr(md5('legacy-roll-call:' || s.id::text), 21, 12))::uuid
+ where r.legacy and r.revision = 1
+on conflict (record_table, record_id) do nothing;
+
 drop table public.timers;

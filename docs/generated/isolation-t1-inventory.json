@@ -38,7 +38,7 @@
   "20261031090000_committee_live_state.sql",
   "20261031100000_attendance_to_roll_calls.sql"
  ],
- "migrationsSha256": "714d570eccc663ab64eeb4a4823098fef78170b767dec75d235f790ce9978ef9",
+ "migrationsSha256": "00420750f536f2a350a5551183059906b83ea6194244ef3c708bd05f7a34f888",
  "supabase-model": {
   "fns": [
    {

@@ -26,7 +26,11 @@ test('real PostgreSQL: attendance converts to one legacy roll call per session, 
   assert.equal(rows.length,delegates.length,'the roll call is whole: every delegate has a row');
   const status=Object.fromEntries(rows.map(r=>[r.delegate_id,r.status]));
   assert.equal(status[delegates[0]],'Present & Voting');assert.equal(status[delegates[1]],'Absent');assert.equal(status[delegates[2]],'Absent','never marked reads as Absent');
+  const label=await query<{assigned_label:string;legacy:boolean}>(`select assigned_label,legacy from public.record_label where record_table='roll_call' and record_id=$1`,[rolls[0].id]);
+  assert.equal(label.length,1);assert.equal(label[0].assigned_label,session.id,'labelled with its source session');assert.equal(label[0].legacy,true);
+  assert.equal((await query<{l:string}>(`select private.final_label('roll_call',$1) l`,[rolls[0].id]))[0].l,session.id);
   await db.exec(conversion);
+  assert.equal((await query(`select 1 from public.record_label where record_table='roll_call' and record_id=$1`,[rolls[0].id])).length,1);
   assert.equal((await query(`select 1 from public.roll_call where committee_id=$1 and legacy`,[ids.ga1])).length,1,'re-running changes nothing');
   assert.equal((await query(`select 1 from public.roll_call_row where roll_call_id=$1`,[rolls[0].id])).length,delegates.length);
   assert.equal((await query(`select to_regclass('public.timers') t`))[0].t,null);
