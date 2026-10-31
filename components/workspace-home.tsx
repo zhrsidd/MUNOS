@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Conference, Role } from "@/lib/domain";
 import { workspaces } from "@/lib/workspaces";
 import { Brand } from "./brand";
+import { MunosMark } from "./munos-mark";
 import { Icon } from "./ui";
 import styles from "./workspace-home.module.css";
 
@@ -43,6 +44,7 @@ export function WorkspaceHome({ conference, availableRoles, demo }: {
       <footer className={styles.footer}>
         <span>One conference. Every team connected.</span>
         <span>{demo ? "Demo data · not official records" : "Need another role? Ask the Executive team."}</span>
+        <Link className={styles.about} href="/about"><MunosMark size={20} />About MUNOS</Link>
       </footer>
     </main>
   </div>;

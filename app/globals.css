@@ -3281,6 +3281,11 @@ html { scroll-padding-top: 12rem; }
 }
 .workspace-loading > p { margin: var(--space-5) 0 0; color: var(--ink-2); font-size: 13px; }
 @keyframes workspace-orbit { to { transform: rotate(360deg); } }
+.workspace-loading-about { margin-top: var(--space-5); width: min(560px, 100%); text-align: left; }
+.workspace-loading-about > summary { width: max-content; margin: 0 auto; padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--brand); font-size: 13px; font-weight: 600; }
+.workspace-loading-about-body { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--ink-2); }
+.workspace-loading-about-body h3 { font-size: 14px; margin: var(--space-4) 0 var(--space-1); color: var(--ink); }
+.workspace-loading-about-body p { margin: 0 0 var(--space-3); }
 @media (max-height: 420px) {
   .workspace-loading { --loading-seal-size: 80px; --loading-plate-size: 112px; --loading-orbit-size: 128px; }
   .workspace-loading h1 { margin-top: var(--space-2); }
@@ -3330,6 +3335,8 @@ html { scroll-padding-top: 12rem; }
 .about-card h2 { font-size: 15px; margin: var(--space-5) 0 var(--space-1); }
 .about-card .small { font-size: 13px; }
 .about-logo { display: block; margin-bottom: var(--space-2); }
+.about-powered { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.about-powered .munos-mark { flex: none; }
 .about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }
 @media (max-width: 700px) { .about-card { padding: var(--space-5) var(--space-4); } }
 

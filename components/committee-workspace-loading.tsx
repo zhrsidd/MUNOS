@@ -46,7 +46,7 @@ export function AlternativeLoadingScreen({ committeeCode }: { committeeCode: str
   return (
     <section className="committee-loading" data-motion={visible ? "running" : "paused"} aria-label={`${committeeCode} workspace loading`}>
       <div className="committee-loading-header">
-        <div className="committee-loading-heading"><strong>DCMUN OS</strong><span>{committeeCode}</span></div>
+        <div className="committee-loading-heading"><strong>MUNOS</strong><span>{committeeCode}</span></div>
         <span className="committee-loading-tag">COMMITTEE IN SESSION</span>
       </div>
       <div className="committee-loading-scene">

@@ -120,7 +120,7 @@ export function createSeed(): ConferenceData {
   return {
     conference: {
       id: "conf1",
-      name: "DCMUN · Conference OS",
+      name: "DCMUN · MUNOS",
       venue: "Doha • Demo edition",
       date: "2026-10-05",
       features: {

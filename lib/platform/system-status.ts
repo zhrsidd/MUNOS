@@ -53,7 +53,7 @@ export function systemStatus(i: StatusInput): SystemStatus {
   else if (health.pending) add("device", "This device", "yellow", `${changes(health.pending)} saved here · will sync automatically`);
   else add("device", "This device", "green", "All changes synced");
 
-  if (i.server === "unreachable") add("server", "Conference OS service", "yellow", i.online ? "Not responding · this screen keeps working" : "Not checked while offline");
+  if (i.server === "unreachable") add("server", "MUNOS service", "yellow", i.online ? "Not responding · this screen keeps working" : "Not checked while offline");
   else if (report && report.app.commit && i.clientCommit && report.app.commit !== i.clientCommit)
     add("version", "Version", "yellow", "Server has a different version. Refresh once this device shows 0 unsynced changes.");
 

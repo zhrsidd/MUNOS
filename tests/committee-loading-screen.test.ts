@@ -15,7 +15,7 @@ const access = (): StaffAccess => ({ status: "active", roles: ["chair"], committ
 
 test("artwork uses live text, stable loading semantics and neither removed line nor fake progress", () => {
   const html = renderToStaticMarkup(createElement(AlternativeLoadingScreen, { committeeCode: "GA1" }));
-  assert.match(html, /DCMUN OS/);
+  assert.match(html, /MUNOS/);
   assert.match(html, /GA1/);
   assert.match(html, /committee-collage-v1.webp/);
   assert.equal((html.match(/role="status"/g) ?? []).length, 1);

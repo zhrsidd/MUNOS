@@ -132,7 +132,7 @@ export function SubmissionLinks() {
         </div>
         <p className="footnote">
           Security: each link is a 128-bit random code. Anyone holding it can register a resolution for that committee only (at most 20 per 10 minutes); it
-          can only see committee submission details and assigned Chair contacts. Conference OS stores the Google Doc&apos;s id, never its text. {demo && "Local demo: links work against demo data only."} Chairs see
+          can only see committee submission details and assigned Chair contacts. MUNOS stores the Google Doc&apos;s id, never its text. {demo && "Local demo: links work against demo data only."} Chairs see
           their QR in Chair Console → Documents.
         </p>
       </Panel>
