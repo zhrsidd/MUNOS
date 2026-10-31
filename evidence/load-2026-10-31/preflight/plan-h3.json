@@ -1,0 +1,491 @@
+{
+  "dryRun": true,
+  "modelStatus": "HISTORICAL COMPARISON ONLY; no current H3 rate prediction. Live runner uses actual DurableRepository.",
+  "staff": 110,
+  "staffProfile": "dcmun-2026",
+  "delegates": 150,
+  "minutes": 30,
+  "humanFloorSeconds": 3,
+  "roles": {
+    "chair": 75,
+    "approval": 20,
+    "admins": 10,
+    "executive": 5,
+    "delegate": 150
+  },
+  "counts": {
+    "open": 110,
+    "draft": 932,
+    "rollCall": 128,
+    "read": 3701,
+    "refocus": 636,
+    "queueAdd": 1385,
+    "sendToApproval": 32,
+    "timer": 164,
+    "speechStart": 252,
+    "speechScore": 240,
+    "speechFinish": 240,
+    "queueOrder": 68,
+    "poiAllowance": 96,
+    "poiAdd": 95,
+    "poiRecognize": 95,
+    "poiScore": 95,
+    "photoAck": 161,
+    "approve": 196,
+    "print": 59,
+    "health": 54,
+    "submitPage": 150,
+    "submit": 16
+  },
+  "staffApp": {
+    "steps": 8739,
+    "writes": 2840,
+    "writesPerMinute": 95
+  },
+  "legacyHarnessModel": {
+    "note": "Old harness: 3 writer reads + a refresh on every other subscribed device per write, scheduled reads, no one-in-flight limit, no topics.",
+    "refreshes": 120758,
+    "snapshotReadsPerMinute": 4025,
+    "readAmplification": 41
+  },
+  "delegatePublicForm": {
+    "pageLoads": 150,
+    "submissions": 16,
+    "authSessions": 0
+  },
+  "maxWritesPerUserPerMinute": 2.8,
+  "clientModelEstimates": [
+    {
+      "model": "current",
+      "executiveChairWindowMs": 0,
+      "readMs": 600,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2839,
+      "pendingAtEnd": 3,
+      "refreshes": 58363,
+      "snapshotRpcCalls": 58363,
+      "readsPerWrite": 20.6,
+      "triggersAttempted": 71930,
+      "triggersDropped": 13589,
+      "bySource": {
+        "open": 102,
+        "postWrite": 2839,
+        "realtime": 54482,
+        "periodic": 4,
+        "refocus": 936
+      },
+      "droppedBySource": {
+        "open": 8,
+        "postWrite": 205,
+        "realtime": 13067,
+        "periodic": 1,
+        "refocus": 308
+      },
+      "byRole": {
+        "admins": 13406,
+        "approval": 26810,
+        "chair": 11444,
+        "executive": 6703
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 6,
+          "postWrite": 53,
+          "realtime": 13273,
+          "periodic": 0,
+          "refocus": 74
+        },
+        "approval": {
+          "open": 18,
+          "postWrite": 181,
+          "realtime": 26397,
+          "periodic": 0,
+          "refocus": 214
+        },
+        "chair": {
+          "open": 75,
+          "postWrite": 2605,
+          "realtime": 8151,
+          "periodic": 4,
+          "refocus": 609
+        },
+        "executive": {
+          "open": 3,
+          "postWrite": 0,
+          "realtime": 6661,
+          "periodic": 0,
+          "refocus": 39
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14195,
+        "chairWindows": 0,
+        "chairEventsCoalesced": 0,
+        "realtimeTriggers": 8105,
+        "refreshes": 6703
+      }
+    },
+    {
+      "model": "topic-aware",
+      "executiveChairWindowMs": 0,
+      "readMs": 600,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2839,
+      "pendingAtEnd": 2,
+      "refreshes": 25993,
+      "snapshotRpcCalls": 25993,
+      "readsPerWrite": 9.2,
+      "triggersAttempted": 31026,
+      "triggersDropped": 5054,
+      "bySource": {
+        "open": 108,
+        "postWrite": 2839,
+        "realtime": 21902,
+        "periodic": 4,
+        "refocus": 1140
+      },
+      "droppedBySource": {
+        "open": 2,
+        "postWrite": 113,
+        "realtime": 4834,
+        "periodic": 1,
+        "refocus": 104
+      },
+      "byRole": {
+        "admins": 2625,
+        "approval": 5342,
+        "chair": 11433,
+        "executive": 6593
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 10,
+          "postWrite": 53,
+          "realtime": 2430,
+          "periodic": 0,
+          "refocus": 132
+        },
+        "approval": {
+          "open": 20,
+          "postWrite": 181,
+          "realtime": 4781,
+          "periodic": 0,
+          "refocus": 360
+        },
+        "chair": {
+          "open": 75,
+          "postWrite": 2605,
+          "realtime": 8141,
+          "periodic": 4,
+          "refocus": 608
+        },
+        "executive": {
+          "open": 3,
+          "postWrite": 0,
+          "realtime": 6550,
+          "periodic": 0,
+          "refocus": 40
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14195,
+        "chairWindows": 0,
+        "chairEventsCoalesced": 0,
+        "realtimeTriggers": 8095,
+        "refreshes": 6593
+      }
+    },
+    {
+      "model": "topic-aware",
+      "executiveChairWindowMs": 2000,
+      "readMs": 600,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2839,
+      "pendingAtEnd": 2,
+      "refreshes": 23120,
+      "snapshotRpcCalls": 23120,
+      "readsPerWrite": 8.1,
+      "triggersAttempted": 26781,
+      "triggersDropped": 3682,
+      "bySource": {
+        "open": 108,
+        "postWrite": 2839,
+        "realtime": 19012,
+        "periodic": 5,
+        "refocus": 1156
+      },
+      "droppedBySource": {
+        "open": 2,
+        "postWrite": 114,
+        "realtime": 3478,
+        "periodic": 0,
+        "refocus": 88
+      },
+      "byRole": {
+        "admins": 2625,
+        "approval": 5342,
+        "chair": 11434,
+        "executive": 3719
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 10,
+          "postWrite": 53,
+          "realtime": 2430,
+          "periodic": 0,
+          "refocus": 132
+        },
+        "approval": {
+          "open": 20,
+          "postWrite": 181,
+          "realtime": 4781,
+          "periodic": 0,
+          "refocus": 360
+        },
+        "chair": {
+          "open": 75,
+          "postWrite": 2605,
+          "realtime": 8141,
+          "periodic": 5,
+          "refocus": 608
+        },
+        "executive": {
+          "open": 3,
+          "postWrite": 0,
+          "realtime": 3660,
+          "periodic": 0,
+          "refocus": 56
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14195,
+        "chairWindows": 3525,
+        "chairEventsCoalesced": 9355,
+        "realtimeTriggers": 3850,
+        "refreshes": 3719
+      }
+    },
+    {
+      "model": "current",
+      "executiveChairWindowMs": 0,
+      "readMs": 7000,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2830,
+      "pendingAtEnd": 28,
+      "refreshes": 16296,
+      "snapshotRpcCalls": 16296,
+      "readsPerWrite": 5.8,
+      "triggersAttempted": 70024,
+      "triggersDropped": 54181,
+      "bySource": {
+        "open": 84,
+        "postWrite": 2830,
+        "realtime": 12940,
+        "periodic": 1,
+        "refocus": 441
+      },
+      "droppedBySource": {
+        "open": 26,
+        "postWrite": 1277,
+        "realtime": 52079,
+        "periodic": 7,
+        "refocus": 792
+      },
+      "byRole": {
+        "admins": 2262,
+        "approval": 4525,
+        "chair": 8377,
+        "executive": 1132
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 3,
+          "postWrite": 53,
+          "realtime": 2190,
+          "periodic": 0,
+          "refocus": 16
+        },
+        "approval": {
+          "open": 9,
+          "postWrite": 181,
+          "realtime": 4297,
+          "periodic": 0,
+          "refocus": 38
+        },
+        "chair": {
+          "open": 70,
+          "postWrite": 2596,
+          "realtime": 5328,
+          "periodic": 1,
+          "refocus": 382
+        },
+        "executive": {
+          "open": 2,
+          "postWrite": 0,
+          "realtime": 1125,
+          "periodic": 0,
+          "refocus": 5
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14145,
+        "chairWindows": 0,
+        "chairEventsCoalesced": 0,
+        "realtimeTriggers": 7870,
+        "refreshes": 1132
+      }
+    },
+    {
+      "model": "topic-aware",
+      "executiveChairWindowMs": 0,
+      "readMs": 7000,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2829,
+      "pendingAtEnd": 29,
+      "refreshes": 13451,
+      "snapshotRpcCalls": 13451,
+      "readsPerWrite": 4.8,
+      "triggersAttempted": 29591,
+      "triggersDropped": 16592,
+      "bySource": {
+        "open": 95,
+        "postWrite": 2829,
+        "realtime": 9862,
+        "periodic": 1,
+        "refocus": 664
+      },
+      "droppedBySource": {
+        "open": 15,
+        "postWrite": 1182,
+        "realtime": 14817,
+        "periodic": 9,
+        "refocus": 569
+      },
+      "byRole": {
+        "admins": 1311,
+        "approval": 2638,
+        "chair": 8360,
+        "executive": 1142
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 8,
+          "postWrite": 53,
+          "realtime": 1168,
+          "periodic": 0,
+          "refocus": 82
+        },
+        "approval": {
+          "open": 14,
+          "postWrite": 180,
+          "realtime": 2247,
+          "periodic": 0,
+          "refocus": 197
+        },
+        "chair": {
+          "open": 71,
+          "postWrite": 2596,
+          "realtime": 5315,
+          "periodic": 1,
+          "refocus": 377
+        },
+        "executive": {
+          "open": 2,
+          "postWrite": 0,
+          "realtime": 1132,
+          "periodic": 0,
+          "refocus": 8
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14145,
+        "chairWindows": 0,
+        "chairEventsCoalesced": 0,
+        "realtimeTriggers": 8040,
+        "refreshes": 1142
+      }
+    },
+    {
+      "model": "topic-aware",
+      "executiveChairWindowMs": 2000,
+      "readMs": 7000,
+      "sendMs": 300,
+      "minutes": 30,
+      "writes": 2829,
+      "pendingAtEnd": 29,
+      "refreshes": 13359,
+      "snapshotRpcCalls": 13359,
+      "readsPerWrite": 4.7,
+      "triggersAttempted": 25340,
+      "triggersDropped": 12433,
+      "bySource": {
+        "open": 95,
+        "postWrite": 2829,
+        "realtime": 9760,
+        "periodic": 1,
+        "refocus": 674
+      },
+      "droppedBySource": {
+        "open": 15,
+        "postWrite": 1182,
+        "realtime": 10669,
+        "periodic": 8,
+        "refocus": 559
+      },
+      "byRole": {
+        "admins": 1311,
+        "approval": 2638,
+        "chair": 8360,
+        "executive": 1050
+      },
+      "bySourceAndRole": {
+        "admins": {
+          "open": 8,
+          "postWrite": 53,
+          "realtime": 1168,
+          "periodic": 0,
+          "refocus": 82
+        },
+        "approval": {
+          "open": 14,
+          "postWrite": 180,
+          "realtime": 2247,
+          "periodic": 0,
+          "refocus": 197
+        },
+        "chair": {
+          "open": 71,
+          "postWrite": 2596,
+          "realtime": 5315,
+          "periodic": 1,
+          "refocus": 377
+        },
+        "executive": {
+          "open": 2,
+          "postWrite": 0,
+          "realtime": 1030,
+          "periodic": 0,
+          "refocus": 18
+        }
+      },
+      "maxConcurrentReadsPerDevice": 1,
+      "executive": {
+        "realtimeEvents": 14145,
+        "chairWindows": 3450,
+        "chairEventsCoalesced": 9385,
+        "realtimeTriggers": 3790,
+        "refreshes": 1050
+      }
+    }
+  ]
+}

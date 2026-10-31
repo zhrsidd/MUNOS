@@ -1,0 +1,1037 @@
+{
+  "date": "2026-10-31T12:45:43.775Z",
+  "app": "https://munos-jij0int7d-dcmun.vercel.app",
+  "appBuild": {
+    "version": "0.2.0",
+    "commit": "288c7236059bafe6bb2b16e860fdcdcca19f5d31",
+    "shortCommit": "288c723",
+    "branch": "codex/preproduction-connected",
+    "environment": "preview",
+    "deploymentId": "dpl_2UYk8wYf7zyudbDjetsbuCv3gBTR",
+    "builtAt": "2026-10-31T10:41:56.038Z"
+  },
+  "supabaseProject": "kllhswucdhqqywnzxado",
+  "staffProfile": "dcmun-2026",
+  "staffRolesPerStage": [
+    {
+      "chair": 6,
+      "approval": 2,
+      "admins": 1,
+      "executive": 1
+    }
+  ],
+  "identityMode": "realistic-multi-committee",
+  "readinessLabel": "RAMP / DIAGNOSTIC ONLY",
+  "readiness": {
+    "mode": "realistic-multi-committee",
+    "label": "NOT A READINESS RUN",
+    "qualifiesForReadiness": false,
+    "reasons": [
+      "6 distinct Chair identities for 19 simulated committees",
+      "no Chair traffic for 13 committee(s): ECOSOC, UNEP, UNHCR, ICJ, UNSC2, UNODC, UNESCO, CSW, C15, C16, C17, C18, C19"
+    ],
+    "simulatedCommittees": 19,
+    "actualCommitteesWithChairTraffic": 6,
+    "distinctChairIdentities": 6,
+    "chairDevices": 6,
+    "committees": [
+      {
+        "code": "GA1",
+        "committeeId": "d6b64d3d-c704-45b2-8d40-74e14eb28d95",
+        "chairIdentity": "78ead11e",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "WHO",
+        "committeeId": "a8fdb98d-4f69-40e4-94ac-777d2c406dec",
+        "chairIdentity": "32ed1ef2",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "HRC",
+        "committeeId": "032aed20-4584-47c2-b205-0ce8d104f39e",
+        "chairIdentity": "056e0dc0",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "SC",
+        "committeeId": "43e7b4f0-526d-4b8f-9e8e-ca5a46427ffd",
+        "chairIdentity": "e6f548a1",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "GA2",
+        "committeeId": "5d2af2ec-9e4c-42dd-ae9c-aeec0abd7d98",
+        "chairIdentity": "8d47d30c",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "GA3",
+        "committeeId": "c024e65b-bcab-4403-80b5-1caf76450213",
+        "chairIdentity": "9d0db768",
+        "chairIdentities": 1,
+        "chairDevices": 1
+      },
+      {
+        "code": "ECOSOC",
+        "committeeId": "6cec9b74-5999-46d7-9f6b-ae8877418641",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "UNEP",
+        "committeeId": "acaf8a39-771a-4253-bd24-9c3e10b416cb",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "UNHCR",
+        "committeeId": "d13e780f-9824-487d-a727-31c3535ec188",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "ICJ",
+        "committeeId": "07a8dad7-4cfd-482b-9378-fe37171031e5",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "UNSC2",
+        "committeeId": "7ce06339-3d97-4bff-bdeb-6ade0e4a2ff1",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "UNODC",
+        "committeeId": "504172b5-e395-4e9c-b4fc-547d87cf7827",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "UNESCO",
+        "committeeId": "da0661d9-c663-4f8a-9835-8f17b1f14d5a",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "CSW",
+        "committeeId": "4dcb02fd-2775-4a42-ac66-fb2087f01171",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "C15",
+        "committeeId": "4fb22221-4045-4e57-b70c-bd35ad815ac3",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "C16",
+        "committeeId": "e82ddba5-f547-4644-a619-796056a7d43d",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "C17",
+        "committeeId": "2fe817bb-f6c2-4ffb-a69a-d5137d60fbeb",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "C18",
+        "committeeId": "847122e2-8749-424d-b424-0b042f11044c",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      },
+      {
+        "code": "C19",
+        "committeeId": "2c87a151-803c-440b-b84e-13fd01987363",
+        "chairIdentity": null,
+        "chairIdentities": 0,
+        "chairDevices": 0
+      }
+    ]
+  },
+  "conferenceGate": {
+    "eligible": false,
+    "checks": [
+      {
+        "check": "every capacity stage has at least 110 staff devices",
+        "pass": false
+      },
+      {
+        "check": "at least 30 minutes across 19 real committees",
+        "pass": false
+      },
+      {
+        "check": "at least 150 public page loads and 16 planned creates per stage",
+        "pass": false
+      },
+      {
+        "check": "every capacity stage covers 57 Chairs, 20 Approval, 10 printing/Admins and 5 Executives",
+        "pass": false
+      }
+    ],
+    "pass": false
+  },
+  "distinctAuthIdentities": 22,
+  "note": "Realistic multi-committee run: each simulated committee is a real committee row with its own session and its own Chair identity/grant; Chair devices of committee k use only committee k's identity, row and session. Approval, Admins and Executive use one role-scoped identity each. No Auth sessions were created during the run. Delegates use only the public form.",
+  "capacityGate": "BELOW the 50-staff comparison (smoke / warm-up only)",
+  "publicForm": {
+    "delegates": 0,
+    "singleLink": false,
+    "submissionsPlannedPerStage": {
+      "10": 0
+    },
+    "maxSingleLinkSubmissions": 18,
+    "note": "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately."
+  },
+  "minutes": 5,
+  "stages": [
+    {
+      "staff": 10,
+      "delegates": 0,
+      "configuredReadiness": {
+        "mode": "realistic-multi-committee",
+        "label": "NOT A READINESS RUN",
+        "qualifiesForReadiness": false,
+        "reasons": [
+          "6 distinct Chair identities for 19 simulated committees",
+          "no Chair traffic for 13 committee(s): ECOSOC, UNEP, UNHCR, ICJ, UNSC2, UNODC, UNESCO, CSW, C15, C16, C17, C18, C19"
+        ],
+        "simulatedCommittees": 19,
+        "actualCommitteesWithChairTraffic": 6,
+        "distinctChairIdentities": 6,
+        "chairDevices": 6,
+        "committees": [
+          {
+            "code": "GA1",
+            "committeeId": "d6b64d3d-c704-45b2-8d40-74e14eb28d95",
+            "chairIdentity": "78ead11e",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "WHO",
+            "committeeId": "a8fdb98d-4f69-40e4-94ac-777d2c406dec",
+            "chairIdentity": "32ed1ef2",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "HRC",
+            "committeeId": "032aed20-4584-47c2-b205-0ce8d104f39e",
+            "chairIdentity": "056e0dc0",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "SC",
+            "committeeId": "43e7b4f0-526d-4b8f-9e8e-ca5a46427ffd",
+            "chairIdentity": "e6f548a1",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "GA2",
+            "committeeId": "5d2af2ec-9e4c-42dd-ae9c-aeec0abd7d98",
+            "chairIdentity": "8d47d30c",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "GA3",
+            "committeeId": "c024e65b-bcab-4403-80b5-1caf76450213",
+            "chairIdentity": "9d0db768",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "ECOSOC",
+            "committeeId": "6cec9b74-5999-46d7-9f6b-ae8877418641",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNEP",
+            "committeeId": "acaf8a39-771a-4253-bd24-9c3e10b416cb",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNHCR",
+            "committeeId": "d13e780f-9824-487d-a727-31c3535ec188",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "ICJ",
+            "committeeId": "07a8dad7-4cfd-482b-9378-fe37171031e5",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNSC2",
+            "committeeId": "7ce06339-3d97-4bff-bdeb-6ade0e4a2ff1",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNODC",
+            "committeeId": "504172b5-e395-4e9c-b4fc-547d87cf7827",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNESCO",
+            "committeeId": "da0661d9-c663-4f8a-9835-8f17b1f14d5a",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "CSW",
+            "committeeId": "4dcb02fd-2775-4a42-ac66-fb2087f01171",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C15",
+            "committeeId": "4fb22221-4045-4e57-b70c-bd35ad815ac3",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C16",
+            "committeeId": "e82ddba5-f547-4644-a619-796056a7d43d",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C17",
+            "committeeId": "2fe817bb-f6c2-4ffb-a69a-d5137d60fbeb",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C18",
+            "committeeId": "847122e2-8749-424d-b424-0b042f11044c",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C19",
+            "committeeId": "2c87a151-803c-440b-b84e-13fd01987363",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          }
+        ]
+      },
+      "readiness": {
+        "mode": "realistic-multi-committee",
+        "label": "NOT A READINESS RUN",
+        "qualifiesForReadiness": false,
+        "reasons": [
+          "6 distinct Chair identities for 19 simulated committees",
+          "no Chair traffic for 13 committee(s): ECOSOC, UNEP, UNHCR, ICJ, UNSC2, UNODC, UNESCO, CSW, C15, C16, C17, C18, C19"
+        ],
+        "simulatedCommittees": 19,
+        "actualCommitteesWithChairTraffic": 6,
+        "distinctChairIdentities": 6,
+        "chairDevices": 6,
+        "committees": [
+          {
+            "code": "GA1",
+            "committeeId": "d6b64d3d-c704-45b2-8d40-74e14eb28d95",
+            "chairIdentity": "78ead11e",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "WHO",
+            "committeeId": "a8fdb98d-4f69-40e4-94ac-777d2c406dec",
+            "chairIdentity": "32ed1ef2",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "HRC",
+            "committeeId": "032aed20-4584-47c2-b205-0ce8d104f39e",
+            "chairIdentity": "056e0dc0",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "SC",
+            "committeeId": "43e7b4f0-526d-4b8f-9e8e-ca5a46427ffd",
+            "chairIdentity": "e6f548a1",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "GA2",
+            "committeeId": "5d2af2ec-9e4c-42dd-ae9c-aeec0abd7d98",
+            "chairIdentity": "8d47d30c",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "GA3",
+            "committeeId": "c024e65b-bcab-4403-80b5-1caf76450213",
+            "chairIdentity": "9d0db768",
+            "chairIdentities": 1,
+            "chairDevices": 1
+          },
+          {
+            "code": "ECOSOC",
+            "committeeId": "6cec9b74-5999-46d7-9f6b-ae8877418641",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNEP",
+            "committeeId": "acaf8a39-771a-4253-bd24-9c3e10b416cb",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNHCR",
+            "committeeId": "d13e780f-9824-487d-a727-31c3535ec188",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "ICJ",
+            "committeeId": "07a8dad7-4cfd-482b-9378-fe37171031e5",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNSC2",
+            "committeeId": "7ce06339-3d97-4bff-bdeb-6ade0e4a2ff1",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNODC",
+            "committeeId": "504172b5-e395-4e9c-b4fc-547d87cf7827",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "UNESCO",
+            "committeeId": "da0661d9-c663-4f8a-9835-8f17b1f14d5a",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "CSW",
+            "committeeId": "4dcb02fd-2775-4a42-ac66-fb2087f01171",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C15",
+            "committeeId": "4fb22221-4045-4e57-b70c-bd35ad815ac3",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C16",
+            "committeeId": "e82ddba5-f547-4644-a619-796056a7d43d",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C17",
+            "committeeId": "2fe817bb-f6c2-4ffb-a69a-d5137d60fbeb",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C18",
+            "committeeId": "847122e2-8749-424d-b424-0b042f11044c",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          },
+          {
+            "code": "C19",
+            "committeeId": "2c87a151-803c-440b-b84e-13fd01987363",
+            "chairIdentity": null,
+            "chairIdentities": 0,
+            "chairDevices": 0
+          }
+        ]
+      },
+      "observed": {
+        "openedDevices": 10,
+        "reads": {
+          "chair": 67,
+          "admins": 8,
+          "executive": 27,
+          "approval": 13
+        },
+        "writes": {
+          "chair": 42,
+          "admins": 1,
+          "approval": 1
+        },
+        "actions": {
+          "rollCall": 6,
+          "speechStart": 7,
+          "poiAllowance": 3,
+          "poiAdd": 3,
+          "poiRecognize": 3,
+          "poiScore": 3,
+          "queueAdd": 5,
+          "speechScore": 5,
+          "speechFinish": 5,
+          "sendToApproval": 2,
+          "print": 1,
+          "approve": 1
+        },
+        "publicForm": {
+          "pages": 0,
+          "creates": 0
+        }
+      },
+      "work": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "every configured staff device completed a successful snapshot",
+            "pass": true
+          },
+          {
+            "check": "at least one successful snapshot per configured role",
+            "pass": true
+          },
+          {
+            "check": "at least one accepted mutation per configured writing role",
+            "pass": true
+          },
+          {
+            "check": "accepted Chair traffic matches every configured committee",
+            "pass": true
+          },
+          {
+            "check": "zero pending, conflicting or unconfirmed actions at a settled close",
+            "pass": true
+          },
+          {
+            "check": "no scripted intent was rejected locally",
+            "pass": true
+          },
+          {
+            "check": "declared critical operations were observed",
+            "pass": true
+          },
+          {
+            "check": "every configured public page and submission completed successfully",
+            "pass": true
+          }
+        ]
+      },
+      "drainSeconds": 0,
+      "pendingAtClose": 0,
+      "conflictsAtClose": 0,
+      "unconfirmedAtClose": 0,
+      "closeTimedOut": false,
+      "snapshotRpcsByName": {
+        "conference_state_snapshot": 88,
+        "executive_state_snapshot": 27
+      },
+      "clientModel": {
+        "implementation": "actual DurableRepository + DurableStore, isolated fake IndexedDB",
+        "realtimeDelivery": "simulated; no real channels",
+        "sourceAttribution": "actual-core; internal trigger attribution is not inferred",
+        "byRole": {
+          "chair": [
+            {
+              "reads": 8,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 4,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 18,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 12,
+              "focuses": 0,
+              "localRefusals": 0
+            },
+            {
+              "reads": 10,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 5,
+              "focuses": 0,
+              "localRefusals": 0
+            },
+            {
+              "reads": 11,
+              "coreSendAttempts": 7,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 6,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 14,
+              "coreSendAttempts": 8,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 7,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 6,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 3,
+              "focuses": 0,
+              "localRefusals": 0
+            }
+          ],
+          "approval": [
+            {
+              "reads": 6,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 4,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 7,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 4,
+              "focuses": 3,
+              "localRefusals": 0
+            }
+          ],
+          "admins": [
+            {
+              "reads": 8,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 4,
+              "focuses": 2,
+              "localRefusals": 0
+            }
+          ],
+          "executive": [
+            {
+              "reads": 27,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 38,
+              "focuses": 1,
+              "localRefusals": 0
+            }
+          ]
+        }
+      },
+      "total": 163,
+      "errors": 0,
+      "rateLimited": 0,
+      "conflicts": 0,
+      "errorRate": 0,
+      "summary": {
+        "writes": {
+          "requests": 44,
+          "errors": 0,
+          "p50_ms": 305,
+          "p95_ms": 882,
+          "p99_ms": 999
+        },
+        "reads": {
+          "requests": 115,
+          "errors": 0,
+          "p50_ms": 484,
+          "p95_ms": 1166,
+          "p99_ms": 1541
+        },
+        "readsByRole": {
+          "chair": {
+            "requests": 67,
+            "errors": 0,
+            "p50_ms": 402,
+            "p95_ms": 967,
+            "p99_ms": 1213
+          },
+          "admins": {
+            "requests": 8,
+            "errors": 0,
+            "p50_ms": 433,
+            "p95_ms": 1040,
+            "p99_ms": 1040
+          },
+          "executive": {
+            "requests": 27,
+            "errors": 0,
+            "p50_ms": 1060,
+            "p95_ms": 1541,
+            "p99_ms": 1565
+          },
+          "approval": {
+            "requests": 13,
+            "errors": 0,
+            "p50_ms": 484,
+            "p95_ms": 1120,
+            "p99_ms": 1120
+          }
+        },
+        "readsBySource": {
+          "actual-core": {
+            "requests": 115,
+            "errors": 0,
+            "p50_ms": 484,
+            "p95_ms": 1166,
+            "p99_ms": 1541
+          }
+        },
+        "snapshotRpcCalls": 115,
+        "snapshotRpcsPerRefresh": 1,
+        "readsPerWrite": 2.6
+      },
+      "actions": {
+        "refresh": {
+          "requests": 115,
+          "ok": 115,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 484,
+          "p95_ms": 1166,
+          "p99_ms": 1541
+        },
+        "rollCallCommit": {
+          "requests": 6,
+          "ok": 6,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 313,
+          "p95_ms": 999,
+          "p99_ms": 999
+        },
+        "speechStart": {
+          "requests": 7,
+          "ok": 7,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 402,
+          "p95_ms": 856,
+          "p99_ms": 856
+        },
+        "poiAllowance": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 297,
+          "p95_ms": 327,
+          "p99_ms": 327
+        },
+        "poiAdd": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 297,
+          "p95_ms": 301,
+          "p99_ms": 301
+        },
+        "poiRecognize": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 300,
+          "p95_ms": 304,
+          "p99_ms": 304
+        },
+        "poiScore": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 309,
+          "p95_ms": 309,
+          "p99_ms": 309
+        },
+        "queueAdd": {
+          "requests": 5,
+          "ok": 5,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 317,
+          "p95_ms": 350,
+          "p99_ms": 350
+        },
+        "speechScore": {
+          "requests": 5,
+          "ok": 5,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 316,
+          "p95_ms": 668,
+          "p99_ms": 668
+        },
+        "speechScore (resend)": {
+          "requests": 2,
+          "ok": 2,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 338,
+          "p95_ms": 780,
+          "p99_ms": 780
+        },
+        "speechFinish": {
+          "requests": 5,
+          "ok": 5,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 293,
+          "p95_ms": 299,
+          "p99_ms": 299
+        },
+        "health": {
+          "requests": 2,
+          "ok": 2,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 801,
+          "p95_ms": 899,
+          "p99_ms": 899
+        },
+        "sendToApproval": {
+          "requests": 2,
+          "ok": 2,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 275,
+          "p95_ms": 344,
+          "p99_ms": 344
+        },
+        "print": {
+          "requests": 1,
+          "ok": 1,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 280,
+          "p95_ms": 280,
+          "p99_ms": 280
+        },
+        "approve": {
+          "requests": 1,
+          "ok": 1,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 299,
+          "p95_ms": 299,
+          "p99_ms": 299
+        }
+      }
+    }
+  ],
+  "realtimeModel": "topic-aware",
+  "clientModel": "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)",
+  "exactlyOnce": {
+    "acknowledgedScoring": 8,
+    "duplicates": 0,
+    "lost": 0
+  },
+  "diagnosticVerdict": {
+    "label": "RAMP / DIAGNOSTIC ONLY",
+    "pass": true,
+    "checks": [
+      {
+        "check": "no duplicate writes after retries",
+        "pass": true
+      },
+      {
+        "check": "no lost acknowledged writes",
+        "pass": true
+      },
+      {
+        "check": "error rate below 1% (conflicts excluded)",
+        "pass": true
+      },
+      {
+        "check": "no rate-limit responses",
+        "pass": true
+      },
+      {
+        "check": "write p95 ≤ 1500 ms (was 856)",
+        "pass": true
+      },
+      {
+        "check": "read p95 ≤ 2500 ms (was 1166)",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured staff device completed a successful snapshot",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one successful snapshot per configured role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one accepted mutation per configured writing role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: accepted Chair traffic matches every configured committee",
+        "pass": true
+      },
+      {
+        "check": "stage 1: zero pending, conflicting or unconfirmed actions at a settled close",
+        "pass": true
+      },
+      {
+        "check": "stage 1: no scripted intent was rejected locally",
+        "pass": true
+      },
+      {
+        "check": "stage 1: declared critical operations were observed",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured public page and submission completed successfully",
+        "pass": true
+      },
+      {
+        "check": "role-scoped multi-committee fixture",
+        "pass": true
+      }
+    ]
+  },
+  "verdict": {
+    "pass": false,
+    "label": "NOT A READINESS RUN",
+    "checks": [
+      {
+        "check": "no duplicate writes after retries",
+        "pass": true
+      },
+      {
+        "check": "no lost acknowledged writes",
+        "pass": true
+      },
+      {
+        "check": "error rate below 1% (conflicts excluded)",
+        "pass": true
+      },
+      {
+        "check": "no rate-limit responses",
+        "pass": true
+      },
+      {
+        "check": "write p95 ≤ 1500 ms (was 856)",
+        "pass": true
+      },
+      {
+        "check": "read p95 ≤ 2500 ms (was 1166)",
+        "pass": true
+      },
+      {
+        "check": "realistic multi-committee distribution (NOT A READINESS RUN: 6 distinct Chair identities for 19 simulated committees; no Chair traffic for 13 committee(s): ECOSOC, UNEP, UNHCR, ICJ, UNSC2, UNODC, UNESCO, CSW, C15, C16, C17, C18, C19)",
+        "pass": false
+      },
+      {
+        "check": "stage 1: every configured staff device completed a successful snapshot",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one successful snapshot per configured role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one accepted mutation per configured writing role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: accepted Chair traffic matches every configured committee",
+        "pass": true
+      },
+      {
+        "check": "stage 1: zero pending, conflicting or unconfirmed actions at a settled close",
+        "pass": true
+      },
+      {
+        "check": "stage 1: no scripted intent was rejected locally",
+        "pass": true
+      },
+      {
+        "check": "stage 1: declared critical operations were observed",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured public page and submission completed successfully",
+        "pass": true
+      }
+    ]
+  }
+}

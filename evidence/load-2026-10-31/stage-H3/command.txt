@@ -1,0 +1,4 @@
+# diagnostic attempt after NO-GO ramp
+npm run rehearsal:run -- --app "$PREVIEW" --identities "$B/identities.json" --fixture "$B/fixture.json" \
+  --staff-profile dcmun-2026 --staff 110 --minutes 30 --delegates 150 --delegate-window 120 \
+  --submit-token "$SUBMIT_TOKEN" --submit-committee GA1 --submit-fraction 0.08

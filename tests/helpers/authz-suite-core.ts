@@ -53,6 +53,8 @@ export const HOSTED_AUDIT = {
 };
 /** Reviewed session-model additions (docs/SESSION_MODEL.md): the device clock call and its private implementation, executable by signed-in users only. */
 const SESSION_MODEL_DELTA = ['public.record_device_clock', 'private.record_device_clock', 'private.session_schedules', 'private.hold_settings', 'private.day_closes'];
+/** Reviewed read-cost addition (20261101090000): the snapshot's committee pre-filter, read-only, executable by signed-in users only. */
+const READ_COST_DELTA = ['private.visible_committees'];
 const nameOf = (key: string) => key.slice(0, key.indexOf('('));
 
 export async function privilegeSection(t: TestContext, {engine}: Ctx) {
@@ -79,12 +81,12 @@ export async function privilegeSection(t: TestContext, {engine}: Ctx) {
    const name = nameOf(key);
    if (got.anon !== (name==='public.preproduction_status')) problems.push(`${key}: unexpected anon EXECUTE=${got.anon}`);
    if (got.public) problems.push(`${key}: PUBLIC has EXECUTE`);
-   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows',...SESSION_MODEL_DELTA].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
+   if (got.authenticated !== (HOSTED_AUDIT.authenticated.has(name)||['public.preproduction_status','private.lifecycle_allows',...SESSION_MODEL_DELTA,...READ_COST_DELTA].includes(name))) problems.push(`${key}: authenticated=${got.authenticated}, audit says ${HOSTED_AUDIT.authenticated.has(name)}`);
    if (got.service_role !== HOSTED_AUDIT.serviceRole.has(name)) problems.push(`${key}: service_role=${got.service_role}, audit says ${HOSTED_AUDIT.serviceRole.has(name)}`);
   }
   assertNone('privilege matrix vs hosted audit', problems);
   assert.equal(HOSTED_AUDIT.authenticated.size, 23);
-  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25 + SESSION_MODEL_DELTA.length, 'the audited baseline, two lifecycle functions and the reviewed session-model delta exist exactly once');
+  assert.equal(Object.keys(live).filter(k => live[k].authenticated).length, 25 + SESSION_MODEL_DELTA.length + READ_COST_DELTA.length, 'the audited baseline, two lifecycle functions and the reviewed session-model and read-cost deltas exist exactly once');
   assert.equal(Object.keys(live).filter(k => live[k].service_role).length, 4);
  });
 
