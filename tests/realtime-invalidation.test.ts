@@ -5,11 +5,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Role } from '../lib/domain';
 import { createSeed } from '../lib/seed';
 import { SupabaseTransport } from '../lib/supabase/repository';
+import { AccessGatedTransport } from '../lib/access';
 import { DurableRepository } from '../lib/sync/repository';
 import { DurableStore } from '../lib/sync/store';
-import { MIN_REFRESH_GAP_MS } from '../lib/sync/backoff';
+import { MIN_REFRESH_GAP_MS, SUPPORT_REFRESH_GAP_MS } from '../lib/sync/backoff';
 
-type Notification = { new: { conference_id: string; committee_id: string | null; topic?: string } };
+type Notification = { new: { conference_id: string; committee_id: string | null; topic?: string; mutation_id?: string } };
 class MockChannel {
   filter = '';
   onChange?: (payload: Notification) => void;
@@ -70,8 +71,8 @@ function harness(roles: readonly Role[], committeeIds: string[] = [], connectImm
     authCalls: () => authCalls,
     authArgs: () => authArgs,
     releaseAuth,
-    emit(topic: string | undefined, committeeId: string | null = 'ga1') {
-      channels.forEach(channel => channel.deliver({ new: { conference_id: 'conference-test', committee_id: committeeId, topic } }));
+    emit(topic: string | undefined, committeeId: string | null = 'ga1', mutationId?: string) {
+      channels.forEach(channel => channel.deliver({ new: { conference_id: 'conference-test', committee_id: committeeId, topic, ...(mutationId ? { mutation_id: mutationId } : {}) } }));
     },
   };
 }
@@ -266,7 +267,7 @@ test('repository startup and Realtime connection perform one reconciliation, wit
   const store = new DurableStore(`realtime-startup-${crypto.randomUUID()}`);
   const repo = new DurableRepository('conference-test', createSeed, store, h.transport);
   // The test clock is real, so age the persisted refresh time instead of waiting out the coalescing window.
-  const ageRefresh = async () => { await store.update('conference-test', old => ({ ...old!, savedAt: new Date(Date.now() - 10_000).toISOString() })); };
+  const ageRefresh = async () => { await store.update('conference-test', old => ({ ...old!, savedAt: new Date(Date.now() - SUPPORT_REFRESH_GAP_MS - 5_000).toISOString() })); };
   try {
     await repo.ready();
     await settleUntil(() => !!repo.getHealth().lastSynced && repo.getHealth().state === 'saved');
@@ -283,9 +284,9 @@ test('repository startup and Realtime connection perform one reconciliation, wit
     h.emit('documents');
     t.mock.timers.tick(350);
     for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));
-    assert.equal(h.reads(), 1, 'a notification within MIN_REFRESH_GAP_MS of the last refresh is coalesced, not read immediately');
+    assert.equal(h.reads(), 1, 'a notification within the support gap of the last refresh is coalesced, not read immediately');
     await ageRefresh();
-    t.mock.timers.tick(MIN_REFRESH_GAP_MS + 500);
+    t.mock.timers.tick(SUPPORT_REFRESH_GAP_MS + 500);
     await settleUntil(() => h.reads() === 2 && repo.getHealth().state === 'saved');
     assert.equal(h.reads(), 2);
     h.channels[0].onStatus?.('CHANNEL_ERROR');
@@ -293,7 +294,7 @@ test('repository startup and Realtime connection perform one reconciliation, wit
     h.channels[0].onStatus?.('SUBSCRIBED');
     for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));
     await ageRefresh();
-    t.mock.timers.tick(MIN_REFRESH_GAP_MS + 500);
+    t.mock.timers.tick(SUPPORT_REFRESH_GAP_MS + 500);
     await settleUntil(() => h.reads() === 3 && repo.getHealth().state === 'saved');
     t.mock.timers.tick(350);
     for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve));
@@ -304,4 +305,111 @@ test('repository startup and Realtime connection perform one reconciliation, wit
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }
+});
+
+test('a window of only this device\'s own echoes skips its read; any other notification in the window still refreshes', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(['chair'], ['ga1']);
+  const own = new Set(['own-1', 'own-2']);
+  let refreshes = 0;
+  const stop = h.transport.subscribe(() => { refreshes++; }, () => {}, id => own.has(id));
+  try {
+    h.emit('chair', 'ga1', 'own-1');
+    h.emit('documents', 'ga1', 'own-2');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 0, 'the post-send confirmation read already covers own actions');
+    h.emit('chair', 'ga1', 'own-1');
+    h.emit('chair', 'ga1', 'someone-else');
+    h.emit('chair', 'ga1', 'own-2');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1, 'one foreign change in the window is enough');
+    h.emit('chair', 'ga1', 'own-1');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1, 'the foreign flag resets after each window');
+    h.emit('configuration', 'ga1');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 2, 'a notification without a mutation id is treated as foreign');
+  } finally { stop(); }
+});
+
+test('without isOwn every notification refreshes, as before', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(['chair'], ['ga1']);
+  let refreshes = 0;
+  const stop = h.transport.subscribe(() => { refreshes++; }, () => {});
+  try {
+    h.emit('chair', 'ga1', 'own-1');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1);
+  } finally { stop(); }
+});
+
+test('Executive Chair window also skips when it holds only own echoes', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(['admin']);
+  let refreshes = 0;
+  const stop = h.transport.subscribe(() => { refreshes++; }, () => {}, id => id === 'own');
+  try {
+    h.emit('chair', 'ga1', 'own');
+    t.mock.timers.tick(2000);
+    assert.equal(refreshes, 0);
+    h.emit('chair', 'ga1', 'own');
+    t.mock.timers.tick(500);
+    h.emit('chair', 'ga1', 'other');
+    t.mock.timers.tick(1500);
+    assert.equal(refreshes, 1, 'a foreign Chair change inside the fixed window still reconciles at its deadline');
+  } finally { stop(); }
+});
+
+for (const [roles, gap] of [
+  [['approval'], SUPPORT_REFRESH_GAP_MS], [['logistics'], SUPPORT_REFRESH_GAP_MS], [['approval', 'logistics'], SUPPORT_REFRESH_GAP_MS],
+  [['admin'], SUPPORT_REFRESH_GAP_MS], [['chair'], undefined], [['admin', 'approval'], undefined], [['chair', 'approval'], undefined], [[], undefined],
+] as [Role[], number | undefined][]) {
+  test(`${roles.join('/') || 'missing role metadata'} passive refresh gap is ${gap ?? 'the default'}`, () => {
+    assert.equal(harness(roles).transport.passiveRefreshGapMs, gap);
+  });
+}
+
+test('repository applies the transport gap to passive refreshes: a Chair at the default, a support identity at the longer gap', async () => {
+  for (const [roles, gap] of [[['chair'], MIN_REFRESH_GAP_MS], [['approval'], SUPPORT_REFRESH_GAP_MS]] as [Role[], number][]) {
+    const h = harness(roles, roles[0] === 'chair' ? ['ga1'] : []);
+    const store = new DurableStore(`refresh-gap-${crypto.randomUUID()}`);
+    const repo = new DurableRepository('conference-test', createSeed, store, h.transport);
+    try {
+      await repo.ready();
+      await settleUntil(() => !!repo.getHealth().lastSynced && repo.getHealth().state === 'saved');
+      const age = async (ms: number) => { await store.update('conference-test', old => ({ ...old!, savedAt: new Date(Date.now() - ms).toISOString() })); };
+      await age(gap - 1_000);
+      await repo.flush(true);
+      assert.equal(h.reads(), 1, `${roles[0]}: within its gap a passive refresh is deferred`);
+      await age(gap + 1_000);
+      await repo.flush(true);
+      assert.equal(h.reads(), 2, `${roles[0]}: past its gap a passive refresh reads`);
+    } finally { repo.dispose(); await store.close(); }
+  }
+});
+
+test('the access gate used by the staff workspace forwards the refresh gap and own-echo filtering', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  // lib/repository-instance.ts wraps every SupabaseTransport in AccessGatedTransport before the repository sees it.
+  for (const [roles, gap] of [[['approval'], SUPPORT_REFRESH_GAP_MS], [['admin'], SUPPORT_REFRESH_GAP_MS], [['chair'], undefined]] as [Role[], number | undefined][]) {
+    assert.equal(new AccessGatedTransport(harness(roles).transport, () => true).passiveRefreshGapMs, gap, `${roles[0]} gap through the gate`);
+  }
+  const h = harness(['chair'], ['ga1']);
+  let allowed = true;
+  const gate = new AccessGatedTransport(h.transport, () => allowed);
+  let refreshes = 0;
+  const stop = gate.subscribe(() => { refreshes++; }, () => {}, id => id === 'own');
+  try {
+    h.emit('chair', 'ga1', 'own');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 0, 'an own echo through the gate skips its read');
+    h.emit('chair', 'ga1', 'other');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1);
+    allowed = false;
+    h.emit('chair', 'ga1', 'other');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1, 'the gate still blocks refreshes once access ends');
+  } finally { stop(); }
 });

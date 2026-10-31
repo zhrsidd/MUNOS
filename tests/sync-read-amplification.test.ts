@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSeed} from '../lib/seed';
 import {applyCommand} from '../lib/commands';
-import {DurableRepository,ConflictError,type Transport} from '../lib/sync/repository';
+import {DurableRepository,ConflictError,OWN_ECHO_MS,type Transport} from '../lib/sync/repository';
 import {DurableStore,type Mutation} from '../lib/sync/store';
 const pause=()=>new Promise<void>(resolve=>setImmediate(resolve));
 async function until(check:()=>boolean){for(let n=0;n<300;n++){if(check())return;await pause();}assert.ok(check(),'repository did not settle');}
@@ -75,4 +75,24 @@ test('new conflict preserves failed and subsequent intent without a final read',
   assert.equal(server.reads,0);assert.equal(server.sends,1);assert.equal(repo.getHealth().pending,2);
   assert.deepEqual((await store.read(key))!.pending.map(m=>m.id),[first.id,second.id]);
  }finally{await close();}
+});
+test('isOwn recognises this device\'s sent actions from acknowledgement until OWN_ECHO_MS after confirmation, and nothing else',async()=>{
+ const server=new CountingServer();server.readGate=gate();let isOwn:((id:string)=>boolean)|undefined;
+ (server as Transport).subscribe=(_refresh,_state,own)=>{isOwn=own;return ()=>{};};
+ const m=mutation(),queued=mutation();const {repo,close}=await setup(server,[m]);
+ const realNow=Date.now;const previousWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
+ Object.defineProperty(globalThis,'window',{configurable:true,value:new EventTarget()});
+ try{
+  await repo.ready();assert.ok(isOwn,'the repository hands isOwn to the transport');
+  await until(()=>server.reads===1);
+  assert.equal(isOwn!(m.id),true,'acknowledged and awaiting its confirmation read: that read covers it');
+  assert.equal(isOwn!(queued.id),false);assert.equal(isOwn!(crypto.randomUUID()),false,'another device\'s action is never own');
+  server.readGate.release();await until(()=>repo.getHealth().pending===0);
+  assert.equal(isOwn!(m.id),true,'confirmed: a late echo still carries nothing new');
+  Date.now=()=>realNow()+OWN_ECHO_MS+1;
+  assert.equal(isOwn!(m.id),false,'after OWN_ECHO_MS the id is forgotten and a notification refreshes again');
+ }finally{
+  Date.now=realNow;server.readGate.release();await close();
+  if(previousWindow)Object.defineProperty(globalThis,'window',previousWindow);else Reflect.deleteProperty(globalThis,'window');
+ }
 });
