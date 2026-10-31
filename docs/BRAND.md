@@ -1,4 +1,4 @@
-# DCMUN Conference OS: brand and design system
+# DCMUN MUNOS: brand and design system
 
 Authoritative reference for all UI. Tokens live in `app/globals.css` (`:root`); this document explains how to use
 them. If the two disagree, fix one of them in the same change.
@@ -16,8 +16,11 @@ rooms for hours; it has to be quiet.
 
 - The mark is `public/dcmun-logo.jpg`, the Doha College Model United Nations seal (UN blue on white). Use it as
   supplied: do not recolour, crop, add shadows or place it on a coloured fill. Minimum 28 px.
-- The lockup is the mark plus **DCMUN** in Manrope 750 and **Conference OS** in DM Sans 500, ink-2, on one line.
-  The product name is "Conference OS"; "DCMUN" is the conference.
+- The lockup is the mark plus **DCMUN** in Manrope 750 and **MUNOS** in DM Sans 500, ink-2, on one line.
+  The product name is "MUNOS" (Model United Nations Conference Management System; renamed from "Conference OS",
+  31 October 2026); "DCMUN" is the conference. The MUNOS column-and-laurel mark (the munos.pages.dev mark,
+  `components/munos-mark.tsx`, inline so it renders offline) appears only as the platform credit: "Powered by MUNOS" on
+  About, the loading screen's About panel and the workspace chooser. It never replaces the DCMUN seal.
 - One logo placement per screen: the workspace header (or the page header on public pages). Never repeat it in
   panels.
 - Attribution and legal text: the conference owner decides; keep it in the footer of Settings, not in work
@@ -112,6 +115,10 @@ below, content in the page frame. Colour does not distinguish workspaces; the na
 the seal as a background.
 
 ## 8. Accessibility baseline
+
+### Opt-in committee loading artwork · 30 October 2026
+
+The owner requested an alternative, humorous game-inspired loading screen for selected committees. This is a loading-only exception to the restrained layout and motion rules: edge-to-edge collage artwork behind a compact italic Manrope header and smaller angled tag and tip panel, and a 1.5 s one/two/three-dot loop. It uses existing palette tokens and the `--loading-title` / `--loading-status` type tokens and the `--loading-tip-width` limit, never changes operational surfaces or the seal, stops motion in hidden tabs and displays static dots for reduced motion. The subtitle “Diplomatic Royale” and the bottom tagline are not part of the final design. No fake percentage or minimum visible time. See [COMMITTEE_LOADING_SCREEN.md](COMMITTEE_LOADING_SCREEN.md) for selection, fallback and rollout constraints.
 
 AA contrast; full keyboard operation; visible focus; status never by colour alone; labelled controls; live
 regions for save and sync status; `lang="en"`; touch targets as above; works at 200% zoom and 320 px width.

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AboutContent } from "./about-content";
 
 const subscribeVisibility = (listener: () => void) => {
   document.addEventListener("visibilitychange", listener);
@@ -30,8 +31,13 @@ export function WorkspaceLoading({ label = "Opening your workspace…" }: { labe
         </div>
         <div className="workspace-loading-orbit" />
       </div>
-      <h1>DCMUN<span>Conference OS</span></h1>
+      <h1>DCMUN<span>MUNOS</span></h1>
       <p role="status" aria-live="polite" aria-atomic="true">{label}</p>
+      {/* Readable while the workspace opens; it expands in place so loading is never interrupted. */}
+      <details className="workspace-loading-about">
+        <summary>About MUNOS</summary>
+        <div className="workspace-loading-about-body"><AboutContent headingLevel={3} /></div>
+      </details>
     </main>
   );
 }

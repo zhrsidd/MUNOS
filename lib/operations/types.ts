@@ -10,7 +10,7 @@ export interface SubmissionLink {
   createdAt: string;
 }
 /**
- * The workflow's pointers to the resolution's Google Docs. Conference OS stores ids only and
+ * The workflow's pointers to the resolution's Google Docs. MUNOS stores ids only and
  * never reads document text: the working Google Doc is the editable resolution.
  */
 export interface ResolutionLink {

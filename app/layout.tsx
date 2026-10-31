@@ -14,7 +14,7 @@ const manrope = localFont({
 import { OfflineShell } from "@/components/offline-shell";
 import { ConferenceShell } from "@/components/conference-shell";
 export const metadata: Metadata = {
-  title: "Conference OS · A calmer conference day",
+  title: "MUNOS · A calmer conference day",
   description: "One conference. Every team in sync.",
   icons: { icon: "/dcmun-logo.jpg" },
 };

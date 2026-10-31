@@ -1,5 +1,5 @@
 /**
- * Felix's knowledge base. Every answer describes behaviour that exists in DCMUN Conference OS today: button labels,
+ * Felix's knowledge base. Every answer describes behaviour that exists in DCMUN MUNOS today: button labels,
  * page names and messages are quoted from the app (reviewed 20 October 2026, see docs/FELIX.md). Keep it in step
  * with the UI; tests check every link against the real workspace navigation. Answers are per role; a role without
  * an answer is told which workspace does that job.
@@ -122,8 +122,8 @@ export const KNOWLEDGE: Entry[] = [
     all: ["award"],
     examples: ["who should win best delegate", "how are awards decided"],
     answers: {
-      chair: { text: "Conference OS does not rank delegates or score awards: awards remain the Chairs’ judgement. Participation shows each delegation’s contributions and points if you want them for reference.", href: "/chair/participation", linkLabel: "Open Participation" },
-      admin: { text: "Conference OS does not rank delegates or score awards: awards remain the Chairs’ judgement. Scoring only sets participation point values.", href: "/admin/scoring", linkLabel: "Open Scoring" },
+      chair: { text: "MUNOS does not rank delegates or score awards: awards remain the Chairs’ judgement. Participation shows each delegation’s contributions and points if you want them for reference.", href: "/chair/participation", linkLabel: "Open Participation" },
+      admin: { text: "MUNOS does not rank delegates or score awards: awards remain the Chairs’ judgement. Scoring only sets participation point values.", href: "/admin/scoring", linkLabel: "Open Scoring" },
     },
   },
   // ------------------------------------------------------------------ Debate
@@ -237,7 +237,7 @@ export const KNOWLEDGE: Entry[] = [
       chair: {
         text: `Delegates must let Chairs edit the Doc. ${shareSteps}`,
         steps: ["If you can’t open a submitted Doc, press “Can’t access” on its card (Submit to Approval stays disabled while it is marked).", "Ask the delegation to fix the sharing, open the Doc again, then press “Access fixed”."],
-        mistakes: "Conference OS stores only the Doc’s link, never its text, and cannot check sharing for you.",
+        mistakes: "MUNOS stores only the Doc’s link, never its text, and cannot check sharing for you.",
         href: "/chair/documents", linkLabel: "Open Resolutions",
       },
       approval: { text: "If an approval copy or working Doc won’t open, tell the committee’s Chair: Chairs ask delegations to share with Anyone with the link → Editor, or directly with a Chair.", href: "/approval", linkLabel: "Open Review inbox" },
@@ -388,7 +388,7 @@ export const KNOWLEDGE: Entry[] = [
     examples: ["how do I record votes", "divide the house"],
     answers: {
       chair: {
-        text: "Voting records ballots for the resolution in debate; Conference OS never votes for delegates.",
+        text: "Voting records ballots for the resolution in debate; MUNOS never votes for delegates.",
         steps: ["Choose Normal vote or Divide the House, and a Vote type: Substantive or Procedural · no veto.", "Record For, Against or Abstain for each delegation not marked Absent.", "Press “Close voting”, then confirm the result."],
         mistakes: "Changing the procedure after ballots exist starts a fresh ballot (earlier choices stay in the audit history). On a substantive vote, an Against from a veto-capable delegation makes it fail.",
         href: "/chair/voting", linkLabel: "Open Voting",

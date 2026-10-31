@@ -39,10 +39,10 @@ function render(role: Role, answer: Answer, intent: string): Reply {
 
 function smallTalk(question: string, role: Role): Reply | undefined {
   const q = question.toLowerCase().trim();
-  if (/^(hi|hello|hey|hiya|yo|good morning|good afternoon|good evening)( felix)?[!. ]*$/.test(q)) return { text: pick(["Hello! Felix here. What can I help you find?", "Hi there! Need a hand finding something in Conference OS?", "Hello! Ask me what to do next, or how something works."], q), intent: "smalltalk" };
+  if (/^(hi|hello|hey|hiya|yo|good morning|good afternoon|good evening)( felix)?[!. ]*$/.test(q)) return { text: pick(["Hello! Felix here. What can I help you find?", "Hi there! Need a hand finding something in MUNOS?", "Hello! Ask me what to do next, or how something works."], q), intent: "smalltalk" };
   if (/^(thanks|thank you|thx|cheers)( felix)?[!. ]*$/.test(q)) return { text: pick(["Any time! I’ll be right here if you need me.", "You’re welcome! Anything else you want to find?", "Happy to help. Good luck with the session!"], q), intent: "smalltalk" };
   if (/how are you|hows it going|how's it going|how are things/.test(q)) return { text: "All feathers in order, thank you! How can I help with your workspace?", intent: "smalltalk" };
-  if (/who are you|your name|what are you\b/.test(q)) return { text: "I’m Felix, the Doha College mascot and your Conference OS helper. I can tell you what needs doing next, walk you through a workflow and help you recover safely when something goes wrong. I follow fixed rules, not AI: I only read what this page has already loaded and never change anything for you.", intent: "smalltalk" };
+  if (/who are you|your name|what are you\b/.test(q)) return { text: "I’m Felix, the Doha College mascot and your MUNOS helper. I can tell you what needs doing next, walk you through a workflow and help you recover safely when something goes wrong. I follow fixed rules, not AI: I only read what this page has already loaded and never change anything for you.", intent: "smalltalk" };
   if (/\bjoke\b|make me laugh/.test(q)) return { text: "Why did the Chair bring a ladder to committee? To help the debate reach new heights. Want help finding anything while we’re here?", intent: "smalltalk" };
   if (/\b(weather|music|movie|football|soccer|weekend|lunch|game)\b/.test(q)) return { text: `I’m happy to chat, but I don’t have news or opinions about that. I can help with your ${roleLabel(role)} workspace, though. What are you trying to do?`, intent: "smalltalk" };
   return undefined;
