@@ -385,8 +385,8 @@ On STOP: the operator presses Ctrl-C (discards in-memory outboxes; synthetic dat
 | --- | --- | --- | --- |
 | 1 | Any write to a real or original conference | Fingerprint differs, or an API log shows a `conference_id` other than the fixture. Do not resume; notify the owner |  |
 | 2 | Error rate (conflicts excluded) | > 2 % in any 60 s window, or > 1 % over 5 minutes |  |
-| 3 | Latency | write p95 > 5 s or read p95 > 8 s for 3 consecutive minutes; any single request > 30 s |  |
-| 4 | Postgres CPU | > 90 % for 2 consecutive minutes |  |
+| 3 | Latency | write p95 > 5 s or read p95 > 8 s for 3 consecutive minutes; any single request > 30 s | Not met in H3: read p95 8,350 ms (14:18) and 8,116 ms (14:24), two non-consecutive minutes; longest request 12.4 s (14:12) |
+| 4 | Postgres CPU | > 90 % for 2 consecutive minutes | **Met in H3, 14:13:27 UTC:** 98.4 % node-wide, about a 2-minute average over 14:11:27-14:13:27 (previous reading 68.2 %). Owner waived this row for the rest of H3 (decided about 14:15 UTC); CPU was still reported at every reading and all other rows stayed active |
 | 5 | Connections | any `PGRST003`; database connections > 85 % of the limit (90 -> 77 or more); pool fully busy > 60 s |  |
 | 6 | Memory and IO | memory > 90 % or swap growing; IO budget depleted or IOPS pinned |  |
 | 7 | Server errors | `57014` twice in a window; any `40001`; 5xx burst of 3 or more in 60 s |  |
@@ -523,9 +523,9 @@ Anything unexpected, STOP or not: log, alert, refusal, exit code, deviation from
 
 | # | UTC | Stage | What was seen (source: log, chart, runner) | STOP row? | Action taken / by | Resolved at (UTC) | Owner told? |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 |  |  |  |  |  |  |  |
-| 2 |  |  |  |  |  |  |  |
-| 3 |  |  |  |  |  |  |  |
+| 1 | 13:55 | H3 | H3 started as an owner-approved diagnostic attempt after NO-GO results in R3 and R3b (departure from section 5.5, which runs H3 only after a clean R3). R1 had been accepted by the owner as a recorded deviation (no Draft left in two committees) | none | Owner decision; all H3 files labelled "diagnostic attempt after NO-GO ramp"; H3 does not count toward the gate | 14:28 (H3 ended) | Yes |
+| 2 | 14:13 | H3 | Node-wide CPU 98.4 % (about 2-minute average 14:11:27-14:13:27; previous reading 68.2 %), source: metrics feed | 4 (met) | Owner chose to continue and waived row 4 for the rest of H3, about 14:15; watcher kept reporting CPU, other rows active | 14:28 (H3 ended; CPU 0.7 % by 14:37) | Yes |
+| 3 | 14:18, 14:24 | H3 | Read p95 8,350 ms and 8,116 ms (API gateway logs), two non-consecutive minutes; longest request 12.4 s at 14:12 | 3 (not met) | Watched; no action needed | 14:28 | Yes |
 | 4 |  |  |  |  |  |  |  |
 | 5 |  |  |  |  |  |  |  |
 | 6 |  |  |  |  |  |  |  |
@@ -583,13 +583,15 @@ Do **not** do any of these on 31 October unless the owner has declared every app
 | Delete `.test-sessions/fixtures/*`, the 22 pool session files, `rehearsal-multi-identities.json`, `development.json` | Needed for any approved contingency rerun and for evidence |  |
 | Delete original harness reports `.test-sessions/rehearsal-*.json` (after the sample-free copies are saved) | Samples are the only per-request record |  |
 | Unset `SUBMIT_TOKEN` and `VERCEL_AUTOMATION_BYPASS_SECRET` in shells | Keep set while another run is approved |  |
-| Delete the Preview deployment(s) used; retire connected Previews, server key and connectors | Owner approves; lifecycle cutover step 1 |  |
+| Delete the Preview deployment(s) used; retire connected Previews, server key and connectors. For the 31 October window this includes Preview `dpl_2UYk8wYf7zyudbDjetsbuCv3gBTR` (`munos-jij0int7d-dcmun.vercel.app`, commit `288c723`), created that day under the branch name `codex/preproduction-connected` so it picked up the connected staging settings. (`munos-1d7xzn1wz-dcmun.vercel.app`, built from `main`, is an unconnected demo build) | Owner approves; lifecycle cutover step 1 |  |
 | Guarded deletion of labelled `LOAD TEST ·` conferences, Storage objects and test Auth users (scripts/cleanup, docs/SYNTHETIC_CLEANUP.md) | Prepared but not reviewed or approved; runs after the last synthetic test and before promotion |  |
 | Revoke Auth sessions and refresh capability; record last possible token issuance; retire legacy API/server keys, Storage capabilities and cloud connectors | Lifecycle step 2; replace the preproduction server key with a fresh Production-only key |  |
 | Token wait-out: 3,600 s from the last possible test-token issuance plus the recorded margin and any older longer-lived token | Lifecycle step 3 |  |
 | Backup/restore evidence; acceptable data-loss window decision (PITR off is a state, not an approval) | Lifecycle step 3; before real data |  |
 | Registry/marker transition to production; exact-SHA release approval; Production deployment; view-only verification; release sign-off; first production Executive bootstrap | Lifecycle steps 4 and 5; John Paul Ribeiru approves releases; cloud agents lose hosted access at promotion |  |
 | No version, tag or Production configuration change belongs to this run | Card |  |
+
+**Credentials used on 31 October, to delete or rotate promptly after the window (not part of the wait list):** the Supabase Secret API key supplied for the metrics feed, and the Vercel Protection Bypass for Automation secret placed in session environments (`VERCEL_AUTOMATION_BYPASS_SECRET`). Record who rotated them and when.
 
 ## 10. Evidence
 
