@@ -22,7 +22,10 @@ class Server implements Transport{
 }
 const scheduled=(data:ConferenceData,at:number):ConferenceData=>{
  const committeeId=data.sessions.find(s=>s.id==='s1')!.committeeId;
- return {...data,sessionSchedules:[{committeeId,timeZone:'Asia/Qatar',overrides:[],versions:[{effectiveFrom:new Date(at-86400000).toISOString(),leadMinutes:5,graceMinutes:20,automationEnabled:true,
+ // Keep this relative fixture at local midday; session windows deliberately do not span midnight.
+ const offset=12-new Date(at).getUTCHours();
+ const timeZone=offset===0?'UTC':`Etc/GMT${offset>0?'-':'+'}${Math.abs(offset)}`;
+ return {...data,sessionSchedules:[{committeeId,timeZone,overrides:[],versions:[{effectiveFrom:new Date(at-86400000).toISOString(),leadMinutes:5,graceMinutes:20,automationEnabled:true,
   sessions:[{id:'s1',start:new Date(at-3600000).toISOString(),end:new Date(at+3600000).toISOString()}]}]}]};
 };
 
@@ -42,25 +45,32 @@ test('the device id is stable across restarts and the sequence only grows, acros
 
 test('hosted actions carry deviceId, deviceSeq and the displayed label; local demo actions carry none',async()=>{
  const store=new DurableStore('proto-'+crypto.randomUUID()),server=new Server();server.online=false;server.read=async()=>{throw Error('offline');};
- const repo=new DurableRepository('ga1',()=>scheduled(createSeed(),Date.now()),store,server);await repo.ready();await tick();
- await repo.execute(speech,'chair');await repo.execute(speech,'chair');
- const [m1,m2]=repo.getPending();
- assert.ok(m1.deviceId);assert.equal(m1.deviceId,m2.deviceId);assert.equal(m2.deviceSeq,m1.deviceSeq!+1);
- assert.equal(m1.displayedLabel,'s1','the schedule puts this committee in s1 now');
- repo.dispose();await store.close();
- const local=new DurableStore('local-'+crypto.randomUUID());const demo=new DurableRepository('ga1',createSeed,local);await demo.ready();await tick();
- await demo.execute(speech,'chair');
- assert.equal((await local.read('ga1'))!.pending.length,0,'the demo applies directly');
- await local.close();
+ const repo=new DurableRepository('ga1',()=>scheduled(createSeed(),Date.now()),store,server);
+ try {
+  await repo.ready();await tick();
+  await repo.execute(speech,'chair');await repo.execute(speech,'chair');
+  const [m1,m2]=repo.getPending();
+  assert.ok(m1.deviceId);assert.equal(m1.deviceId,m2.deviceId);assert.equal(m2.deviceSeq,m1.deviceSeq!+1);
+  assert.equal(m1.displayedLabel,'s1','the schedule puts this committee in s1 now');
+ } finally {repo.dispose();await store.close();}
+ const local=new DurableStore('local-'+crypto.randomUUID());const demo=new DurableRepository('ga1',createSeed,local);
+ try {
+  await demo.ready();await tick();
+  await demo.execute(speech,'chair');
+  assert.equal((await local.read('ga1'))!.pending.length,0,'the demo applies directly');
+ } finally {demo.dispose();await local.close();}
 });
 
 test('the displayed label: unknown without a schedule, "no session" outside every window, the session inside one',()=>{
- const data=createSeed(),now=Date.now();
+ const data=createSeed();
  const committeeId=data.sessions.find(s=>s.id==='s1')!.committeeId;
- assert.equal(displayedLabel(data,committeeId,new Date(now).toISOString()),undefined,'no schedule held: report nothing');
- assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now).toISOString()),'s1');
- assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now+5*3600000).toISOString()),null,'after close: an explicit "no session"');
- assert.equal(displayedLabel(scheduled(data,now),null,new Date(now).toISOString()),undefined);
+ for(let hour=0;hour<24;hour++) {
+  const now=Date.UTC(2026,10,6,hour,30);
+  assert.equal(displayedLabel(data,committeeId,new Date(now).toISOString()),undefined,'no schedule held: report nothing');
+  assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now).toISOString()),'s1');
+  assert.equal(displayedLabel(scheduled(data,now),committeeId,new Date(now+5*3600000).toISOString()),null,'after close: an explicit "no session"');
+  assert.equal(displayedLabel(scheduled(data,now),null,new Date(now).toISOString()),undefined);
+ }
  assert.equal(committeeOfCommand(data,{type:'participation',committeeId:'ga1'} as {type:string}),committeeId);
  assert.equal(committeeOfCommand(data,{type:'vetoRules',committeeId:'x'} as {type:string}),'x');
  assert.equal(committeeOfCommand(data,{type:'import'}),null);
