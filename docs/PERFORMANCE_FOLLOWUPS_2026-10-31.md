@@ -87,3 +87,18 @@ Required local cases include simultaneous chairs at a boundary, clear/add conten
 The [load plan](LOAD_TEST_PLAN.md), [execution packet](LOAD_TEST_EXECUTION_PACKET.md), [lifecycle](INFRASTRUCTURE_LIFECYCLE.md), [scope decision](RELEASE_SCOPE_2026-10-26.md) and [release checklist](V1_RELEASE_CHECKLIST.md) remain authoritative for their respective controls. The new selected window supersedes the old date for scheduling only; old run records remain historical evidence.
 
 No new hosted project, paid branch, production configuration change, hosted migration or release approval follows from this design. Source review and local synthetic tests remain the cloud-agent boundary after production promotion. John Paul Ribeiru approves release; Zuhayr Siddique owns scope/infrastructure decisions. Record final capacity results before choosing another performance architecture.
+
+## Appendix: fresh-fixture local component observation
+
+A disposable PostgreSQL 17.11 replay of all 37 migrations accepted the four-Draft fixture SQL: 19 committees, 420 delegates, 22 synthetic identities/grants, 133 documents/versions, 19 roll calls and 420 roll-call rows. No event, vote, audit or queue history was populated. The temporary database was dropped after the probe.
+
+For each role/RPC, one warm-up was discarded and five sequential calls were timed with the server clock. The table shows median JSONB construction/execution time and uncompressed JSON text bytes; text-size calculation was outside the timed interval. Host contention was uncontrolled and this excludes HTTP, network, Auth issuance, Realtime and concurrent load. The raw local report was kept under `/tmp/munos-final-readiness/profiling/report.json` during preparation; it contains only counts and metrics. This is a fresh-fixture observation, not the history-rich profile prescribed in section 2, a before/after comparison or a capacity result.
+
+| Caller | `conference_state_snapshot` | JSON bytes | `executive_state_snapshot` | JSON bytes |
+| --- | --- | --- | --- | --- |
+| Chair | 30.390 ms | 18,112 | 31.974 ms | 15,937 |
+| Approval | 50.744 ms | 59,296 | 34.884 ms | 47,480 |
+| Printing | 34.303 ms | 59,353 | 45.758 ms | 47,537 |
+| Executive | 138.719 ms | 320,120 | 113.347 ms | 278,759 |
+
+Both bundles were probed for comparison; actual client role routing still chooses the production RPC. The result supports measuring the wider Executive payload and real request rate during H3, and does not establish that another prefilter or delta protocol is necessary.

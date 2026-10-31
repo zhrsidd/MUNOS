@@ -69,8 +69,8 @@ export class ActualClient {
       }),
     };
     this.repo = new DurableRepository(options.key, options.seed, this.store, transport);
-    // ready() only subscribes in a browser. This public health field makes the *actual* polling code use the explicitly
-    // simulated connection state without a window shim (which would activate browser Auth/session code in Node).
+    // Seed the explicit simulated connection state before open() connects the notification adapter.
+    // No window shim is installed: browser Auth/session code must not activate in Node.
     this.repo.health = { ...this.repo.health, realtime: options.connected ?? true };
     this.stop = this.repo.subscribe(() => { if (this.repo.getHealth().lastSynced) this.snapshotReady = true; });
   }

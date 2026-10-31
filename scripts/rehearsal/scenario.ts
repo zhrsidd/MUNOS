@@ -7,7 +7,7 @@
 //    no session, no dashboard, no Supabase Auth.
 // A 100-person conference is NOT 100 simultaneous staff users; size each population separately.
 //
-// Chair actions use the chair-procedure commands on main (#7): a shared Current session, lane queues,
+// Chair actions use committee-level live state and committed roll calls: lane queues,
 // speeches started from the queue, scored, optional POIs, then finished. One Chair device per committee
 // holds the floor (speeches/POIs/reorder); the others take roll call, add to queues and watch.
 export type StaffRole = "chair" | "approval" | "admins" | "executive";
@@ -58,7 +58,7 @@ export const LOCAL_ACTIONS: Action[] = ["draft", "timer"];
 /** A step the server receives as a mutation. */
 export const isWrite = (action: Action) => !READS.includes(action) && !LOCAL_ACTIONS.includes(action);
 /** LEGACY upper-bound model (kept for before/after comparison only): every write = 3 writer reads + one refresh on every
- *  other subscribed device, with no one-in-flight limit. The run-time model is scripts/rehearsal/client-model.ts. */
+ *  other subscribed device, with no one-in-flight limit. The live run-time adapter is scripts/rehearsal/actual-client.ts. */
 export const WRITER_READS_PER_WRITE = 3;
 
 
@@ -81,11 +81,11 @@ export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
 };
 /**
  * Which devices refresh when an operational change lands.
- *  * "topic-aware" (core read-path change in progress): Chairs subscribe to their own committee (every topic for that
+ *  * "topic-aware" (shipping policy): Chairs subscribe to their own committee (every topic for that
  *    committee); Approval and Admins/Logistics ignore 'chair'; Executive/Admin keeps every topic.
- *  * "current" (main today): Chairs as above; every non-Chair role refreshes on every conference-wide change.
- * The writer itself is included when it is subscribed (production does not suppress its own notification).
- * Documents events written by Approval/Admins are attributed to that device's simulated committee index.
+ *  * "current" (historical comparison): Chairs as above; every non-Chair role refreshes on every conference-wide change.
+ * Recipients include the writer; the actual client suppresses notifications that only echo its own known mutations.
+ * Delivery uses the command entity's committee, including for conference-wide Approval/Admins identities.
  */
 export type RealtimeModel = "topic-aware" | "current";
 /** An operational change: its topic and the (simulated) committee it belongs to. */
