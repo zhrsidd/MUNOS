@@ -1791,7 +1791,7 @@ color: var(--ink-3);
   bottom: 24px;
   z-index: 99;
 background: #2b4569;
-color: var(--ink-3);
+  color: var(--surface); /* white on the navy panel: --ink-3 was unreadable here */
   border: 1px solid #ffffff20;
   border-radius: 9px;
   font-size: 12px;
@@ -3334,7 +3334,10 @@ html { scroll-padding-top: 12rem; }
 .about-card h1 { margin: var(--space-1) 0 var(--space-3); }
 .about-card h2 { font-size: 15px; margin: var(--space-5) 0 var(--space-1); }
 .about-card .small { font-size: 13px; }
-.about-logo { display: block; margin-bottom: var(--space-2); }
+.about-header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-3); }
+.about-header h1 { margin-bottom: 0; }
+.about-logo { display: block; flex: none; }
+@media (max-width: 700px) { .about-logo { width: 64px; height: 64px; } }
 .about-powered { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
 .about-powered .munos-mark { flex: none; }
 .about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }

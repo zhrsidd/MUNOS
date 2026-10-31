@@ -9,11 +9,15 @@ export default function AboutPage() {
   return (
     <main className="about-page">
       <section className="panel about-card" aria-labelledby="about-title">
-        <Image src={BRAND.logo} alt={BRAND.logoAlt} width={96} height={96} className="about-logo" />
-        <p className="eyebrow">About</p>
-        <h1 id="about-title">
-          {BRAND.conference} {BRAND.product}
-        </h1>
+        <header className="about-header">
+          <div>
+            <p className="eyebrow">About</p>
+            <h1 id="about-title">
+              {BRAND.conference} {BRAND.product}
+            </h1>
+          </div>
+          <Image src={BRAND.logo} alt={BRAND.logoAlt} width={96} height={96} className="about-logo" />
+        </header>
         <AboutContent />
         <p>
           <Link href="/">Back to {BRAND.product}</Link>
