@@ -76,6 +76,27 @@ After applying:
 * **Cleanup.** Afterwards only the temporary conference's credentials (4) and device grants (36) were revoked. The original test conference was not touched: its two active credentials (Executive and Chair), 8 active grants and its Draft document are as before, and the ledger is still 26 rows. The temporary conference's TEST records remain, labelled and with no active access.
 * **Finding (existing behaviour, not from this release):** a Chair-created draft in hosted mode is numbered `<committee> / <first 8 characters of the id>` (for example `TST/ca7640bb`), because the `newDocument` SQL builds the code that way; public submissions get sequential numbers (`TST / 01`). The identity display (`TST/ca7640bb — France`) is therefore correct but not sequential for Chair-created drafts. A reviewed change would be needed to number them sequentially.
 
+## Migration 37: snapshot committee pre-filter (31 October 2026, owner-approved)
+
+The owner approved applying `20261101090000_snapshot_committee_prefilter` (PR #93, merged as `4f7d9d7`) to this project. It was applied through the Supabase connector (`apply_migration`) from the exact file on `main` at `f1d9597`.
+
+Before applying:
+
+* **Preproduction confirmed.** `config/project-lifecycle.json` lists this ref as `preproduction`. The ledger had 36 rows, equal to the repository files, and this was the only file missing.
+* **Same starting point.** The hosted `public.conference_snapshot` source matched a local PostgreSQL 17 replay of the chain up to the previous migration (MD5 `902500e2…`). The migration replaces the whole function, so this confirms it was generated from the definition actually in force.
+* **Dry run on the live database.** The migration ran in a transaction that a final `RAISE EXCEPTION` aborted on purpose. The new function's source matched the local replay after the migration (MD5 `f8426caf…`), and `private.visible_committees` was executable by `authenticated` only. Afterwards nothing had changed and the ledger still had 36 rows.
+
+After applying:
+
+* **Ledger.** The connector recorded apply-time version `20261031164128`. It was set to the filename version `20261101090000`. The ledger now has 37 rows. The stored statement matches the file by MD5 (trimmed, `5cf4a3ba…`).
+* **Grants.** `private.visible_committees` is `SECURITY DEFINER` and executable by `authenticated` only. `public.conference_snapshot` is still `SECURITY INVOKER` and executable by `authenticated` only.
+* **Old and new output compared on the hosted database (rolled back; no data left).** This ran on the 19-committee load fixture (420 delegates, 909 audit rows). Its revoked synthetic grants were reactivated, and one Chair was given a second committee, all inside a transaction that was aborted at the end. The old definition was created under a temporary name in the same transaction, and each caller read both functions:
+  * Single-committee Chairs (two), Approval, Logistics, Executive, and a signed-in user with no grant (refused, 42501): byte-identical.
+  * The two-committee Chair and the owner (no signed-in user): every key identical except the order of the `speeches` array (18 and 189 entries, the same entries).
+  * `speeches` is aggregated without an `ORDER BY` in both versions, so its order was never defined and a plan change can reorder it. The client only looks speeches up by id, with `some()`, or finds the single unfinished speech. `speech_one_floor` and `speech_one_floor_committee` allow at most one unfinished speech per session or per committee, so the result does not depend on the order.
+  * Afterwards: no temporary function; 0 live grants on any conference; ledger 37.
+* **Security advisors.** Nothing new from this migration. `private` is not an exposed schema, so the new helper is not listed. The remaining warnings are the same kinds as before.
+
 ## Verification against the live project
 
 **Schema fingerprint.** The same 21 files were rebuilt on a throwaway local PostgreSQL and fingerprinted (md5 over sorted catalogue definitions). Live result: identical for columns (402), constraints (291), indexes (260), policies (41), RLS flags (41), function definitions (46), triggers (5), enums (4) and the view.
