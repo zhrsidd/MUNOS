@@ -1,6 +1,6 @@
 # Alternative committee loading screen
 
-Executive → Workflow & features → Alternative loading screen provides Preview and a switch for each active committee. Defaults are off. The “Diplomatic Royale” subtitle and bottom-right tagline have been removed. The collage is a decorative image; branding, committee, loading status and tip are live HTML. The full artwork fits without cropping in its own middle region, with smaller header and footer text kept outside the image so no person is hidden on portrait, landscape or preview layouts. Dots cycle one/two/three every 500 ms, stop moving in hidden tabs and show three static dots with reduced motion. No progress bar, animation dependency, external font or artificial wait is added.
+Executive → Workflow & features → Alternative loading screen provides Preview and a switch for each active committee. Defaults are off. The “Diplomatic Royale” subtitle and bottom-right tagline have been removed. The collage is a decorative image; branding, committee, loading status and tip are live HTML. The artwork fills the screen edge to edge behind the smaller header and footer, with a gentle gradient for text contrast. The owner chose the natural borderless layout over letterboxing; narrow screens crop the artwork to fill their viewport. Dots cycle one/two/three every 500 ms, stop moving in hidden tabs and show three static dots with reduced motion. No progress bar, animation dependency, external font or artificial wait is added.
 
 ## Integration and limits
 
@@ -35,3 +35,9 @@ Independent review, CI and release approval remain the normal merge/release gate
 Reduced the title, loading label, committee tag and tip text; limited the tip panel to 400 px. The complete collage now uses `object-fit: contain` in a separate middle grid row, with header and footer outside the artwork. Browser checks confirm no crop, overlap or overflow at 1440 × 900, 1920 × 1080, 768 × 1024, 390 × 844, 320 × 568, 568 × 320 and the 390 px Executive preview.
 
 Latest verification: typecheck and production build pass; lint has only the three existing warnings. The full suite on Node 22.23.3 (`npm test -- --test-force-exit`) completes with **836 passed, 58 skipped, zero failed**. PostgreSQL 17 checks gated by local environment availability remain for CI. Earlier clock-fixture failures no longer reproduce at the current time; no unrelated test or session behavior was changed.
+
+## Borderless refinement · 31 October
+
+The owner preferred removing the navy frame. Restored edge-to-edge artwork with `object-fit: cover`, with the smaller text, tag and 400 px tip panel over it. The separate letterboxed image region described in the earlier layout follow-up is superseded. Cropping on narrow viewports is intentional for this full-screen presentation.
+
+Borderless verification: browser checks confirm the artwork reaches all four edges at the same seven desktop/mobile/landscape/preview sizes, without overflow. Production build, typecheck and the loading/loader/artwork-filtered test run pass; lint retains only the three existing warnings.
