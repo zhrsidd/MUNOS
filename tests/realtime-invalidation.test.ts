@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Role } from '../lib/domain';
 import { createSeed } from '../lib/seed';
 import { SupabaseTransport } from '../lib/supabase/repository';
+import { AccessGatedTransport } from '../lib/access';
 import { DurableRepository } from '../lib/sync/repository';
 import { DurableStore } from '../lib/sync/store';
 import { MIN_REFRESH_GAP_MS, SUPPORT_REFRESH_GAP_MS } from '../lib/sync/backoff';
@@ -386,4 +387,29 @@ test('repository applies the transport gap to passive refreshes: a Chair at the 
       assert.equal(h.reads(), 2, `${roles[0]}: past its gap a passive refresh reads`);
     } finally { repo.dispose(); await store.close(); }
   }
+});
+
+test('the access gate used by the staff workspace forwards the refresh gap and own-echo filtering', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  // lib/repository-instance.ts wraps every SupabaseTransport in AccessGatedTransport before the repository sees it.
+  for (const [roles, gap] of [[['approval'], SUPPORT_REFRESH_GAP_MS], [['admin'], SUPPORT_REFRESH_GAP_MS], [['chair'], undefined]] as [Role[], number | undefined][]) {
+    assert.equal(new AccessGatedTransport(harness(roles).transport, () => true).passiveRefreshGapMs, gap, `${roles[0]} gap through the gate`);
+  }
+  const h = harness(['chair'], ['ga1']);
+  let allowed = true;
+  const gate = new AccessGatedTransport(h.transport, () => allowed);
+  let refreshes = 0;
+  const stop = gate.subscribe(() => { refreshes++; }, () => {}, id => id === 'own');
+  try {
+    h.emit('chair', 'ga1', 'own');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 0, 'an own echo through the gate skips its read');
+    h.emit('chair', 'ga1', 'other');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1);
+    allowed = false;
+    h.emit('chair', 'ga1', 'other');
+    t.mock.timers.tick(350);
+    assert.equal(refreshes, 1, 'the gate still blocks refreshes once access ends');
+  } finally { stop(); }
 });

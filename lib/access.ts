@@ -46,5 +46,7 @@ export class AccessGatedTransport implements Transport {
  async read(){this.assertAccess();const data=await this.delegate.read();this.assertAccess();return data;}
  async send(m:Mutation){this.assertAccess();if(m.actorId!==this.actorId)throw Error('Saved action belongs to another staff identity.');await this.delegate.send(m);this.assertAccess();}
  async syncClock(deviceId:string){this.assertAccess();await this.delegate.syncClock?.(deviceId);this.assertAccess();}
- subscribe(refresh:()=>void,state:(connected:boolean)=>void){this.assertAccess();return this.delegate.subscribe?.(()=>{if(this.allowed())refresh();},connected=>state(this.allowed()&&connected))??(()=>{});}
+ /** Forwarded unchanged: the gate limits what runs, not how often an allowed identity refreshes. */
+ get passiveRefreshGapMs(){return this.delegate.passiveRefreshGapMs;}
+ subscribe(refresh:()=>void,state:(connected:boolean)=>void,isOwn?:(mutationId:string)=>boolean){this.assertAccess();return this.delegate.subscribe?.(()=>{if(this.allowed())refresh();},connected=>state(this.allowed()&&connected),isOwn)??(()=>{});}
 }
