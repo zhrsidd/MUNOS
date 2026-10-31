@@ -10,14 +10,16 @@ Commit under test (tooling): `________________`   App candidate / Preview deploy
 
 | Role [packet 1] | Holder (name) | Contact / channel | Present at (UTC) | Confirmed by |
 | --- | --- | --- | --- | --- |
-| Approver and stop authority (Zuhayr Siddique; applies or approves every hosted SQL; Small upgrade and cost) | Zuhayr Siddique (overseer; terminates the test when told to) |  |  | Owner, 30 Oct |
-| Harness operator (runs `npm run rehearsal:*`, holds `.test-sessions/`, fills this sheet) |  |  |  |  |
-| Dashboard watcher (Supabase Observability and logs, Vercel logs; **calls STOP**) [card: confirm before GO] |  |  |  |  |
-| Go/no-go decider and settle timer (not the operator alone) |  |  |  |  |
+| Approver and stop authority (Zuhayr Siddique; applies or approves every hosted SQL; Small upgrade and cost) | Zuhayr Siddique (overseer; terminates the test when told to) | this chat | 31 Oct, from pre-flight | Owner, 30 Oct; 31 Oct (Small upgrade done) |
+| Harness operator (runs `npm run rehearsal:*`, holds `.test-sessions/`, fills this sheet) | Claude (AI operator, cloud session). Operates only; never decides GO | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
+| Dashboard watcher (Supabase Observability and logs, Vercel logs; **calls STOP**) [card: confirm before GO] | Zuhayr Siddique | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
+| Go/no-go decider and settle timer (not the operator alone) | Zuhayr Siddique | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
 | Independent reviewer (reviews the report and every stop/go) |  |  |  |  |
 | Release approver (John Paul Ribeiru): not involved in running |  |  |  |  |
 
-**STOP communication channel** (a voice call or chat the watcher can use in under 10 seconds; the operator stays on it): `________________`   **Owner on-call contact during the window:** `________________`
+**STOP communication channel** (a voice call or chat the watcher can use in under 10 seconds; the operator stays on it): `this chat`   **Owner on-call contact during the window:** `Zuhayr Siddique, this chat`
+
+**Role arrangement (owner, 31 Oct).** Zuhayr Siddique holds the Approver and stop authority, dashboard watcher and go/no-go decider roles. Claude operates only and never decides GO. On "STOP" in this chat the operator interrupts the runner immediately and confirms with `pgrep -f rehearsal-run` (prints nothing). No fixture SQL is applied until Zuhayr confirms in this chat. The independent reviewer and release approver rows are unchanged and not filled by this arrangement.
 
 ## 2. GO and STOP record
 
