@@ -14,11 +14,16 @@ export interface Transport {
   send(mutation: Mutation): Promise<void>;
   /** Report this device's clock to the server (offset = device time - server time). Best effort; never blocks sending. */
   syncClock?(deviceId: string): Promise<void>;
-  subscribe?(refresh: () => void, state: (connected: boolean) => void): () => void;
+  /** Minimum gap between passive refreshes for this identity; MIN_REFRESH_GAP_MS when absent. */
+  passiveRefreshGapMs?: number;
+  /** `isOwn(mutationId)` lets the transport ignore notifications that only echo this device's own confirmed or in-flight actions. */
+  subscribe?(refresh: () => void, state: (connected: boolean) => void, isOwn?: (mutationId: string) => boolean): () => void;
 }
 export class ConflictError extends Error {}
 /** At most one clock report per page session per minute (the server also limits one stored row per device per minute). */
 const CLOCK_SYNC_GAP_MS = 60_000;
+/** How long a confirmed action of this device still counts as its own when its Realtime notification arrives late. */
+export const OWN_ECHO_MS = 60_000;
 /** How long sending waits for a clock report before it carries on without it. */
 export const CLOCK_SYNC_DEADLINE_MS = 3_000;
 function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
@@ -79,6 +84,8 @@ export class DurableRepository implements ConferenceRepository {
   // Actions the server acknowledged in this page session. They stay in the durable outbox until a snapshot confirms them,
   // but are not sent again, so a failed read-back no longer replays the whole queue. Lost on reload: replay is then idempotent.
   private acked = new Set<string>();
+  // Actions confirmed by a snapshot read in this page session, with the confirmation time (see isOwn).
+  private confirmedOwn = new Map<string, number>();
   private disposed = false;
   // Coalescing only applies after THIS page session has completed a sync: the first read after opening is never skipped.
   private hasSynced = false;
@@ -118,7 +125,7 @@ export class DurableRepository implements ConferenceRepository {
       this.stopLive = this.transport?.subscribe?.(this.refresh, connected=>{
         this.health={...this.health,realtime:connected}; this.emit();
         if(connected) this.refresh();
-      });
+      }, this.isOwn);
     }
     if (this.transport) void this.flush();
   }
@@ -186,7 +193,7 @@ export class DurableRepository implements ConferenceRepository {
     if(!this.hasSynced || !c) return 0;
     if(c.pending.length) return this.pendingBlocked() ? BLOCKED_REFRESH_GAP_MS-(Date.now()-this.lastReadAt) : 0;
     const age=Date.now()-Date.parse(c.savedAt);
-    return Number.isFinite(age) ? MIN_REFRESH_GAP_MS-age : 0;
+    return Number.isFinite(age) ? (this.transport?.passiveRefreshGapMs ?? MIN_REFRESH_GAP_MS)-age : 0;
   }
   private deferRefresh() {
     if(this.deferTimer || this.disposed) return;
@@ -200,8 +207,17 @@ export class DurableRepository implements ConferenceRepository {
     this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};
     const ids=new Set(batch.map(m=>m.id));
     this.publish(await this.store.update(this.key,old=>({...old!,base,pending:old!.pending.filter(m=>!ids.has(m.id)),savedAt:new Date().toISOString()})));
-    ids.forEach(id=>this.acked.delete(id));
+    ids.forEach(id=>{this.acked.delete(id);this.confirmedOwn.set(id,Date.now());});
   }
+  /**
+   * True for an action this device has sent and that a read issued after it covers: acknowledged and awaiting its confirmation
+   * read (that read starts after the send), or confirmed within OWN_ECHO_MS. Its Realtime echo carries nothing new.
+   */
+  private isOwn = (mutationId: string) => {
+    const now=Date.now();
+    for(const [id,at] of this.confirmedOwn) if(now-at>OWN_ECHO_MS) this.confirmedOwn.delete(id);
+    return this.acked.has(mutationId) || this.confirmedOwn.has(mutationId);
+  };
   async flush(passive=false) {
     if (!this.transport || this.flushing) return;
     this.flushing=true;

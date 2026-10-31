@@ -93,6 +93,9 @@ export function pollDelay(realtimeConnected: boolean, random: () => number = Mat
 
 /** Passive triggers (focus, Realtime, peer tabs, polling) never refresh more often than this when nothing is waiting to send. */
 export const MIN_REFRESH_GAP_MS = 5_000;
+/** The same gap for review and overview identities (Approval, Printing, an Executive-only device): they follow every committee,
+ *  so each refresh is a large read, and they do not need sub-15-second freshness. Their own actions still confirm immediately. */
+export const SUPPORT_REFRESH_GAP_MS = 15_000;
 /** Behind a conflict nothing can be sent, so passive refreshes are spread further apart. */
 export const BLOCKED_REFRESH_GAP_MS = 30_000;
 /** At most this many actions (counting any acknowledged earlier) are confirmed by one snapshot read. */
