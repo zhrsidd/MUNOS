@@ -27,7 +27,7 @@
 
 ## Tasks
 
-- [x] **1. Establish baseline.** Run the full suite on disposable PostgreSQL 17; record failures and their origin before edits.
+- [x] **1. Establish baseline.** Attempt the full baseline, record the environment failure, establish the protected PostgreSQL 17 baseline and verify the final full suite; keep those results distinct.
 - [x] **2. Repair rehearsal fidelity.** Add failing adapter tests for role refresh gaps, own/foreign notifications, metadata attribution and clock forwarding. Implement shared notification scheduling and transport subscription lifecycle; run existing Realtime/outbox tests and rehearsal typecheck.
 - [x] **3. Make workflow fixtures repeatable.** Add failing tests for Draft budgeting and depleted-stage refusal. Generate adequate deterministic workflow reserves for the planned stage sequence and add read-only stage preflight. Preserve public burst timings and keep fixture changes explicit in the run packet.
 - [x] **4. Make failures explainable.** Add bounded, redacted conflict/pending summaries and missing-work diagnostics. Test that retained conflicts cannot obtain PASS and that diagnostics expose no command payloads, tokens or contact data.
