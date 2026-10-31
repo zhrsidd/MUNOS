@@ -96,6 +96,6 @@ export function PassedAmendmentHistory({ committeeId }: { committeeId: string })
       })}
     </div>
     {cloud && next && <div className="actions"><PendingButton disabled={status === 'loading'} pending={status === 'loading'} pendingLabel="Loading older passed amendments…" onClick={() => void older(next)}>Load older passed amendments</PendingButton></div>}
-    <p className="footnote">{cloud ? `Older history loads ${PASSED_HISTORY_PAGE} at a time.` : 'Showing amendments held on this device.'} The time shown is when the amendment was submitted; Conference OS does not record the time it passed.</p>
+    <p className="footnote">{cloud ? `Older history loads ${PASSED_HISTORY_PAGE} at a time.` : 'Showing amendments held on this device.'} The time shown is when the amendment was submitted; MUNOS does not record the time it passed.</p>
   </Panel>;
 }

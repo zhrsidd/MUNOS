@@ -36,9 +36,10 @@
   "20261030100000_session_holds.sql",
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql",
-  "20261031100000_attendance_to_roll_calls.sql"
+  "20261031100000_attendance_to_roll_calls.sql",
+  "20261101090000_snapshot_committee_prefilter.sql"
  ],
- "migrationsSha256": "8ac1bdb676b4376fb7581861a186c2f6390390754df0ee976c4fd3121d72a956",
+ "migrationsSha256": "776e5787ee9052018a7bd5be38bf8e17d8e37094d06a65a37ff64f8eaf1b9281",
  "supabase-model": {
   "fns": [
    {
@@ -2795,6 +2796,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "visible_committees",
+    "args": "conf uuid, roles conference_role[]",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true
@@ -8357,6 +8388,36 @@
     "exec": {
      "anon": false,
      "authenticated": false,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "publicExec": false
+   },
+   {
+    "schema": "private",
+    "name": "visible_committees",
+    "args": "conf uuid, roles conference_role[]",
+    "result": "uuid[]",
+    "kind": "f",
+    "security": "definer",
+    "owner": "postgres",
+    "volatility": "stable",
+    "config": "search_path=\"\"",
+    "lang": "sql",
+    "trigger": false,
+    "aclDefault": false,
+    "aclRaw": "postgres=X/postgres,authenticated=X/postgres",
+    "usage": {
+     "anon": false,
+     "authenticated": true,
+     "service_role": false,
+     "authenticator": false,
+     "postgres": true
+    },
+    "exec": {
+     "anon": false,
+     "authenticated": true,
      "service_role": false,
      "authenticator": false,
      "postgres": true

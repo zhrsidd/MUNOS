@@ -1,4 +1,8 @@
 :root {
+  /* Opt-in loading art only; operational typography and motion stay unchanged. */
+  --loading-title: clamp(24px, 4vw, 56px);
+  --loading-status: clamp(20px, 2vw, 32px);
+  --loading-tip-width: 400px;
   /* DCMUN brand tokens: see docs/BRAND.md. Roles never swap. */
   --paper: #f7f8fa;
   --surface: #fff;
@@ -39,6 +43,73 @@
   --radius: var(--radius-container);
   font-synthesis: none;
   color-scheme: light;
+}
+
+/* Committee loading screen: see docs/COMMITTEE_LOADING_SCREEN.md. */
+.committee-loading {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  height: 100svh;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  color: var(--surface);
+  background: var(--ink);
+}
+.committee-loading-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: var(--space-4); }
+.committee-loading-scene { position: absolute; inset: 0; z-index: -2; }
+.committee-loading-art { object-fit: cover; object-position: center; }
+.committee-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--ink), transparent 35%, transparent 70%, var(--ink));
+  opacity: .6;
+}
+.committee-loading-heading { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.committee-loading-heading strong {
+  font-family: var(--font-manrope), Arial, sans-serif;
+  font-size: var(--loading-title);
+  line-height: 1;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -.04em;
+}
+.committee-loading-heading > span { font-weight: 700; font-size: 14px; }
+.committee-loading-tag {
+  transform: rotate(-3deg);
+  padding: var(--space-2) var(--space-4);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--attention-soft);
+}
+.committee-loading-bottom { grid-row: 3; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: end; }
+.committee-loading-label { font: italic 800 var(--loading-status)/1.1 var(--font-manrope), Arial, sans-serif; text-transform: uppercase; overflow-wrap: anywhere; }
+.committee-loading-dots { display: inline-block; width: 1em; white-space: nowrap; }
+.committee-loading-dots > span:nth-child(2) { animation: loading-dot-two 1.5s step-end infinite; }
+.committee-loading-dots > span:nth-child(3) { animation: loading-dot-three 1.5s step-end infinite; }
+@keyframes loading-dot-two { 0%, 100% { opacity: 0; } 33.333%, 99.999% { opacity: 1; } }
+@keyframes loading-dot-three { 0%, 100% { opacity: 0; } 66.666%, 99.999% { opacity: 1; } }
+.committee-loading[data-motion="paused"] .committee-loading-dots > span { animation-play-state: paused; }
+.committee-loading-tip { width: 100%; max-width: var(--loading-tip-width); justify-self: end; background: var(--action); padding: var(--space-3) var(--space-4); clip-path: polygon(0 0, 96% 0, 97% 8%, 98% 0, 100% 0, 100% 100%, 2% 100%); }
+.committee-loading-tip > span { font-size: 12px; letter-spacing: .08em; }
+.committee-loading-tip p { font-size: 14px; font-weight: 700; margin: var(--space-2) 0 0; color: inherit; }
+.modal:has(.committee-loading) { width: min(1100px, 95vw); max-width: min(1100px, 95vw); }
+.modal .committee-loading { min-height: 360px; height: min(560px, 65svh); padding: var(--space-4); }
+.modal .committee-loading-heading strong { font-size: 28px; }
+.modal .committee-loading-label { font-size: 20px; }
+.modal .committee-loading-tip p { font-size: 14px; margin: var(--space-2) 0 0; }
+@media (max-width: 720px) {
+  .committee-loading { padding: var(--space-4); }
+  .committee-loading-bottom { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .committee-loading-dots > span { animation: none !important; opacity: 1; }
 }
 * {
   box-sizing: border-box;
@@ -1720,7 +1791,7 @@ color: var(--ink-3);
   bottom: 24px;
   z-index: 99;
 background: #2b4569;
-color: var(--ink-3);
+  color: var(--surface); /* white on the navy panel: --ink-3 was unreadable here */
   border: 1px solid #ffffff20;
   border-radius: 9px;
   font-size: 12px;
@@ -3210,6 +3281,11 @@ html { scroll-padding-top: 12rem; }
 }
 .workspace-loading > p { margin: var(--space-5) 0 0; color: var(--ink-2); font-size: 13px; }
 @keyframes workspace-orbit { to { transform: rotate(360deg); } }
+.workspace-loading-about { margin-top: var(--space-5); width: min(560px, 100%); text-align: left; }
+.workspace-loading-about > summary { width: max-content; margin: 0 auto; padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--brand); font-size: 13px; font-weight: 600; }
+.workspace-loading-about-body { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--ink-2); }
+.workspace-loading-about-body h3 { font-size: 14px; margin: var(--space-4) 0 var(--space-1); color: var(--ink); }
+.workspace-loading-about-body p { margin: 0 0 var(--space-3); }
 @media (max-height: 420px) {
   .workspace-loading { --loading-seal-size: 80px; --loading-plate-size: 112px; --loading-orbit-size: 128px; }
   .workspace-loading h1 { margin-top: var(--space-2); }
@@ -3258,7 +3334,12 @@ html { scroll-padding-top: 12rem; }
 .about-card h1 { margin: var(--space-1) 0 var(--space-3); }
 .about-card h2 { font-size: 15px; margin: var(--space-5) 0 var(--space-1); }
 .about-card .small { font-size: 13px; }
-.about-logo { display: block; margin-bottom: var(--space-2); }
+.about-header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-3); }
+.about-header h1 { margin-bottom: 0; }
+.about-logo { display: block; flex: none; }
+@media (max-width: 700px) { .about-logo { width: 64px; height: 64px; } }
+.about-powered { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.about-powered .munos-mark { flex: none; }
 .about-credits { margin: 0 0 var(--space-3); padding-left: 18px; }
 @media (max-width: 700px) { .about-card { padding: var(--space-5) var(--space-4); } }
 

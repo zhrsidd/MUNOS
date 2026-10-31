@@ -1,4 +1,4 @@
-// Google Docs links. Conference OS stores ONLY the document id and always rebuilds the URL itself,
+// Google Docs links. MUNOS stores ONLY the document id and always rebuilds the URL itself,
 // so no user-supplied URL is ever rendered or followed. The text of the document is never read.
 export const GOOGLE_DOC_ID = /^[A-Za-z0-9_-]{25,100}$/;
 export type GoogleDocProblem = "empty" | "not_google_doc" | "published_link" | "office_file" | "malformed";
