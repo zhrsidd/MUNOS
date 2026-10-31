@@ -450,7 +450,7 @@ for(const approval of ['single','bulk'] as const)test(`counted close waits for h
 });
 
 for(const approval of ['single','bulk'] as const)test(`held vote changes preserve revision order through ${approval} approval`,async()=>{
- const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,verify}=f;
  try{
   const [delegateId]=delegates;
   await send(roll(present(delegateId)),now);
@@ -480,7 +480,7 @@ for(const approval of ['single','bulk'] as const)test(`held vote changes preserv
 });
 
 test('real PostgreSQL: a ballot opened by approval snapshots the roll calls approved before it in the same chain',async()=>{
- const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,verify}=f;
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one}=f;
  try{
   const [pv]=delegates;
   await ops(exec,{type:'holdSettings',enforce:true});
@@ -502,7 +502,7 @@ test('real PostgreSQL: a ballot opened by approval snapshots the roll calls appr
 });
 
 test('real PostgreSQL: held votes stay with the ballot they were recorded against, and a superseded one is refused on approval',async()=>{
- const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,count,verify}=f;
+ const f=await fixture();const {db,ids,now,send,delegates,roll,ops,one,verify}=f;
  try{
   const [pv]=delegates;
   await send(roll(present(pv)),now);

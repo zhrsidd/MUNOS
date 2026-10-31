@@ -4,6 +4,7 @@ import {ConflictError,DurableRepository,type Transport} from '../sync/repository
 import {DurableStore,type Mutation} from '../sync/store';
 import {SUPPORT_REFRESH_GAP_MS,transportError} from '../sync/backoff';
 import {isOperationsCommand} from '../operations/commands';
+import {createInvalidationScheduler} from '../sync/invalidation';
 import type {OperationsData} from '../operations/types';
 // CODEX REVIEW REQUIRED: read() normally makes ONE RPC — conference_state_snapshot, or executive_state_snapshot for
 // an Admin-only identity — which returns the core snapshot merged with operations_snapshot (right-hand precedence,
@@ -66,22 +67,7 @@ export class SupabaseTransport implements Transport {
  }
  subscribe(refresh:()=>void,state:(connected:boolean)=>void,isOwn?:(mutationId:string)=>boolean){
   if(this.recoveryOnly){state(false);return ()=>{};}
-  let debounce:ReturnType<typeof setTimeout>|undefined;
-  let chairWindow:ReturnType<typeof setTimeout>|undefined;
-  // True once the pending window holds a notification that is not only an echo of this device's own sent action. A window of
-  // echoes alone skips its read: the post-send confirmation read already covers those changes. Unknown ids count as foreign.
-  let foreign=false;
-  const fire=()=>{const go=foreign;foreign=false;if(go)refresh();};
-  const changed=()=>{
-   // The fast read includes Chair state too; avoid a second pending refresh.
-   clearTimeout(chairWindow);chairWindow=undefined;
-   clearTimeout(debounce);debounce=setTimeout(()=>{debounce=undefined;fire();},350);
-  };
-  const executiveChairChanged=()=>{
-   if(debounce!==undefined || chairWindow!==undefined)return;
-   // Fixed window: sustained Chair traffic cannot postpone reconciliation.
-   chairWindow=setTimeout(()=>{chairWindow=undefined;fire();},2000);
-  };
+  const invalidation=createInvalidationScheduler(refresh,isOwn,this.isExecutive()?2000:0);
   // Only the compact notification table, filtered to committee scopes or conference operations.
   const scopes=this.committeeIds.length?this.committeeIds.map(id=>`committee_id=eq.${id}`):[`conference_id=eq.${this.conferenceId}`];
   const connected=new Set<string>();
@@ -96,10 +82,7 @@ export class SupabaseTransport implements Transport {
       // These roles consume document/configuration changes, not Chair-only activity.
       // Unknown or broader grants keep all notifications; this is not authorization.
       if(payload.new.topic==='chair' && this.isReviewOnly())return;
-      const id=payload.new.mutation_id;
-      if(typeof id!=='string' || !isOwn?.(id))foreign=true;
-      if(payload.new.topic==='chair' && this.isExecutive()){executiveChairChanged();return;}
-      changed();
+      invalidation.notify(payload.new.topic,payload.new.mutation_id);
      })
      .subscribe(status=>{if(status==='SUBSCRIBED'){connected.add(filter);}else connected.delete(filter);state(connected.size===scopes.length);});
     channels.push(channel);
@@ -111,7 +94,7 @@ export class SupabaseTransport implements Transport {
   // the source of truth for later refreshes. If preparation itself fails, retain the existing
   // degraded Realtime behavior; the minute recovery read remains the correctness fallback.
   void this.client.realtime.setAuth().catch(()=>undefined).then(startChannels);
-  return ()=>{cancelled=true;clearTimeout(debounce);clearTimeout(chairWindow);channels.forEach(c=>{void this.client.removeChannel(c);});};
+  return ()=>{cancelled=true;invalidation.dispose();channels.forEach(c=>{void this.client.removeChannel(c);});};
  }
 }
 export class SupabaseConferenceRepository extends DurableRepository {

@@ -89,7 +89,7 @@ export const TOPIC_OF: Partial<Record<Action, Topic | null>> = {
  */
 export type RealtimeModel = "topic-aware" | "current";
 /** An operational change: its topic and the (simulated) committee it belongs to. */
-export interface ChangeEvent { topic: Topic; committee: number }
+export interface ChangeEvent { topic: Topic; committee: number; mutationId?: string }
 export function receives(model: RealtimeModel, device: SimUser, event: ChangeEvent) {
   if (device.role === "delegate") return false;
   if (device.role === "chair") return device.committee === event.committee;

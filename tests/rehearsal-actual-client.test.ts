@@ -6,7 +6,7 @@ import { createSeed } from '../lib/seed';
 import { applyCommand } from '../lib/commands';
 import { ConflictError, type Transport } from '../lib/sync/repository';
 import type { Mutation } from '../lib/sync/store';
-import { MAX_BATCH } from '../lib/sync/backoff';
+import { MAX_BATCH, SUPPORT_REFRESH_GAP_MS } from '../lib/sync/backoff';
 import type { SimUser } from '../scripts/rehearsal/scenario';
 const pause = () => new Promise<void>(r => setImmediate(r));
 async function until(check: () => boolean) { for (let i = 0; i < 1000; i++) { if (check()) return; await pause(); } assert.ok(check(), 'actual core did not settle'); }
@@ -18,6 +18,51 @@ class Server implements Transport {
   async send(m: Mutation) { this.sends++; await pause(); if (this.conflict) throw new ConflictError('Synthetic conflict'); if (!this.receipts.has(m.id)) { this.data = applyCommand(this.data, m.command, m.role, m); this.receipts.add(m.id); } }
 }
 function setup(server = new Server()) { const key = crypto.randomUUID(); const client = new ActualClient({ key, seed: createSeed, transport: server, connected: true }); return { key, client, server }; }
+test('rehearsal uses the shipping own-echo window while retaining foreign invalidations', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
+  const { client, server } = setup();
+  try {
+    await client.open(); await until(() => !!client.snapshot && !client.busy);
+    await client.execute(mutation().command, 'chair', { action: 'participation' });
+    await until(() => client.pending === 0 && !client.busy);
+    const id = [...server.receipts][0], reads = server.reads;
+    t.mock.timers.tick(6_000);
+    client.notify('chair', id); t.mock.timers.tick(350); await pause();
+    assert.equal(server.reads, reads, 'the confirmation already includes this mutation');
+    client.notify('chair', id); client.notify('chair', 'another-device');
+    t.mock.timers.tick(350); await until(() => server.reads > reads && !client.busy);
+    assert.equal(server.reads, reads + 1, 'a mixed window must still refresh');
+  } finally { t.mock.timers.reset(); await client.close(); }
+});
+test('rehearsal forwards support refresh gaps and best-effort clock reports', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
+  const server = new Server(); let clockReports = 0;
+  const client = new ActualClient({ key: crypto.randomUUID(), seed: createSeed, transport: {
+    actorId: server.actorId, passiveRefreshGapMs: SUPPORT_REFRESH_GAP_MS,
+    read: () => server.read(), send: m => server.send(m), syncClock: async () => { clockReports++; },
+  } });
+  try {
+    await client.open(); await until(() => !!client.snapshot && !client.busy);
+    const reads = server.reads;
+    t.mock.timers.tick(6_000); client.focus(); await pause();
+    assert.equal(server.reads, reads, 'support readers retain their 15-second gap');
+    t.mock.timers.tick(9_501); await until(() => server.reads === reads + 1 && !client.busy);
+    await client.execute(mutation().command, 'chair', { action: 'participation' });
+    await until(() => client.pending === 0 && !client.busy);
+    assert.equal(clockReports, 1, 'clock evidence follows the actual send stack');
+  } finally { t.mock.timers.reset(); await client.close(); }
+});
+test('rehearsal intent attribution survives the shipping roll-call citation', async () => {
+  const server = new Server(); let action = '';
+  const client = new ActualClient({ key: crypto.randomUUID(), seed: createSeed, transport: server,
+    accepted: (_m, meta) => { action = meta.action; } });
+  try {
+    await client.open(); await until(() => !!client.snapshot && !client.busy);
+    await client.execute({ type: 'queueAdd', committeeId: 'ga1', delegateId: 'd3', lane: 'open' }, 'chair', { action: 'tracked-queue' });
+    await until(() => client.pending === 0 && !client.busy);
+    assert.equal(action, 'tracked-queue', 'server protocol metadata must not erase the scenario action');
+  } finally { await client.close(); }
+});
 test('actual-core adapter immediately rechecks an action recorded during its opening read', async () => {
   const { client, server } = setup(); const hold = gate(); server.held = hold;
   try { await client.open(); await until(() => server.reads === 1); await client.execute(mutation().command, 'chair', { action: 'participation' }); assert.equal(server.sends, 0); hold.release(); await until(() => client.pending === 0 && !client.busy); assert.equal(server.sends, 1); assert.equal(client.stats.maxConcurrentTransportCalls, 1); assert.equal(client.repo.getHealth().realtime, true); }

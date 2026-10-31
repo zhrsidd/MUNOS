@@ -36,6 +36,7 @@ const int = (flag: string, fallback: number, max: number) => {
 const template = value("--identities");
 if (!template) { console.error("Pass --identities <rehearsal-identities.json> (its session files are reused, not copied)."); process.exit(2); }
 const committeesCount = int("--committees", 14, 40), delegatesCount = int("--delegates", 420, 2000), hours = int("--grant-hours", 3, 12);
+const draftsPerCommittee = int("--drafts-per-committee", 1, 100);
 const ids = JSON.parse(await readFile(template, "utf8")) as IdentityFile;
 // Only the Auth user id is read from each session file; tokens are never copied or printed.
 const userId = async (path: string) => {
@@ -54,13 +55,13 @@ if (isMultiCommittee(ids)) {
   const chairs = ids.chairs.slice(0, committeesCount);
   const chairUsers = await Promise.all(chairs.map((c) => userId(c.session)));
   if (new Set(chairUsers).size !== chairUsers.length) { console.error("Chair identities must be distinct Auth users (one per committee)."); process.exit(2); }
-  try { fixture = buildFixture({ mode: "multi-committee", conference, committees: committeesCount, delegates: delegatesCount, grantHours: hours, users: { chairs: chairUsers, ...support } }); }
+  try { fixture = buildFixture({ mode: "multi-committee", conference, committees: committeesCount, delegates: delegatesCount, grantHours: hours, draftsPerCommittee, users: { chairs: chairUsers, ...support } }); }
   catch (e) { console.error((e as Error).message); process.exit(2); }
   runIdentities = { mode: "multi-committee", chairs: chairs.map((c, k) => ({ session: c.session, committee: fixture.committees[k].id })), approval: ids.approval, admins: ids.admins, executive: ids.executive };
 } else {
   if (!args.includes("--legacy-floors")) { console.error("This identities file has a single Chair identity (legacy). A readiness fixture needs one Chair identity per committee: prepare them with scripts/rehearsal-identities.mts. For a historical single-committee comparison, pass --legacy-floors explicitly."); process.exit(2); }
   const floorsCount = int("--floors", 14, 40);
-  fixture = buildFixture({ mode: "legacy-floors", conference, committees: committeesCount, delegates: delegatesCount, floors: floorsCount, grantHours: hours, users: { chair: await userId(ids.chair.session), ...support } });
+  fixture = buildFixture({ mode: "legacy-floors", conference, committees: committeesCount, delegates: delegatesCount, floors: floorsCount, grantHours: hours, draftsPerCommittee, users: { chair: await userId(ids.chair.session), ...support } });
   runIdentities = { ...ids, chair: { ...ids.chair, committee: fixture.chairCommittee.id, sessions: fixture.floors } };
 }
 const { delegates, floors, sql, cleanup, mode, chairGrants } = fixture;
@@ -70,4 +71,4 @@ await writeFile(`${dir}/fixture.json`, JSON.stringify(fixtureJson(fixture), null
 await writeFile(`${dir}/identities.json`, JSON.stringify(runIdentities, null, 1), { mode: 0o600 });
 await writeFile(`${dir}/fixture.sql`, sql, { mode: 0o600 });
 await writeFile(`${dir}/cleanup.sql`, cleanup, { mode: 0o600 }); // revokes this conference's grants/links after the run (docs/LOAD_TEST_PLAN.md)
-console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, delegatesInFixtureJson: delegates.length, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`, `${dir}/cleanup.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));
+console.log(JSON.stringify({ conference, mode, readinessFixture: mode === "multi-committee", committees: committeesCount, delegatesInFixtureJson: delegates.length, chairGrants: chairGrants.length, distinctChairUsers: new Set(chairGrants.map((g) => g.user)).size, floors: floors.length || undefined, delegates: delegatesCount, grantHours: hours, draftsPerCommittee, files: [`${dir}/fixture.json`, `${dir}/identities.json`, `${dir}/fixture.sql`, `${dir}/cleanup.sql`], next: "Apply fixture.sql to the DEVELOPMENT project, then pass --fixture and --identities from this folder to rehearsal-snapshots.mts and rehearsal-run.mts." }, null, 1));
