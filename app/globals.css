@@ -448,18 +448,27 @@ color: var(--ink-3);
 }
 .panel-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 21px 23px;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
 border-bottom: 1px solid var(--line);
+}
+.panel-heading > div:first-child {
+  min-width: 0;
+  flex: 1 1 240px;
+}
+.panel-heading > .actions {
+  min-width: 0;
+  max-width: 100%;
 }
 .panel-heading h2 {
   font-size: 14px;
 }
 .panel-heading p {
   font-size: 12px;
-  margin-top: 5px;
+  margin-top: var(--space-1);
 color: var(--ink-3);
 }
 .panel-heading > a {
@@ -472,10 +481,10 @@ color: var(--ink-3);
 .panel > label,
 .panel > dl,
 .panel > p {
-  margin: 22px 24px;
+  margin: var(--space-5);
 }
 .panel > button {
-  margin: 0 24px 24px;
+  margin: 0 var(--space-5) var(--space-5);
 }
 .current-speaker {
   display: flex;
@@ -526,7 +535,11 @@ color: var(--ink-3);
 }
 .scorer {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.scorer > div {
+  min-width: 0;
 }
 .speaker-panel > .scorer {
   margin: 0 24px 25px;
@@ -537,25 +550,26 @@ color: var(--ink-3);
   font-size: 12px;
 color: var(--ink-3);
   margin-bottom: 8px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .scorer > div > div {
   display: flex;
-  gap: 5px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .scorer button {
 background: var(--sunken);
-color: #5578aa;
+color: var(--action);
   font-size: 12px;
-  min-width: 35px;
-  min-height: 35px;
-  padding: 6px 8px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-2);
 border-color: var(--line);
   border-radius: 6px;
 }
 .scorer button:hover {
-background: #e4edfb;
-border-color: #9bb7e2;
+background: var(--action-soft);
+border-color: var(--action);
 }
 .speaker-bottom {
   display: flex;
@@ -937,11 +951,16 @@ color: var(--ink-3);
 }
 .roll-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 17px 23px;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
 border-bottom: 1px solid var(--line);
+}
+.roll-row .identity {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 .roll-row:last-child {
   border-bottom: 0;
@@ -957,33 +976,39 @@ border-bottom: 1px solid var(--line);
   background: transparent;
 }
 .attendance-segments {
-  display: flex;
-  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: var(--space-1);
+  gap: var(--space-1);
 background: var(--sunken);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 border: 1px solid var(--line);
-  flex-shrink: 0;
+  max-width: 100%;
 }
 .attendance-segments button {
+  display: grid;
+  grid-template-columns: 1ch minmax(0, 1fr);
+  gap: var(--space-1);
   border: 0;
   background: transparent;
 color: var(--ink-3);
   font-size: 12px;
-  min-height: 31px;
-  padding: 5px 11px;
-  white-space: nowrap;
+  min-height: 40px;
+  padding: var(--space-2);
+  overflow-wrap: anywhere;
 }
 .attendance-segments .selected {
-background: #fff;
-  box-shadow: 0 1px 4px #32466317;
-color: #577cae;
+background: var(--surface);
+color: var(--action);
 }
 .search {
   width: 225px;
+  max-width: 100%;
+  min-width: 0;
   font-size: 12px;
 background: var(--sunken) !important;
   padding: 9px 12px !important;
-  min-height: 35px !important;
+  min-height: 40px !important;
 }
 .footnote {
   font-size: 12px;
@@ -994,8 +1019,8 @@ color: var(--ink-3);
 .participation-row {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 17px 23px;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
 border-bottom: 1px solid var(--line);
 }
 .participation-row .identity {
@@ -1018,14 +1043,11 @@ color: var(--ink-3);
   flex-wrap: wrap;
 }
 .participation-row .scorer button {
-  min-width: 27px;
-  min-height: 29px;
   font-size: 12px;
-  padding: 4px 7px;
 }
 .participation-row .scorer > div > span {
-  font-size: 8px;
-  margin-bottom: 5px;
+  font-size: 12px;
+  margin-bottom: var(--space-2);
 }
 .table-scroll {
   overflow-x: auto;
@@ -1212,14 +1234,14 @@ color: #6b82a4;
   text-align: right;
 }
 .panel > .footnote {
-  margin: 20px 24px;
+  margin: var(--space-5);
 }
 label {
   display: block;
   font-size: 12px;
   font-weight: 500;
 color: var(--ink-3);
-  margin-bottom: 19px;
+  margin-bottom: var(--space-4);
 }
 input,
 select,
@@ -1281,8 +1303,11 @@ input[type="file"] {
 }
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.form-grid > * {
+  min-width: 0;
 }
 .form-error {
 color: #b87058;
@@ -1706,8 +1731,8 @@ color: #6d87ad;
 }
 .modal {
 border: 1px solid var(--line);
-  border-radius: 15px;
-  padding: 0 25px 25px;
+  border-radius: var(--radius-container);
+  padding: 0 var(--space-5) var(--space-5);
   background: white;
   color: var(--ink);
   box-shadow: 0 20px 90px #1b345437;
@@ -1720,19 +1745,23 @@ border: 1px solid var(--line);
   backdrop-filter: blur(4px);
 }
 .modal > .panel-heading {
-  padding: 22px 0;
-  margin-bottom: 22px;
+  flex-wrap: nowrap;
+  padding: var(--space-4) 0;
+  margin-bottom: var(--space-5);
 }
 .modal > .panel-heading h2 {
   font-size: 18px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .modal p {
   margin: 12px 0;
   font-size: 12px;
 }
 .icon-button {
-  min-height: 28px;
-  width: 28px;
+  flex: 0 0 40px;
+  min-height: 40px;
+  width: 40px;
   font-size: 20px;
   padding: 0;
   border: 0;
@@ -1846,9 +1875,6 @@ background: #2b4569;
     gap: 18px;
     grid-template-columns: minmax(0, 1.5fr) minmax(270px, 1fr);
   }
-  .panel-heading {
-    padding: 18px;
-  }
   .current-speaker {
     padding: 24px 18px;
   }
@@ -1867,8 +1893,6 @@ background: #2b4569;
     margin-right: 18px;
   }
   .scorer button {
-    min-width: 29px;
-    padding: 5px 6px;
     font-size: 12px;
   }
   .speaker-bottom {
@@ -1892,21 +1916,17 @@ background: #2b4569;
     display: none;
   }
   .participation-row {
-    gap: 15px;
+    gap: var(--space-4);
     flex-wrap: wrap;
   }
   .participation-row .scorer {
     width: 100%;
-    justify-content: space-between;
-  }
-  .roll-row {
-    padding: 16px 18px;
+    justify-content: flex-start;
   }
   .roll-row .identity span:not(.flag) {
     max-width: 220px;
   }
   .attendance-segments button {
-    padding: 5px 8px;
     font-size: 12px;
   }
   .review-layout {
@@ -2070,7 +2090,7 @@ background: #2b4569;
     margin-bottom: 19px;
   }
   .panel-heading {
-    padding: 19px 17px;
+    padding: var(--space-4);
     flex-wrap: wrap;
     gap: 12px;
   }
@@ -2100,12 +2120,10 @@ background: #2b4569;
     gap: 8px;
   }
   .scorer button {
-    min-width: 30px;
-    min-height: 33px;
     font-size: 12px;
   }
   .scorer > div > span {
-    font-size: 8px;
+    font-size: 12px;
   }
   .speaker-bottom {
     padding: 16px 17px;
@@ -2200,7 +2218,7 @@ background: #2b4569;
     font-size: 12px;
   }
   .roll-row {
-    padding: 18px 17px;
+    padding: var(--space-4);
   }
   .roll-row .identity {
     width: 100%;
@@ -2214,23 +2232,16 @@ background: #2b4569;
     margin-left: 0;
   }
   .attendance-segments button {
-    flex: 1;
     font-size: 12px;
-    padding: 6px 5px;
-    min-height: 34px;
   }
   .panel-heading .search {
     width: 100%;
   }
   .participation-row {
-    padding: 18px 17px;
+    padding: var(--space-4);
   }
   .participation-row .scorer {
-    gap: 10px;
-  }
-  .participation-row .scorer button {
-    min-width: 28px;
-    font-size: 12px;
+    gap: var(--space-3) var(--space-4);
   }
   .participation-row .identity {
     min-width: 120px;
@@ -2335,7 +2346,7 @@ background: #2b4569;
     margin-left: auto;
   }
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
   .import-steps {
@@ -2345,7 +2356,7 @@ background: #2b4569;
     font-size: 12px;
   }
   .modal {
-    padding: 0 18px 20px;
+    padding: 0 var(--space-4) var(--space-4);
   }
   .modal .table-scroll table {
     min-width: 480px;
@@ -2354,7 +2365,10 @@ background: #2b4569;
   .panel > label,
   .panel > p,
   .panel > dl {
-    margin: 20px 18px;
+    margin: var(--space-4);
+  }
+  .panel > button {
+    margin: 0 var(--space-4) var(--space-4);
   }
   .scope-bar {
     gap: 10px;
@@ -3311,20 +3325,19 @@ html { scroll-padding-top: 12rem; }
 .executive-resolution-feedback { margin: var(--space-4) 0; padding: var(--space-3); border-left: var(--space-1) solid var(--action); background: var(--action-soft); white-space: pre-wrap; }
 .executive-resolution-feedback p { margin-bottom: 0; }
 .executive-resolution-row details { margin-top: var(--space-3); }
-/* Participation quick entry on touch or narrow screens (including 200% zoom): 44 × 44 px targets with 8 px gaps
-   (audit F5), compact groups that wrap rather than squeeze. After the narrow-width rules above so it wins. */
+/* Frequently used Chair controls keep comfortable touch targets and grouped point values. */
 @media (pointer: coarse), (max-width: 700px) {
-  .participation-row .scorer > div > div { gap: var(--space-2); }
-  .participation-row .scorer button { min-width: 44px; min-height: 44px; padding: 0 var(--space-2); font-size: 13px; }
+  .participation-row .scorer button { min-width: 44px; min-height: 44px; font-size: 13px; }
+  .attendance-segments button { min-height: 44px; }
 }
 /* On a phone the four groups no longer fit one line at 44 px: a two-column grid keeps them aligned
    (Speech | POI, Main Submitter | Amendment) instead of leaving one group alone on a second line. */
 @media (max-width: 700px) {
-  .participation-row .scorer { display: grid; grid-template-columns: repeat(2, max-content); justify-content: start; gap: var(--space-3) var(--space-4); }
+  .participation-row .scorer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: start; gap: var(--space-3) var(--space-4); }
 }
-/* Below 360 px two 44 px columns would overflow the row: one group per line. */
-@media (max-width: 359px) {
-  .participation-row .scorer { grid-template-columns: max-content; }
+/* Below 384 px there is no room for two full groups of three 44 px controls. */
+@media (max-width: 383px) {
+  .participation-row .scorer { grid-template-columns: minmax(0, 1fr); }
 }
 /* About (ported from PHESMUN PR #1): a public page with the seal, credits and licence wording. */
 .about-page { min-height: 100vh; display: grid; place-items: center; padding: var(--space-5) var(--space-4); background: var(--bg); }

@@ -1,0 +1,1309 @@
+{
+  "before": [
+    {
+      "width": 1280,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.28125,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        },
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 66.96875,
+          "h": 31
+        },
+        {
+          "w": 131.53125,
+          "h": 31
+        },
+        {
+          "w": 63.9375,
+          "h": 31
+        }
+      ],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.28125,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        },
+        {
+          "w": 30.125,
+          "h": 29
+        },
+        {
+          "w": 27.21875,
+          "h": 29
+        },
+        {
+          "w": 29.875,
+          "h": 29
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        },
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 60.96875,
+          "h": 31
+        },
+        {
+          "w": 125.53125,
+          "h": 31
+        },
+        {
+          "w": 57.9375,
+          "h": 31
+        }
+      ],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        },
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 97.234375,
+          "h": 40
+        },
+        {
+          "w": 119.53125,
+          "h": 40
+        },
+        {
+          "w": 97.234375,
+          "h": 40
+        }
+      ],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        },
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 62.234375,
+          "h": 40
+        },
+        {
+          "w": 119.53125,
+          "h": 40
+        },
+        {
+          "w": 62.234375,
+          "h": 40
+        }
+      ],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    }
+  ],
+  "after": [
+    {
+      "width": 1280,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        },
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 125.640625,
+          "h": 40
+        },
+        {
+          "w": 125.640625,
+          "h": 40
+        },
+        {
+          "w": 125.640625,
+          "h": 40
+        }
+      ],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 1280,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 1150,
+          "scroll": 1150
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        },
+        {
+          "w": 40,
+          "h": 40
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        },
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 125.640625,
+          "h": 40
+        },
+        {
+          "w": 125.640625,
+          "h": 40
+        },
+        {
+          "w": 125.640625,
+          "h": 40
+        }
+      ],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 768,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 718,
+          "scroll": 718
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        },
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 102,
+          "h": 46
+        },
+        {
+          "w": 102,
+          "h": 46
+        },
+        {
+          "w": 102,
+          "h": 46
+        }
+      ],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 390,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 356,
+          "scroll": 356
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "chair/participation",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        },
+        {
+          "w": 44,
+          "h": 44
+        }
+      ],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        },
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "chair/roll-call",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [
+        {
+          "w": 78.65625,
+          "h": 46
+        },
+        {
+          "w": 78.671875,
+          "h": 46
+        },
+        {
+          "w": 78.65625,
+          "h": 46
+        }
+      ],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "admin/committees",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "route": "admin/scoring",
+      "overflow": false,
+      "viewport": 320,
+      "scorer": [],
+      "roll": [],
+      "panels": [
+        {
+          "w": 286,
+          "scroll": 286
+        }
+      ]
+    }
+  ],
+  "interaction": [
+    {
+      "width": 1280,
+      "close": {
+        "x": 935,
+        "y": 286.703125,
+        "width": 40,
+        "height": 40
+      },
+      "focus": {
+        "inside": true,
+        "outline": "3px"
+      },
+      "rollSelectionStable": true,
+      "keyboardScoring": true,
+      "longLabelNoOverflow": true,
+      "reduced": {
+        "transition": "1e-05s",
+        "reduce": true
+      }
+    },
+    {
+      "width": 390,
+      "close": {
+        "x": 316,
+        "y": 237.90625,
+        "width": 40,
+        "height": 40
+      },
+      "focus": {
+        "inside": true,
+        "outline": "3px"
+      },
+      "rollSelectionStable": true,
+      "keyboardScoring": true,
+      "longLabelNoOverflow": true,
+      "reduced": {
+        "transition": "1e-05s",
+        "reduce": true
+      }
+    },
+    {
+      "width": 320,
+      "close": {
+        "x": 246,
+        "y": 227.109375,
+        "width": 40,
+        "height": 40
+      },
+      "focus": {
+        "inside": true,
+        "outline": "3px"
+      },
+      "rollSelectionStable": true,
+      "keyboardScoring": true,
+      "longLabelNoOverflow": true,
+      "reduced": {
+        "transition": "1e-05s",
+        "reduce": true
+      }
+    }
+  ],
+  "survey": [
+    {
+      "width": 1280,
+      "route": "",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "chair",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "chair/documents",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "chair/amendments",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "chair/voting",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "approval",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "logistics",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "admin",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "admin/conference",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "admin/workflow",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "admin/scoring",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "admin/schools",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 1280,
+      "route": "submit/demo_ga1_abcdef0123456789",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "chair",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "chair/documents",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "chair/amendments",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "chair/voting",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "approval",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "logistics",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "admin",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "admin/conference",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "admin/workflow",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "admin/scoring",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "admin/schools",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 390,
+      "route": "submit/demo_ga1_abcdef0123456789",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "chair",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "chair/documents",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "chair/amendments",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "chair/voting",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "approval",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "logistics",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "admin",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "admin/conference",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "admin/workflow",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "admin/scoring",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "admin/schools",
+      "overflow": false,
+      "headings": 0
+    },
+    {
+      "width": 320,
+      "route": "submit/demo_ga1_abcdef0123456789",
+      "overflow": false,
+      "headings": 0
+    }
+  ],
+  "zoom": [
+    {
+      "route": "chair/participation",
+      "innerWidth": 640,
+      "outerWidth": 1280,
+      "devicePixelRatio": 2,
+      "visualScale": 1,
+      "overflow": false,
+      "pageZoom": 2
+    },
+    {
+      "route": "chair/roll-call",
+      "innerWidth": 640,
+      "outerWidth": 1280,
+      "devicePixelRatio": 2,
+      "visualScale": 1,
+      "overflow": false,
+      "pageZoom": 2
+    },
+    {
+      "route": "admin/committees",
+      "innerWidth": 640,
+      "outerWidth": 1280,
+      "devicePixelRatio": 2,
+      "visualScale": 1,
+      "overflow": false,
+      "pageZoom": 2
+    }
+  ]
+}
