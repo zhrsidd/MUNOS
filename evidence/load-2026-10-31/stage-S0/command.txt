@@ -1,0 +1,2 @@
+npm run rehearsal:run -- --app "$PREVIEW" --identities "$A/identities.json" --fixture "$A/fixture.json" \
+  --staff-profile dcmun-2026 --staff 10 --minutes 5

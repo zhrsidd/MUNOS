@@ -1,0 +1,10 @@
+# diagnostic attempt after NO-GO ramp
+# PF15 query after H3 (read-only, 2026-10-31 14:28 UTC) - original conference 0331ceb6-3fa8-4731-92cb-2b4c0316d0cb
+changes=24
+last_change=2026-10-25 23:43:50.904606+00
+active_grants=11
+documents=1
+attendance=2
+audit_rows=30
+# identical to preflight/fingerprint-before.txt. No other conference had an operational change in the last 40 minutes.
+# Fixture B 1e6bb11f-95c2-4acc-9849-2047818cbdd4 after the run: operational_changes 1655 (was 1), audit_log 909 (was 1), documents 92 (was 76; +16 = the 16 public submissions), roll_calls 140 (was 19; +121 commits)

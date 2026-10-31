@@ -1,0 +1,12 @@
+# diagnostic attempt after NO-GO ramp
+# Fixture B 1e6bb11f-95c2-4acc-9849-2047818cbdd4 - revoke-only cleanup APPLIED by the operator with execute_sql under owner approval, 2026-10-31 ~14:37 UTC (cleanup.sql retyped exactly).
+# Counts after (active = revoked_at is null):
+user_access active=0 (was 22)
+submission_links active=0 (was 1: the GA1 QR bearer link)
+amendment_links active=0 (was 0)
+private.access_credentials active=0 (was 0)
+delegates kept=420 (nothing deleted)
+# Other conferences unchanged vs the pre-cleanup snapshot:
+0331ceb6 (original) 11/1/0/2 ; 5d9f8e82 0/1/0/0 ; a410008d 0/0/0/0 ; ac63e049 2/0/0/4 ; e3a38dc2 0/0/0/0 ; 573cfbeb (fixture A) 0/0/0/0 -> all identical
+# Original-conference fingerprint after (14:37:05 UTC): changes=24 last_change=2026-10-25 23:43:50.904606+00 active_grants=11 documents=1 attendance=2 audit_rows=30 (identical to preflight/fingerprint-before.txt)
+# Not covered by cleanup.sql: the Auth sessions of the 22 pool identities stay valid until final retirement (they have no active grants now).

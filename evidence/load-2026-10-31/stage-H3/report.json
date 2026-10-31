@@ -1,0 +1,1940 @@
+{
+  "date": "2026-10-31T14:28:04.164Z",
+  "app": "https://munos-jij0int7d-dcmun.vercel.app",
+  "appBuild": {
+    "version": "0.2.0",
+    "commit": "288c7236059bafe6bb2b16e860fdcdcca19f5d31",
+    "shortCommit": "288c723",
+    "branch": "codex/preproduction-connected",
+    "environment": "preview",
+    "deploymentId": "dpl_2UYk8wYf7zyudbDjetsbuCv3gBTR",
+    "builtAt": "2026-10-31T10:41:56.038Z"
+  },
+  "supabaseProject": "kllhswucdhqqywnzxado",
+  "staffProfile": "dcmun-2026",
+  "staffRolesPerStage": [
+    {
+      "chair": 75,
+      "approval": 20,
+      "admins": 10,
+      "executive": 5
+    }
+  ],
+  "identityMode": "realistic-multi-committee",
+  "readinessLabel": "READINESS RUN",
+  "readiness": {
+    "mode": "realistic-multi-committee",
+    "label": "READINESS RUN",
+    "qualifiesForReadiness": true,
+    "reasons": [],
+    "simulatedCommittees": 19,
+    "actualCommitteesWithChairTraffic": 19,
+    "distinctChairIdentities": 19,
+    "chairDevices": 75,
+    "committees": [
+      {
+        "code": "GA1",
+        "committeeId": "2c6a89ef-2cac-4c26-9979-129404172eea",
+        "chairIdentity": "78ead11e",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "WHO",
+        "committeeId": "bb9ca039-42e8-43b2-91b9-c72be9747a36",
+        "chairIdentity": "32ed1ef2",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "HRC",
+        "committeeId": "7049cc84-6ce8-4767-890b-148813241687",
+        "chairIdentity": "056e0dc0",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "SC",
+        "committeeId": "a12827ab-b19c-4987-8c5b-b42f49d2f9a1",
+        "chairIdentity": "e6f548a1",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "GA2",
+        "committeeId": "98cc6b0b-e4df-4f7e-bdab-9f1ce1b78ac7",
+        "chairIdentity": "8d47d30c",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "GA3",
+        "committeeId": "050a72da-83ed-48ff-9173-2b31d85e4a26",
+        "chairIdentity": "9d0db768",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "ECOSOC",
+        "committeeId": "a19a5f69-14f9-4b63-91dc-c5480fc97e72",
+        "chairIdentity": "38c87ed5",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "UNEP",
+        "committeeId": "3b220ee4-8466-4568-ba29-c7463c8fb1a8",
+        "chairIdentity": "2e4b0405",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "UNHCR",
+        "committeeId": "b342d013-7eb6-4ee4-8738-d7da9a3ff02b",
+        "chairIdentity": "36df6846",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "ICJ",
+        "committeeId": "7f6f7b0b-40a7-4c6e-b591-58af34d4a771",
+        "chairIdentity": "5245b43f",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "UNSC2",
+        "committeeId": "5bf2c975-4b1c-4286-bfa4-b935ab5dee3a",
+        "chairIdentity": "9ae7e18c",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "UNODC",
+        "committeeId": "4b87c057-9ee4-42ac-a3ba-6d5435d3cefe",
+        "chairIdentity": "ec53fa89",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "UNESCO",
+        "committeeId": "b99d50ca-03ae-42aa-929e-6818b03637fc",
+        "chairIdentity": "79fde84b",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "CSW",
+        "committeeId": "7f3ec78d-4dc8-433e-bcfb-b0bae0b6a966",
+        "chairIdentity": "3f6cb609",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "C15",
+        "committeeId": "f129cd16-4273-4831-ab25-5a290b73f0bc",
+        "chairIdentity": "8594ec8d",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "C16",
+        "committeeId": "2aa1e7c4-11d7-499c-bc24-f9db185e957f",
+        "chairIdentity": "a87581db",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "C17",
+        "committeeId": "d1b61a7d-aaa4-4c06-9da8-862eb1ed2de0",
+        "chairIdentity": "3c11abd8",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "C18",
+        "committeeId": "86101444-cd5a-49fb-995c-2f80e44f09a6",
+        "chairIdentity": "a2a67297",
+        "chairIdentities": 1,
+        "chairDevices": 4
+      },
+      {
+        "code": "C19",
+        "committeeId": "975026ca-aa08-484c-be14-d8ae9bb1a770",
+        "chairIdentity": "43e6ac85",
+        "chairIdentities": 1,
+        "chairDevices": 3
+      }
+    ]
+  },
+  "conferenceGate": {
+    "eligible": true,
+    "checks": [
+      {
+        "check": "every capacity stage has at least 110 staff devices",
+        "pass": true
+      },
+      {
+        "check": "at least 30 minutes across 19 real committees",
+        "pass": true
+      },
+      {
+        "check": "at least 150 public page loads and 16 planned creates per stage",
+        "pass": true
+      },
+      {
+        "check": "every capacity stage covers 57 Chairs, 20 Approval, 10 printing/Admins and 5 Executives",
+        "pass": true
+      }
+    ],
+    "pass": false
+  },
+  "distinctAuthIdentities": 22,
+  "note": "Realistic multi-committee run: each simulated committee is a real committee row with its own session and its own Chair identity/grant; Chair devices of committee k use only committee k's identity, row and session. Approval, Admins and Executive use one role-scoped identity each. No Auth sessions were created during the run. Delegates use only the public form.",
+  "capacityGate": "CURRENT capacity gate size (110 devices; it counts only if the report is also a READINESS RUN across all 19 committees)",
+  "publicForm": {
+    "delegates": 150,
+    "singleLink": true,
+    "submissionsPlannedPerStage": {
+      "110": 16
+    },
+    "maxSingleLinkSubmissions": 18,
+    "note": "Resolution public form only; delegates create no Auth session. Amendment form and rate limiting are tested functionally, separately."
+  },
+  "minutes": 30,
+  "stages": [
+    {
+      "staff": 110,
+      "delegates": 150,
+      "configuredReadiness": {
+        "mode": "realistic-multi-committee",
+        "label": "READINESS RUN",
+        "qualifiesForReadiness": true,
+        "reasons": [],
+        "simulatedCommittees": 19,
+        "actualCommitteesWithChairTraffic": 19,
+        "distinctChairIdentities": 19,
+        "chairDevices": 75,
+        "committees": [
+          {
+            "code": "GA1",
+            "committeeId": "2c6a89ef-2cac-4c26-9979-129404172eea",
+            "chairIdentity": "78ead11e",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "WHO",
+            "committeeId": "bb9ca039-42e8-43b2-91b9-c72be9747a36",
+            "chairIdentity": "32ed1ef2",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "HRC",
+            "committeeId": "7049cc84-6ce8-4767-890b-148813241687",
+            "chairIdentity": "056e0dc0",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "SC",
+            "committeeId": "a12827ab-b19c-4987-8c5b-b42f49d2f9a1",
+            "chairIdentity": "e6f548a1",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "GA2",
+            "committeeId": "98cc6b0b-e4df-4f7e-bdab-9f1ce1b78ac7",
+            "chairIdentity": "8d47d30c",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "GA3",
+            "committeeId": "050a72da-83ed-48ff-9173-2b31d85e4a26",
+            "chairIdentity": "9d0db768",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "ECOSOC",
+            "committeeId": "a19a5f69-14f9-4b63-91dc-c5480fc97e72",
+            "chairIdentity": "38c87ed5",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNEP",
+            "committeeId": "3b220ee4-8466-4568-ba29-c7463c8fb1a8",
+            "chairIdentity": "2e4b0405",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNHCR",
+            "committeeId": "b342d013-7eb6-4ee4-8738-d7da9a3ff02b",
+            "chairIdentity": "36df6846",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "ICJ",
+            "committeeId": "7f6f7b0b-40a7-4c6e-b591-58af34d4a771",
+            "chairIdentity": "5245b43f",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNSC2",
+            "committeeId": "5bf2c975-4b1c-4286-bfa4-b935ab5dee3a",
+            "chairIdentity": "9ae7e18c",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNODC",
+            "committeeId": "4b87c057-9ee4-42ac-a3ba-6d5435d3cefe",
+            "chairIdentity": "ec53fa89",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNESCO",
+            "committeeId": "b99d50ca-03ae-42aa-929e-6818b03637fc",
+            "chairIdentity": "79fde84b",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "CSW",
+            "committeeId": "7f3ec78d-4dc8-433e-bcfb-b0bae0b6a966",
+            "chairIdentity": "3f6cb609",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C15",
+            "committeeId": "f129cd16-4273-4831-ab25-5a290b73f0bc",
+            "chairIdentity": "8594ec8d",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C16",
+            "committeeId": "2aa1e7c4-11d7-499c-bc24-f9db185e957f",
+            "chairIdentity": "a87581db",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C17",
+            "committeeId": "d1b61a7d-aaa4-4c06-9da8-862eb1ed2de0",
+            "chairIdentity": "3c11abd8",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C18",
+            "committeeId": "86101444-cd5a-49fb-995c-2f80e44f09a6",
+            "chairIdentity": "a2a67297",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C19",
+            "committeeId": "975026ca-aa08-484c-be14-d8ae9bb1a770",
+            "chairIdentity": "43e6ac85",
+            "chairIdentities": 1,
+            "chairDevices": 3
+          }
+        ]
+      },
+      "readiness": {
+        "mode": "realistic-multi-committee",
+        "label": "READINESS RUN",
+        "qualifiesForReadiness": true,
+        "reasons": [],
+        "simulatedCommittees": 19,
+        "actualCommitteesWithChairTraffic": 19,
+        "distinctChairIdentities": 19,
+        "chairDevices": 75,
+        "committees": [
+          {
+            "code": "GA1",
+            "committeeId": "2c6a89ef-2cac-4c26-9979-129404172eea",
+            "chairIdentity": "78ead11e",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "WHO",
+            "committeeId": "bb9ca039-42e8-43b2-91b9-c72be9747a36",
+            "chairIdentity": "32ed1ef2",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "HRC",
+            "committeeId": "7049cc84-6ce8-4767-890b-148813241687",
+            "chairIdentity": "056e0dc0",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "SC",
+            "committeeId": "a12827ab-b19c-4987-8c5b-b42f49d2f9a1",
+            "chairIdentity": "e6f548a1",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "GA2",
+            "committeeId": "98cc6b0b-e4df-4f7e-bdab-9f1ce1b78ac7",
+            "chairIdentity": "8d47d30c",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "GA3",
+            "committeeId": "050a72da-83ed-48ff-9173-2b31d85e4a26",
+            "chairIdentity": "9d0db768",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "ECOSOC",
+            "committeeId": "a19a5f69-14f9-4b63-91dc-c5480fc97e72",
+            "chairIdentity": "38c87ed5",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNEP",
+            "committeeId": "3b220ee4-8466-4568-ba29-c7463c8fb1a8",
+            "chairIdentity": "2e4b0405",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNHCR",
+            "committeeId": "b342d013-7eb6-4ee4-8738-d7da9a3ff02b",
+            "chairIdentity": "36df6846",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "ICJ",
+            "committeeId": "7f6f7b0b-40a7-4c6e-b591-58af34d4a771",
+            "chairIdentity": "5245b43f",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNSC2",
+            "committeeId": "5bf2c975-4b1c-4286-bfa4-b935ab5dee3a",
+            "chairIdentity": "9ae7e18c",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNODC",
+            "committeeId": "4b87c057-9ee4-42ac-a3ba-6d5435d3cefe",
+            "chairIdentity": "ec53fa89",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "UNESCO",
+            "committeeId": "b99d50ca-03ae-42aa-929e-6818b03637fc",
+            "chairIdentity": "79fde84b",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "CSW",
+            "committeeId": "7f3ec78d-4dc8-433e-bcfb-b0bae0b6a966",
+            "chairIdentity": "3f6cb609",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C15",
+            "committeeId": "f129cd16-4273-4831-ab25-5a290b73f0bc",
+            "chairIdentity": "8594ec8d",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C16",
+            "committeeId": "2aa1e7c4-11d7-499c-bc24-f9db185e957f",
+            "chairIdentity": "a87581db",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C17",
+            "committeeId": "d1b61a7d-aaa4-4c06-9da8-862eb1ed2de0",
+            "chairIdentity": "3c11abd8",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C18",
+            "committeeId": "86101444-cd5a-49fb-995c-2f80e44f09a6",
+            "chairIdentity": "a2a67297",
+            "chairIdentities": 1,
+            "chairDevices": 4
+          },
+          {
+            "code": "C19",
+            "committeeId": "975026ca-aa08-484c-be14-d8ae9bb1a770",
+            "chairIdentity": "43e6ac85",
+            "chairIdentities": 1,
+            "chairDevices": 3
+          }
+        ]
+      },
+      "observed": {
+        "openedDevices": 110,
+        "reads": {
+          "admins": 924,
+          "approval": 1974,
+          "chair": 6660,
+          "executive": 1008
+        },
+        "writes": {
+          "approval": 34,
+          "chair": 1566,
+          "admins": 38
+        },
+        "actions": {
+          "approve": 34,
+          "rollCall": 121,
+          "queueAdd": 536,
+          "sendToApproval": 16,
+          "speechStart": 189,
+          "print": 38,
+          "speechScore": 180,
+          "speechFinish": 180,
+          "poiAllowance": 75,
+          "poiAdd": 75,
+          "queueOrder": 44,
+          "poiRecognize": 75,
+          "poiScore": 75
+        },
+        "publicForm": {
+          "pages": 150,
+          "creates": 16
+        }
+      },
+      "work": {
+        "pass": false,
+        "checks": [
+          {
+            "check": "every configured staff device completed a successful snapshot",
+            "pass": true
+          },
+          {
+            "check": "at least one successful snapshot per configured role",
+            "pass": true
+          },
+          {
+            "check": "at least one accepted mutation per configured writing role",
+            "pass": true
+          },
+          {
+            "check": "accepted Chair traffic matches every configured committee",
+            "pass": true
+          },
+          {
+            "check": "zero pending, conflicting or unconfirmed actions at a settled close",
+            "pass": false
+          },
+          {
+            "check": "no scripted intent was rejected locally",
+            "pass": true
+          },
+          {
+            "check": "declared critical operations were observed",
+            "pass": true
+          },
+          {
+            "check": "every configured public page and submission completed successfully",
+            "pass": true
+          }
+        ]
+      },
+      "drainSeconds": 120,
+      "pendingAtClose": 181,
+      "conflictsAtClose": 4,
+      "unconfirmedAtClose": 0,
+      "closeTimedOut": false,
+      "snapshotRpcsByName": {
+        "conference_state_snapshot": 9558,
+        "executive_state_snapshot": 1008
+      },
+      "clientModel": {
+        "implementation": "actual DurableRepository + DurableStore, isolated fake IndexedDB",
+        "realtimeDelivery": "simulated; no real channels",
+        "sourceAttribution": "actual-core; internal trigger attribution is not inferred",
+        "byRole": {
+          "chair": [
+            {
+              "reads": 98,
+              "coreSendAttempts": 50,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 100,
+              "focuses": 3,
+              "localRefusals": 0
+            },
+            {
+              "reads": 97,
+              "coreSendAttempts": 61,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 91,
+              "focuses": 3,
+              "localRefusals": 0
+            },
+            {
+              "reads": 79,
+              "coreSendAttempts": 28,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 45,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 84,
+              "coreSendAttempts": 55,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 84,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 67,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 99,
+              "focuses": 2,
+              "localRefusals": 0
+            },
+            {
+              "reads": 113,
+              "coreSendAttempts": 78,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 106,
+              "focuses": 2,
+              "localRefusals": 0
+            },
+            {
+              "reads": 93,
+              "coreSendAttempts": 63,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 99,
+              "coreSendAttempts": 67,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 97,
+              "focuses": 2,
+              "localRefusals": 0
+            },
+            {
+              "reads": 76,
+              "coreSendAttempts": 44,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 67,
+              "focuses": 5,
+              "localRefusals": 0
+            },
+            {
+              "reads": 80,
+              "coreSendAttempts": 52,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 79,
+              "focuses": 0,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 62,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 73,
+              "coreSendAttempts": 34,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 59,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 63,
+              "coreSendAttempts": 19,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 35,
+              "focuses": 2,
+              "localRefusals": 0
+            },
+            {
+              "reads": 111,
+              "coreSendAttempts": 75,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 4,
+              "localRefusals": 0
+            },
+            {
+              "reads": 96,
+              "coreSendAttempts": 62,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 94,
+              "focuses": 0,
+              "localRefusals": 0
+            },
+            {
+              "reads": 77,
+              "coreSendAttempts": 50,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 76,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 111,
+              "coreSendAttempts": 84,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 110,
+              "focuses": 1,
+              "localRefusals": 0
+            },
+            {
+              "reads": 57,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 19,
+              "focuses": 0,
+              "localRefusals": 0
+            },
+            {
+              "reads": 89,
+              "coreSendAttempts": 61,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 82,
+              "focuses": 3,
+              "localRefusals": 0
+            },
+            {
+              "reads": 104,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 100,
+              "focuses": 9,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 14,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 91,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 60,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 45,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 90,
+              "coreSendAttempts": 15,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 84,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 99,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 118,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 106,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 12,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 8,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 97,
+              "focuses": 9,
+              "localRefusals": 0
+            },
+            {
+              "reads": 75,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 67,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 86,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 79,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 102,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 74,
+              "coreSendAttempts": 15,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 59,
+              "focuses": 13,
+              "localRefusals": 0
+            },
+            {
+              "reads": 53,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 35,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 108,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 9,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 94,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 87,
+              "coreSendAttempts": 12,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 76,
+              "focuses": 14,
+              "localRefusals": 0
+            },
+            {
+              "reads": 115,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 110,
+              "focuses": 13,
+              "localRefusals": 0
+            },
+            {
+              "reads": 39,
+              "coreSendAttempts": 8,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 19,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 83,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 82,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 15,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 100,
+              "focuses": 6,
+              "localRefusals": 0
+            },
+            {
+              "reads": 99,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 91,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 58,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 45,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 91,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 84,
+              "focuses": 16,
+              "localRefusals": 0
+            },
+            {
+              "reads": 99,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 99,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 106,
+              "coreSendAttempts": 7,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 106,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 97,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 81,
+              "coreSendAttempts": 8,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 67,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 91,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 79,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 103,
+              "coreSendAttempts": 10,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 68,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 59,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 50,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 35,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 106,
+              "coreSendAttempts": 7,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 19,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 94,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 81,
+              "coreSendAttempts": 6,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 76,
+              "focuses": 8,
+              "localRefusals": 0
+            },
+            {
+              "reads": 114,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 110,
+              "focuses": 6,
+              "localRefusals": 0
+            },
+            {
+              "reads": 39,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 19,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 91,
+              "coreSendAttempts": 12,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 82,
+              "focuses": 13,
+              "localRefusals": 0
+            },
+            {
+              "reads": 107,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 100,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 96,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 91,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 61,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 45,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 88,
+              "coreSendAttempts": 10,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 84,
+              "focuses": 8,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 99,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 114,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 106,
+              "focuses": 14,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 13,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 10,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 97,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 78,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 67,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 91,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 79,
+              "focuses": 16,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 93,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 72,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 59,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 52,
+              "coreSendAttempts": 10,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 35,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 113,
+              "coreSendAttempts": 10,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 18,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 12,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 94,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 79,
+              "coreSendAttempts": 13,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 76,
+              "focuses": 7,
+              "localRefusals": 0
+            },
+            {
+              "reads": 118,
+              "coreSendAttempts": 11,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 110,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 35,
+              "coreSendAttempts": 9,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 19,
+              "focuses": 9,
+              "localRefusals": 0
+            }
+          ],
+          "approval": [
+            {
+              "reads": 98,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 19,
+              "localRefusals": 0
+            },
+            {
+              "reads": 97,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 16,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 14,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 23,
+              "localRefusals": 0
+            },
+            {
+              "reads": 103,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 19,
+              "localRefusals": 0
+            },
+            {
+              "reads": 103,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 26,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 14,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 18,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 105,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 22,
+              "localRefusals": 0
+            },
+            {
+              "reads": 99,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 21,
+              "localRefusals": 0
+            },
+            {
+              "reads": 97,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 100,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 101,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 21,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 97,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 20,
+              "localRefusals": 0
+            },
+            {
+              "reads": 96,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 18,
+              "localRefusals": 0
+            },
+            {
+              "reads": 98,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 21,
+              "localRefusals": 0
+            },
+            {
+              "reads": 93,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 19,
+              "localRefusals": 0
+            }
+          ],
+          "admins": [
+            {
+              "reads": 95,
+              "coreSendAttempts": 5,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 90,
+              "coreSendAttempts": 8,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 11,
+              "localRefusals": 0
+            },
+            {
+              "reads": 85,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 10,
+              "localRefusals": 0
+            },
+            {
+              "reads": 94,
+              "coreSendAttempts": 5,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 2,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 18,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 3,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 17,
+              "localRefusals": 0
+            },
+            {
+              "reads": 95,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 17,
+              "localRefusals": 0
+            },
+            {
+              "reads": 91,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 16,
+              "localRefusals": 0
+            },
+            {
+              "reads": 96,
+              "coreSendAttempts": 4,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 16,
+              "localRefusals": 0
+            },
+            {
+              "reads": 88,
+              "coreSendAttempts": 1,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 104,
+              "focuses": 11,
+              "localRefusals": 0
+            }
+          ],
+          "executive": [
+            {
+              "reads": 200,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 1533,
+              "focuses": 12,
+              "localRefusals": 0
+            },
+            {
+              "reads": 203,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 1533,
+              "focuses": 13,
+              "localRefusals": 0
+            },
+            {
+              "reads": 198,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 1533,
+              "focuses": 15,
+              "localRefusals": 0
+            },
+            {
+              "reads": 205,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 1533,
+              "focuses": 17,
+              "localRefusals": 0
+            },
+            {
+              "reads": 202,
+              "coreSendAttempts": 0,
+              "maxConcurrentTransportCalls": 1,
+              "notifications": 1533,
+              "focuses": 16,
+              "localRefusals": 0
+            }
+          ]
+        }
+      },
+      "total": 12505,
+      "errors": 0,
+      "rateLimited": 0,
+      "conflicts": 4,
+      "errorRate": 0,
+      "summary": {
+        "writes": {
+          "requests": 1642,
+          "errors": 0,
+          "p50_ms": 336,
+          "p95_ms": 1834,
+          "p99_ms": 3187
+        },
+        "reads": {
+          "requests": 10566,
+          "errors": 0,
+          "p50_ms": 2197,
+          "p95_ms": 6215,
+          "p99_ms": 8387
+        },
+        "readsByRole": {
+          "admins": {
+            "requests": 924,
+            "errors": 0,
+            "p50_ms": 4340,
+            "p95_ms": 8080,
+            "p99_ms": 9464
+          },
+          "approval": {
+            "requests": 1974,
+            "errors": 0,
+            "p50_ms": 3647,
+            "p95_ms": 6028,
+            "p99_ms": 8396
+          },
+          "chair": {
+            "requests": 6660,
+            "errors": 0,
+            "p50_ms": 1516,
+            "p95_ms": 5179,
+            "p99_ms": 6943
+          },
+          "executive": {
+            "requests": 1008,
+            "errors": 0,
+            "p50_ms": 2387,
+            "p95_ms": 7977,
+            "p99_ms": 9525
+          }
+        },
+        "readsBySource": {
+          "actual-core": {
+            "requests": 10566,
+            "errors": 0,
+            "p50_ms": 2197,
+            "p95_ms": 6215,
+            "p99_ms": 8387
+          }
+        },
+        "snapshotRpcCalls": 10566,
+        "snapshotRpcsPerRefresh": 1,
+        "readsPerWrite": 6.4
+      },
+      "actions": {
+        "refresh": {
+          "requests": 10566,
+          "ok": 10566,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 2197,
+          "p95_ms": 6215,
+          "p99_ms": 8387
+        },
+        "submitPage": {
+          "requests": 150,
+          "ok": 150,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 270,
+          "p95_ms": 470,
+          "p99_ms": 1595
+        },
+        "approve": {
+          "requests": 34,
+          "ok": 34,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 322,
+          "p95_ms": 894,
+          "p99_ms": 1463
+        },
+        "rollCallCommit": {
+          "requests": 121,
+          "ok": 121,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 367,
+          "p95_ms": 1573,
+          "p99_ms": 2432
+        },
+        "rollCallCommit (resend)": {
+          "requests": 7,
+          "ok": 7,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 336,
+          "p95_ms": 2208,
+          "p99_ms": 2208
+        },
+        "health": {
+          "requests": 54,
+          "ok": 54,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 160,
+          "p95_ms": 1794,
+          "p99_ms": 2539
+        },
+        "submit": {
+          "requests": 16,
+          "ok": 16,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 520,
+          "p95_ms": 2180,
+          "p99_ms": 2180
+        },
+        "queueAdd": {
+          "requests": 536,
+          "ok": 536,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 339,
+          "p95_ms": 1950,
+          "p99_ms": 3117
+        },
+        "sendToApproval": {
+          "requests": 16,
+          "ok": 16,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 349,
+          "p95_ms": 1779,
+          "p99_ms": 1779
+        },
+        "sendToApproval (resend)": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 300,
+          "p95_ms": 327,
+          "p99_ms": 327
+        },
+        "speechStart": {
+          "requests": 189,
+          "ok": 189,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 323,
+          "p95_ms": 1822,
+          "p99_ms": 3996
+        },
+        "print": {
+          "requests": 38,
+          "ok": 38,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 310,
+          "p95_ms": 2726,
+          "p99_ms": 3640
+        },
+        "speechScore": {
+          "requests": 180,
+          "ok": 180,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 354,
+          "p95_ms": 2051,
+          "p99_ms": 3679
+        },
+        "speechFinish": {
+          "requests": 180,
+          "ok": 180,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 323,
+          "p95_ms": 1578,
+          "p99_ms": 4382
+        },
+        "speechScore (resend)": {
+          "requests": 22,
+          "ok": 22,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 303,
+          "p95_ms": 802,
+          "p99_ms": 1702
+        },
+        "poiAllowance": {
+          "requests": 75,
+          "ok": 75,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 325,
+          "p95_ms": 1834,
+          "p99_ms": 2925
+        },
+        "poiAdd": {
+          "requests": 75,
+          "ok": 75,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 329,
+          "p95_ms": 882,
+          "p99_ms": 3657
+        },
+        "poiAllowance (resend)": {
+          "requests": 9,
+          "ok": 9,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 303,
+          "p95_ms": 347,
+          "p99_ms": 347
+        },
+        "queueOrder": {
+          "requests": 48,
+          "ok": 44,
+          "conflicts": 4,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 325,
+          "p95_ms": 482,
+          "p99_ms": 1490
+        },
+        "poiRecognize": {
+          "requests": 75,
+          "ok": 75,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 335,
+          "p95_ms": 1034,
+          "p99_ms": 2666
+        },
+        "poiScore": {
+          "requests": 75,
+          "ok": 75,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 377,
+          "p95_ms": 2602,
+          "p99_ms": 3004
+        },
+        "speechFinish (resend)": {
+          "requests": 22,
+          "ok": 22,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 309,
+          "p95_ms": 867,
+          "p99_ms": 1209
+        },
+        "poiScore (resend)": {
+          "requests": 6,
+          "ok": 6,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 299,
+          "p95_ms": 320,
+          "p99_ms": 320
+        },
+        "approve (resend)": {
+          "requests": 2,
+          "ok": 2,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 305,
+          "p95_ms": 311,
+          "p99_ms": 311
+        },
+        "print (resend)": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 310,
+          "p95_ms": 312,
+          "p99_ms": 312
+        },
+        "queueOrder (resend)": {
+          "requests": 3,
+          "ok": 3,
+          "conflicts": 0,
+          "rateLimited": 0,
+          "errors": 0,
+          "p50_ms": 309,
+          "p95_ms": 317,
+          "p99_ms": 317
+        }
+      }
+    }
+  ],
+  "realtimeModel": "topic-aware",
+  "clientModel": "ACTUAL DurableRepository + DurableStore (Node fake IndexedDB; explicitly simulated Realtime delivery)",
+  "exactlyOnce": {
+    "acknowledgedScoring": 255,
+    "duplicates": 0,
+    "lost": 0
+  },
+  "diagnosticVerdict": {
+    "label": "RAMP / DIAGNOSTIC ONLY",
+    "pass": false,
+    "checks": [
+      {
+        "check": "no duplicate writes after retries",
+        "pass": true
+      },
+      {
+        "check": "no lost acknowledged writes",
+        "pass": true
+      },
+      {
+        "check": "error rate below 1% (conflicts excluded)",
+        "pass": true
+      },
+      {
+        "check": "no rate-limit responses",
+        "pass": true
+      },
+      {
+        "check": "write p95 ≤ 1500 ms (was 2726)",
+        "pass": false
+      },
+      {
+        "check": "read p95 ≤ 2500 ms (was 6215)",
+        "pass": false
+      },
+      {
+        "check": "stage 1: every configured staff device completed a successful snapshot",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one successful snapshot per configured role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one accepted mutation per configured writing role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: accepted Chair traffic matches every configured committee",
+        "pass": true
+      },
+      {
+        "check": "stage 1: zero pending, conflicting or unconfirmed actions at a settled close",
+        "pass": false
+      },
+      {
+        "check": "stage 1: no scripted intent was rejected locally",
+        "pass": true
+      },
+      {
+        "check": "stage 1: declared critical operations were observed",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured public page and submission completed successfully",
+        "pass": true
+      },
+      {
+        "check": "role-scoped multi-committee fixture",
+        "pass": true
+      }
+    ]
+  },
+  "verdict": {
+    "pass": false,
+    "label": "READINESS RUN",
+    "checks": [
+      {
+        "check": "no duplicate writes after retries",
+        "pass": true
+      },
+      {
+        "check": "no lost acknowledged writes",
+        "pass": true
+      },
+      {
+        "check": "error rate below 1% (conflicts excluded)",
+        "pass": true
+      },
+      {
+        "check": "no rate-limit responses",
+        "pass": true
+      },
+      {
+        "check": "write p95 ≤ 1500 ms (was 2726)",
+        "pass": false
+      },
+      {
+        "check": "read p95 ≤ 2500 ms (was 6215)",
+        "pass": false
+      },
+      {
+        "check": "realistic multi-committee distribution (READINESS RUN)",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured staff device completed a successful snapshot",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one successful snapshot per configured role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: at least one accepted mutation per configured writing role",
+        "pass": true
+      },
+      {
+        "check": "stage 1: accepted Chair traffic matches every configured committee",
+        "pass": true
+      },
+      {
+        "check": "stage 1: zero pending, conflicting or unconfirmed actions at a settled close",
+        "pass": false
+      },
+      {
+        "check": "stage 1: no scripted intent was rejected locally",
+        "pass": true
+      },
+      {
+        "check": "stage 1: declared critical operations were observed",
+        "pass": true
+      },
+      {
+        "check": "stage 1: every configured public page and submission completed successfully",
+        "pass": true
+      }
+    ]
+  },
+  "label": "diagnostic attempt after NO-GO ramp"
+}

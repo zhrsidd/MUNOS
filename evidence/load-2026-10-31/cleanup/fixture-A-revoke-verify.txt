@@ -1,0 +1,11 @@
+# diagnostic attempt after NO-GO ramp
+# Fixture A 573cfbeb-d3ed-4cf5-b418-7d36326f69c8 - revoke-only cleanup APPLIED by the operator with execute_sql under owner approval, 2026-10-31 ~14:36 UTC (cleanup.sql retyped exactly: transaction wrapper, lifecycle guard, four revoked_at updates).
+# Counts after (active = revoked_at is null):
+user_access active=0 (was 22)
+submission_links active=0 (was 0)
+amendment_links active=0 (was 0)
+private.access_credentials active=0 (was 0)
+delegates kept=420 (nothing deleted)
+# Other conferences unchanged vs the pre-cleanup snapshot (grants / submission links / amendment links / credentials):
+0331ceb6 (original) 11/1/0/2 ; 5d9f8e82 0/1/0/0 ; a410008d 0/0/0/0 ; ac63e049 2/0/0/4 ; e3a38dc2 0/0/0/0 ; 1e6bb11f (fixture B, at that moment) 22/1/0/0 -> all identical
+# Original-conference fingerprint after: changes=24 last_change=2026-10-25 23:43:50.904606+00 active_grants=11 documents=1 attendance=2 audit_rows=30 (identical to preflight/fingerprint-before.txt)

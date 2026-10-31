@@ -1,0 +1,8 @@
+# PF15 query after R3b (read-only, 2026-10-31 13:51 UTC) - original conference 0331ceb6-3fa8-4731-92cb-2b4c0316d0cb
+changes=24
+last_change=2026-10-25 23:43:50.904606+00
+active_grants=11
+documents=1
+attendance=2
+audit_rows=30
+# identical to preflight/fingerprint-before.txt

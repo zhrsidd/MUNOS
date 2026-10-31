@@ -1,0 +1,11 @@
+# PF3b: select version, name from supabase_migrations.schema_migrations order by version desc limit 8
+# project kllhswucdhqqywnzxado, read-only via Supabase connector, 2026-10-31 (UTC, before fixture A)
+20261031100000  attendance_to_roll_calls
+20261031090000  committee_live_state
+20261030110000  session_schedules_snapshot
+20261030100000  session_holds
+20261030090000  record_labelling
+20261029110000  session_schedule
+20261029100000  session_window
+20261026003647  lifecycle_controls
+# All seven session-model migrations required by PF3b are present.
