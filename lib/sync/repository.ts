@@ -122,12 +122,17 @@ export class DurableRepository implements ConferenceRepository {
       this.channel.onmessage = () => { void this.reload().then(()=>{ if(this.checkpoint?.pending.length) this.refresh(); }); };
       window.addEventListener("online", this.onOnline);
       window.addEventListener("focus", this.refresh);
-      this.stopLive = this.transport?.subscribe?.(this.refresh, connected=>{
-        this.health={...this.health,realtime:connected}; this.emit();
-        if(connected) this.refresh();
-      }, this.isOwn);
+      this.connectNotifications();
     }
     if (this.transport) void this.flush();
+  }
+  /** Browser startup and the opt-in Node rehearsal attach the same own-id and reconnect behaviour. Idempotent until disposal. */
+  connectNotifications() {
+    if (this.disposed || this.stopLive || !this.transport?.subscribe) return;
+    this.stopLive = this.transport.subscribe(this.refresh, connected=>{
+      this.health={...this.health,realtime:connected}; this.emit();
+      if(connected) this.refresh();
+    }, this.isOwn);
   }
   private async reload() { const latest=await this.store.read(this.key); if(latest) this.publish(latest); }
   execute = async (raw: Command, role: Role) => {
@@ -264,8 +269,8 @@ export class DurableRepository implements ConferenceRepository {
         const head=this.checkpoint?.pending[0];
         if(!batch.length || !head || head.state==="conflict") break;
       }
-      // The last confirmation already persisted the server snapshot. Empty-outbox polling and an existing conflict still reconcile.
-      if(!settled || this.checkpoint?.pending[0]) {
+      // A confirmation already persisted a complete snapshot, even if an existing conflict remains. Standalone blocked/idle reads still reconcile.
+      if(!settled) {
         const start=performance.now(); const base=await this.transport!.read();
         this.lastReadAt=Date.now();
         this.health={...this.health,latency:Math.round(performance.now()-start),lastSynced:new Date().toISOString()};

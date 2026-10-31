@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 export interface SupportUsers { approval: string; admins: string; executive: string }
 export interface MultiCommitteeUsers extends SupportUsers { chairs: string[] }
 export interface LegacyUsers extends SupportUsers { chair: string }
-interface BaseOptions { conference: string; committees: number; delegates: number; grantHours: number }
+interface BaseOptions { conference: string; committees: number; delegates: number; grantHours: number; draftsPerCommittee?: number }
 export type FixtureOptions =
   | (BaseOptions & { mode: "multi-committee"; users: MultiCommitteeUsers })
   | (BaseOptions & { mode?: "legacy-floors"; floors: number; users: LegacyUsers });
@@ -23,6 +23,8 @@ export function derivedUuid(seed: string) {
 const CODES = ["GA1", "WHO", "HRC", "SC", "GA2", "GA3", "ECOSOC", "UNEP", "UNHCR", "ICJ", "UNSC2", "UNODC", "UNESCO", "CSW"];
 export function buildFixture(o: FixtureOptions) {
   const { conference } = o;
+  const draftsPerCommittee = o.draftsPerCommittee ?? 1;
+  if (!Number.isInteger(draftsPerCommittee) || draftsPerCommittee < 1 || draftsPerCommittee > 100) throw Error('Draft reserve must be a whole number 1–100 per committee.');
   const multi = o.mode === "multi-committee";
   const committees = Array.from({ length: o.committees }, (_, i) => ({ id: derivedUuid(`${conference}:committee:${i}`), session: derivedUuid(`${conference}:session:${i}`), code: CODES[i] ?? `C${i + 1}` }));
   let chairGrants: ChairGrant[];
@@ -45,7 +47,7 @@ export function buildFixture(o: FixtureOptions) {
   if (multi && o.delegates < o.committees) throw Error('Readiness fixture needs at least one delegate per committee.');
   const workflowDocuments = committees.flatMap(c => {
     const submitter = delegates.find(d => d.committee === c.id);
-    return !submitter ? [] : ['Draft','Review','Approved','In Debate'].map((status, index) => ({
+    return !submitter ? [] : [...Array<string>(draftsPerCommittee).fill('Draft'),'Review','Approved','In Debate'].map((status, index) => ({
       id: derivedUuid(`${conference}:document:${c.id}:${index}`), version: derivedUuid(`${conference}:version:${c.id}:${index}`),
       committee: c.id, session: c.session, submitter: submitter.id, status, code: `${c.code} / SYN-${index + 1}`,
       googleDocId: `synthetic_${derivedUuid(`${conference}:doc-link:${c.id}:${index}`).replaceAll('-','')}`,
@@ -90,7 +92,7 @@ insert into public.user_access(conference_id,user_id,role,committee_id,expires_a
 ${[...chairGrants.map((g) => grant(g.user, "chair", g.committee)), grant(o.users.approval, "approval", null), grant(o.users.admins, "logistics", null), grant(o.users.executive, "admin", null)].join(",\n")};
 commit;
 `;
-  return { conference, workflowDocuments, cleanup: cleanupSql(conference), mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
+  return { conference, draftsPerCommittee, workflowDocuments, cleanup: cleanupSql(conference), mode: multi ? "multi-committee" as const : "legacy-floors" as const, committees, delegates, chairGrants, chairCommittee, floors, sql };
 }
 /**
  * Safe cleanup for ONE fixture conference: revokes every grant and link scoped to that conference id and nothing else.
@@ -115,5 +117,5 @@ commit;
 }
 /** The harness/probe `--fixture` file: ids only (committees, sessions, delegates); no users, tokens or secrets. */
 export function fixtureJson(f: ReturnType<typeof buildFixture>) {
-  return { conference: f.conference, mode: f.mode, committees: f.committees, delegates: f.delegates };
+  return { conference: f.conference, mode: f.mode, draftsPerCommittee: f.draftsPerCommittee, committees: f.committees, delegates: f.delegates };
 }

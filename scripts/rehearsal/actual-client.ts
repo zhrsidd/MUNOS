@@ -7,6 +7,7 @@ import { normalizeCommand, type Command } from '../../lib/commands';
 import type { ConferenceData, Role } from '../../lib/domain';
 import type { ChangeEvent, SimUser, RealtimeModel } from './scenario';
 import { recipients } from './scenario';
+import { createInvalidationScheduler } from '../../lib/sync/invalidation';
 
 export interface IntentMeta { action: string; retry?: boolean }
 export interface ActualClientStats { reads: number; coreSendAttempts: number; maxConcurrentTransportCalls: number; notifications: number; focuses: number; localRefusals: number }
@@ -27,8 +28,7 @@ export class ActualClient {
   private active = 0;
   private snapshotReady = false;
   private closed = false;
-  private debounce?: ReturnType<typeof setTimeout>;
-  private chairWindow?: ReturnType<typeof setTimeout>;
+  private notifications?: ReturnType<typeof createInvalidationScheduler>;
   private intents: { signature: string; meta: IntentMeta }[] = [];
   private byMutation = new Map<string, IntentMeta>();
   private sent = new Set<string>();
@@ -44,6 +44,13 @@ export class ActualClient {
     };
     const transport: Transport = {
       actorId: options.transport.actorId,
+      passiveRefreshGapMs: options.transport.passiveRefreshGapMs,
+      syncClock: options.transport.syncClock ? device => tracked(() => options.transport.syncClock!(device)) : undefined,
+      subscribe: (refresh, state, isOwn) => {
+        this.notifications = createInvalidationScheduler(refresh, isOwn, options.executiveChairWindowMs ?? 0);
+        state(options.connected ?? true);
+        return () => this.notifications?.dispose();
+      },
       read: () => tracked(async () => { this.stats.reads++; return options.transport.read(); }),
       send: m => tracked(async () => {
         this.stats.coreSendAttempts++;
@@ -62,8 +69,8 @@ export class ActualClient {
       }),
     };
     this.repo = new DurableRepository(options.key, options.seed, this.store, transport);
-    // ready() only subscribes in a browser. This public health field makes the *actual* polling code use the explicitly
-    // simulated connection state without a window shim (which would activate browser Auth/session code in Node).
+    // Seed the explicit simulated connection state before open() connects the notification adapter.
+    // No window shim is installed: browser Auth/session code must not activate in Node.
     this.repo.health = { ...this.repo.health, realtime: options.connected ?? true };
     this.stop = this.repo.subscribe(() => { if (this.repo.getHealth().lastSynced) this.snapshotReady = true; });
   }
@@ -72,7 +79,7 @@ export class ActualClient {
   get conflicts() { return this.repo.getHealth().conflicts; }
   get unconfirmed() { return this.repo.getHealth().awaitingConfirmation ?? 0; }
   get busy() { return this.active > 0 || this.repo.getHealth().state === 'syncing'; }
-  open() { return this.repo.ready(); }
+  async open() { await this.repo.ready(); this.repo.connectNotifications(); }
   async execute(command: Command, role: Role, meta: IntentMeta) {
     if (this.closed) throw Error('Rehearsal device is closed.');
     const intent = { signature: signature(normalizeCommand(command), role), meta };
@@ -81,23 +88,15 @@ export class ActualClient {
     catch (error) { this.intents = this.intents.filter(i => i !== intent); this.stats.localRefusals++; throw error; }
   }
   focus() { if (!this.closed) { this.stats.focuses++; this.repo.refresh(); } }
-  /** The existing transport's trailing debounce / fixed Executive window; delivery is explicitly simulated. */
-  notify(topic?: string) {
+  /** Shipping notification policy; delivery is explicitly simulated and unknown ids remain foreign. */
+  notify(topic?: string, mutationId?: string) {
     if (this.closed) return;
     this.stats.notifications++;
-    const window = this.options.executiveChairWindowMs ?? 0;
-    if (window > 0 && topic === 'chair') {
-      if (this.debounce || this.chairWindow) return;
-      this.chairWindow = setTimeout(() => { this.chairWindow = undefined; this.repo.refresh(); }, window);
-      return;
-    }
-    clearTimeout(this.chairWindow); this.chairWindow = undefined;
-    clearTimeout(this.debounce);
-    this.debounce = setTimeout(() => { this.debounce = undefined; this.repo.refresh(); }, 350);
+    this.notifications?.notify(topic, mutationId);
   }
   async close(timeoutMs = 30_000): Promise<boolean> {
     this.closed = true;
-    clearTimeout(this.debounce); clearTimeout(this.chairWindow);
+    this.notifications?.dispose();
     this.repo.dispose();
     const deadline = Date.now() + timeoutMs;
     // A nonresponsive transport must not prevent a failure report. The live runner also aborts every wire request.
@@ -110,11 +109,16 @@ export class ActualClient {
   }
 
 }
-const signature = (c: Command, role: Role) => JSON.stringify([role, c]);
+const signature = (c: Command, role: Role) => {
+  // Attribution only: the saved and transmitted command retain their complete protocol fields.
+  const core = { ...c } as Record<string, unknown>;
+  delete core.rollCall; delete core._device;
+  return JSON.stringify([role, core]);
+};
 
 /** Staff writes and successful public creates use the SAME simulated delivery path and actual event committee. */
-export function deliverChange(model: RealtimeModel, users: SimUser[], event: ChangeEvent, notify: (user: SimUser, topic: string) => void) {
-  for (const user of recipients(model, users, event)) notify(user, event.topic);
+export function deliverChange(model: RealtimeModel, users: SimUser[], event: ChangeEvent, notify: (user: SimUser, topic: string, mutationId?: string) => void) {
+  for (const user of recipients(model, users, event)) notify(user, event.topic, event.mutationId);
 }
 /** Resolve event scope from the command's entity, not a conference-wide reviewer's arbitrary scenario index. */
 export function commandCommittee(data: ConferenceData | null, command: Command): string | undefined {

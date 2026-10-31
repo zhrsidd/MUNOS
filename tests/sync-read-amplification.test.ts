@@ -67,6 +67,23 @@ test('existing conflict still reconciles and blocks subsequent pending intent',a
   assert.deepEqual((await store.read(key))!.pending.map(m=>[m.id,m.state]),[[first.id,'conflict'],[second.id,'pending']]);
  }finally{await close();}
 });
+test('a batch before an existing conflict confirms once and retains the blocked intent',async()=>{
+ const server=new CountingServer();server.readGate=gate();
+ const first=mutation(),blocked={...mutation(),state:'conflict' as const,message:'Review stale attendance'},last=mutation();
+ const {repo,store,key,close}=await setup(server,[first,blocked,last]);
+ try{
+  await repo.ready();await until(()=>server.reads===1);
+  assert.equal(server.sends,1,'the existing conflict blocks the later action');
+  assert.deepEqual((await store.read(key))!.pending,[first,blocked,last],'the accepted action stays durable until read-back');
+  server.readGate.release();await until(()=>repo.getHealth().pending===2);await pause();
+  assert.deepEqual((await store.read(key))!.pending,[blocked,last],'only the confirmed UUID leaves the outbox');
+  assert.equal((await store.read(key))!.base.events.length,createSeed().events.length+1);
+  assert.equal(server.reads,1,'the batch confirmation already reconciled the snapshot before the conflict');
+  await repo.flush();
+  assert.equal(server.reads,2,'a later blocked refresh still reconciles');assert.equal(server.sends,1);
+  assert.deepEqual((await store.read(key))!.pending,[blocked,last]);
+ }finally{server.readGate.release();await close();}
+});
 test('new conflict preserves failed and subsequent intent without a final read',async()=>{
  const server=new CountingServer();server.send=async()=>{server.sends++;throw new ConflictError('Review change');};
  const first=mutation(),second=mutation();const {repo,store,key,close}=await setup(server,[first,second]);

@@ -79,7 +79,8 @@ export function RollCallPanel({ committeeId }: { committeeId: string }) {
                 {STATUSES.map((s) => (
                   <button key={s} aria-pressed={s === status} className={s === status ? "selected" : ""} disabled={!draft}
                     onClick={() => draft && setDraft({ ...draft, rows: { ...draft.rows, [d.id]: s } })}>
-                    {s === status ? "✓ " : ""}{s}
+                    <span aria-hidden="true">{s === status ? "✓" : ""}</span>
+                    <span>{s}</span>
                   </button>
                 ))}
               </div>

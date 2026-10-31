@@ -1,6 +1,12 @@
-# Session model: sessions are a schedule that labels records (contract draft v3)
+# Session model: sessions are a schedule that labels records (v3 contract)
 
-**Status:** draft contract v3 with the owner-confirmed 5-minute lead (29 Oct 2026) and an implementation plan in §12, issued on the owner's instruction to implement from this document. Schema, RLS and sync changes still go through the review gates in `AGENTS.md`. Implementation is in progress on branch `claude/session-model`: phases 1, 2, 3 and the device protocol with a minimal review screen are done, see §12.13. Everything is unapplied and awaiting independent review. v2 (`4aa2e64`) answered the first review's four blockers; v3 answers the re-review's three remaining findings (uncertain timestamps must not authorise totals; offline roll-call time semantics; automation toggle versus existing overrides). Schema, RLS and sync-contract changes are shared-architecture work, serialised under one integration owner (see `AGENTS.md`) and cross-reviewed.
+**Current status · 31 October 2026:** implemented and merged through #84 (`c4bb067`) and #88 (`c9e6a64`), replacing the former draft/in-progress status. Committee live state, schedule labels, roll calls, ballot eligibility snapshots, device clock reporting, held-action dependencies and Executive review are implemented. The [31 October run sheet §3a](LOAD_RUN_SHEET_2026-10-31.md#3a-what-changed-with-the-session-model-read-before-pf3a) records all seven session-model migrations present in preproduction, attendance converted to legacy roll calls and `timers` removed. The [#95 project record](SUPABASE_PROJECT_SETUP.md#migration-37-snapshot-committee-pre-filter-31-october-2026-owner-approved) subsequently records a 37-migration ledger. These are recorded hosted observations, not a fresh live check by this documentation change.
+
+Release settings are **2-minute trust / 5-minute control staleness / 20-minute close grace**, confirmed by the owner on 30 October; schedule lead is **5 minutes**. Hold enforcement remains **off by default**. Enable it first on synthetic fixtures with published schedules, clock reporting and review flows verified; conference activation remains an explicit rollout decision. Queue/debate state persist; optional automatic queue clearing remains approved but deferred (§9).
+
+The [31 October diagnostic](../evidence/load-2026-10-31/SUMMARY.md) was **NO-GO**. #93/#95's applied snapshot pre-filter and #94's merged client optimisations have not received a new capacity verdict. The owner-selected final-test window is **1 November, 16:00–18:00 Qatar (13:00–15:00 UTC)**, pending the [readiness preparation and GO checks](superpowers/specs/2026-10-31-final-rehearsal-design.md). Implementation completion does not establish capacity or production release readiness.
+
+The rules below retain the session contract; the implementation and rollout status above governs what has been verified. §12 retains the chronological design/implementation record; its branch names, proposed defaults and unapplied statements describe the point at which each entry was written and are superseded by this status where they differ. Schema, RLS and sync-contract changes remain serialised and independently reviewed under `AGENTS.md`.
 
 ## 1. Decisions and their provenance
 
@@ -55,7 +61,7 @@ A record has four distinct session fields. They are never merged or overwritten.
 - An action is labelled by the override log and schedule versions **as they were at the action's time**, not as they are now.
 - **Automation off with no applicable override: the committee has no session** (null label, flagged). The Chair Console says so, and the Executive dashboard lists such committees.
 
-### Conformance vectors (Saturday 17 Oct, Qatar; lead 5; grace 20 proposed)
+### Conformance vectors (Saturday 17 Oct, Qatar; lead 5; grace 20)
 
 | Slot | Scheduled | switch | Window |
 |---|---|---|---|
@@ -83,7 +89,7 @@ A record has four distinct session fields. They are never merged or overwritten.
 
 A device timestamp is **evidence, not authority**. Everything below follows from one classification, computed by the server at receipt for every mutation and recorded with it.
 
-**Time confidence.** An action's time is **Trusted** when either (a) the server received it within 2 minutes of its device time (an online action), or (b) the device's most recent successful sync **on the same conference day** recorded a clock offset of at most 2 minutes. Otherwise it is **Uncertain**: offset over 2 minutes, no sync that day, or a device time later than receipt by more than 2 minutes. (2 minutes is a **proposed**, unconfirmed parameter.)
+**Time confidence.** An action's time is **Trusted** when either (a) the server received it within 2 minutes of its device time (an online action), or (b) the device's most recent successful sync **on the same conference day** recorded a clock offset of at most 2 minutes. Otherwise it is **Uncertain**: offset over 2 minutes, no sync that day, or a device time later than receipt by more than 2 minutes. (Default 2 minutes, confirmed by the owner on 30 October; configurable.)
 
 **Order without clocks.** Within one device, order is the outbox sequence number (`device_seq`), which does not depend on the clock. Across devices, order uses Trusted times only.
 
@@ -92,7 +98,7 @@ A device timestamp is **evidence, not authority**. Everything below follows from
 | Command class | Trusted time, in window, day open | Trusted, label differs from the device's | Trusted, outside any window | Uncertain time | Arrives after the day is closed |
 |---|---|---|---|---|---|
 | **Record** (scores, vote records, POI scores, document comments) | **Apply** | **Apply**; label flagged for review | **Apply**; label null, flagged | **Hold** | **Hold** |
-| **Control** (queue, debate mode/phase, speech start/finish, vote open/close, resolution status) | **Apply** if the entity revision matches and the action is not stale (received within `control_stale_minutes`, default 5, proposed) | same as left, label flagged | **Hold** | **Hold** | **Hold** |
+| **Control** (queue, debate mode/phase, speech start/finish, vote open/close, resolution status) | **Apply** if the entity revision matches and the action is not stale (received within `control_stale_minutes`, default 5, owner-confirmed) | same as left, label flagged | **Hold** | **Hold** | **Hold** |
 | **Roll call** (§6) | **Apply** | **Apply**, flagged | **Hold** | **Hold** | **Hold** |
 
 **Why records are held when the time is Uncertain.** A record's validity depends on the time: historical eligibility is chosen by the action's time (§6) and the schedule version by its time (§3). An unreliable clock can therefore pick the wrong eligibility state, not only the wrong label, and scores and votes change authoritative totals before anyone reviews. There is **no automatic-application exception** for Uncertain-time records. (If the owner later wants one, it needs an explicit rule and recorded provenance: every non-label precondition independently established by identifiers alone.) **Chairs keep recording**; held work is never lost.
@@ -150,9 +156,9 @@ The server stamps `assigned_label` from the action's time with the schedule vers
 
 A time boundary produces no database write, so nothing announces it. Devices hold the schedule version, lead times and overrides, compute the displayed label with a timer, and correct it on focus and reconnect. The server's assignment is authoritative; a mismatch is flagged, never an error to the chair.
 
-## 8. Data model changes (inventory from the current code)
+## 8. Data model transition (implemented in #84 / #88)
 
-**Session-bound today:** `amendments`, `attendance`, `debate_states`, `documents`, `participation_events`, `speaker_queue`, `speeches`, `timers`, `votes`, plus `committees.currentSessionId` and `sessionRevision`; commands with `sessionId` in `lib/commands.ts`: `attendance`, `newDocument`, `participation`, `queue`, `timer`, `vote`, and the procedure commands in `lib/procedure/commands.ts`. Vote eligibility currently reads attendance in the resolution's session (`lib/commands.ts:327`).
+**Before the restructure:** `amendments`, `attendance`, `debate_states`, `documents`, `participation_events`, `speaker_queue`, `speeches`, `timers` and `votes` depended on sessions, with `currentSessionId` / `sessionRevision` pointers and session-bound commands. This inventory motivated the transition below; it is not the current command contract. #84 removed Chair session selection and rekeyed live state to the committee; #88 converted saved attendance and dropped `timers`.
 
 | Entity | New model |
 |---|---|
@@ -164,26 +170,30 @@ A time boundary produces no database write, so nothing announces it. Devices hol
 | Timers | Removed |
 | `currentSessionId`, `sessionRevision`, `currentSession` command | Removed; the chair-visible session is the derived label |
 
-**Timer removal scope (precise).** Disconnect the persistence command path (`timer` command and its fingerprint, the server `timer` branch and its audit); **replace every consumer**, namely the read-only `<Timer>` used by the projector page (`components/workspace.tsx`), the `data.timers` reads (`components/ui.tsx`), the speech-transition timer reset, and the "session used" check that looks at timer presence; delete the projector page (owner: remove). Hiding the UI is not enough. **Database cleanup (dropping the table) is left to the schema owner.**
+**Timer retirement complete.** The persisted `timer` command is retired, its consumers and projector route removed, and #88's `20261031100000_attendance_to_roll_calls` drops the table. Speaker timers remain local-only and unaudited. The seed, cleanup rules and fixtures use the post-retirement model.
 
 ## 9. Deferred (approved) scope: automatic queue clear at session start
 
 The owner approved an optional auto-clear. It is **retained as approved but deferred**, not cancelled. A device-side boundary timer would let every chair clear the shared queue independently, and an old offline queue-add could resurrect a deliberately cleared entry. The future design needs a **server-side, versioned, idempotent transition**: a per-committee `queue_epoch` bumped by the server at the boundary or by the Executive, entries carrying their epoch, and offline adds with an older epoch **held** (§4). Until then the queue persists and chairs clear it with the existing controls.
 
-## 10. Test plan (before any merge)
+## 10. Regression acceptance contract
 
 Shared vectors for the window function, identical in TypeScript and SQL: all of §3's cases, including an offline action crossing a schedule edit in both orders, override precedence and expiry, automation toggled both ways, a break shorter than the lead, overnight, day close and grace, before-first and after-close. Lifecycle: every cell of the §4 acceptance table (including Uncertain-time **record** commands held), held-behind, approve applies once, replay of an approved UUID, the same UUID with a different payload rejected, crash between receive and apply, revision mismatch on approval, bulk approval after a confirmed clock error. Roll calls: the 11:55/12:30/12:40 example, **the offline roll call plus action arriving together (effective time, not server commit time, decides)**, a future-dated roll call held, a delayed older roll call, copy-last (also offline) is a draft until committed, vote snapshot with `Present & Voting` and abstention, a vote after the result closed. Speech, vote and amendment spanning a boundary; RLS unchanged (chairs see their own committee); duplicate mutation replay; the existing outbox, idempotency and PT409 tests unchanged.
 
-## 11. Open items
+## 11. Remaining rollout and deferred work
 
-- Settings: the 20-minute close grace (decision 11), `control_stale_minutes` (5) and the 2-minute time-trust tolerance are **confirmed by the owner (30 Oct 2026)** as the release settings; the migration defaults already hold these values. The 5-minute lead is confirmed (decision 11).
-- Reports, exports and awards that group by session are **not yet audited** for the four-label model.
-- Every UI use of `currentSessionId` is not yet inventoried; the Executive archive and "session used" checks need design. (Archive: settled in the committee live state bundle, §12.13. "Session used" still counts session-linked history and published schedules.)
-- Whether `Present` (non-voting) may abstain exactly as today when snapshot-based; confirm with the procedure rules. (Owner: keep the rule as today; implemented on the ballot snapshot.)
-- Schema detail: `final_label` is derived, but "no correction yet" must be distinguishable from "corrected to null"; store an explicit correction record, not a nullable column that falls back to `assigned_label`.
-- The review UI for held items (per device, bulk approve, reasons) is not designed. §12 gives it a minimum scope.
+| Item | Current disposition |
+| --- | --- |
+| Timing settings | Settled: owner-confirmed 2 / 5 / 20 minutes for trust, control staleness and close grace; 5-minute schedule lead. These remain configurable parameters. |
+| Reports / exports / awards audit | Complete in #88: no current report/export groups by session; CSV paths are imports. A future session-grouped report must use the final label from `record_label` / `label_correction`, including an explicit correction to null. |
+| Chair session selection and archive checks | Implemented in #84. Chairs never choose the session; live state is committee-level. Session-used checks retain historical links and published schedules. |
+| Attendance and timers | Complete in #88: legacy roll calls retain their source-session labels; saved timers and the table are retired. Real-data migration is not authorised by this status. |
+| Ballot abstention | Settled and implemented: Present may abstain; Present & Voting may not; Absent cannot vote. Eligibility is the ballot's roll-call snapshot. |
+| Executive held-action review | Implemented with individual and bulk decisions, reasons and dependency ordering. Rehearse with synthetic fixtures before enabling enforcement for conference use. |
+| Automatic queue clearing | Approved but deferred (§9); requires a separately reviewed server epoch contract. Preserve queued work and explicit recovery. |
+| Final acceptance | Verify the exact final candidate, schema, schedule/clock/hold workflows and device/browser behavior; pass the full capacity gate and separate release/lifecycle checks. Dated local and hosted evidence does not waive these. |
 
-## 12. Implementation plan
+## 12. Historical implementation plan and log
 
 This section tells the implementer what to build. Where it says "per §N", the rule is defined above and is not restated. Where a choice is not covered, record it in the pull request and in §11 instead of guessing.
 
@@ -283,7 +293,7 @@ Do the phases in this order. Each one must pass its tests before the next starts
 ### 12.11 Open questions to settle before the relevant phase
 
 - **Close grace (20 minutes):** confirmed by the owner (30 Oct 2026); the last session of the day closes 20 minutes after its end, not at midnight.
-- **Attendance conversion (§12.8):** implemented as migration `20261031100000_attendance_to_roll_calls` (unapplied): one committed, legacy roll call per session with attendance, effective at the session start, every delegate a row (never marked reads as Absent), no time confidence, idempotent. The rule is the one in §12.8; confirm it before the migration runs on real data (none exists yet).
+- **Attendance conversion (§12.8):** implemented as migration `20261031100000_attendance_to_roll_calls` (merged in #88; application recorded in the run sheet): one committed, legacy roll call per session with attendance, effective at the session start, every delegate a row (never marked reads as Absent), no time confidence, idempotent. The rule is the one in §12.8; confirm it before the migration runs on real data (none exists yet).
 - **Roll call during a break:** the design labels it with the previous session. Confirmed by the owner (previous session); implemented.
 - **Reports and exports** that group by session (§11): audited. No report or export in the application groups by session today (the only CSV paths are imports), so nothing needs the four-label model yet. Any report added later must read the final label from `record_label` / `label_correction`, not `sessionId`.
 - **Timer table:** dropped by the same migration; saved timers are retired and nothing read or wrote the table. Seed, cleanup rules and fixtures no longer mention it.

@@ -19,6 +19,7 @@ import { ActualClient, commandCommittee, deliverChange, boundedFetch, ownsWorkIt
 import { SUBMISSION_TOKEN } from "../lib/submissions/rules";
 import {activeLane,floorSpeech,laneEntries,nextSpeaker} from '../lib/procedure/view';
 import { isLive, rollCallAt } from '../lib/sessions/presence';
+import { draftRequirements, workflowPreflight, pendingDiagnostics } from './rehearsal/workflow';
 import type { AttendanceStatus } from '../lib/domain';
 import { createSeed } from "../lib/seed";
 import type { Transport } from "../lib/sync/repository";
@@ -71,6 +72,8 @@ const staffRolesPerStage = stages.map(n => {
   return Object.fromEntries((['chair','approval','admins','executive'] as const).map(role=>[role,roles[role]??0])) as Record<StaffRole,number>;
 });
 console.log(JSON.stringify({staffProfile, staffRolesPerStage}));
+console.log(JSON.stringify({ fixtureDraftsRequired: draftRequirements(stages.map(scenarioFor), simulatedCommittees),
+  note: 'Draft counts cover this command only; separate ramp commands consume the same fixture. Recheck before every stage.' }));
 // One resolution link: stay below its designed 20 accepted submissions / 10 min. Never plan an intentional 429.
 for (const n of stages) {
   const plan = checkSingleLinkSubmissions(scenarioFor(n), Boolean(submitToken));
@@ -184,9 +187,9 @@ let observedReads: Record<string, number> = {}, observedWrites: Record<string, n
 let openedDevices=new Set<number>();
 let observedActions: Record<string, number> = {}, observedPublic = { pages: 0, creates: 0 };
 let observedChairDevices = new Map<number, ChairTraffic>();
-const broadcast = (event: { topic: Topic; committee: number }) => {
+const broadcast = (event: { topic: Topic; committee: number; mutationId?: string }) => {
   if (event.committee < 0) throw Error('Cannot attribute an accepted change to its fixture committee.');
-  deliverChange(realtimeModel, [...devices.keys()], event, (user, topic) => setTimeout(() => devices.get(user)?.client.notify(topic), REALTIME_DELIVERY_MS));
+  deliverChange(realtimeModel, [...devices.keys()], event, (user, topic, mutationId) => setTimeout(() => devices.get(user)?.client.notify(topic, mutationId), REALTIME_DELIVERY_MS));
 };
 const actionOf = (m: Mutation): string => m.command.type === 'document'
   ? ({ Submitted: 'sendToApproval', Approved: 'approve', Printed: 'print' } as Record<string,string>)[m.command.status] ?? 'document'
@@ -199,6 +202,8 @@ function makeDevice(user: SimUser): Device {
   const seen = new Set<string>();
   const measured: Transport = {
     actorId: id.userId,
+    passiveRefreshGapMs: transport.passiveRefreshGapMs,
+    syncClock: device => transport.syncClock(device),
     read: async () => {
       const before = counter.snapshot; let data!: Data;
       await measure('refresh', async () => { data = await transport.read(); }, user.role, 'actual-core', () => counter.snapshot - before);
@@ -224,7 +229,7 @@ function makeDevice(user: SimUser): Device {
       }
       if (m.command.type === 'speechScore' || m.command.type === 'poiScore') acknowledged.add(m.id);
       const topic = TOPIC_OF[actionOf(m) as Action];
-      if (topic) broadcast({ topic, committee: fixture.committees.findIndex(c => c.id === committeeId) });
+      if (topic) broadcast({ topic, committee: fixture.committees.findIndex(c => c.id === committeeId), mutationId: m.id });
     },
   });
   return { user, transport, client, get data() { return client.snapshot; } };
@@ -311,6 +316,13 @@ const stageReports = [];
 const readinessByStage: ReturnType<typeof assessReadiness>[] = [];
 for (const users of stages) {
   const scenario = scenarioFor(users);
+  // Outside the timed workload: scope-check the real workflow state instead of discovering a depleted fixture after a five-minute run.
+  const chairScopes = [...new Map(scenario.filter(u => u.role === 'chair').map(u => {
+    const assignment = chairOf(u); return [assignment.committee.id, assignment] as const;
+  })).values()];
+  const fixtureState = await Promise.all(chairScopes.map(a => new Transport(clientFor(a.identity.token), fixture.conference, a.identity.userId, [], false, ['chair']).read()));
+  const workflow = workflowPreflight(scenario, legacy ? Array.from({ length: simulatedCommittees }, (_, i) => ({ id: legacy.committee, code: `floor-${i}` })) : fixture.committees, fixtureState);
+  if (!workflow.pass) { console.error(`Refused before timed stage: ${workflow.reasons.join('; ')}`); process.exit(2); }
   const before = samples.length;
   console.log(`Stage: ${users} staff + ${delegateCount} delegates (public form) for ${minutes} min against ${base} (Supabase ${ref}, realtime model ${realtimeModel})…`);
   const staffUsers = scenario.filter((u) => u.role !== "delegate");
@@ -330,6 +342,8 @@ for (const users of stages) {
   const pendingAtClose = [...devices.values()].reduce((n, d) => n + d.client.pending, 0);
   const conflictsAtClose = [...devices.values()].reduce((n, d) => n + d.client.conflicts, 0);
   const unconfirmedAtClose = [...devices.values()].reduce((n, d) => n + d.client.unconfirmed, 0);
+  const unresolved = pendingDiagnostics([...devices.values()].map(d => ({ device: d.user.id, role: d.user.role,
+    committee: d.user.role === 'chair' ? chairOf(d.user).committee.code : 'conference', pending: d.client.repo.getPending() })));
   const readiness = assessReadiness({ mode, committees: fixture.committees.slice(0, simulatedCommittees), chairTraffic: [...observedChairDevices.values()] });
   readinessByStage.push(readiness);
   const work = observedWorkVerdict({ expectedDevices:staffUsers.length,openedDevices:openedDevices.size, expectedRoles: [...new Set(staffUsers.map(u => u.role))], reads: observedReads, writes: observedWrites,
@@ -338,7 +352,7 @@ for (const users of stages) {
     expectedActions: ['speechScore','poiRecognize','poiScore','sendToApproval','approve','print'].filter(a => scenario.some(u => u.steps.some(s => s.action === a))), actions: observedActions,
     expectedPages: delegateCount, completedPages: observedPublic.pages, expectedSubmissions: plannedSubmissions(scenario), createdSubmissions: observedPublic.creates });
   stageReports.push({ staff: users, delegates: delegateCount, configuredReadiness, readiness, observed: { openedDevices:openedDevices.size, reads: observedReads, writes: observedWrites, actions: observedActions, publicForm: observedPublic }, work,
-    drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose, conflictsAtClose, unconfirmedAtClose, closeTimedOut,
+    drainSeconds: Math.round((Date.now() - scenarioEnded) / 1000), pendingAtClose, conflictsAtClose, unconfirmedAtClose, closeTimedOut, workflowPreflight: workflow, unresolved,
     snapshotRpcsByName: stageSnapshotRpcs,
     clientModel: { implementation: 'actual DurableRepository + DurableStore, isolated fake IndexedDB', realtimeDelivery: 'simulated; no real channels', sourceAttribution: 'actual-core; internal trigger attribution is not inferred',
       byRole: Object.fromEntries(['chair','approval','admins','executive'].map(role => [role, [...devices.values()].filter(d => d.user.role === role).map(d => d.client.stats)])) },

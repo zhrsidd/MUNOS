@@ -1,13 +1,30 @@
 # UI priorities and first implementation package
 
-Repository review follow-through: [START_HERE.md](START_HERE.md) records the shared agent context, governance and post-merge Graphify refresh; the [PR #22 acceptance gate](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate) covers migrations and the sync changes. Existing owner decisions and feature statuses below are retained; none is upgraded to staging or release acceptance by this documentation update.
+## Current status · 31 October 2026
+
+This update supersedes the dated branch and unapplied-migration statuses below. The local reconciliation baseline is `682ab47`; it does not claim a new browser or hosted acceptance run. [BACKLOG.md](BACKLOG.md) is the current remaining-work index, [SESSION_MODEL.md](SESSION_MODEL.md) the implemented session contract, and [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md) the recorded hosted migration evidence.
+
+| Area | Current disposition |
+| --- | --- |
+| Session and retirement work | #84 / #88 merged: committee live state, derived session labels, roll calls, ballot snapshots, held-action dependencies and Executive review. Attendance conversion, reports/export audit and timer-table retirement are complete. The speaker timer stays local; automatic queue clearing remains approved but deferred. |
+| Protected feature requests | Clear-majority voting (#37), Chair-school photo matching (#36), configurable credits (#35), approval history, point adjustments, print copies and identity projection are implemented. The setup record documents their preproduction application; #95 records a 37-migration ledger. Old draft/unapplied rows are history. |
+| Existing UI packages | Contribution ranking, Debate points list, Executive resolution status, country search, sync strip, passed-amendment history, About, Felix and restrained loading/motion are implemented. Their dated verification below establishes only the checks actually recorded, not final-candidate acceptance. |
+| Remaining visual work | Targeted Chair-control sizing and shared spacing need the current pass and browser evidence at mobile/desktop widths, keyboard, reduced motion and 200% zoom. Keep broader W2/W3/W7 acceptance open where no complete all-workspace evidence is recorded. |
+| Docs access checks | New submissions are Google Docs-only; automated access-verification states/recheck remain distinct from URL validation and need the specified reviewed implementation. Preserve the limits in [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md). |
+| Capacity and release | [31 October evidence](../evidence/load-2026-10-31/SUMMARY.md): **NO-GO**. #93/#95's applied committee pre-filter and #94's merged client changes await a new capacity run. Owner selected **1 November, 16:00–18:00 Qatar (13:00–15:00 UTC)**; see the [readiness specification](superpowers/specs/2026-10-31-final-rehearsal-design.md). Candidate review, named watcher, explicit GO, physical-device checks, rollback and release approval remain required. |
+
+Direct RPC remains the [approved conference scope](RELEASE_SCOPE_2026-10-26.md); gateway and signed attestation are deferred. No capacity result, production promotion or release approval is created by this documentation reconciliation.
+
+## Historical first-package record · 19–21 October 2026
+
+The sections below retain the original handoff and verification evidence. Their branch names, pending items and unapplied-migration statements describe those dates; they do not override the current-status table above. Keep the owner's decisions and feature boundaries, including removal of the SC/HSC clause-by-clause / informal P5 proposal.
 
 Owner-authorised Codex implementation, 19 October 2026. Base: Claude branch `0a43c73`.
 Branch: `codex/priority-chair-ui`. Claude can review and clean up this package independently.
 
 ## Claude handoff coverage · 20 October 2026
 
-This is the active feature handoff, alongside [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
+This was the 20 October feature handoff, alongside [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md).
 The owner removed the SC/HSC clause-by-clause and informal P5-outcome proposal from this handoff on 20 October.
 General clear-majority voting remains a separate request. Do not revive the removed proposal from Git history.
 Statuses below describe the reviewed branch; implemented locally does not mean released or verified in staging.
@@ -35,7 +52,7 @@ Statuses below describe the reviewed branch; implemented locally does not mean r
 | Port PHESMUN About and check feature parity through PR #13 | About ported 20 October in its own PR: public `/about`, DCMUN seal, credits Zuhayr Siddique (creator) and John Paul Ribeiru (Development Contributor) and the PHESMUN licence wording, linked from every workspace footer. Parity table: Codex audit 20 October §D; missing ports (print copies, optional email/committee import, staff edit/remove) are tracked separately. |
 | Leo becomes Felix, with all proposed Leo improvements | Implemented in the `claude/felix` PR (not released): supplied Launcher head at 48 px in a 56 px button, six optimised expression frames, blink/typing beak/petting hover, motion-off switch and reduced motion; typing retuned 21 October (replies stay instant, faster than Leo's 19 ms/char plus 500 ms delay; face cycle 1.1 s, one beak change and one blink, settles 600 ms after the last key); deterministic DCMUN knowledge reviewed against MUNOS with links limited to real navigation destinations; short popups above Felix, persistent local Inbox with honest read/unread state, in-app notices only (no browser notification API). See [FELIX.md](FELIX.md). |
 | Orbit seal loading, suitable Watermelon components and gentle transitions | Implemented 21 October on `claude/watermelon-patterns` (not released; no dependency added): Orbit initial loading, Combobox (earlier), one shared **CopyButton**, **Spinner**/`PendingButton` (300 ms threshold) on real network controls, **SkeletonRows** on the two genuine uncached screen reads (passed-amendment history, access-code status) and a single continuous active-tab indicator (150 ms, transform only). Run Action Button, Labeled Progress, Command Search, Inline Toast and Expand Details rejected as the selection brief directs. Evidence, constants and omissions: [UI_OVERHAUL.md](UI_OVERHAUL.md) "Watermelon patterns" and [BRAND.md](BRAND.md) "Feedback and motion patterns". |
-| Existing session and reliability work | Keep [SESSION_MODEL.md](SESSION_MODEL.md) and its sign-off gate; do not confuse the removed procedure proposal with removal of the session work. Preserve offline recovery, export, conflicts, permissions and print copies = delegates + 3 spares. |
+| Existing session and reliability work | Keep [SESSION_MODEL.md](SESSION_MODEL.md) and its independent review gate; do not confuse the removed procedure proposal with removal of the session work. Preserve offline recovery, export, conflicts, permissions and print copies = delegates + 3 spares. |
 | Release and capacity verification | Staging replay, signed-in flows, rollback and realistic 19-committee rehearsal remain outstanding. Size the rehearsal for the owner's 57 Chairs, about 10 Approval devices, 5–6 printing devices and Executive/spares, with 1–2 active Chairs per committee. |
 
 ## Implemented in this package
@@ -68,10 +85,9 @@ three views; no extra polling, schema or permission changes.
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md) for the owner's feedback and acceptance checks.
 This functional package does not claim that cleanup is complete.
 
-## Remaining priority order
+## Historical priority order · 20 October 2026
 
-These are the owner's current requirements, including superseding decisions. They are not marked done by this
-package. Continue from the existing Assembly implementation, rather than reintroducing retired workflows.
+These were the owner's requirements at the first-package handoff, including superseding decisions. Later implementation is reconciled in the current-status table above; this historical list is not the current remaining-work queue. Continue from the existing Assembly implementation, rather than reintroducing retired workflows.
 
 1. **Google Docs-only submissions and access verification.** Native working Docs only for new submissions,
    including the server endpoint; preserve historical attachments. Explicit Anyone-with-link instructions,
