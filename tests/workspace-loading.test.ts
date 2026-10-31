@@ -64,3 +64,21 @@ test("missing data with a failed startup offers existing retry and recovery cont
     assert.doesNotMatch(html, /workspace-loading|Sensitive workspace/);
   }
 });
+
+test("the standard loader offers About MUNOS in place, with no network image and no Conference OS name", () => {
+  const html = renderToStaticMarkup(createElement(StaffAccessGate, { access: { status: "loading", roles: [], committeeIds: [] } }));
+  assert.match(html, /<details class="workspace-loading-about"><summary>About MUNOS<\/summary>/);
+  assert.match(html, /Powered by/);
+  assert.match(html, /class="munos-mark"/, "the mark is inline SVG, so it renders offline");
+  assert.doesNotMatch(html, /href="\/about"/, "opening About must not navigate away from loading");
+  assert.doesNotMatch(html, /Conference OS/);
+  assert.equal((html.match(/role="status"/g) ?? []).length, 1);
+});
+
+test("Choose your workspace links to About MUNOS", async () => {
+  // The component imports a CSS module the test runner cannot load, so check its source.
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile("components/workspace-home.tsx", "utf8");
+  assert.match(source, /Choose your workspace\./);
+  assert.match(source, /<Link className=\{styles\.about\} href="\/about"><MunosMark size=\{20\} \/>About MUNOS<\/Link>/);
+});
