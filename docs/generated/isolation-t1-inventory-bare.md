@@ -1,7 +1,7 @@
 # T1 privilege inventory (GENERATED, do not edit)
 
 Generator: `scripts/isolation-inventory/inventory.mts`. Baseline: **bare**. PostgreSQL 17, disposable local database replayed from empty.
-Migrations replayed: 36 files, combined SHA-256 `8ac1bdb676b4376f`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
+Migrations replayed: 37 files, combined SHA-256 `776e5787ee905201`. Output is deterministic (no timestamps); a diff means the schema, grants or generator changed.
 
 **Bare baseline.** The three-role bootstrap the existing PostgreSQL tests use: no default privileges. Shown only to quantify how much exposure comes from the hosted default-privilege model.
 
@@ -48,7 +48,7 @@ Executed in the disposable database after the inventory was read:
 
 ## Functions
 
-111 functions (100 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
+112 functions (101 callable, 11 trigger functions). Writes column is a **textual heuristic** over the function body and its named callees (insert/update/delete/truncate/merge/nextval); it can miss dynamic SQL and can over-report.
 
 | Function | Kind | Security | Owner | Volatility | Config (search_path) | EXECUTE held by | Data API callers (EXECUTE + schema USAGE) | Writes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -144,6 +144,7 @@ Executed in the disposable database after the inventory was read:
 | `private.uuid_or_null(value text)` | function | invoker | postgres | immutable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.valid_flag(value text)` | function | invoker | postgres | immutable | search_path="" | postgres | - | reads/none |
 | `private.veto_delegates(rid uuid)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
+| `private.visible_committees(conf uuid, roles conference_role[])` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `private.waits_for_held(p_committee uuid, p_device uuid, p_seq bigint, p_command jsonb, p_received timestamp wi...)` | function | invoker | postgres | stable | search_path="" | postgres | - | reads/none |
 | `public.access_code_status(conf uuid)` | function | definer | postgres | stable | search_path="" | authenticated, postgres | authenticated | reads/none |
 | `public.amendment_link_info(link_token text)` | function | definer | postgres | stable | search_path="" | service_role, postgres | service_role | reads/none |
@@ -196,7 +197,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 
 - none
 
-### `private` functions callable by a Data API role (16)
+### `private` functions callable by a Data API role (17)
 
 `private` is not an exposed PostgREST schema (hosted exposure is assumption A3), so these are reachable only from SQL, policies and other functions, but the role privileges below are what a SQL-level caller would have.
 
@@ -216,6 +217,7 @@ PUBLIC covers every role including any future one (and `anon`, subject to schema
 - `private.record_device_clock(conf uuid, device uuid, device_time timestamp with time zone)`: authenticated (writes)
 - `private.session_schedules(conf uuid)`: authenticated (reads/none)
 - `private.uuid_or_null(value text)`: authenticated (reads/none)
+- `private.visible_committees(conf uuid, roles conference_role[])`: authenticated (reads/none)
 
 ## Tables, views and sequences
 
