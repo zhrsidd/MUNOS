@@ -6,6 +6,21 @@ Supabase Pro with Small compute stays outstanding for conference week and is not
 
 Status key: ☐ not started · ◐ in progress · ☑ done (with the verification that closed it).
 
+## Current status · 31 October 2026
+
+This update supersedes the dated branch and unapplied-migration statuses below. The local reconciliation baseline is `682ab47`; it does not claim a new browser or hosted acceptance run. [BACKLOG.md](BACKLOG.md) is the current remaining-work index, [SESSION_MODEL.md](SESSION_MODEL.md) the implemented session contract, and [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md) the recorded hosted migration evidence.
+
+| Area | Current disposition |
+| --- | --- |
+| Session and retirement work | #84 / #88 merged: committee live state, derived session labels, roll calls, ballot snapshots, held-action dependencies and Executive review. Attendance conversion, reports/export audit and timer-table retirement are complete. The speaker timer stays local; automatic queue clearing remains approved but deferred. |
+| Protected feature requests | Clear-majority voting (#37), Chair-school photo matching (#36), configurable credits (#35), approval history, point adjustments, print copies and identity projection are implemented. The setup record documents their preproduction application; #95 records a 37-migration ledger. Old draft/unapplied rows are history. |
+| Existing UI packages | Contribution ranking, Debate points list, Executive resolution status, country search, sync strip, passed-amendment history, About, Felix and restrained loading/motion are implemented. Their dated verification below establishes only the checks actually recorded, not final-candidate acceptance. |
+| Remaining visual work | Targeted Chair-control sizing and shared spacing need the current pass and browser evidence at mobile/desktop widths, keyboard, reduced motion and 200% zoom. Keep broader W2/W3/W7 acceptance open where no complete all-workspace evidence is recorded. |
+| Docs access checks | New submissions are Google Docs-only; automated access-verification states/recheck remain distinct from URL validation and need the specified reviewed implementation. Preserve the limits in [GOOGLE_WORKSPACE_ACCESS_MODEL.md](GOOGLE_WORKSPACE_ACCESS_MODEL.md). |
+| Capacity and release | [31 October evidence](../evidence/load-2026-10-31/SUMMARY.md): **NO-GO**. #93/#95's applied committee pre-filter and #94's merged client changes await a new capacity run. Owner selected **1 November, 16:00–18:00 Qatar (13:00–15:00 UTC)**; see the [readiness specification](superpowers/specs/2026-10-31-final-rehearsal-design.md). Candidate review, named watcher, explicit GO, physical-device checks, rollback and release approval remain required. |
+
+Direct RPC remains the [approved conference scope](RELEASE_SCOPE_2026-10-26.md); gateway and signed attestation are deferred. No capacity result, production promotion or release approval is created by this documentation reconciliation.
+
 ## Order and dependencies
 
 ```
@@ -87,15 +102,14 @@ automatic submitter credit, are in [PARTICIPATION_VIEWS.md](PARTICIPATION_VIEWS.
 align. A separate bounded Debate list shows all committee countries, flags and conference-total net points,
 including zero and negative values. Unit tests and production-build browser checks cover both views.
 
-**W6b · Chair deducts a chosen number of points ◐ (code and migration reviewed for staging replay; no staging application recorded).** A custom amount, not fixed steps.
+**W6b · Chair deducts a chosen number of points ◐ (implemented and applied in preproduction; final-candidate acceptance pending).** A custom amount, not fixed steps.
 Stored as a traceable adjustment: amount, reason (required), chair, time, delegate; original participation
 history is never edited or deleted, totals are original events plus adjustments. Existing committee permissions
-(Chair of that committee only) enforced on the server and through the outbox/idempotency path. Needs a
-migration and repository change: written up and reviewed independently before it is applied on staging.
+(Chair of that committee only) enforced on the server and through the outbox/idempotency path. The reviewed migration and repository change are merged and applied in preproduction; final-candidate acceptance remains separate.
 Acceptance: unit tests for totals and bounds; a replay and double-submit test (receipt idempotency); a
 cross-committee Chair is refused; history shows original event and adjustment separately.
 
-**W6c · Approval history in the Approval Panel ◐ (code and migration reviewed for staging replay; no staging application recorded).** Accessible list or table of decisions: decision,
+**W6c · Approval history in the Approval Panel ◐ (implemented and applied in preproduction; final-candidate acceptance pending).** Accessible list or table of decisions: decision,
 comment, reviewer, time, newest first, per resolution. Landmark and heading structure, status by word, keyboard
 focusable, announced updates. Acceptance: axe-style checks (roles, names, contrast) pass in a browser; works
 without colour; shows decisions made offline once synced, labelled with the server time.
@@ -133,16 +147,18 @@ the conference-week gate.
 
 ## Related items already approved (not part of this sequence)
 
-Session restructure (blocked on contract sign-off), Leo notification inbox and short messages, popups above Leo,
+Session restructure (implemented through #84 / #88), Felix notification inbox and short messages, popups above Felix,
 ad-blocker-resistant notifications, configurable Debated Amendment and Main Submitter points, print copies =
 delegates + 3 spares, break-shorter-than-lead rule, executive resolution overview, automatic conflict pause and
 export, amendments-by-resolution fix. See `docs/SESSION_MODEL.md` and `docs/BACKLOG.md`.
 
 ## Review queue (protected changes)
 
-`docs/REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md`: migrations 20261019100000, 100100, 100200. Not applied anywhere.
-Independent of: session contract (`docs/SESSION_MODEL.md`, still draft) and the conference-week Pro/Small
-performance checks, both unchanged.
+`docs/REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md` preserves the PR #22 review packet. Its migrations are merged and their application is recorded in [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md); the session implementation is merged through #84 / #88. Any new protected changes still require independent review. Final-candidate acceptance and conference-week Pro/Small performance gates remain open.
+
+## Historical package evidence · 19–21 October 2026
+
+The following dated implementation, branch and verification entries preserve their original evidence. Where an entry says pending, draft or unapplied, consult the current-status table above before treating it as remaining work.
 
 ## Owner follow-up and first priority pass · 19 October 2026
 
@@ -218,12 +234,9 @@ Claude owns the global button, alignment, panel-width and spacing cleanup reques
 See [CLAUDE_VISUAL_CLEANUP.md](CLAUDE_VISUAL_CLEANUP.md). The functional follow-up is recorded in
 [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md); it does not complete the global visual overhaul.
 
-## Clear-majority voting · retained owner request
+## Clear-majority voting · implemented owner request
 
-Pending implementation by Claude: [CLEAR_MAJORITY_VOTING.md](CLEAR_MAJORITY_VOTING.md). Add compact
-Clear majority For / Against actions that record the Chair's observed result without filling country ballots.
-Keep counted voting, Divide the House, existing veto rules, history, permissions and offline durability.
-The complete current coverage checklist is in [UI_PRIORITY_PASS.md](UI_PRIORITY_PASS.md).
+Implemented in #37; migration `20261021110000_clear_majority` was applied and signed-in browser behavior recorded on 21 October in [SUPABASE_PROJECT_SETUP.md](SUPABASE_PROJECT_SETUP.md). [CLEAR_MAJORITY_VOTING.md](CLEAR_MAJORITY_VOTING.md) preserves the design. Clear majority For / Against records the observed result without fabricated country ballots; ballot-revision checks, counted voting, Divide the House, veto rules, history, permissions and offline durability remain required in final-candidate verification.
 
 ## Home screen proposal and local reference · 20 October 2026
 
