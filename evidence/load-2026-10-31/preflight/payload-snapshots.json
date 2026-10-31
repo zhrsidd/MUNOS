@@ -1,0 +1,186 @@
+{
+  "date": "2026-10-31T12:15:01.589Z",
+  "supabaseProject": "kllhswucdhqqywnzxado",
+  "conference": "573cfbeb-d3ed-4cf5-b418-7d36326f69c8",
+  "identityMode": "realistic-multi-committee",
+  "chairIdentities": 19,
+  "sequentialReadsPerRpc": 20,
+  "results": {
+    "chair (GA1)": {
+      "conference_state_snapshot": {
+        "bytes": 14598,
+        "p50_ms": 375,
+        "p95_ms": 912,
+        "failures": 0
+      }
+    },
+    "chair (WHO)": {
+      "conference_state_snapshot": {
+        "bytes": 14598,
+        "p50_ms": 364,
+        "p95_ms": 387,
+        "failures": 0
+      }
+    },
+    "chair (HRC)": {
+      "conference_state_snapshot": {
+        "bytes": 14258,
+        "p50_ms": 369,
+        "p95_ms": 513,
+        "failures": 0
+      }
+    },
+    "chair (SC)": {
+      "conference_state_snapshot": {
+        "bytes": 14252,
+        "p50_ms": 371,
+        "p95_ms": 399,
+        "failures": 0
+      }
+    },
+    "chair (GA2)": {
+      "conference_state_snapshot": {
+        "bytes": 14258,
+        "p50_ms": 368,
+        "p95_ms": 394,
+        "failures": 0
+      }
+    },
+    "chair (GA3)": {
+      "conference_state_snapshot": {
+        "bytes": 14261,
+        "p50_ms": 372,
+        "p95_ms": 391,
+        "failures": 0
+      }
+    },
+    "chair (ECOSOC)": {
+      "conference_state_snapshot": {
+        "bytes": 14279,
+        "p50_ms": 369,
+        "p95_ms": 399,
+        "failures": 0
+      }
+    },
+    "chair (UNEP)": {
+      "conference_state_snapshot": {
+        "bytes": 14267,
+        "p50_ms": 370,
+        "p95_ms": 389,
+        "failures": 0
+      }
+    },
+    "chair (UNHCR)": {
+      "conference_state_snapshot": {
+        "bytes": 14273,
+        "p50_ms": 403,
+        "p95_ms": 430,
+        "failures": 0
+      }
+    },
+    "chair (ICJ)": {
+      "conference_state_snapshot": {
+        "bytes": 14261,
+        "p50_ms": 368,
+        "p95_ms": 480,
+        "failures": 0
+      }
+    },
+    "chair (UNSC2)": {
+      "conference_state_snapshot": {
+        "bytes": 14280,
+        "p50_ms": 369,
+        "p95_ms": 395,
+        "failures": 0
+      }
+    },
+    "chair (UNODC)": {
+      "conference_state_snapshot": {
+        "bytes": 14280,
+        "p50_ms": 368,
+        "p95_ms": 386,
+        "failures": 0
+      }
+    },
+    "chair (UNESCO)": {
+      "conference_state_snapshot": {
+        "bytes": 14286,
+        "p50_ms": 365,
+        "p95_ms": 375,
+        "failures": 0
+      }
+    },
+    "chair (CSW)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 364,
+        "p95_ms": 391,
+        "failures": 0
+      }
+    },
+    "chair (C15)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 363,
+        "p95_ms": 384,
+        "failures": 0
+      }
+    },
+    "chair (C16)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 365,
+        "p95_ms": 389,
+        "failures": 0
+      }
+    },
+    "chair (C17)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 363,
+        "p95_ms": 386,
+        "failures": 0
+      }
+    },
+    "chair (C18)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 373,
+        "p95_ms": 389,
+        "failures": 0
+      }
+    },
+    "chair (C19)": {
+      "conference_state_snapshot": {
+        "bytes": 14268,
+        "p50_ms": 367,
+        "p95_ms": 387,
+        "failures": 0
+      }
+    },
+    "approval": {
+      "conference_state_snapshot": {
+        "bytes": 59353,
+        "p50_ms": 406,
+        "p95_ms": 566,
+        "failures": 0
+      }
+    },
+    "admins": {
+      "conference_state_snapshot": {
+        "bytes": 59410,
+        "p50_ms": 406,
+        "p95_ms": 431,
+        "failures": 0
+      }
+    },
+    "executive": {
+      "executive_state_snapshot": {
+        "bytes": 229581,
+        "p50_ms": 1035,
+        "p95_ms": 1101,
+        "failures": 0
+      }
+    }
+  }
+}

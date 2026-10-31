@@ -1,0 +1,11 @@
+# PF15 Advisors baseline, project kllhswucdhqqywnzxado, read-only via Supabase connector, 2026-10-31T11:59:57Z (counts and names only)
+SECURITY (findings by lint):
+- rls_enabled_no_policy (INFO) x2: private.conference_settings, private.project_lifecycle
+- anon_security_definer_function_executable (WARN) x1: public.preproduction_status
+- authenticated_security_definer_function_executable (WARN) x5: access_code_status, preproduction_status, redeem_access_code, revoke_access_code, rotate_access_code
+- auth_allow_anonymous_sign_ins (WARN) x38: auth.sessions, storage.objects, and 36 public tables (RLS policies reachable by anonymous users)
+- auth_leaked_password_protection (WARN) x1
+PERFORMANCE:
+- unindexed_foreign_keys (INFO) x37
+- unused_index (INFO) x87
+- auth_db_connections_absolute (INFO) x1: Auth server uses at most 10 connections (absolute, not percentage)
