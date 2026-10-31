@@ -13,7 +13,7 @@ Commit under test (tooling): `________________`   App candidate / Preview deploy
 | Approver and stop authority (Zuhayr Siddique; applies or approves every hosted SQL; Small upgrade and cost) | Zuhayr Siddique (overseer; terminates the test when told to) | this chat | 31 Oct, from pre-flight | Owner, 30 Oct; 31 Oct (Small upgrade done) |
 | Harness operator (runs `npm run rehearsal:*`, holds `.test-sessions/`, fills this sheet) | Claude (AI operator, cloud session). Operates only; never decides GO | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
 | Dashboard watcher (Supabase Observability and logs, Vercel logs; **calls STOP**) [card: confirm before GO] | Zuhayr Siddique | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
-| Go/no-go decider and settle timer (not the operator alone) | Zuhayr Siddique | this chat | 31 Oct, from pre-flight | Owner, 31 Oct |
+| Go/no-go decider and settle timer (not the operator alone) | Claude, on owner instruction from S0 onward (changed 31 Oct; replaces Zuhayr Siddique, who keeps STOP authority) | this chat | 31 Oct | Owner, 31 Oct |
 | Independent reviewer (reviews the report and every stop/go) |  |  |  |  |
 | Release approver (John Paul Ribeiru): not involved in running |  |  |  |  |
 
