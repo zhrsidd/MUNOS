@@ -45,9 +45,13 @@ export function AlternativeLoadingScreen({ committeeCode }: { committeeCode: str
   if (failed) return <WorkspaceLoading />;
   return (
     <section className="committee-loading" data-motion={visible ? "running" : "paused"} aria-label={`${committeeCode} workspace loading`}>
-      <Image className="committee-loading-art" src="/loading/committee-collage-v1.webp" alt="" fill unoptimized onError={() => setFailed(true)} />
-      <div className="committee-loading-heading"><strong>DCMUN OS</strong><span>{committeeCode}</span></div>
-      <span className="committee-loading-tag">COMMITTEE IN SESSION</span>
+      <div className="committee-loading-header">
+        <div className="committee-loading-heading"><strong>DCMUN OS</strong><span>{committeeCode}</span></div>
+        <span className="committee-loading-tag">COMMITTEE IN SESSION</span>
+      </div>
+      <div className="committee-loading-scene">
+        <Image className="committee-loading-art" src="/loading/committee-collage-v1.webp" alt="" fill unoptimized onError={() => setFailed(true)} />
+      </div>
       <div className="committee-loading-bottom">
         <div className="committee-loading-label" role="status" aria-label="Opening your workspace">
           <span className="sr-only">Opening your workspace</span>
