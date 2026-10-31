@@ -9,6 +9,7 @@ import {
 import {usePathname,useRouter} from "next/navigation";
 import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
 import {WorkspaceLoading} from "../components/workspace-loading";
+import {CommitteeWorkspaceLoading} from "../components/committee-workspace-loading";
 import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
 import {requestPersistentStorage} from "./platform/persistent-storage";
 import { DurableStore } from "./sync/store";
@@ -85,7 +86,7 @@ export function ConferenceProvider({
   if (!data) {
     if (health.state === "error" || health.state === "waiting")
       return <StaffAccessGate access={{...access,status:"unavailable",message:health.message}}/>;
-    return <WorkspaceLoading/>;
+    return <CommitteeWorkspaceLoading access={access}/>;
   }
   return (
     <Context.Provider

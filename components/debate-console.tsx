@@ -150,7 +150,7 @@ export function DebateConsole({ committeeId }: { committeeId: string }) {
     </section>}
     {!amendment && passedAmendments.length > 0 && <div className="callout amendment-applied" role="note">
       <strong>Apply the passed amendment to the working Google Doc.</strong>
-      <p>Conference OS records the outcome only. Passed for {identity?.text}: {passedAmendments.map(a => `${a.type} · ${a.clause} (${country(a.submitterId)})`).join("; ")}.</p>
+      <p>MUNOS records the outcome only. Passed for {identity?.text}: {passedAmendments.map(a => `${a.type} · ${a.clause} (${country(a.submitterId)})`).join("; ")}.</p>
     </div>}
     <div className="procedure-live-grid">
       <Panel title={speaker ? "The floor is with" : "The floor is with the Chair"} action={active ? <Chip tone="blue">{active.classification}{active.amendmentId ? " · amendment" : ""}</Chip> : undefined}>

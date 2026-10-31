@@ -1,5 +1,7 @@
 "use client";
 import {VetoSettings} from "./veto-settings";
+import { LoadingScreenSettings } from "./loading-screen-settings";
+import { loadingScreenFeatureKey } from "../lib/loading-screen";
 import { ExecutiveResolutionOverview } from "./executive-resolution-overview";
 import { CentralSessions } from "./central-sessions";
 import { CommitteeManagement } from "./committee-management";
@@ -387,13 +389,14 @@ export function AdminScreen({ section }: { section: string }) {
         <ScoringSettings scope={scoreScope} setScope={setScoreScope} />
       )}
       {section === "workflow" && <VetoSettings/>}
+      {section === "workflow" && <LoadingScreenSettings/>}
       {section === "workflow" && (
         <div className="two-column">
           <Panel
             title="Conference features"
             subtitle="Feature settings are saved; operational feature gating is a later integration step."
           >
-            {Object.entries(data.conference.features).map(([name, enabled]) => (
+            {Object.entries(data.conference.features).filter(([name]) => !name.startsWith(loadingScreenFeatureKey(""))).map(([name, enabled]) => (
               <div className="toggle-row" key={name}>
                 <div>
                   <strong>{name}</strong>

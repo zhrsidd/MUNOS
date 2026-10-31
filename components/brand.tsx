@@ -7,7 +7,7 @@ export function Brand({ href = "/", size = 36 }: { href?: string; size?: number 
     <Link href={href} className="brand">
       <Image className="brand-logo" src="/dcmun-logo.jpg" alt="" width={size} height={size} priority />
       <span>
-        DCMUN<span className="brand-os"> Conference OS</span>
+        DCMUN<span className="brand-os"> MUNOS</span>
       </span>
     </Link>
   );
