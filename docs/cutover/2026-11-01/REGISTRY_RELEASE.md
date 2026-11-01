@@ -2,7 +2,7 @@
 
 This change marks only `kllhswucdhqqywnzxado` as production in the committed owner registry. PHESMUN remains forbidden. It does not promote the hosted database, create real data, install credentials or deploy Production.
 
-**Keep this PR a draft and unmerged until credential/connector retirement, cleanup verification, the recorded 3,600-second wait plus margin, and release approvals are complete.** A clean review or CI result does not complete those operator actions. The owner has authorised preparation and reported team/John Paul approval; the final source SHA must still be recorded in the release handover.
+**Keep this PR a draft and unmerged until credential/connector retirement, cleanup verification, the recorded 3,600-second wait plus margin, and release approvals are complete.** A clean review or CI result does not complete those operator actions. The owner-reported retirement cutoff and margin are in [RETIREMENT.json](RETIREMENT.json): activation must be **no earlier than 15:33 Qatar, 1 November 2026**, and later if issuance resumes or another gate is incomplete. The owner has authorised preparation and reported team/John Paul approval; the final source SHA must still be recorded in the release handover.
 
 The regression test checks the actual committed DCMUN classification, stale staging/development allow-list refusal, both nonproduction deployment modes, the expected Production target, and PHESMUN denial. It failed on the old preproduction record and passed with this change. Synthetic fixtures remain independent of the real project's phase.
 

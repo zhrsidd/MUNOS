@@ -1,0 +1,23 @@
+{
+  "cutoffUtc": "2026-11-01T11:17:16.000Z",
+  "earliestUtc": "2026-11-01T12:32:16.000Z",
+  "cutoffQatar": "1 Nov 2026, 14:17",
+  "earliestQatar": "1 Nov 2026, 15:32",
+  "jwtSeconds": 3600,
+  "marginSeconds": 900,
+  "source": "Owner reported other retirement steps completed and old HS256 signing key revoked; conservative observation-time cutoff, not a new hosted verification",
+  "earliestHumanActivationQatar": "2026-11-01T15:33:00+03:00",
+  "completionReportedBy": "Zuhayr Siddique",
+  "reportedControls": {
+    "modernKeysReplacedAndOldKeysRetired": true,
+    "legacyApiKeysDisabled": true,
+    "legacyHs256SigningKeyRevoked": true,
+    "currentEccSigningKeyActive": true,
+    "databasePasswordRotated": true,
+    "testManagementTokensRevoked": true,
+    "supabaseAndVercelAgentConnectorsDisconnected": true
+  },
+  "verificationScope": "Owner-reported completion; no platform or live database call made to re-check after connector retirement",
+  "productionPromoted": false,
+  "tokenWaitRestartRule": "Restart from the last possible issuance if any test token can be issued or refreshed again"
+}
