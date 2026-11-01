@@ -1,0 +1,20 @@
+{
+  "deploymentId": "dpl_AgKbB2jJNzS3hpnMhvPCS63JNmwg",
+  "candidate": "032daa5",
+  "scope": "Protected Preview through temporary Vercel test access; no real document or amendment submitted; not unauthenticated phone proof",
+  "checks": [
+    {
+      "name": "Exact deployed candidate serves the valid synthetic Google-Docs-only resolution form",
+      "pass": true
+    },
+    {
+      "name": "PDF link is rejected by the deployed delegate form before submission",
+      "pass": true
+    },
+    {
+      "name": "Exact deployed candidate serves the valid synthetic amendment form",
+      "pass": true
+    }
+  ],
+  "finishedAt": "2026-11-01T09:35:29.754Z"
+}

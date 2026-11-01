@@ -143,6 +143,13 @@ test('current POI scoring latency contributes to the write p95 threshold', async
   const { evaluate, report } = await import('../scripts/rehearsal/metrics');
   assert.equal(evaluate(report([{ action: 'poiScore', ms: 10_000, outcome: 'ok' }]), 0, 0).pass, false);
 });
+test('current and legacy roll-call commits contribute to the write p95 threshold', async () => {
+  const { evaluate, report } = await import('../scripts/rehearsal/metrics');
+  for (const action of ['rollCallCommit', 'rollCall']) {
+    assert.equal(evaluate(report([{ action, ms: 10_000, outcome: 'ok' }]), 0, 0).pass, false, `${action} must not bypass the write limit`);
+    assert.equal(evaluate(report([{ action, ms: 200, outcome: 'ok' }]), 0, 0).pass, true);
+  }
+});
 test('synthetic fixture SQL replays with valid sessions, workflow documents and the current allowance-recognize-score flow', async () => {
   const { buildFixture } = await import('../scripts/rehearsal/fixture');
   const { freshDatabase } = await import('./helpers/database');

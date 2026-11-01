@@ -1,0 +1,15 @@
+{
+  "scope": "Disposable local PGlite only; no hosted execution",
+  "checks": [
+    "create-real-conference: refuses premature/wrong-scope execution",
+    "retire-all-test-authority: refuses premature/wrong-scope execution",
+    "relabel-legacy-synthetic: refuses premature/wrong-scope execution",
+    "mark-production: refuses premature/wrong-scope execution",
+    "All-ten-conference authority script parses and verifies its reviewed scope locally",
+    "Single legacy relabel is scoped and idempotent",
+    "Production marker script succeeds only after local empty cleanup",
+    "Real conference shell uses the reserved UUID and real-data protection flag",
+    "create-real-conference: refuses premature/wrong-scope execution"
+  ],
+  "pass": true
+}

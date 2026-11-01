@@ -117,9 +117,10 @@ One transaction: any refusal, token mismatch, count mismatch, foreign-key error 
 ## 8. Ordering with the load test and cutover
 
 1. Per fixture, after its last stage: revoke-only `cleanup.sql`, verify 0 (packet 10.1 rows 1 to 4). **No deletion during the test window**; contingency reruns need the fixtures.
-2. After the last approved run and its evidence: the packet's **final global retirement** (identity pool, session files, Previews per the owner).
-3. Then this deletion (packet 10.1 row 6 / lifecycle cutover **step 2**), before the cloud-agent disconnect (step 3), token wait-out (step 4), secret/Preview retirement (step 5) and **promotion** (step 6). It can still be run against the preproduction ref only: once the project is production-classified (`EXPECTED_SUPABASE_REF`), the wrapper refuses every run, by design. Revoke-only cleanup does not satisfy step 2.
-4. Planned slot: the release plan's cutover day (Mon 2 Nov), as a dependency of cutover, not an extra.
+2. After the last approved synthetic run and its saved evidence, stop test activity and retire the connected Previews. Follow the detailed **Human cutover order** in [LIFECYCLE_CONTROLS.md](LIFECYCLE_CONTROLS.md) and Phases B–D of [CUTOVER_PREP_2026-11-01.md](CUTOVER_PREP_2026-11-01.md): in the exclusive owner transaction retire test grants/codes/QR links, then separately retire Auth refresh capability, agent/test credentials and cloud connectors. Do not delete Auth users while conference records still reference them.
+3. The **human operator** then runs this guarded cleanup while the marker remains preproduction/rehearsal. Retain the human operator's own database credential and local `STAGING_SUPABASE_REFS` (or `DEVELOPMENT_SUPABASE_REFS`) entry until the dry run, approved execute, separate Storage/Auth cleanup and verification are complete. Retiring agent access does not retire this separate human-controlled access; do not give newly rotated credentials to an agent. Both the dry run and execution remain human-only under section 7.
+4. Only after successful cleanup verification does the human remove the remaining operator allow-list entry, complete the recorded token wait and proceed to the reviewed source-record/database-marker promotion. Once production-classified, the wrapper refuses every run by design. Revoke-only cleanup does not satisfy synthetic deletion, and no cloud access is re-enabled for post-promotion verification.
+5. The planned slot was the release plan's cutover day (Mon 2 Nov); the owner records the actual approved write-pause window. The sequence above follows the later reviewed lifecycle controls and replaces the earlier instruction here to delete before disconnecting cloud agents.
 
 ## 9. Rollback: there is none
 
