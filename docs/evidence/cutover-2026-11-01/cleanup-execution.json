@@ -1,0 +1,465 @@
+{
+  "projectRef": "kllhswucdhqqywnzxado",
+  "sourceRevision": "741faac3bf2969efa0d8524f281ebc4a38f1b9f0",
+  "operator": "Codex, explicitly delegated by owner in this conversation",
+  "ownerApproval": "1 November 2026: SQL reviewed; John Paul approved; blanket approval from the whole team to perform cutover work",
+  "scope": "Ten explicitly named synthetic conferences only; reserved real conference UUID protected",
+  "executedAt": "2026-11-01T10:26:48.775257+00:00",
+  "status": "deleted",
+  "conferences": [
+    {
+      "id": "0331ceb6-3fa8-4731-92cb-2b4c0316d0cb",
+      "name": "DCMUN Development Test",
+      "venue": "TEST DATA - not a real conference"
+    },
+    {
+      "id": "1e6bb11f-95c2-4acc-9849-2047818cbdd4",
+      "name": "LOAD TEST \u00b7 multi-committee \u00b7 19 committees",
+      "venue": "Development only"
+    },
+    {
+      "id": "2067d8be-48cb-4b55-a139-3c8be42b4c51",
+      "name": "SYNTHETIC \u00b7 TEST Cutover Browser Check 1 November 2026",
+      "venue": "Development only"
+    },
+    {
+      "id": "573cfbeb-d3ed-4cf5-b418-7d36326f69c8",
+      "name": "LOAD TEST \u00b7 multi-committee \u00b7 19 committees",
+      "venue": "Development only"
+    },
+    {
+      "id": "5d9f8e82-13dc-4f90-8fde-bed46bcb0741",
+      "name": "DCMUN Development Test",
+      "venue": "TEST DATA - temporary verification conference (21 October 2026), not real, to be revoked"
+    },
+    {
+      "id": "a410008d-8d79-478c-9a08-341952f6af0a",
+      "name": "SYNTHETIC \u00b7 TEST Offline Rehearsal 2026-10-26",
+      "venue": "Temporary offline browser rehearsal"
+    },
+    {
+      "id": "ac63e049-b89d-40c6-88a4-f635dd6fad80",
+      "name": "SYNTHETIC \u00b7 OWNER REVIEW \u00b7 26 October 2026",
+      "venue": "Development only"
+    },
+    {
+      "id": "bd211427-4dda-40b0-953e-651dfe5a2a57",
+      "name": "LOAD TEST \u00b7 multi-committee \u00b7 19 committees",
+      "venue": "Development only"
+    },
+    {
+      "id": "e3a38dc2-58ca-4ef5-a962-aaab6794717e",
+      "name": "SYNTHETIC \u00b7 TEST Offline Rehearsal (temporary)",
+      "venue": "TEST DATA - temporary offline rehearsal conference (21 October 2026), not real, to be revoked"
+    },
+    {
+      "id": "ee243abf-e315-4c9c-a83f-a523b89bb42a",
+      "name": "LOAD TEST \u00b7 multi-committee \u00b7 19 committees",
+      "venue": "Development only"
+    }
+  ],
+  "totalRowsDeleted": 35654,
+  "counts": [
+    {
+      "seq": 1,
+      "kind": "delete",
+      "table": "private.access_grant_sources",
+      "affected": 115,
+      "expected": 115
+    },
+    {
+      "seq": 2,
+      "kind": "delete",
+      "table": "private.amendment_submissions",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 3,
+      "kind": "delete",
+      "table": "private.resolution_submissions",
+      "affected": 36,
+      "expected": 36
+    },
+    {
+      "seq": 4,
+      "kind": "delete",
+      "table": "private.mutation_receipts",
+      "affected": 4743,
+      "expected": 4743
+    },
+    {
+      "seq": 5,
+      "kind": "delete",
+      "table": "private.access_redemption_attempts",
+      "affected": 133,
+      "expected": 133
+    },
+    {
+      "seq": 6,
+      "kind": "delete",
+      "table": "public.participation_corrections",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 7,
+      "kind": "delete",
+      "table": "public.photo_acknowledgements",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 8,
+      "kind": "delete",
+      "table": "public.document_decisions",
+      "affected": 109,
+      "expected": 109
+    },
+    {
+      "seq": 9,
+      "kind": "delete",
+      "table": "public.document_comments",
+      "affected": 2,
+      "expected": 2
+    },
+    {
+      "seq": 10,
+      "kind": "delete",
+      "table": "public.document_versions",
+      "affected": 467,
+      "expected": 467
+    },
+    {
+      "seq": 11,
+      "kind": "delete",
+      "table": "public.resolution_links",
+      "affected": 465,
+      "expected": 465
+    },
+    {
+      "seq": 12,
+      "kind": "delete",
+      "table": "public.poi_queue",
+      "affected": 2,
+      "expected": 2
+    },
+    {
+      "seq": 13,
+      "kind": "delete",
+      "table": "public.participation_events",
+      "affected": 744,
+      "expected": 744
+    },
+    {
+      "seq": 14,
+      "kind": "delete",
+      "table": "public.votes",
+      "affected": 2,
+      "expected": 2
+    },
+    {
+      "seq": 15,
+      "kind": "delete",
+      "table": "public.speeches",
+      "affected": 539,
+      "expected": 539
+    },
+    {
+      "seq": 16,
+      "kind": "delete",
+      "table": "public.amendments",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 17,
+      "kind": "delete",
+      "table": "public.participation_adjustments",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 18,
+      "kind": "delete",
+      "table": "public.attendance",
+      "affected": 38,
+      "expected": 38
+    },
+    {
+      "seq": 19,
+      "kind": "delete",
+      "table": "public.speaker_queue",
+      "affected": 1388,
+      "expected": 1388
+    },
+    {
+      "seq": 21,
+      "kind": "delete",
+      "table": "public.debate_states",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 22,
+      "kind": "delete",
+      "table": "public.award_scores",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 23,
+      "kind": "delete",
+      "table": "public.award_criteria",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 24,
+      "kind": "delete",
+      "table": "public.ballot_eligibility",
+      "affected": 6,
+      "expected": 6
+    },
+    {
+      "seq": 25,
+      "kind": "delete",
+      "table": "public.documents",
+      "affected": 468,
+      "expected": 468
+    },
+    {
+      "seq": 26,
+      "kind": "delete",
+      "table": "public.label_correction",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 27,
+      "kind": "delete",
+      "table": "public.record_label",
+      "affected": 1155,
+      "expected": 1155
+    },
+    {
+      "seq": 28,
+      "kind": "delete",
+      "table": "public.roll_call_row",
+      "affected": 11903,
+      "expected": 11903
+    },
+    {
+      "seq": 29,
+      "kind": "delete",
+      "table": "public.roll_call",
+      "affected": 545,
+      "expected": 545
+    },
+    {
+      "seq": 30,
+      "kind": "delete",
+      "table": "public.held_action",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 31,
+      "kind": "delete",
+      "table": "public.session_override_end",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 32,
+      "kind": "delete",
+      "table": "public.session_override",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 33,
+      "kind": "delete",
+      "table": "public.schedule_version",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 34,
+      "kind": "delete",
+      "table": "public.device_clock_sync",
+      "affected": 2942,
+      "expected": 2942
+    },
+    {
+      "seq": 35,
+      "kind": "delete",
+      "table": "public.clock_confirmation",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 36,
+      "kind": "delete",
+      "table": "public.conference_day_close",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 37,
+      "kind": "delete",
+      "table": "private.conference_settings",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 38,
+      "kind": "update",
+      "table": "public.committees",
+      "affected": 5,
+      "expected": 5
+    },
+    {
+      "seq": 39,
+      "kind": "delete",
+      "table": "public.sessions",
+      "affected": 83,
+      "expected": 83
+    },
+    {
+      "seq": 40,
+      "kind": "delete",
+      "table": "public.conference_session_slots",
+      "affected": 0,
+      "expected": 0
+    },
+    {
+      "seq": 41,
+      "kind": "delete",
+      "table": "public.scoring_definitions",
+      "affected": 11,
+      "expected": 11
+    },
+    {
+      "seq": 42,
+      "kind": "delete",
+      "table": "public.submission_links",
+      "affected": 6,
+      "expected": 6
+    },
+    {
+      "seq": 43,
+      "kind": "delete",
+      "table": "public.amendment_links",
+      "affected": 2,
+      "expected": 2
+    },
+    {
+      "seq": 44,
+      "kind": "delete",
+      "table": "private.access_credentials",
+      "affected": 43,
+      "expected": 43
+    },
+    {
+      "seq": 45,
+      "kind": "delete",
+      "table": "public.user_access",
+      "affected": 207,
+      "expected": 207
+    },
+    {
+      "seq": 46,
+      "kind": "delete",
+      "table": "public.committee_staff",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 47,
+      "kind": "delete",
+      "table": "public.conference_staff",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 48,
+      "kind": "delete",
+      "table": "public.photo_list_epochs",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 49,
+      "kind": "delete",
+      "table": "public.photo_slots",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 50,
+      "kind": "delete",
+      "table": "public.staff",
+      "affected": 1,
+      "expected": 1
+    },
+    {
+      "seq": 51,
+      "kind": "delete",
+      "table": "public.delegates",
+      "affected": 1727,
+      "expected": 1727
+    },
+    {
+      "seq": 52,
+      "kind": "delete",
+      "table": "public.schools",
+      "affected": 23,
+      "expected": 23
+    },
+    {
+      "seq": 53,
+      "kind": "delete",
+      "table": "public.audit_log",
+      "affected": 2865,
+      "expected": 2865
+    },
+    {
+      "seq": 54,
+      "kind": "delete",
+      "table": "public.operational_changes",
+      "affected": 4783,
+      "expected": 4783
+    },
+    {
+      "seq": 55,
+      "kind": "delete",
+      "table": "public.committees",
+      "affected": 83,
+      "expected": 83
+    },
+    {
+      "seq": 56,
+      "kind": "delete",
+      "table": "public.conferences",
+      "affected": 10,
+      "expected": 10
+    }
+  ],
+  "postVerification": {
+    "status": "nothing_to_delete",
+    "totalRows": 0,
+    "allReviewedTablesEmpty": true
+  },
+  "storageObjects": 0,
+  "authCandidates": 170,
+  "backup": {
+    "id": 2128585969,
+    "status": "COMPLETED",
+    "pitr": false,
+    "insertedAt": "2026-10-31T23:23:45.763Z"
+  },
+  "lifecycleAfter": "preproduction",
+  "migrationCountAfter": 38,
+  "productionPromoted": false
+}
