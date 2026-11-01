@@ -42,27 +42,23 @@ All seven old immutable test URLs were independently checked without credentials
 
 1. **Credential retirement, by the owner.** In Supabase retire the old test publishable/secret and legacy keys as applicable; rotate the database password and revoke test management/PAT access. Keep newly rotated production values with the human operator and Production runtime only. Disconnect the Supabase and Vercel agent connectors. The agent must not receive new credentials or reconnect after promotion. Key/password changes through browser UI require the human to complete them.
 2. **Record the cutoff and wait.** Once test refresh capability and credential/connector access are stopped, record the last possible issuance time. Wait at least **3,600 seconds plus a recorded clock margin**, and any longer lifetime of older tokens. If a test token can be issued or refreshed again, restart the wait. The deletion time of the Auth accounts alone is not the global cutoff.
-3. **Final source record and branch protection.** Independently review the separate production-registry change, get its CI green, and record the final approved source SHA. The prepared [production-ruleset.json](production-ruleset.json) requires `verify` on `production`, forbids force-push/deletion and permits a verified fast-forward release of the approved SHA; it does not weaken `main`'s Codex review gate. For production releases, a successful manually dispatched CI run
-(`workflow_dispatch`) is not sufficient to satisfy the protected
-production branch's required `verify` status check.
+3. **Final source record and branch protection.** Independently review the separate production-registry change, get its CI green, and record the final approved source SHA. The prepared [production-ruleset.json](production-ruleset.json) requires `verify` on `production`, forbids force-push/deletion and permits a verified fast-forward release of the approved SHA. The separate `main` ruleset remains disabled by operator decision; the production ruleset remains active.
 
-The final approved release commit must have a successful `verify`
-check from an eligible GitHub Actions event.
+   For production releases, a successful manually dispatched CI run (`workflow_dispatch`) is not sufficient to satisfy the protected production branch's required `verify` status check.
 
-To establish this check, merge the approved release-correction PR
-into `main` using the GitHub web interface. This must trigger
-the CI workflow's `push` event on the final main commit.
+   The final approved release commit must have a successful `verify` check from an eligible GitHub Actions event.
 
-Before advancing `production`:
+   To establish this check, merge the approved release-correction PR into `main` using the GitHub web interface. This must trigger the CI workflow's `push` event on the final main commit.
 
-1. Confirm the final main SHA.
-2. Confirm a successful push-triggered CI `verify` job on that exact SHA.
-3. Confirm `production` is an ancestor of that SHA.
-4. Record approval of the final release revision.
-5. Advance `production` using the GitHub API with `force=false`.
+   Before advancing `production`:
 
-Do not disable production branch protection, bypass required checks,
-force-push, or substitute a manually dispatched CI result.
+   - Confirm the final main SHA.
+   - Confirm a successful push-triggered CI `verify` job on that exact SHA.
+   - Confirm `production` is an ancestor of that SHA.
+   - Record approval of the final release revision.
+   - Advance `production` using the GitHub API with `force=false`.
+
+   Do not disable production branch protection, bypass required checks, force-push, or substitute a manually dispatched CI result.
 4. **Human promotion and release.** After the earlier gates, run [mark-production.sql](mark-production.sql) on the intended project. Install the newly rotated publishable and Sensitive server key in **Vercel Production only**, set `NEXT_PUBLIC_DATA_BACKEND=supabase`, and keep staging/development allow-lists empty. Set Production public access without a Vercel account while keeping Previews protected. Release the approved verified SHA on `production`, region `bom1`. Verify deployment SHA/ref/health and retain a compatible rollback deployment built with the new credentials. Agents perform no live database checks after promotion.
 5. **Real conference and first Executive.** With final owner and John Paul release sign-off recorded, run [create-real-conference.sql](create-real-conference.sql), then [FIRST_EXECUTIVE_BOOTSTRAP.md](../../FIRST_EXECUTIVE_BOOTSTRAP.md). The UUID must remain `586db0d4-dde5-40a1-a50e-f925fce7e70a`. Give the bootstrap code in person, rotate it through the app, issue real access and QR links, and check both valid forms from a normal phone without submitting test data. Real-data entry starts only after those gates.
 
