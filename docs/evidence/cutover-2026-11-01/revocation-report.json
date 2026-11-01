@@ -1,0 +1,8 @@
+{
+  "readDenied": true,
+  "freshWriteRefused": true,
+  "originalSavedActionRetained": true,
+  "authenticatedUnexpiredToken": true,
+  "tokenRemainingSeconds": 3600,
+  "checkedAt": "2026-11-01T09:35:52.482Z"
+}

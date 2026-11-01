@@ -4,7 +4,11 @@ A simple, ordered list for the production cutover. It adds no approval and chang
 
 Dates: 2 November is for fixes only. The 48-hour freeze starts 3 November. The conference is 5 to 7 November.
 
-## Verified on 1 November
+## Latest preparation status
+
+The [human handover packet](cutover/2026-11-01/README.md) and [verification record](evidence/cutover-2026-11-01/VERIFICATION.md) supersede the early-morning snapshot below. Preproduction now has **38 migrations and ten synthetic conferences**; the added browser-check fixture has been revoked. Production remains demo. The owner chose **PITR off, daily backups**. No cleanup, promotion or real-data entry has happened.
+
+## Early-morning snapshot on 1 November
 
 - [x] Candidate `032daa5`; staging ledger at 37 migrations through `20261101090000_snapshot_committee_prefilter`.
 - [x] Staging is Pro, Small compute, 90 connections. PITR is **off** and the last backup was 31 October 08:52 UTC.
@@ -14,6 +18,8 @@ Dates: 2 November is for fixes only. The 48-hour freeze starts 3 November. The c
 - [x] The owner deleted the metrics key, rotated the Vercel bypass secret, closed the operator terminals and deleted the session files.
 
 ## Retire the connected Previews (owner, Vercel dashboard)
+
+Also retire `dpl_2JExsFt7E8gvgaLsnjfKUEbL1UvF` (`munos-ka77ci8ax-dcmun.vercel.app`, `codex/owner-review-preview`, `c82dcd9`). The H3 Preview was accessed through a temporary Vercel share link during the browser check; retiring that deployment must also retire its sharing capability. Audit for newer connected deployments before declaring the list complete.
 
 Claude's Vercel connector cannot delete deployments. In the Vercel dashboard, project `munos`, Deployments, filter branch `codex/preproduction-connected`, delete each:
 
@@ -42,9 +48,9 @@ The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes
 ## Decisions and sign-offs still open
 
 - [ ] Independent reviewer sign-off and release approver sign-off on the capacity evidence, including the recorded deviations and the unexplained difference of 45 between runner-derived and server-log write counts. The summary is evidence of a reported runner PASS; it does not itself close this review.
-- [ ] Backups: PITR is off. Decide before any real data is entered whether to turn it on, and record the choice.
-- [ ] Real-browser functional checks on the exact candidate (Chair reconnect, roll-call correction, immutable ballot eligibility, speeches and points, Approval and printing, public resolution and amendment access, revocation).
-- [ ] **Real Realtime delivery is a release gate and must be validated before cutover** (Phase A, step 8). The capacity runner only simulates it, and after cutover hosted rehearsal and synthetic writes are prohibited. Dashboard monitoring in the live session supplements this evidence and does not replace it.
+- [x] Backup policy: PITR is off. Owner decision recorded on 1 November: **keep PITR off and use daily backups**. Record the latest backup before cleanup.
+- [x] Functional checks completed with scope recorded in the [verification record](evidence/cutover-2026-11-01/VERIFICATION.md): production-mode local browser client against real synthetic Supabase, and public forms on the exact deployed H3 Preview. This is not venue or unauthenticated-phone proof.
+- [x] **Real Realtime functional delivery verified before cutover**: two Chromium contexts joined actual channels; a committed roll call reached the second device without reload; core writes/readback worked while Realtime was blocked, then channels rejoined. See [browser-report.json](evidence/cutover-2026-11-01/browser-report.json). The client was built locally in production mode; this is not a venue-network test or a 110-channel Realtime capacity result. The load runner still simulates notifications.
 - [ ] **Pre-cutover capacity evidence gaps:** disk IO and swap were not recorded, and approximately five-minute dashboard samples do not establish every consecutive-minute STOP check. Recover suitable historical charts/metrics for the run or obtain the missing evidence on synthetic preproduction state. If the evidence cannot be recovered, the owner and independent reviewer must explicitly decide and record the deviation, and the release approver must consider it before sign-off. Do not silently close these operator checks. Monitoring the first live session supplements pre-cutover evidence and does not replace it.
 - [ ] Support-role read latency (Admin, Executive and Approval snapshots, 2.7 to 3.4 s p95 at 110 staff) is an observation under the existing per-action threshold, not a new role-specific failure criterion. Further read architecture work is conditional on the evidence review; delta reads remain a design option in [PERFORMANCE_FOLLOWUPS_2026-10-31.md](PERFORMANCE_FOLLOWUPS_2026-10-31.md).
 
@@ -60,8 +66,8 @@ These are the hands-on steps for the cutover, in the order [LIFECYCLE_CONTROLS.m
 
 1. Pick the release candidate: the `main` commit with green CI that you want in production. It is **not** the same commit as the final production source record (Phase E, step 2), because that one changes `config/project-lifecycle.json`.
 2. Write down the rollback target: the last known-good Production deployment ID in Vercel. If no Production deployment exists yet, the rollback is the credential-rotated compatible deployment you build in Phase F (see [DEPLOYMENT.md](DEPLOYMENT.md), step 10).
-3. Confirm the Supabase ledger matches the repository for the candidate: Supabase dashboard, SQL Editor, `select count(*) from supabase_migrations.schema_migrations;`. It must equal the number of files in `supabase/migrations` (37 on 1 November).
-4. Check what Supabase shows for the project: plan Pro, compute Small, latest backup time, PITR state. Decide and record whether to turn PITR on before real data (it is off). Any new spending needs the owner's approval.
+3. Confirm the Supabase ledger matches the repository for the candidate: Supabase dashboard, SQL Editor, `select count(*) from supabase_migrations.schema_migrations;`. It must equal the number of files in `supabase/migrations` (38 after the reviewed amendment lookup fix on 1 November).
+4. Check what Supabase shows for the project: plan Pro, compute Small, latest backup time, PITR state. The owner has chosen PITR off with daily backups. Record the latest backup before destructive cleanup; any new spending needs the owner's approval.
 5. Review the advisors (Supabase dashboard, Advisors). The known warnings are the access-code `SECURITY DEFINER` functions, the anonymous-policy notices and leaked-password protection. Anything new needs a decision before promotion.
 6. Agree the write-pause window with the Executive, and announce it. Nobody should be using the staging project then.
 7. Do the real-browser functional checks from the open-decisions list above and record them.

@@ -1,0 +1,128 @@
+{
+  "scope": "Locally built candidate browser client against live synthetic preproduction; not deployed-Vercel or venue proof",
+  "checks": [
+    {
+      "name": "Real Realtime channels join on both browsers",
+      "pass": true,
+      "at": "2026-11-01T03:56:31.338Z"
+    },
+    {
+      "name": "Committed roll call arrives on second browser through real Realtime",
+      "pass": true,
+      "at": "2026-11-01T03:56:38.887Z"
+    },
+    {
+      "name": "Ballot freezes eligibility before later roll-call correction",
+      "pass": true,
+      "at": "2026-11-01T03:56:44.748Z"
+    },
+    {
+      "name": "Offline points survive reload and drain exactly once after reconnect",
+      "pass": true,
+      "at": "2026-11-01T03:56:46.762Z"
+    },
+    {
+      "name": "Writes and recovery reads continue while real Realtime is blocked, then channels reconnect",
+      "pass": true,
+      "at": "2026-11-01T03:56:48.495Z"
+    },
+    {
+      "name": "Keyboard country search selects the top result and a speech records once",
+      "pass": true,
+      "at": "2026-11-01T03:56:49.705Z"
+    },
+    {
+      "name": "Approval, Printing and Executive browsers read only their synthetic conference",
+      "pass": true,
+      "at": "2026-11-01T03:56:53.386Z"
+    },
+    {
+      "name": "No uncaught browser page errors",
+      "pass": true,
+      "at": "2026-11-01T03:56:53.392Z"
+    }
+  ],
+  "devices": [
+    {
+      "name": "Chair A",
+      "frames": 22,
+      "joined": 6,
+      "changes": 9,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 6,
+        "system": 6,
+        "postgres_changes": 9,
+        "phx_close": 1
+      },
+      "statuses": [
+        "ok",
+        "ok",
+        "ok",
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    {
+      "name": "Chair B",
+      "frames": 12,
+      "joined": 3,
+      "changes": 6,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 3,
+        "system": 3,
+        "postgres_changes": 6
+      },
+      "statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    {
+      "name": "Approval",
+      "frames": 2,
+      "joined": 1,
+      "changes": 0,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 1,
+        "system": 1
+      },
+      "statuses": [
+        "ok"
+      ]
+    },
+    {
+      "name": "Printing",
+      "frames": 2,
+      "joined": 1,
+      "changes": 0,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 1,
+        "system": 1
+      },
+      "statuses": [
+        "ok"
+      ]
+    },
+    {
+      "name": "Executive",
+      "frames": 2,
+      "joined": 1,
+      "changes": 0,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 1,
+        "system": 1
+      },
+      "statuses": [
+        "ok"
+      ]
+    }
+  ],
+  "finishedAt": "2026-11-01T03:56:53.398Z"
+}

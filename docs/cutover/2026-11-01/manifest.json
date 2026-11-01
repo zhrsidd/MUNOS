@@ -1,0 +1,30 @@
+{
+  "projectRef": "kllhswucdhqqywnzxado",
+  "state": "PREPARATION ONLY; not promoted",
+  "applicationCandidate": "032daa5864a38b377b0df96f20939512b554fcd7",
+  "reservedProductionConferenceId": "586db0d4-dde5-40a1-a50e-f925fce7e70a",
+  "syntheticConferenceIds": [
+    "0331ceb6-3fa8-4731-92cb-2b4c0316d0cb",
+    "5d9f8e82-13dc-4f90-8fde-bed46bcb0741",
+    "e3a38dc2-58ca-4ef5-a962-aaab6794717e",
+    "a410008d-8d79-478c-9a08-341952f6af0a",
+    "ac63e049-b89d-40c6-88a4-f635dd6fad80",
+    "573cfbeb-d3ed-4cf5-b418-7d36326f69c8",
+    "1e6bb11f-95c2-4acc-9849-2047818cbdd4",
+    "bd211427-4dda-40b0-953e-651dfe5a2a57",
+    "ee243abf-e315-4c9c-a83f-a523b89bb42a",
+    "2067d8be-48cb-4b55-a139-3c8be42b4c51"
+  ],
+  "tokenLifetimeSeconds": 3600,
+  "globalTokenWaitStarted": false,
+  "migrationCount": 38,
+  "latestMigration": "20261101100000_amendment_link_committee_scope",
+  "backupDecision": {
+    "pitr": false,
+    "policy": "Use daily backups",
+    "ownerApproved": "2026-11-01"
+  },
+  "browserFixtureAuthorityRevoked": true,
+  "productionBackend": "local (demo)",
+  "scriptsStatus": "Prepared; local synthetic validation only; independent human review required before execution"
+}

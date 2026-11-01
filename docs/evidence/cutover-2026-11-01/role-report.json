@@ -1,0 +1,70 @@
+{
+  "scope": "Locally built candidate browser client against live synthetic preproduction; not deployed-Vercel or venue proof",
+  "checks": [
+    {
+      "name": "Approval changes-request feedback is visible inline on the Chair resolution row",
+      "pass": true,
+      "at": "2026-11-01T04:01:22.119Z"
+    },
+    {
+      "name": "Chair resubmission, approval history and printing preserve the feedback",
+      "pass": true,
+      "at": "2026-11-01T04:01:36.229Z"
+    },
+    {
+      "name": "No uncaught browser page errors in role workflow",
+      "pass": true,
+      "at": "2026-11-01T04:01:36.229Z"
+    }
+  ],
+  "devices": [
+    {
+      "name": "Chair A",
+      "frames": 5,
+      "joined": 1,
+      "changes": 3,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 1,
+        "system": 1,
+        "postgres_changes": 3
+      },
+      "statuses": [
+        "ok"
+      ]
+    },
+    {
+      "name": "Approval",
+      "frames": 8,
+      "joined": 3,
+      "changes": 2,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 3,
+        "system": 3,
+        "postgres_changes": 2
+      },
+      "statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    {
+      "name": "Printing",
+      "frames": 5,
+      "joined": 1,
+      "changes": 3,
+      "errors": 0,
+      "kinds": {
+        "phx_reply": 1,
+        "system": 1,
+        "postgres_changes": 3
+      },
+      "statuses": [
+        "ok"
+      ]
+    }
+  ],
+  "finishedAt": "2026-11-01T04:01:36.230Z"
+}

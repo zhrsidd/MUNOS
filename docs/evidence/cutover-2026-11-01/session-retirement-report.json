@@ -1,0 +1,10 @@
+{
+  "scope": "Only locally retained synthetic browser-check identities; not global Auth-session retirement",
+  "identitiesFound": 9,
+  "signedOut": 8,
+  "alreadyUnavailable": 1,
+  "failed": 0,
+  "lastPossibleTokenIssuance": "2026-11-01T09:36:52.662Z",
+  "globalTokenWaitStarted": false,
+  "checkedAt": "2026-11-01T09:36:52.939Z"
+}

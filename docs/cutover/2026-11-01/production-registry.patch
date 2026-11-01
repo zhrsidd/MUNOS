@@ -1,0 +1,12 @@
+diff --git a/config/project-lifecycle.json b/config/project-lifecycle.json
+--- a/config/project-lifecycle.json
++++ b/config/project-lifecycle.json
+@@ -2,7 +2,7 @@
+   "version": 1,
+   "recordedAt": "2026-10-26",
+   "projects": {
+-    "kllhswucdhqqywnzxado": { "phase": "preproduction" },
++    "kllhswucdhqqywnzxado": { "phase": "production" },
+     "gglltljhdpkfjnyjmnif": { "phase": "production" }
+   }
+ }
