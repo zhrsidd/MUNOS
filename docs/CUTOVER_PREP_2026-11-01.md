@@ -8,7 +8,7 @@ Dates: 2 November is for fixes only. The 48-hour freeze starts 3 November. The c
 
 - [x] Candidate `032daa5`; staging ledger at 37 migrations through `20261101090000_snapshot_committee_prefilter`.
 - [x] Staging is Pro, Small compute, 90 connections. PITR is **off** and the last backup was 31 October 08:52 UTC.
-- [x] H3 (110 staff, 30 minutes, 19 committees) passed as a READINESS RUN. R3 passed.
+- [x] Reported runner result: H3 (110 staff, 30 minutes, 19 committees) passed as a READINESS RUN; R3 passed. Independent capacity acceptance and production release approval remain open.
 - [x] 0 live grants on any conference, both load fixtures revoked, original-conference fingerprint unchanged.
 - [x] Staging holds nine conferences, all synthetic; 0 non-test grants. No real conference data has been entered.
 - [x] The owner deleted the metrics key, rotated the Vercel bypass secret, closed the operator terminals and deleted the session files.
@@ -41,12 +41,12 @@ The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes
 
 ## Decisions and sign-offs still open
 
-- [ ] Independent reviewer sign-off and release approver sign-off on the capacity evidence.
+- [ ] Independent reviewer sign-off and release approver sign-off on the capacity evidence, including the recorded deviations and the unexplained difference of 45 between runner-derived and server-log write counts. The summary is evidence of a reported runner PASS; it does not itself close this review.
 - [ ] Backups: PITR is off. Decide before any real data is entered whether to turn it on, and record the choice.
 - [ ] Real-browser functional checks on the exact candidate (Chair reconnect, roll-call correction, immutable ballot eligibility, speeches and points, Approval and printing, public resolution and amendment access, revocation).
 - [ ] **Real Realtime delivery is a release gate and must be validated before cutover** (Phase A, step 8). The capacity runner only simulates it, and after cutover hosted rehearsal and synthetic writes are prohibited. Dashboard monitoring in the live session supplements this evidence and does not replace it.
-- [ ] Not measured in the capacity run: disk IO and swap. Check both in the dashboard during the first live session, as a supplement.
-- [ ] Support-role read latency (Admin, Executive and Approval snapshots, 2.7 to 3.4 s p95 at 110 staff) is the next place to improve if time allows. The planned fix is delta reads, documented in [PERFORMANCE_FOLLOWUPS_2026-10-31.md](PERFORMANCE_FOLLOWUPS_2026-10-31.md).
+- [ ] **Pre-cutover capacity evidence gaps:** disk IO and swap were not recorded, and approximately five-minute dashboard samples do not establish every consecutive-minute STOP check. Recover suitable historical charts/metrics for the run or obtain the missing evidence on synthetic preproduction state. If the evidence cannot be recovered, the owner and independent reviewer must explicitly decide and record the deviation, and the release approver must consider it before sign-off. Do not silently close these operator checks. Monitoring the first live session supplements pre-cutover evidence and does not replace it.
+- [ ] Support-role read latency (Admin, Executive and Approval snapshots, 2.7 to 3.4 s p95 at 110 staff) is an observation under the existing per-action threshold, not a new role-specific failure criterion. Further read architecture work is conditional on the evidence review; delta reads remain a design option in [PERFORMANCE_FOLLOWUPS_2026-10-31.md](PERFORMANCE_FOLLOWUPS_2026-10-31.md).
 
 ## Manual cutover instructions
 
@@ -66,6 +66,7 @@ These are the hands-on steps for the cutover, in the order [LIFECYCLE_CONTROLS.m
 6. Agree the write-pause window with the Executive, and announce it. Nobody should be using the staging project then.
 7. Do the real-browser functional checks from the open-decisions list above and record them.
 8. **Validate real Realtime delivery** (release gate; see gap G5 in [LOAD_TEST_EXECUTION_PACKET.md](LOAD_TEST_EXECUTION_PACKET.md) and [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)). It needs synthetic data with test access, so do it **before** Phase B and C, on a fresh fixture with its own grants. It also needs a connected build, so create one temporary connected Preview of the release candidate for this check and delete it in Phase B. With a few real browsers: confirm a change made on one device appears on another through Realtime without a reload, then block `*/realtime/v1/*` (STAGING_REHEARSAL E2) and confirm core actions continue and recover once it is unblocked. Watch the Realtime logs and connection counts in the Supabase dashboard, and record the result, any errors and who ran it. Revoke the fixture afterwards, as for the load runs.
+9. **Reserve the real conference UUID and prepare its creation statement.** Record `<REAL_CONFERENCE_UUID>` for the later Production configuration and have the human operator's statement independently checked against the current schema. Prepare the required conference metadata and `features.real = true`; do not execute it while the project is preproduction. Cleanup removes the synthetic conferences, and the Executive bootstrap refuses a missing conference. The real conference is created in Phase H after promotion and final sign-off, before the bootstrap.
 
 ### Phase B: stop test activity (start of the write pause)
 
@@ -124,10 +125,11 @@ Steps 1–2 must execute within a single explicit database transaction, starting
 
 ### Phase H: first Executive and opening real-data entry
 
-1. Follow [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), with the technical lead and the first Executive together in person: in the Supabase SQL Editor of the production project, paste `scripts/bootstrap-first-executive.sql`, set EDIT 1 to the real conference UUID and EDIT 2 to the validity (for example `2 hours`), run the whole script, read the code to the first Executive in person, and do not save, screenshot or paste it.
-2. The first Executive redeems it in the normal app (Enter staff access code), then issues the real Executive code with Executive, Access codes, Rotate (this also revokes the bootstrap code), and stores it in the password manager. Verify section B of the script: the bootstrap row is revoked.
-3. All other access codes come from the app from then on. Set the first Executive's remaining devices up with the new code before the bootstrap window ends.
-4. **Verify real QR links after issuance.** Once the first Executive has issued the actual resolution and amendment links, open one of each from a normal phone on mobile data without a Vercel login. Confirm both forms load correctly. These are view-only checks: do not submit test data. Record the results as post-bootstrap verification, not as a pre-bootstrap release prerequisite, consistent with `V1_RELEASE_CHECKLIST.md` step 4.8.
-5. Record the known-good release: tag the production commit (`git tag -a known-good-dcmun-<yyyy-mm-dd> <sha> -m "Known-good conference release"` and push), add it to [RELEASES.md](RELEASES.md), and print the Known-good card.
-6. **Freeze.** From 48 hours before the conference (3 November), set `CONFERENCE_FREEZE=1` on the Production environment. Do not advance `production` or run migrations. Only narrowly scoped emergency fixes with `[emergency]` in the commit message may deploy, as described in [DEPLOYMENT.md](DEPLOYMENT.md).
-7. Real conference data may be entered only after every sign-off above is recorded. Keep [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) printed and in the operations folder.
+1. **Human operator: create the protected real conference record.** Only after the production marker, Phase G sign-offs and permission for real-data entry are recorded, execute the reviewed creation statement from Phase A. Use the reserved `<REAL_CONFERENCE_UUID>`, exactly matching Production's `NEXT_PUBLIC_CONFERENCE_ID`, and mark `features.real = true`. Register that UUID as protected in the human operator's retained configuration/record. Verify the intended conference exists once, with the agreed metadata, before issuing any credential. This step creates the conference shell; it does not import the roster or create staff grants.
+2. Follow [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), with the technical lead and the first Executive together in person: in the Supabase SQL Editor of the production project, paste `scripts/bootstrap-first-executive.sql`, set EDIT 1 to the real conference UUID and EDIT 2 to the validity (for example `2 hours`), run the whole script, read the code to the first Executive in person, and do not save, screenshot or paste it.
+3. The first Executive redeems it in the normal app (Enter staff access code), then issues the real Executive code with Executive, Access codes, Rotate (this also revokes the bootstrap code), and stores it in the password manager. Verify section B of the script: the bootstrap row is revoked.
+4. All other access codes come from the app from then on. Set the first Executive's remaining devices up with the new code before the bootstrap window ends.
+5. **Verify real QR links after issuance.** Once the first Executive has issued the actual resolution and amendment links, open one of each from a normal phone on mobile data without a Vercel login. Confirm both forms load correctly. These are view-only checks: do not submit test data. Record the results as post-bootstrap verification, not as a pre-bootstrap release prerequisite, consistent with `V1_RELEASE_CHECKLIST.md` step 4.8.
+6. Record the known-good release: tag the production commit (`git tag -a known-good-dcmun-<yyyy-mm-dd> <sha> -m "Known-good conference release"` and push), add it to [RELEASES.md](RELEASES.md), and print the Known-good card.
+7. **Freeze.** From 48 hours before the conference (3 November), set `CONFERENCE_FREEZE=1` on the Production environment. Do not advance `production` or run migrations. Only narrowly scoped emergency fixes with `[emergency]` in the commit message may deploy, as described in [DEPLOYMENT.md](DEPLOYMENT.md).
+8. Real conference data may be entered only after every sign-off above is recorded. Keep [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) printed and in the operations folder.
