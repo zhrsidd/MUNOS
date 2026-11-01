@@ -7,9 +7,9 @@ Owner: Claude, primary engineer across the application including platform, schem
 ```
 GitHub zhrsidd/MUNOS
   feature branch ──► Pull request ──► CI (typecheck, lint, test, build)
-        │                               + Vercel Preview deployment (dev Supabase)
+        │                               + Vercel Preview deployment (local demo)
         ▼
-  review + Preview check ──► merge to main ──► Vercel **Preview** of main (dev Supabase)
+  review + Preview check ──► merge to main ──► Vercel **Preview** of main (local demo)
                                                    │
                          deliberate release step ──┘
                                                    ▼
@@ -18,20 +18,20 @@ GitHub zhrsidd/MUNOS
 
 - **One Vercel project** (`munos`, team `dcmun`), Next.js framework preset, imported from `zhrsidd/MUNOS`. **Production branch: `production`** (changed from `main` on 7 October 2026).
 - `main` is the integration baseline. Every push to `main`, every other branch and every pull request gets a **Preview** deployment with its own immutable URL. **Merging to `main` never deploys Production.**
-- Production is built only when someone deliberately moves the `production` branch to a commit that already passed CI and a Preview check (see *Releasing to Production*). As of this writing `production` = `c0a6a65` and **no Production deployment exists**.
+- Production is built only when someone deliberately moves `production` to a verified commit. On 1 November GitHub showed `production` at `cfa63dbd857e6fa639774b25448f25fc09621673`; the operator reports a healthy Supabase-backed deployment. See [RELEASES.md](RELEASES.md).
 - Functions run in `bom1` (Mumbai), next to the Supabase project, so server routes add little latency.
 - Configuration in the repository: [`vercel.json`](../vercel.json) (install/build commands, region, freeze guard), [`next.config.ts`](../next.config.ts) (build identity, security headers), [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 - Nothing else is required: no Redis, no extra hosting, no separate backend. Supabase remains the only data store.
 
 ## Environments
 
-**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical/optional integration-test context, not the selected default. **Applied and verified 20 October 2026:** Preview `NEXT_PUBLIC_DATA_BACKEND` was changed from `supabase` to `local` by a team-authorized Vercel connection (Production untouched). A fresh Preview of this branch (`dpl_6Zo7x5BTfZ6Lm4bj6vRrkBtnEUtQ`, commit `a5975e9`) built successfully, and its `/api/health` reported `environment: preview`, status `ok`, and Supabase, database and storage all `not_configured` (browser demo). The leftover Preview Supabase variables for the deleted development project are now unused; removing them is a separate owner decision.
+**Owner-selected Preview mode (20 October 2026): browser demo.** Set `NEXT_PUBLIC_DATA_BACKEND=local` for Preview only. This decision does not change Production. The earlier shared-development-database setup below is historical, not an option for the promoted project. **Applied and verified 20 October 2026:** Preview `NEXT_PUBLIC_DATA_BACKEND` was changed from `supabase` to `local` by a team-authorized Vercel connection (Production untouched). A fresh Preview of this branch (`dpl_6Zo7x5BTfZ6Lm4bj6vRrkBtnEUtQ`, commit `a5975e9`) built successfully, and its `/api/health` reported `environment: preview`, status `ok`, and Supabase, database and storage all `not_configured` (browser demo). The prior connected Preview setup is historical; connected test deployments were retired during cutover. Never connect Preview to the promoted project.
 
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
 | Trigger | `npm run dev` | any push / PR, **including `main`** | push to the `production` branch only |
-| Supabase | none (local demo) or the DCMUN project | the **same** DCMUN project, `kllhswucdhqqywnzxado`, while it is in its development role | the **same** project `kllhswucdhqqywnzxado` after cutover (no second project) |
-| Data | demo / test | test data only (the `DCMUN Development Test` conference) | real conference data, from cutover |
+| Supabase | local demo; do not connect agents to Production | none (local demo) | promoted project `kllhswucdhqqywnzxado` |
+| Data | local demo / disposable local tests | demo only | real conference data |
 | Who uses it | developers | reviewers, rehearsals | the conference |
 
 There is one DCMUN Supabase project (`kllhswucdhqqywnzxado`). It is the development project until cutover and the production project afterwards; it is never both at once in the target guard. The PHESMUN production project is never used. Preview must never run against the project once it holds real conference data.
@@ -49,6 +49,8 @@ There is one DCMUN Supabase project (`kllhswucdhqqywnzxado`). It is the developm
 A project has exactly one role: listing the same ref as production and staging, or listing the PHESMUN production project anywhere, is a configuration error and refuses. Refusal messages name project refs only (public in the URL), never keys.
 
 #### Single-project cutover
+
+**Historical record:** cutover was completed as reported by the operator. See [EXECUTION.md](cutover/2026-11-01/EXECUTION.md); do not repeat the following preparation or synthetic testing on Production.
 
 While the project is in its development role set `STAGING_SUPABASE_REFS=kllhswucdhqqywnzxado` (operator shell, `.env.local`, Vercel **Preview**), leave `DEVELOPMENT_SUPABASE_REFS` empty, and set `NEXT_PUBLIC_CONFERENCE_ID` to the test conference.
 
@@ -83,14 +85,14 @@ Set these in Vercel → Project → Settings → Environment Variables, separate
 
 | Variable | Exposure | Preview | Production | Notes |
 | --- | --- | --- | --- | --- |
-| `NEXT_PUBLIC_DATA_BACKEND` | browser | `supabase` | `supabase` | `local` = isolated demo, no database |
-| `NEXT_PUBLIC_SUPABASE_URL` | browser | dev URL | prod URL | public by design |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser | dev publishable key | prod publishable key | publishable (`sb_publishable_…`) only — never the secret/service-role key |
-| `NEXT_PUBLIC_CONFERENCE_ID` | browser | dev conference UUID | prod conference UUID | |
+| `NEXT_PUBLIC_DATA_BACKEND` | browser | `local` | `supabase` | `local` = isolated demo, no database |
+| `NEXT_PUBLIC_SUPABASE_URL` | browser | unset | prod URL | public by design |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser | unset | prod publishable key | publishable (`sb_publishable_…`) only — never the secret/service-role key |
+| `NEXT_PUBLIC_CONFERENCE_ID` | browser | demo default | prod conference UUID | |
 | `NEXT_PUBLIC_ENABLE_ANONYMOUS_BOOTSTRAP` | browser | — | — | **No longer read** by the application (the staff access-code gate creates the device's anonymous identity only when a code is submitted). Leave unset; harmless if present. |
 | `NEXT_PUBLIC_APP_VERSION` | browser | optional | optional | defaults to `package.json` version |
 | `NEXT_PUBLIC_CONFERENCE_TIMEZONE` | browser | `Asia/Qatar` | `Asia/Qatar` | venue time zone for schedule import and group photos |
-| `SUPABASE_SECRET_KEY` | **server only** | dev secret key | prod secret key | mark **Sensitive**. Used only by server routes: resolution QR submission (`/submit/*`, `/api/submissions`, file-upload fallback), amendment QR submission (`/amend/*`, `/api/amendments`) and the health storage probe. Without it both QR forms report "not available". Never prefix with `NEXT_PUBLIC_`. |
+| `SUPABASE_SECRET_KEY` | **server only** | unset | prod secret key | mark **Sensitive**. Used only by server routes: resolution QR submission (`/submit/*`, `/api/submissions`, file-upload fallback), amendment QR submission (`/amend/*`, `/api/amendments`) and the health storage probe. Without it both QR forms report "not available". Never prefix with `NEXT_PUBLIC_`. |
 | `CONFERENCE_FREEZE` | build only | unset | `1` during freeze | see Production freeze |
 
 Vercel's system variables (`VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`, `VERCEL_GIT_COMMIT_REF`, `VERCEL_DEPLOYMENT_ID`) are read at build time to stamp each deployment; leave "Automatically expose System Environment Variables" enabled.
@@ -99,13 +101,13 @@ Rules: never commit `.env.local`; never place a secret in a `NEXT_PUBLIC_*` vari
 
 ## Vercel project setup
 
-Current state (verified 8 October 2026):
+Historical state (verified 8 October 2026; superseded by the [1 November activation record](cutover/2026-11-01/EXECUTION.md#production-activation--1-november-2026)):
 
 - Project `munos` exists; Git integration with `zhrsidd/MUNOS` is live; Preview deployments build automatically.
 - Production branch: **`production`**. Preview environment variables point at the **development** Supabase project, including a development `SUPABASE_SECRET_KEY` (Preview only). **No Production environment variables exist** and **no Production deployment exists**.
 - Deployment Protection: *Vercel Authentication* on **all** deployments (Preview and Production). Automated checks use a *Protection Bypass for Automation* secret held only by the technical contact.
 
-Still to do, **only after the conference-week gates in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) pass**:
+Historical setup list (the activation record identifies what remains):
 
 1. Settings → **Environment Variables** → Production: the table above with **production** Supabase values (never development values).
 2. Settings → **Deployment Protection** (conference-week configuration gate — leave unchanged until then): Production must open **without a Vercel account** for conference devices and, above all, for delegates' phones on `/submit/*` and `/amend/*`. Change protection so the Production domain is public (for example "Standard Protection", which protects Preview URLs only); keep Previews protected. Removing the Vercel login does **not** weaken staff authorization: every staff workspace still requires a MUNOS staff access code and an active grant (enforced by the app and by database RLS), and the public delegate routes never create a staff session or open a workspace. Verify from a normal, unauthenticated phone on mobile data before release: the conference URL shows the staff access-code screen, and a resolution QR and an amendment QR open their forms.
@@ -119,7 +121,7 @@ Still to do, **only after the conference-week gates in [RELEASE_CHECKLIST.md](RE
 1. Work on a feature branch; open a PR.
 2. CI must pass. Vercel posts the Preview URL on the PR.
 3. Verify the Preview: `npm run verify:deployment -- <preview-url>` (for protected previews, run it from a browser session or use a bypass token), then click through the changed screens.
-4. Merge to `main`. Vercel builds a **Preview** of `main` (development Supabase). Verify it the same way.
+4. Merge to `main`. Vercel builds a **Preview** of `main` (local demo). Verify it the same way.
 
 Database migrations are coordinated separately by the named integration owner, independently reviewed and replayed on staging before release, and must be **backward compatible** with the currently deployed application: apply the migration first, then deploy the code that uses it. A Vercel rollback never reverts the database.
 
@@ -185,7 +187,7 @@ A rollback restores an earlier **application build and its configuration**. It d
 4. Ask chairs to refresh only once System health shows the known-good version and their device shows **0 unsynced changes**. Devices keep working offline in the meantime.
 5. After rollback Vercel stops auto-assigning the production domain to new builds. That is desirable during the conference. Undo it only after a replacement is verified.
 
-Rehearse a rollback on the Production project at least once before the freeze (deploy a harmless change, roll back, verify the version).
+The operator confirmed a healthy same-revision recovery deployment is selectable; no rollback was performed. An earlier-version rollback drill remains unproven. Do not run synthetic rollback drills against the promoted project; follow the production lifecycle and human-controlled recovery procedure.
 
 ## Uptime monitoring
 

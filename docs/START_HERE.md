@@ -1,5 +1,7 @@
 # Full Claude handoff — MUNOS / DCMUN Conference OS
 
+**1 November 2026 update:** The operator reports the single hosted project has been promoted to Production and the real conference shell created. GitHub confirms the release SHA and CI; see the [activation record](cutover/2026-11-01/EXECUTION.md). Earlier development, staging and rehearsal directions below are historical for this project. Do not reconnect cloud agents, run hosted rehearsals, or use synthetic fixtures on Production.
+
 Updated 20 October 2026 against the owner's supplied **MUNOS repository analysis — 20 October 2026** from “continued consult”. This package updates documentation only. It does not authorise a merge, hosted migration, resource purchase, production configuration change or deployment.
 
 ## Status update — 20 October 2026, after this package was written

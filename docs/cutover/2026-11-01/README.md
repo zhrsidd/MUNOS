@@ -1,22 +1,22 @@
 # Human cutover handover · 1 November 2026
 
-**Production still uses the demo backend. The database is still preproduction.** No real conference has been created and no synthetic conference has been deleted. The owner chose **PITR off, daily backups**.
+**Production activation, 1 November:** the operator reports Production is connected to the promoted Supabase project and the real conference shell exists. GitHub confirms the release SHA and successful push CI. See the [activation record](EXECUTION.md#production-activation--1-november-2026) and [release record](../../RELEASES.md). First Executive bootstrap and other operational steps remain pending. PITR is off by owner decision; daily backups are the selected policy.
 
-The [verification record](../../evidence/cutover-2026-11-01/VERIFICATION.md) separates completed checks from the remaining release gates. Follow the full [cutover checklist](../../CUTOVER_PREP_2026-11-01.md) for the authoritative order and responsibilities. These files prepare that procedure; they do not approve production promotion.
+The [verification record](../../evidence/cutover-2026-11-01/VERIFICATION.md) separates completed checks from the remaining release gates. The [cutover checklist](../../CUTOVER_PREP_2026-11-01.md) retains the preparation history. The dated preparation material below is retained as history; do not repeat completed cutover operations.
 
-## Execution update
+## Historical execution update (before promotion)
 
 The owner subsequently approved delegated execution, reported John Paul's approval and confirmed the SQL had been reviewed. PR #98 passed CI and the independent Codex review and merged as `741faac3bf2969efa0d8524f281ebc4a38f1b9f0`. The seven connected deployments were deleted; both test branches were verified empty. All ten synthetic conferences and their 35,654 reviewed rows were deleted in one hash-confirmed transaction and a fresh dry run found nothing remaining. All 175 anonymous test users and their sessions were then removed through the Auth admin API. Do not repeat those completed steps. See [EXECUTION.md](EXECUTION.md) for the exact remaining handover. Production remains demo and the lifecycle remains preproduction.
 
-## Preparation record (before execution)
+## Historical preparation record (before execution)
 
 - The amendment-link lookup defect is fixed and verified on the deployed test build. The hosted ledger now has **38 migrations**, through `20261101100000_amendment_link_committee_scope`.
 - Real Chromium checks covered Realtime, reconnect, offline reload, roll-call correction, ballot eligibility, speeches, Approval comments/history and printing against synthetic preproduction data.
 - The deployed test build serves valid resolution and amendment forms and rejects a PDF link before submitting it. No real document or amendment was submitted.
 - The temporary browser fixture's grants, codes and public links are revoked. A valid, unexpired caller was denied fresh reads/writes, with its saved action retained in the outbox.
-- The real conference UUID is reserved in [manifest.json](manifest.json), and [production.env.example](production.env.example) matches it. It does not exist in the database yet.
+- The real conference UUID is reserved in [manifest.json](manifest.json), and [production.env.example](production.env.example) matches it. At that time it had not yet been created. The manifest is a historical snapshot, not current project state.
 
-## Do these next, in order
+## Historical planned cutover steps (completed or superseded; do not rerun)
 
 1. **Close the release decisions.** Have the owner, independent reviewer and release approver consider [CAPACITY_REVIEW.md](../../evidence/cutover-2026-11-01/CAPACITY_REVIEW.md). The full H3 runner passes, but retained IO/swap and watcher cadence evidence is incomplete, and request-by-request correlation is unproven. A new hosted re-query matches the runner's aggregate write count (2,072 rows); the old 45-row gap is superseded, although one request ID appears twice. Recover missing resource evidence or record explicit decisions about the remaining limitations. No operator or agent may silently waive it. Select the final green source SHA, obtain independent review and John Paul Ribeiru's exact-SHA release approval, and name a compatible rollback build. The prepared SQL files in this folder have only been exercised locally and still need independent human review before execution.
 2. **Stop test access.** Agree a write pause. Close test browsers and runners. In Vercel → `munos` → Deployments, delete all connected Previews listed in the cutover checklist, including the `codex/owner-review-preview` deployment. Delete the temporary H3 sharing access too. Confirm the old URLs say deployment not found. Removing an alias or environment value alone does not retire an immutable deployment.
@@ -26,7 +26,7 @@ The owner subsequently approved delegated execution, reported John Paul's approv
 6. **Promote and release.** Review [production-registry.patch](production-registry.patch), apply it in a separate source PR, run CI and obtain exact-SHA approval. It is deliberately not applied here. After all earlier gates, a human runs [mark-production.sql](mark-production.sql). Use [production.env.example](production.env.example) for Vercel **Production only**, with newly rotated keys. Keep new Previews in demo mode. Configure public Production access without a Vercel login; keep Previews protected. Release through the protected `production` branch. Verify SHA, target and health, and retain a verified rollback deployment built with the new credentials. Cloud agents must have no live project access after promotion.
 7. **Open the real conference.** After final owner infrastructure approval and John Paul Ribeiru's release sign-off, a human reviews/runs [create-real-conference.sql](create-real-conference.sql) once. It creates the protected real conference shell with UUID `586db0d4-dde5-40a1-a50e-f925fce7e70a`. Follow [FIRST_EXECUTIVE_BOOTSTRAP.md](../../FIRST_EXECUTIVE_BOOTSTRAP.md); give its temporary code to the first Executive in person. Issue real staff codes and QR links from the app. On a normal phone using mobile data, without Vercel login, check the staff page and both valid public forms without submitting test data. Only then begin real-data entry.
 
-## Exact synthetic cleanup scope
+## Historical synthetic cleanup scope (completed; do not rerun)
 
 The owner must approve deleting all ten IDs in [manifest.json](manifest.json), including the original development/owner-review conferences. Their deliberate inclusion must be reviewed; do not bypass the cleanup protections. In the human operator's ignored `.env.local`, use the verified project's URL/DB connection and staging allow-list. Set `NEXT_PUBLIC_CONFERENCE_ID` to the reserved real UUID above so it remains protected, and review any `PROTECTED_CONFERENCE_IDS`; do not silently remove other protected IDs.
 

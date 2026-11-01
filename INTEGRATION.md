@@ -1,5 +1,7 @@
 # Integration and reliability
 
+**1 November 2026 update:** The operator reports the single hosted project has been promoted to Production and the real conference shell created. GitHub confirms the release SHA and CI; see the [activation record](docs/cutover/2026-11-01/EXECUTION.md). Earlier development, staging and rehearsal directions below are historical for this project. Do not reconnect cloud agents, run hosted rehearsals, or use synthetic fixtures on Production.
+
 ## Environment and deployment scope
 
 One DCMUN project: `kllhswucdhqqywnzxado` (Mumbai, Pro organisation). It is the development project now and becomes the conference production database at cutover; no second project is planned and the earlier development project `opmydpozhdgkpcnjwpqb` was deleted. See [Single-project cutover](docs/DEPLOYMENT.md#single-project-cutover). `.env.local` is ignored. `.env.example` contains placeholders. Only URL, publishable key, conference UUID and non-secret mode/version flags belong in `NEXT_PUBLIC_*`.
