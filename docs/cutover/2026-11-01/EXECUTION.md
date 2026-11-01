@@ -17,6 +17,16 @@ After the preparation packet was supplied, Zuhayr explicitly delegated execution
 
 Final SQL verification at **10:32:27 UTC (13:32:27 Qatar)**: preproduction revision 1, 38 migrations, **zero conferences, grants, access credentials, submission links, amendment links, Auth users, Auth sessions and Storage objects**. This is the last recorded hosted inventory, not proof that credentials/connectors are retired. Cloud-agent access remains to be disconnected. The global token wait has **not** started.
 
+## Later retirement update · 14:17 Qatar
+
+The owner reported replacement/retirement of the old API keys, database-password rotation, management-token revocation and disconnection of the Supabase/Vercel agent connectors. After confirming that ECC was current and HS256 previously used, the owner confirmed the old HS256 key had been revoked. These are **owner-reported actions**, not a new agent verification. No hosted database or platform query was made after that report. Credential-change step 1 below is complete as reported; do not repeat it.
+
+[RETIREMENT.json](RETIREMENT.json) records the conservative observation-time cutoff **11:17:16 UTC / 14:17:16 Qatar**, the configured 3,600-second lifetime and a 900-second safety margin. **Do not activate before 15:33 Qatar on 1 November.** Restart the wait if test issuance or refresh resumes. This update supersedes the earlier “wait not started” snapshot.
+
+PR #99 subsequently passed CI and independent Codex review and merged as `4989e50dbb85ad3a840b05938c37679eea032fba`. Manual CI on that exact main SHA also passed (Actions run `41299320510`). The reviewed production-branch ruleset was applied as **26307954**: trusted `verify` required, no force-push/deletion and no bypass actors. The final production-registry change is in draft **PR #100**, held until the remaining operator gates finish. This source preparation does not promote the database.
+
+All seven old immutable test URLs were independently checked without credentials and returned HTTP 404 `DEPLOYMENT_NOT_FOUND`. There is no credential-rotated production rollback deployment yet; a compatible retained rollback remains a gate before real-data entry.
+
 ## Finish in this order
 
 1. **Credential retirement, by the owner.** In Supabase retire the old test publishable/secret and legacy keys as applicable; rotate the database password and revoke test management/PAT access. Keep newly rotated production values with the human operator and Production runtime only. Disconnect the Supabase and Vercel agent connectors. The agent must not receive new credentials or reconnect after promotion. Key/password changes through browser UI require the human to complete them.
