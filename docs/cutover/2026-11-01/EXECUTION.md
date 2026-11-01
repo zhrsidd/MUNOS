@@ -23,7 +23,18 @@ The owner reported replacement/retirement of the old API keys, database-password
 
 [RETIREMENT.json](RETIREMENT.json) records the conservative observation-time cutoff **11:17:16 UTC / 14:17:16 Qatar**, the configured 3,600-second lifetime and a 900-second safety margin. **Do not activate before 15:33 Qatar on 1 November.** Restart the wait if test issuance or refresh resumes. This update supersedes the earlier “wait not started” snapshot.
 
-PR #99 subsequently passed CI and independent Codex review and merged as `4989e50dbb85ad3a840b05938c37679eea032fba`. Manual CI on that exact main SHA also passed (Actions run `41299320510`). The reviewed production-branch ruleset was applied as **26307954**: trusted `verify` required, no force-push/deletion and no bypass actors. The final production-registry change is in draft **PR #100**, held until the remaining operator gates finish. This source preparation does not promote the database.
+PR #99 subsequently passed CI and independent Codex review and merged as `4989e50dbb85ad3a840b05938c37679eea032fba`. Manual CI on that exact main SHA also passed (Actions run `41299320510`). The reviewed production-branch ruleset was applied as **26307954**: trusted `verify` required, no force-push/deletion and no bypass actors. PR #100 subsequently merged into main as
+`277e6c7c4bde7b786680230e98679ddf8dee3e33`.
+
+Manual CI run `41309969309` passed, including the `verify` job.
+However, the attempted non-force fast-forward of `production`
+to this SHA returned HTTP 422: required status check
+`verify` is expected.
+
+The manually dispatched CI check did not satisfy the
+production ruleset's required status check. The production
+branch was not advanced. A new revision with a successful
+push-triggered CI run is required before release.
 
 All seven old immutable test URLs were independently checked without credentials and returned HTTP 404 `DEPLOYMENT_NOT_FOUND`. There is no credential-rotated production rollback deployment yet; a compatible retained rollback remains a gate before real-data entry.
 
@@ -31,7 +42,27 @@ All seven old immutable test URLs were independently checked without credentials
 
 1. **Credential retirement, by the owner.** In Supabase retire the old test publishable/secret and legacy keys as applicable; rotate the database password and revoke test management/PAT access. Keep newly rotated production values with the human operator and Production runtime only. Disconnect the Supabase and Vercel agent connectors. The agent must not receive new credentials or reconnect after promotion. Key/password changes through browser UI require the human to complete them.
 2. **Record the cutoff and wait.** Once test refresh capability and credential/connector access are stopped, record the last possible issuance time. Wait at least **3,600 seconds plus a recorded clock margin**, and any longer lifetime of older tokens. If a test token can be issued or refreshed again, restart the wait. The deletion time of the Auth accounts alone is not the global cutoff.
-3. **Final source record and branch protection.** Independently review the separate production-registry change, get its CI green, and record the final approved source SHA. The prepared [production-ruleset.json](production-ruleset.json) requires `verify` on `production`, forbids force-push/deletion and permits a verified fast-forward release of the approved SHA; it does not weaken `main`'s Codex review gate. The CI manual trigger lets the exact squash-merged main SHA be tested, since GitHub's workflow-token auto-merges do not trigger another push workflow. Do not promote using an unverified SHA or claim the earlier source approval automatically covers a different final revision.
+3. **Final source record and branch protection.** Independently review the separate production-registry change, get its CI green, and record the final approved source SHA. The prepared [production-ruleset.json](production-ruleset.json) requires `verify` on `production`, forbids force-push/deletion and permits a verified fast-forward release of the approved SHA; it does not weaken `main`'s Codex review gate. For production releases, a successful manually dispatched CI run
+(`workflow_dispatch`) is not sufficient to satisfy the protected
+production branch's required `verify` status check.
+
+The final approved release commit must have a successful `verify`
+check from an eligible GitHub Actions event.
+
+To establish this check, merge the approved release-correction PR
+into `main` using the GitHub web interface. This must trigger
+the CI workflow's `push` event on the final main commit.
+
+Before advancing `production`:
+
+1. Confirm the final main SHA.
+2. Confirm a successful push-triggered CI `verify` job on that exact SHA.
+3. Confirm `production` is an ancestor of that SHA.
+4. Record approval of the final release revision.
+5. Advance `production` using the GitHub API with `force=false`.
+
+Do not disable production branch protection, bypass required checks,
+force-push, or substitute a manually dispatched CI result.
 4. **Human promotion and release.** After the earlier gates, run [mark-production.sql](mark-production.sql) on the intended project. Install the newly rotated publishable and Sensitive server key in **Vercel Production only**, set `NEXT_PUBLIC_DATA_BACKEND=supabase`, and keep staging/development allow-lists empty. Set Production public access without a Vercel account while keeping Previews protected. Release the approved verified SHA on `production`, region `bom1`. Verify deployment SHA/ref/health and retain a compatible rollback deployment built with the new credentials. Agents perform no live database checks after promotion.
 5. **Real conference and first Executive.** With final owner and John Paul release sign-off recorded, run [create-real-conference.sql](create-real-conference.sql), then [FIRST_EXECUTIVE_BOOTSTRAP.md](../../FIRST_EXECUTIVE_BOOTSTRAP.md). The UUID must remain `586db0d4-dde5-40a1-a50e-f925fce7e70a`. Give the bootstrap code in person, rotate it through the app, issue real access and QR links, and check both valid forms from a normal phone without submitting test data. Real-data entry starts only after those gates.
 
