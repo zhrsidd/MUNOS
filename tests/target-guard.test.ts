@@ -119,3 +119,16 @@ test('a production registry record refuses stale process allow-lists; synthetic 
   assert.equal(checkRegisteredToolTarget(url(TEST_PROJECT_REF),{STAGING_SUPABASE_REFS:TEST_PROJECT_REF}).ok,false);
  }finally{live.phase=prior;testRegistry.projects[TEST_PROJECT_REF].phase='preproduction';}
 });
+
+test('the committed DCMUN production record rejects every stale nonproduction allow-list',()=>{
+ const ref='kllhswucdhqqywnzxado';
+ assert.equal(testRegistry.projects[ref].phase,'production');
+ for(const env of [{STAGING_SUPABASE_REFS:ref},{DEVELOPMENT_SUPABASE_REFS:ref}]){
+  assert.equal(checkRegisteredToolTarget(url(ref),env).ok,false);
+  assert.throws(()=>assertToolTarget(url(ref),env),/Target guard refused/);
+  for(const VERCEL_ENV of ['preview','development'])assert.ok(targetProblem(url(ref),{...env,VERCEL_ENV}));
+ }
+ assert.equal(checkProductionTarget(url(ref),{EXPECTED_SUPABASE_REF:ref}).ok,true);
+ assert.equal(targetProblem(url(ref),{VERCEL_ENV:'production',EXPECTED_SUPABASE_REF:ref}),null);
+ assert.equal(checkRegisteredToolTarget(url(PHESMUN_PRODUCTION_REF),{STAGING_SUPABASE_REFS:PHESMUN_PRODUCTION_REF}).ok,false);
+});

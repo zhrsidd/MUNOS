@@ -4,7 +4,7 @@ This implements the remaining register/marker and test-purpose controls for the 
 
 ## Current authority
 
-`config/project-lifecycle.json` is the committed, independently reviewed source record. The DCMUN project `kllhswucdhqqywnzxado` is preproduction; PHESMUN is always forbidden. `assertToolTarget` and nonproduction deployment checks require this record **and** the environment allow-list. Unknown or production refs cannot be authorized by a process override. `checkToolTarget` remains the lower-level environment-only parser and must not be used alone as a tool authorization.
+`config/project-lifecycle.json` is the committed, independently reviewed source record. This final source record classifies the DCMUN project `kllhswucdhqqywnzxado` as production; PHESMUN is always forbidden. The hosted database marker is a separate human-controlled transition: this source classification is not evidence that the database was promoted. Activation follows [the final source handover](cutover/2026-11-01/REGISTRY_RELEASE.md). `assertToolTarget` and nonproduction deployment checks require this record **and** the environment allow-list. Unknown or production refs cannot be authorized by a process override. `checkToolTarget` remains the lower-level environment-only parser and must not be used alone as a tool authorization.
 
 Migration `20261026003647_lifecycle_controls.sql` adds the private singleton marker, revision and timestamp. Only the human database owner can change it. Production cannot be demoted, the ref cannot change and normal deletion/truncation refuse. A database owner or superuser can deliberately override triggers; all administrative/cloud/test credentials still need retirement.
 
