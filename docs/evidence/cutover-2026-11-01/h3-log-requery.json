@@ -1,0 +1,33 @@
+{
+  "projectRef": "kllhswucdhqqywnzxado",
+  "source": "Supabase unified edge_logs, read-only connector query",
+  "windowUTC": {
+    "start": "2026-10-31T23:05:45.700Z",
+    "end": "2026-10-31T23:35:50.938Z"
+  },
+  "sql": "select log_attributes['request.path'] as rpc_path,log_attributes['response.status_code'] as status,count() as requests,uniqExact(log_attributes['request_id']) as distinct_request_ids from logs where source='edge_logs' and log_attributes['request.path'] in ('/rest/v1/rpc/apply_conference_mutation','/rest/v1/rpc/submit_resolution') group by rpc_path,status order by rpc_path,status",
+  "rows": [
+    {
+      "rpc_path": "/rest/v1/rpc/apply_conference_mutation",
+      "status": "204",
+      "requests": 2072,
+      "distinct_request_ids": 2071
+    },
+    {
+      "rpc_path": "/rest/v1/rpc/submit_resolution",
+      "status": "200",
+      "requests": 16,
+      "distinct_request_ids": 16
+    }
+  ],
+  "staffRowsWithoutRequestId": 0,
+  "runnerStaffCalls": 2072,
+  "runnerPublicSubmissions": 16,
+  "aggregateCountsMatch": true,
+  "requestByRequestCorrelation": false,
+  "limitations": [
+    "Earlier 2027 figure superseded; its original query/filter is not established",
+    "One staff request ID appears twice; cause not established",
+    "Runner samples have no per-request identifiers; unique server-call correspondence not proven"
+  ]
+}

@@ -41,9 +41,13 @@ Vercel metadata rechecked at the end: `munos` still has Vercel Authentication on
 
 The last possible local test refresh was `2026-11-01T09:36:52.662Z`; all retained test identities were then signed out. This is **not** the global token-issuance cutoff: legacy/other sessions and agent management access remain. The 3,600-second global wait has not started.
 
+## Hosted H3 log recovery
+
+The exact-window re-query now returns 2,072 staff write log rows (all HTTP 204) and 16 public submissions (all HTTP 200), matching the runner aggregates. The earlier 45-row difference is superseded. There are 2,071 distinct staff request IDs, with one repeated ID; individual correspondence is not established. See [h3-log-requery.json](h3-log-requery.json) and the updated capacity review. This does not recover the missing resource-monitoring evidence or supply final release acceptance.
+
 ## Still open before promotion
 
-- Human capacity-evidence decisions, including missing watcher IO/swap/cadence evidence and the 45-call log-count difference; final independent acceptance and John Paul Ribeiru's exact-SHA release sign-off.
+- Human capacity-evidence decisions, including missing watcher IO/swap/cadence evidence and the bounded request-ID correlation limitation; final independent acceptance and John Paul Ribeiru's exact-SHA release sign-off.
 - Independent review of the prepared human scripts, deliberate owner scope approval for all-ten-conference cleanup, current backup evidence and guarded cleanup/Storage/Auth retirement.
 - Retirement of seven known connected Previews, their sharing access and any newer connected builds; global test Auth and credential retirement; connector disconnection; token wait.
 - Separate approved production registry commit, lifecycle marker promotion, new Production-only configuration/credentials, public Production protection setting, compatible credential-rotated rollback deployment and non-destructive deployment verification.

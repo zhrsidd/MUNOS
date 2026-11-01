@@ -40,13 +40,11 @@ Role-specific read p95 values are Chair 1,449 ms, Approval 2,682 ms, Printing 3,
 
 The evaluator checked the legacy action name `rollCall`, while current samples use `rollCallCommit`. This preparation change adds the current name and preserves the legacy one. A regression with a 10,000 ms current roll-call commit failed against the previous evaluator and passes with the correction; healthy current and legacy samples still pass. The observed H3 has 121 first `rollCallCommit` samples with p95 **166 ms**, so including that row leaves its recomputed verdict **PASS**, with the same 688 ms maximum. This is a harness correction; it does not change the application or retroactively relax a threshold.
 
-## Request-count reconciliation remains bounded
+## Request-count follow-up · 1 November, after browser verification
 
-The raw samples establish **1,877 first staff sends + 195 resends = 2,072 staff send calls**. The reported server-log write total is **2,027**, leaving a difference of **45**. `SupabaseTransport.send` makes one write RPC per call; confirmation batching does not combine these into a single write RPC.
+A read-only hosted log re-query using the exact H3 UTC interval **23:05:45.700–23:35:50.938 on 31 October** returns **2,072 `apply_conference_mutation` edge-log rows, all HTTP 204**, matching the runner's 1,877 first sends plus 195 resends. It also returns 16 `submit_resolution` rows, all HTTP 200, matching the public submissions. The earlier 2,027 figure is superseded for aggregate comparison; the old query/filter was not recovered, so its specific cause is not established. See [h3-log-requery.json](h3-log-requery.json) for the reproducible query and bounded results.
 
-The raw samples contain only action, duration, outcome, role, RPC-count and source fields. They have no per-request timestamp, mutation UUID or server request identifier, so these files cannot identify the 45 calls individually or establish the server log's capture/filtering coverage. The gap is not evidence that 45 mutations were lost, nor is it reconciled by showing that scoring effects were unique. Any separate hosted receipt-count check must be recorded with its operator and scope; it is not invented by this local review.
-
-Before complete capacity acceptance, recover the server-side query/filter and comparable coverage where possible, or record the remaining request-observability limitation and the explicit decision about it. Do not claim a request-by-request reconciliation from these aggregate files.
+This closes the **aggregate 45-row count difference**, not request-by-request attribution. The 2,072 staff log rows contain 2,071 distinct, nonempty request IDs: one ID appears twice. No request IDs or credentials are included in this packet. The runner samples contain no timestamps, mutation UUIDs or request IDs, so individual correspondence and the repeated-ID cause remain unproven. Do not infer 2,072 unique server requests or use the count alone as proof of exactly-once effects. The receipt/effect checks remain separate evidence; this observability limitation must remain visible to the independent reviewer and release approver.
 
 ## Operator evidence still needed before cutover
 
