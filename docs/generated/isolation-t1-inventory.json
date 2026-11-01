@@ -37,9 +37,10 @@
   "20261030110000_session_schedules_snapshot.sql",
   "20261031090000_committee_live_state.sql",
   "20261031100000_attendance_to_roll_calls.sql",
-  "20261101090000_snapshot_committee_prefilter.sql"
+  "20261101090000_snapshot_committee_prefilter.sql",
+  "20261101100000_amendment_link_committee_scope.sql"
  ],
- "migrationsSha256": "776e5787ee9052018a7bd5be38bf8e17d8e37094d06a65a37ff64f8eaf1b9281",
+ "migrationsSha256": "8b836aa8a9d955bf2dadcee1b2054e00403486c59845fdc3ed51099de8567e5a",
  "supabase-model": {
   "fns": [
    {
