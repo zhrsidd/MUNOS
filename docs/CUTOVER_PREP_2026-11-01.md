@@ -84,7 +84,7 @@ Do these in this order, and keep the transaction open until the revocation is ve
 4. **Record the last possible test-token issuance time.** For the 1 November run, the operator's preflight record has the time of the last session refresh. If any test token is issued after this, restart the wait in Phase D.
 5. Retire the keys and tokens separately: rotate the Supabase secret key (the project has a `SUPABASE_SECRET_KEY` used by the Preview's server routes), delete any other secret or publishable keys made for testing, and revoke every personal access token or management token that agents or test tools used.
 6. **Remove cloud-agent access.** Disconnect the Supabase and Vercel connectors that Claude and Codex use, and revoke any database role or password they were given. A connector's access is often organisation-wide, so disconnect the connection itself rather than assuming a per-project limit. Give nobody newly rotated values except the human operators and the Production runtime.
-7. Remove `kllhswucdhqqywnzxado` from `STAGING_SUPABASE_REFS` and `DEVELOPMENT_SUPABASE_REFS` everywhere: Vercel environments, every operator shell and every `.env.local`. From then on the load, rehearsal and verification scripts and any new Preview refuse this project, by design.
+7. Remove hosted Supabase configuration from Vercel Preview, Development and branch overrides, as well as cloud-agent environments. Retain the human operator's local `STAGING_SUPABASE_REFS` allow-list entry until Phase D's synthetic cleanup and verification are complete. Do not remove it yet, because `cleanup:synthetic` requires it to pass the target guard.
 
 ### Phase D: synthetic cleanup, backup and the token wait
 
@@ -94,7 +94,8 @@ Do these in this order, and keep the transaction open until the revocation is ve
    - Execute only with the owner's approval: `npm run cleanup:synthetic -- --conference <id> --conference <id> --execute --token <64 hex> --backup-evidence "<reference>" --owner-approval "<reference>"`. It is one transaction, irreversible, and aborts on any mismatch.
    - Delete the listed Storage objects and Auth users by hand (the tool prints lists and never deletes them), then run the dry run again and expect "nothing to delete".
 3. **Confirm no real data exists:** the read-only query above shows only synthetic conferences, and no real Executive has been bootstrapped.
-4. **Wait out the tokens.** Wait at least **3,600 seconds** from the last possible test-token issuance (Phase C, step 4), plus the clock margin you record and any longer expiry of older tokens. If any test token is issued again, restart the wait.
+4. **Retire operator allow-lists.** Only after synthetic cleanup and its verification succeed, remove `kllhswucdhqqywnzxado` from `STAGING_SUPABASE_REFS` and `DEVELOPMENT_SUPABASE_REFS` in every remaining human operator shell and `.env.local`. Confirm the project is no longer permitted as a tool target before Phase E promotion.
+5. **Wait out the tokens.** Wait at least **3,600 seconds** from the last possible test-token issuance (Phase C, step 4), plus the clock margin you record and any longer expiry of older tokens. If any test token is issued again, restart the wait.
 
 ### Phase E: promote the project to production (write pause continues)
 
@@ -117,7 +118,7 @@ Do these in this order, and keep the transaction open until the revocation is ve
 1. An old Preview URL from Phase B is gone ("deployment not found").
 2. Open a newly built Preview: it must not reach the project (a refused build, "Wrong Supabase project" on `/api/health`, or the local demo).
 3. Production `/api/health` reports the expected project and `ok`.
-4. From a normal phone on mobile data, with no Vercel login: the conference URL shows the staff access-code screen, and a resolution QR and an amendment QR open their forms.
+4. From a normal phone on mobile data, without a Vercel login, confirm the conference URL displays the staff access-code screen. Confirm invalid or unknown resolution and amendment links are rejected. Valid production QR links are checked later in Phase H, after they have been issued.
 5. Confirm the agent connectors are disconnected and that no one holds a rotated key who shouldn't.
 6. The release approver records the sign-off.
 
@@ -126,6 +127,7 @@ Do these in this order, and keep the transaction open until the revocation is ve
 1. Follow [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md), with the technical lead and the first Executive together in person: in the Supabase SQL Editor of the production project, paste `scripts/bootstrap-first-executive.sql`, set EDIT 1 to the real conference UUID and EDIT 2 to the validity (for example `2 hours`), run the whole script, read the code to the first Executive in person, and do not save, screenshot or paste it.
 2. The first Executive redeems it in the normal app (Enter staff access code), then issues the real Executive code with Executive, Access codes, Rotate (this also revokes the bootstrap code), and stores it in the password manager. Verify section B of the script: the bootstrap row is revoked.
 3. All other access codes come from the app from then on. Set the first Executive's remaining devices up with the new code before the bootstrap window ends.
-4. Record the known-good release: tag the production commit (`git tag -a known-good-dcmun-<yyyy-mm-dd> <sha> -m "Known-good conference release"` and push), add it to [RELEASES.md](RELEASES.md), and print the Known-good card.
-5. **Freeze.** From 48 hours before the conference (3 November), set `CONFERENCE_FREEZE=1` on the Production environment. Do not advance `production` or run migrations. Only narrowly scoped emergency fixes with `[emergency]` in the commit message may deploy, as described in [DEPLOYMENT.md](DEPLOYMENT.md).
-6. Real conference data may be entered only after every sign-off above is recorded. Keep [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) printed and in the operations folder.
+4. **Verify real QR links after issuance.** Once the first Executive has issued the actual resolution and amendment links, open one of each from a normal phone on mobile data without a Vercel login. Confirm both forms load correctly. These are view-only checks: do not submit test data. Record the results as post-bootstrap verification, not as a pre-bootstrap release prerequisite, consistent with `V1_RELEASE_CHECKLIST.md` step 4.8.
+5. Record the known-good release: tag the production commit (`git tag -a known-good-dcmun-<yyyy-mm-dd> <sha> -m "Known-good conference release"` and push), add it to [RELEASES.md](RELEASES.md), and print the Known-good card.
+6. **Freeze.** From 48 hours before the conference (3 November), set `CONFERENCE_FREEZE=1` on the Production environment. Do not advance `production` or run migrations. Only narrowly scoped emergency fixes with `[emergency]` in the commit message may deploy, as described in [DEPLOYMENT.md](DEPLOYMENT.md).
+7. Real conference data may be entered only after every sign-off above is recorded. Keep [EMERGENCY_RECOVERY.md](EMERGENCY_RECOVERY.md) printed and in the operations folder.
