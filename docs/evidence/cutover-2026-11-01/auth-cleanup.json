@@ -1,0 +1,13 @@
+{
+  "scope": "175 anonymous test identities only, all created before synthetic cleanup; empty conference tables, no Storage objects and no contact-bearing/nonanonymous accounts verified before execution",
+  "projectRef": "kllhswucdhqqywnzxado",
+  "startedAt": "2026-11-01T10:29:33.902Z",
+  "expectedUsers": 175,
+  "conferenceCandidates": 170,
+  "unreferencedAnonymousUsers": 5,
+  "globalTokenWaitStarted": false,
+  "finishedAt": "2026-11-01T10:31:07.478Z",
+  "deletedUserCount": 175,
+  "verifiedRemainingUsers": 0,
+  "verifiedRemainingSessions": 0
+}

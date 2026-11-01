@@ -1,7 +1,7 @@
 {
   "projectRef": "kllhswucdhqqywnzxado",
-  "state": "PREPARATION ONLY; not promoted",
-  "applicationCandidate": "032daa5864a38b377b0df96f20939512b554fcd7",
+  "state": "SYNTHETIC CLEANUP COMPLETE; still preproduction; not promoted",
+  "applicationCandidate": "741faac3bf2969efa0d8524f281ebc4a38f1b9f0",
   "reservedProductionConferenceId": "586db0d4-dde5-40a1-a50e-f925fce7e70a",
   "syntheticConferenceIds": [
     "0331ceb6-3fa8-4731-92cb-2b4c0316d0cb",
@@ -26,5 +26,10 @@
   },
   "browserFixtureAuthorityRevoked": true,
   "productionBackend": "local (demo)",
-  "scriptsStatus": "Prepared; local synthetic validation only; independent human review required before execution"
+  "scriptsStatus": "Owner reported SQL review and approved delegated execution; synthetic cleanup completed; promotion/real-conference statements not executed",
+  "syntheticCleanupComplete": true,
+  "syntheticRowsDeleted": 35654,
+  "remainingConferences": 0,
+  "remainingAuthUsers": 0,
+  "remainingAuthSessions": 0
 }

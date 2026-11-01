@@ -4,7 +4,11 @@
 
 The [verification record](../../evidence/cutover-2026-11-01/VERIFICATION.md) separates completed checks from the remaining release gates. Follow the full [cutover checklist](../../CUTOVER_PREP_2026-11-01.md) for the authoritative order and responsibilities. These files prepare that procedure; they do not approve production promotion.
 
-## What is ready
+## Execution update
+
+The owner subsequently approved delegated execution, reported John Paul's approval and confirmed the SQL had been reviewed. PR #98 passed CI and the independent Codex review and merged as `741faac3bf2969efa0d8524f281ebc4a38f1b9f0`. The seven connected deployments were deleted; both test branches were verified empty. All ten synthetic conferences and their 35,654 reviewed rows were deleted in one hash-confirmed transaction and a fresh dry run found nothing remaining. All 175 anonymous test users and their sessions were then removed through the Auth admin API. Do not repeat those completed steps. See [EXECUTION.md](EXECUTION.md) for the exact remaining handover. Production remains demo and the lifecycle remains preproduction.
+
+## Preparation record (before execution)
 
 - The amendment-link lookup defect is fixed and verified on the deployed test build. The hosted ledger now has **38 migrations**, through `20261101100000_amendment_link_committee_scope`.
 - Real Chromium checks covered Realtime, reconnect, offline reload, roll-call correction, ballot eligibility, speeches, Approval comments/history and printing against synthetic preproduction data.
