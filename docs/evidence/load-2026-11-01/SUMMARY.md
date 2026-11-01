@@ -89,4 +89,4 @@ The 31 Oct figures are from the run sheet and the operator's report of that run.
 
 ## Not covered by this evidence
 
-Disk IO and swap readings were not recorded. Realtime delivery is simulated by the runner. The real-browser functional checks (reconnect, roll-call correction, public amendment access, revocation) were not part of this run. A watcher metrics feed did not run during H3. The independent reviewer's and release approver's sign-offs are still to be recorded.
+Disk IO and swap readings were not recorded. Realtime delivery is simulated by the runner, so real Realtime validation remains an open pre-cutover release gate (see the cutover checklist). The real-browser functional checks (reconnect, roll-call correction, public amendment access, revocation) were not part of this run. A watcher metrics feed did not run during H3. The independent reviewer's and release approver's sign-offs are still to be recorded.

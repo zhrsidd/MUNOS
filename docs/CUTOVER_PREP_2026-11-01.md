@@ -44,7 +44,8 @@ The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes
 - [ ] Independent reviewer sign-off and release approver sign-off on the capacity evidence.
 - [ ] Backups: PITR is off. Decide before any real data is entered whether to turn it on, and record the choice.
 - [ ] Real-browser functional checks on the exact candidate (Chair reconnect, roll-call correction, immutable ballot eligibility, speeches and points, Approval and printing, public resolution and amendment access, revocation).
-- [ ] Not measured in the capacity run: disk IO and swap, and real Realtime delivery (the runner simulates it). Check both in the dashboard during the first live session.
+- [ ] **Real Realtime delivery is a release gate and must be validated before cutover** (Phase A, step 8). The capacity runner only simulates it, and after cutover hosted rehearsal and synthetic writes are prohibited. Dashboard monitoring in the live session supplements this evidence and does not replace it.
+- [ ] Not measured in the capacity run: disk IO and swap. Check both in the dashboard during the first live session, as a supplement.
 - [ ] Support-role read latency (Admin, Executive and Approval snapshots, 2.7 to 3.4 s p95 at 110 staff) is the next place to improve if time allows. The planned fix is delta reads, documented in [PERFORMANCE_FOLLOWUPS_2026-10-31.md](PERFORMANCE_FOLLOWUPS_2026-10-31.md).
 
 ## Manual cutover instructions
@@ -64,6 +65,7 @@ These are the hands-on steps for the cutover, in the order [LIFECYCLE_CONTROLS.m
 5. Review the advisors (Supabase dashboard, Advisors). The known warnings are the access-code `SECURITY DEFINER` functions, the anonymous-policy notices and leaked-password protection. Anything new needs a decision before promotion.
 6. Agree the write-pause window with the Executive, and announce it. Nobody should be using the staging project then.
 7. Do the real-browser functional checks from the open-decisions list above and record them.
+8. **Validate real Realtime delivery** (release gate; see gap G5 in [LOAD_TEST_EXECUTION_PACKET.md](LOAD_TEST_EXECUTION_PACKET.md) and [STAGING_REHEARSAL.md](STAGING_REHEARSAL.md)). It needs synthetic data with test access, so do it **before** Phase B and C, on a fresh fixture with its own grants. It also needs a connected build, so create one temporary connected Preview of the release candidate for this check and delete it in Phase B. With a few real browsers: confirm a change made on one device appears on another through Realtime without a reload, then block `*/realtime/v1/*` (STAGING_REHEARSAL E2) and confirm core actions continue and recover once it is unblocked. Watch the Realtime logs and connection counts in the Supabase dashboard, and record the result, any errors and who ran it. Revoke the fixture afterwards, as for the load runs.
 
 ### Phase B: stop test activity (start of the write pause)
 
