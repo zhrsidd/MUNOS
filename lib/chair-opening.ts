@@ -2,9 +2,9 @@ import type {Committee, ConferenceData} from './domain';
 import type {StaffAccess} from './access';
 import type {Health} from './sync/repository';
 
-export const CHAIR_INTRO_MS = 3000;
+export const CHAIR_INTRO_MS = 5000;
 export type OpeningState = {phase: 'idle' | 'checking' | 'artwork' | 'showing' | 'done'; committee: Committee | null};
-export type OpeningInput = {access: StaffAccess; health: Health; data: ConferenceData | null; pathname: string};
+export type OpeningInput = {access: StaffAccess; health: Health; data: ConferenceData | null; pathname: string; committeeId?: string; selectionReady?: boolean};
 type Clock = {now: () => number; later: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>; cancel: (id: ReturnType<typeof setTimeout>) => void};
 const clock: Clock = {now: () => performance.now(), later: (fn, ms) => setTimeout(fn, ms), cancel: id => clearTimeout(id)};
 
@@ -25,32 +25,40 @@ export class ChairOpening {
  private actor?: string;
  private remaining = CHAIR_INTRO_MS;
  private visibleSince?: number;
- private generation = 0;
- constructor(private select: (access: StaffAccess) => Promise<Committee | null>, private time: Clock = clock) {}
+
+ constructor(private time: Clock = clock) {}
  getSnapshot = () => this.state;
  subscribe = (fn: () => void) => {this.listeners.add(fn); return () => {this.listeners.delete(fn);};};
  private set(phase: OpeningState['phase'], committee = this.state.committee) {this.state = {phase,committee}; this.listeners.forEach(fn => fn());}
  private clearTimer() {if(this.timer !== undefined)this.time.cancel(this.timer);this.timer=undefined;}
- private finish = () => {this.generation++;this.clearTimer();this.visibleSince=undefined;this.set('done',null);};
+ private finish = () => {this.clearTimer();this.visibleSince=undefined;this.set('done',null);};
  canPresent(input: OpeningInput) {
   return mayShowChairOpening(input) && (!this.actor || input.access.actorId===this.actor) &&
    (!this.state.committee || input.access.committeeIds.includes(this.state.committee.id));
  }
  update(input: OpeningInput) {
   this.input=input;
+  if(input.access.status==='signedOut'){
+   this.clearTimer();this.visibleSince=undefined;this.remaining=CHAIR_INTRO_MS;this.actor=undefined;if(this.state.phase!=='idle')this.set('idle',null);
+  }
   if(this.state.phase==='done')return;
-  if(this.state.phase==='idle' && (input.access.status==='loading' || (input.pathname==='/' && input.access.status==='active' && input.access.roles.includes('chair'))))return;
+  // Login/access checks have not consumed an introduction. Only an authorized workspace can start one.
+  if(this.state.phase==='idle' && (input.access.status!=='active' || input.pathname==='/'))return;
+  if(this.state.phase==='idle' && !input.data)return;
   if(!this.canPresent(input)){this.finish();return;}
   if(this.state.phase==='idle'){
-   this.actor=input.access.actorId;const generation=++this.generation;this.set('checking');
-   // Broken optional storage must not trap a ready workspace.
-   this.timer=this.time.later(this.finish,1500);
-   void this.select(input.access).then(committee=>{
-    if(generation!==this.generation)return;
-    this.clearTimer();
-    if(!committee || !this.input || !mayShowChairOpening(this.input) || !this.input.access.committeeIds.includes(committee.id)){this.finish();return;}
-    this.set('artwork',committee);this.timer=this.time.later(this.finish,5000);
-   }).catch(()=>{if(generation===this.generation)this.finish();});
+   if(!input.data)return;
+   if(!input.health.lastSynced){
+    // Optional decoration must not hide usable cached work behind a hung first read.
+    if(this.timer===undefined)this.timer=this.time.later(this.finish,5000);
+    return;
+   }
+   if(input.selectionReady===false)return;
+   this.clearTimer();
+   const assigned=input.data.committees.filter(c=>!c.archived && input.access.committeeIds.includes(c.id));
+   const committee=assigned.find(c=>c.id===input.committeeId) ?? assigned.find(c=>c.code==='GA1') ?? assigned[0];
+   if(!committee || input.data.conference.features[`committeeLoadingScreen:${committee.id}`]!==true){this.finish();return;}
+   this.actor=input.access.actorId;this.set('artwork',committee);this.timer=this.time.later(this.finish,5000);
   } else if(this.state.phase==='showing' && this.remaining<=0 && input.data)this.finish();
  }
  artworkReady = () => {if(this.state.phase!=='artwork')return;this.clearTimer();this.set('showing');};

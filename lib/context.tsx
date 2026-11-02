@@ -45,22 +45,28 @@ export function ConferenceProvider({
   const requestedRole=staffRoleForPath(pathname);
   const wrongRole=access.status==="active"&&requestedRole&&!access.roles.includes(requestedRole);
   useEffect(()=>{if(wrongRole&&access.roles.length)router.replace(staffRolePath(access.roles[0]));},[wrongRole,access.roles,router]);
-  const opening=useChairOpening({access,health,data,pathname});
   const [notice, setNotice] = useState("");
   const [actError, setActError] = useState("");
   const [committeeId, setCommitteeId] = useState("ga1");
   const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [selectionReady, setSelectionReady] = useState(false);
   useEffect(() => repository.initialize(), []);
   // Public delegate pages never mount this provider, so only active staff devices ask.
   useEffect(()=>{void requestPersistentStorage({status:access.status});},[access.status]);
   const contextConferenceId = data?.conference.id;
   useEffect(()=>{
     if(!contextConferenceId)return;
-    void preferences.readPreferences(`context:${contextConferenceId}`).then(saved=>{
+    let cancelled=false;
+    let deadline: ReturnType<typeof setTimeout>;
+    const fallback=new Promise<undefined>(resolve=>{deadline=setTimeout(()=>resolve(undefined),1500);});
+    void Promise.race([preferences.readPreferences(`context:${contextConferenceId}`),fallback]).then(saved=>{
+      if(cancelled)return;
       if(saved?.committeeId)setCommitteeId(saved.committeeId);
       if(saved?.sessionId)setSelectedSessionId(saved.sessionId);
-    });
+    }).catch(()=>{}).finally(()=>{clearTimeout(deadline);if(!cancelled)setSelectionReady(true);});
+    return ()=>{cancelled=true;clearTimeout(deadline);};
   },[contextConferenceId]);
+  const opening=useChairOpening({access,health,data,pathname,committeeId,selectionReady});
   async function act(c: Command, role: Role) {
     setActError("");
     try {

@@ -26,7 +26,7 @@ const url=`http://127.0.0.1:${server.address().port}`;
 const browser=await engine.launch({headless:true,...(process.env.BROWSER_BIN?{executablePath:process.env.BROWSER_BIN}:{})});
 const results=[];
 try{
- for(const scenario of ['fast','cache-late','slow','skip','disabled','uncached','multi','revoked','expired','denied','recovery','image-failure','conflict','reduced','hidden']){
+ for(const scenario of (process.env.OPENING_SCENARIOS?.split(',')??['login','hung-preferences','fast','cache-late','slow','skip','disabled','hung-read','uncached','multi','revoked','expired','denied','recovery','image-failure','conflict','reduced','hidden'])){
   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:scenario==='reduced'?'reduce':'no-preference'});
   await context.route('**/*',r=>{
    if(!r.request().url().startsWith(url))return r.abort();
@@ -36,13 +36,14 @@ try{
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{window.timing={};new MutationObserver(()=>{const art=document.querySelector('.committee-loading'),ready=document.querySelector('[data-workspace]');if(art&&art.getBoundingClientRect().height&&art.querySelector('img')?.complete&&!window.timing.art)window.timing.art=performance.now();if(ready&&!window.timing.ready)window.timing.ready=performance.now();}).observe(document,{subtree:true,childList:true,attributes:true});});
   await page.goto(`${url}/?scenario=${scenario}`);
+  if(scenario==='login'){await page.getByRole('heading',{name:'Enter staff access code'}).waitFor();await page.evaluate(()=>window.fixtureLogin());}
   const intro=page.locator('.committee-loading:visible'),workspace=page.locator('[data-workspace]');
-  const enabled=['fast','cache-late','slow','skip','multi','conflict','reduced','hidden'].includes(scenario);
+  const enabled=['login','hung-preferences','fast','cache-late','slow','skip','uncached','multi','conflict','reduced','hidden'].includes(scenario);
   if(enabled){
-   await intro.waitFor({state:'visible',timeout:10000}).catch(async error=>{console.error({scenario,errors,body:await page.locator('body').innerText()});throw error;});
+   await intro.waitFor({state:'visible',timeout:30000}).catch(async error=>{console.error({scenario,errors,body:await page.locator('body').innerText()});throw error;});
    if(scenario==='conflict')await page.evaluate(()=>window.setHealth({conflicts:1,state:'conflict'}));
    else if(scenario==='skip'){await page.getByRole('button',{name:'Enter workspace'}).focus();await page.keyboard.press('Enter');}
-   else if(scenario==='slow'){assert.equal(await page.getByRole('button',{name:'Enter workspace'}).count(),0);}
+   else if(scenario==='slow'){assert.equal(await page.getByRole('button',{name:'Enter workspace'}).count(),1);}
    if(scenario==='hidden'){
     await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
     await page.waitForTimeout(3100);assert.equal(await intro.isVisible(),true);
@@ -56,16 +57,16 @@ try{
   }
   if(['revoked','expired','denied'].includes(scenario)){await page.locator('.staff-access-card').waitFor();assert.equal(await workspace.count(),0);assert.equal(await intro.count(),0);}
   else {
-   await workspace.waitFor({timeout:10000});
+   await workspace.waitFor({timeout:30000});
    const timing=await page.evaluate(()=>window.timing);
-   if(enabled&&!['skip','conflict'].includes(scenario))assert.ok(timing.ready-timing.art>=3000,`${scenario}: ${timing.ready-timing.art}`);
+   if(enabled&&!['skip','conflict'].includes(scenario))assert.ok(timing.ready-timing.art>=5000,`${scenario}: ${timing.ready-timing.art}`);
    if(['skip','conflict'].includes(scenario))assert.ok(timing.ready-timing.art<2000);
    if(!enabled)assert.equal(timing.art,undefined,scenario);
    await page.evaluate(()=>{window.go('/chair/participation');window.dispatchEvent(new Event('focus'));});
    assert.equal(await workspace.isVisible(),true);assert.equal(await intro.count(),0);
    results.push({scenario,visibleMs:timing.art?Math.round(timing.ready-timing.art):null});
    if(scenario==='fast'){
-    await page.reload();await intro.waitFor({state:'visible'});await workspace.waitFor();const again=await page.evaluate(()=>window.timing);assert.ok(again.ready-again.art>=3000);results.push({scenario:'refresh',visibleMs:Math.round(again.ready-again.art)});
+    await page.reload();await intro.waitFor({state:'visible'});await workspace.waitFor();const again=await page.evaluate(()=>window.timing);assert.ok(again.ready-again.art>=5000);results.push({scenario:'refresh',visibleMs:Math.round(again.ready-again.art)});
    }
   }
   assert.deepEqual(errors,[],scenario);await context.close();
