@@ -2,9 +2,11 @@
 
 20 October handoff alignment: root `AGENTS.md` governs ownership (Claude primary engineer; Codex independent reviewer). John Paul Ribeiru approves releases; the owner approves production configuration and organisation/cost before hosted resource creation or upgrades. The state paragraph below is an **8 October historical checkpoint**, not a current environment inspection. [START_HERE.md](START_HERE.md) and the [PR #22 gate](REVIEW_APPROVAL_DECISIONS_AND_ADJUSTMENTS.md#pr-22--staging-migration-and-sync-acceptance-gate) record current review requirements.
 
-One page of gates. Work top to bottom. **Do not start a section until every box in the section above it is ticked.** Each gate names who signs it off. Record dates and evidence links next to each box.
+**1 November 2026 update:** The operator reports activation and real conference shell creation; GitHub confirms the release SHA and push CI. See [activation record](cutover/2026-11-01/EXECUTION.md#production-activation--1-november-2026) for provenance, outstanding bootstrap, configuration, QR and freeze tasks, and unresolved capacity-evidence limitations. The following checklist is historical; do not repeat preproduction tests, synthetic cleanup, or a rollback drill on Production.
 
-Release model ([DEPLOYMENT.md](DEPLOYMENT.md)): `main` → automatic **Preview** (development Supabase). Production is built **only** from the `production` branch, which is moved deliberately. Merging to `main` never deploys Production.
+The original gates below are retained for traceability. Use the activation record for the present status and outstanding tasks; do not treat old unchecked boxes as proof that no later work occurred.
+
+Release model ([DEPLOYMENT.md](DEPLOYMENT.md)): `main` → automatic **Preview** (local demo). Production is built **only** from the `production` branch, which is moved deliberately. Merging to `main` never deploys Production.
 
 State at the time of writing (8 October 2026): `main` = `6160f27` (PR #15: System health in every staff workspace; PR #16: those pages available offline); development Supabase has every migration through `20261008135032` applied once; development acceptance passed; `production` = `c0a6a65`; **no Production deployment and no production Supabase project exist**; the Supabase upgrade and load rehearsal are deliberately deferred to conference week.
 
@@ -63,8 +65,8 @@ Release — technical lead, approved by John Paul Ribeiru and recorded in [RELEA
 - [ ] Choose the `main` commit that passed section 1. Advance `production` to it **intentionally** (fast-forward; never force-push).
 - [ ] Production build is READY; `npm run verify:deployment -- <production-url> <sha>` passes.
 - [ ] System health on one device: `<version> · <sha7> · production`, Supabase `ok`, Storage `ok`, GREEN.
-- [ ] One real QR submission (resolution) and one amendment from a phone on mobile data, no Vercel login prompt; then remove the test records in the app.
-- [ ] Rollback drill once on Production with a harmless change (DEPLOYMENT.md → Rollback); time it (< 5 minutes).
+- [ ] Issue real resolution and amendment links, then check both forms on a normal phone using mobile data without submitting test data.
+- [ ] Record rollback readiness: the operator confirmed the retained same-revision deployment is selectable. No earlier-version rollback drill was performed; do not run a synthetic drill on Production.
 - [ ] Declare the **known-good release**: tag, RELEASES.md entry, print the known-good card.
 
 ## 3. T-48 hours — freeze and people

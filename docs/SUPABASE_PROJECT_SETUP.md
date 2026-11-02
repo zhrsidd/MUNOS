@@ -1,5 +1,7 @@
 # New DCMUN Supabase project: setup record
 
+**1 November 2026 update:** The operator reports the single hosted project has been promoted to Production and the real conference shell created. GitHub confirms the release SHA and CI; see the [activation record](cutover/2026-11-01/EXECUTION.md). Earlier development, staging and rehearsal directions below are historical for this project. Do not reconnect cloud agents, run hosted rehearsals, or use synthetic fixtures on Production.
+
 Status 2026-10-21: **all 26 migrations applied (21 on 20 October, 5 on 21 October) and verified (smoke test 15/15 and signed-in browser checks on an isolated TEST conference); development role.** The 21 October rollout is recorded in "Migrations 22 to 26" below. Not yet production. See [Single-project cutover](DEPLOYMENT.md#single-project-cutover) for the move to production.
 
 ## Identity
