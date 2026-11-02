@@ -4,11 +4,8 @@ import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import {ChairOpening, type OpeningInput} from "../lib/chair-opening";
-import { readLoadingCommittee } from "../lib/loading-screen";
-import { DurableStore } from "../lib/sync/store";
 import { WorkspaceLoading } from "./workspace-loading";
 
-const store = new DurableStore();
 const subscribeVisibility = (listener: () => void) => {
   document.addEventListener("visibilitychange", listener);
   return () => document.removeEventListener("visibilitychange", listener);
@@ -17,13 +14,13 @@ const pageVisible = () => typeof document === "undefined" || document.visibility
 const serverVisible = () => true;
 
 // Module lifetime is the page opening, so routing/provider remounts cannot restart the introduction.
-const opening = new ChairOpening(access => readLoadingCommittee(store, process.env.NEXT_PUBLIC_CONFERENCE_ID, access));
+const opening = new ChairOpening();
 
-export function useChairOpening({access, health, data, pathname}: OpeningInput) {
+export function useChairOpening({access, health, data, pathname, committeeId, selectionReady}: OpeningInput) {
  const state = useSyncExternalStore(opening.subscribe, opening.getSnapshot, opening.getSnapshot);
- useEffect(() => {opening.update({access,health,data,pathname});}, [access, health, data, pathname]);
+ useEffect(() => {opening.update({access,health,data,pathname,committeeId,selectionReady});}, [access, health, data, pathname, committeeId, selectionReady]);
  // Check current access/recovery synchronously too: an effect must never flash stale authorized artwork.
- return typeof document !== "undefined" && opening.canPresent({access,health,data,pathname}) && state.phase !== 'done' ? state : null;
+ return typeof document !== "undefined" && opening.canPresent({access,health,data,pathname,committeeId,selectionReady}) && state.phase !== 'done' ? state : null;
 }
 
 export function CommitteeWorkspaceLoading({ ready }: { ready: boolean }) {
