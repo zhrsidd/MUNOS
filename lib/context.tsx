@@ -42,10 +42,10 @@ export function ConferenceProvider({
   const health = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
   const access=useSyncExternalStore(repository.subscribe,repository.getAccess,repository.getAccess);
   const pathname=usePathname(),router=useRouter();
-  const opening=useChairOpening({access,health,data,pathname});
   const requestedRole=staffRoleForPath(pathname);
   const wrongRole=access.status==="active"&&requestedRole&&!access.roles.includes(requestedRole);
   useEffect(()=>{if(wrongRole&&access.roles.length)router.replace(staffRolePath(access.roles[0]));},[wrongRole,access.roles,router]);
+  const opening=useChairOpening({access,health,data,pathname});
   const [notice, setNotice] = useState("");
   const [actError, setActError] = useState("");
   const [committeeId, setCommitteeId] = useState("ga1");
