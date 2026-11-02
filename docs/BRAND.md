@@ -225,3 +225,11 @@ legacy not-null column.
 - Search matches the code with or without the slash and spaces (`ga1/01`, `ga1 / 01`, `ga1 01`) and the country,
   case- and accent-insensitively; resolution lists also match status and outcome.
 - The identity replaces the title text only: status chips, latest Approval feedback and the working Doc link stay.
+
+### Chair points reference
+
+A compact native disclosure sits at bottom left of the Debate console, opposite Felix. It is collapsed by default,
+uses surface/line/ink tokens and 12 px text, has no animation, and is hidden when printing. Its values come from the
+committee scoring configuration. Copy must describe the real credit trigger: Main Submitter is automatic on the
+first scored speech; debated amendments are manually credited in Participation. The workspace About link carries
+the existing MUNOS platform mark at 20 px; the DCMUN conference seal remains the header identity.

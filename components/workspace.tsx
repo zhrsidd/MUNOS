@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { MunosMark } from "./munos-mark";
 import { PLATFORM } from "@/lib/brand";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -132,9 +133,9 @@ export function Workspace({ path }: { path: string }) {
           )}
         </main>
         <footer className="workspace-footer">
-          {PLATFORM.name} · Created by {PLATFORM.creator} · <Link href="/about">About</Link>{" "}
+          {PLATFORM.name} · Created by {PLATFORM.creator} · <Link href="/about" className="workspace-about"><MunosMark size={20} />About MUNOS</Link>{" "}
           <span>
-            Illustrative DCMUN-inspired data · <DataModeLabel />
+            {access.status === "demo" && <>Illustrative conference data · </>}<DataModeLabel />
           </span>
         </footer>
       </div>

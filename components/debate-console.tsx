@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useConference } from "@/lib/context";
+import { ChairPointsGuide } from "./chair-points-guide";
 import { PointsLeaderboard } from "./points-leaderboard";
 import type { Command } from "@/lib/commands";
 import type { Delegate } from "@/lib/domain";
@@ -124,6 +125,7 @@ export function DebateConsole({ committeeId }: { committeeId: string }) {
   const customValid = Number.isInteger(Number(customLimit)) && customLimit.trim() !== "" && Number(customLimit) >= (active?.poiCount ?? 0) && Number(customLimit) <= 1000;
 
   return <div className="procedure-console">
+    <ChairPointsGuide data={data} committeeId={committeeId} />
     {amendment && resolution ? <section className="procedure-context amendment-debate" aria-label="Amendment in debate" role="status">
       <div>
         <span className="eyebrow">AMENDMENT IN DEBATE</span>

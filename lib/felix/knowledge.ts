@@ -424,7 +424,7 @@ export const KNOWLEDGE: Entry[] = [
       admin: {
         text: "People → Access codes creates, rotates and revokes a code for each workspace scope. A new code is shown once: copy it and hand it over privately.",
         steps: ["Rotating blocks the previous code for new devices; devices already in keep access until expiry or revocation.", "Revoke stops new redemptions; tick “Also revoke devices using this code” to block those devices when they next check access (their saved changes stay on the device for recovery)."],
-        mistakes: "Access-code actions need a live connection to the conference database: they are not saved on this device for later, and the local demo does not issue real codes.",
+        mistakes: "Access-code actions need a live connection to the conference database: they are not saved on this device for later.",
         href: "/admin/access-codes", linkLabel: "Open Access codes",
       },
       chair: { text: askExecutive },
