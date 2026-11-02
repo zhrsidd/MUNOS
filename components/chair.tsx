@@ -250,7 +250,7 @@ export function ChairScreen({
                         {(() => { const r = data.documents.find((d) => d.id === e.resolutionId); return r ? resolutionLabel(r, delegates) : "General debate"; })()}
                         {(() => { const amendment = data.amendments?.find((a) => a.id === eventAmendmentId(data, e)); return amendment ? <> · <Chip tone="review">Amendment debate · {amendment.type} {amendment.clause}</Chip></> : null; })()}
                       </td>
-                      <td>Head chair · Demo</td>
+                      <td>{data.staff.find((s) => s.id === e.chairId)?.name ?? "Chair"}</td>
                       <td>
                         {formatTime(e.createdAt)}
                         {e.updatedAt && " · edited"}

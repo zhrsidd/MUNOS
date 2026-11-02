@@ -247,12 +247,12 @@ export function SyncStatus() {
       <span className="status-dot" aria-hidden="true" />
       <span>
       {status.level === "green" ? h.message : status.headline}
-      <small>{h.mode === "supabase" ? `${levelLabel[status.level]} · conference database` : "Local demo · cloud unavailable"}</small>
+      <small>{h.mode === "supabase" ? `${levelLabel[status.level]} · conference database` : cloudExpected ? "Local fallback · connection unavailable" : "Local demo"}</small>
       </span>
     </span>
   );
 }
 export function DataModeLabel(){
  const h=useSyncExternalStore(repository.subscribe,repository.getHealth,repository.getHealth);
- return <span>{h.mode==='supabase'?'Supabase development':'Local demo'}</span>;
+ return <span>{h.mode==='supabase'?'Conference database':cloudExpected?'Local fallback':'Local demo'}</span>;
 }

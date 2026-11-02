@@ -459,7 +459,7 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "audit" && (
         <Panel
           title="Activity trail"
-          subtitle="Demo audit entries are locally stored. Production audit records must be server-written and append-only."
+          subtitle={demo ? "Demo activity is saved in this browser." : "Server-recorded conference activity."}
         >
           <div className="table-scroll">
             <table>

@@ -3662,3 +3662,27 @@ body:has(.felix-launcher) .toast { right: calc(max(var(--space-4), env(safe-area
   .staff-access-page { padding: var(--space-4); }
   .staff-access-card { padding: var(--space-5); }
 }
+
+/* Quiet, keyboard-accessible scoring reference opposite the Felix launcher. */
+.workspace-about { display: inline-flex; align-items: center; gap: var(--space-1); }
+.workspace-about .munos-mark { flex: none; }
+.chair-points-guide {
+  position: fixed;
+  left: max(var(--space-4), env(safe-area-inset-left));
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  z-index: 30;
+  max-width: min(256px, calc(100vw - 2 * var(--space-4) - 72px));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.chair-points-guide summary { cursor: pointer; padding: var(--space-3); min-height: 44px; color: var(--ink); font-weight: 650; }
+.chair-points-guide summary:focus-visible { outline: 2px solid var(--action); outline-offset: var(--space-1); }
+.chair-points-guide dl { display: block; margin: 0 var(--space-3) var(--space-2); }
+.chair-points-guide dl > div { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; }
+.chair-points-guide dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.chair-points-guide p { margin: var(--space-2) var(--space-3); font-size: 12px; line-height: 1.5; }
+.chair-points-guide details[open] { max-height: min(360px, 50dvh); overflow-y: auto; }
+@media print { .chair-points-guide { display: none; } }
