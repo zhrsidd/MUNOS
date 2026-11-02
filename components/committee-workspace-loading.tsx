@@ -2,9 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
-import type { StaffAccess } from "../lib/access";
-import type { Committee } from "../lib/domain";
+
+import {ChairOpening, type OpeningInput} from "../lib/chair-opening";
 import { readLoadingCommittee } from "../lib/loading-screen";
 import { DurableStore } from "../lib/sync/store";
 import { WorkspaceLoading } from "./workspace-loading";
@@ -14,32 +13,41 @@ const subscribeVisibility = (listener: () => void) => {
   document.addEventListener("visibilitychange", listener);
   return () => document.removeEventListener("visibilitychange", listener);
 };
-const pageVisible = () => document.visibilityState !== "hidden";
+const pageVisible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
 const serverVisible = () => true;
 
-/** Artwork is requested only after a verified Chair's cached committee opted in. */
-export function CommitteeWorkspaceLoading({ access }: { access: StaffAccess }) {
-  const pathname = usePathname();
-  if (pathname !== "/chair" && !pathname.startsWith("/chair/")) return <WorkspaceLoading />;
-  // Route changes remount the selection: returning to a route must re-read its current setting.
-  return <CachedCommitteeLoading key={pathname} access={access} />;
+// Module lifetime is the page opening, so routing/provider remounts cannot restart the introduction.
+const opening = new ChairOpening(access => readLoadingCommittee(store, process.env.NEXT_PUBLIC_CONFERENCE_ID, access));
+
+export function useChairOpening({access, health, data, pathname}: OpeningInput) {
+ const state = useSyncExternalStore(opening.subscribe, opening.getSnapshot, opening.getSnapshot);
+ useEffect(() => {opening.update({access,health,data,pathname});}, [access, health, data, pathname]);
+ // Check current access/recovery synchronously too: an effect must never flash stale authorized artwork.
+ return typeof document !== "undefined" && opening.canPresent({access,health,data,pathname}) && state.phase !== 'done' ? state : null;
 }
 
-function CachedCommitteeLoading({ access }: { access: StaffAccess }) {
-  const [cached, setCached] = useState<{ access: StaffAccess; committee: Committee | null } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void readLoadingCommittee(store, process.env.NEXT_PUBLIC_CONFERENCE_ID, access).then(committee => {
-      if (!cancelled) setCached({ access, committee });
-    });
-    return () => { cancelled = true; };
-  }, [access]);
-  if (!cached || cached.access !== access || !cached.committee) return <WorkspaceLoading />;
-  return <AlternativeLoadingScreen committeeCode={cached.committee.code} />;
+export function CommitteeWorkspaceLoading({ ready }: { ready: boolean }) {
+ const state = useSyncExternalStore(opening.subscribe, opening.getSnapshot, opening.getSnapshot);
+ const visible = useSyncExternalStore(subscribeVisibility, pageVisible, serverVisible);
+ useEffect(() => {
+  if (!visible) {opening.hidden(); return;}
+  if (state.phase !== 'showing') return;
+  // Wait for the decoded image's visible DOM to paint, not authorization, cache lookup or image request time.
+  let second = 0;
+  const first = requestAnimationFrame(() => {second = requestAnimationFrame(opening.presented);});
+  return () => {cancelAnimationFrame(first);cancelAnimationFrame(second);opening.hidden();};
+ }, [state.phase, visible]);
+ if (!state.committee || (state.phase !== 'artwork' && state.phase !== 'showing')) return <WorkspaceLoading />;
+ return <>
+  {state.phase === 'artwork' && <WorkspaceLoading />}
+  <div hidden={state.phase === 'artwork'}>
+   <AlternativeLoadingScreen committeeCode={state.committee.code} onArtworkReady={opening.artworkReady} onArtworkFailed={opening.artworkFailed} onSkip={ready && state.phase === 'showing' ? opening.skip : undefined} />
+  </div>
+ </>;
 }
 
 /** Also used by the Executive's explicit preview; it never controls readiness. */
-export function AlternativeLoadingScreen({ committeeCode }: { committeeCode: string }) {
+export function AlternativeLoadingScreen({ committeeCode, onArtworkReady, onArtworkFailed, onSkip }: { committeeCode: string; onArtworkReady?: () => void; onArtworkFailed?: () => void; onSkip?: () => void }) {
   const [failed, setFailed] = useState(false);
   const visible = useSyncExternalStore(subscribeVisibility, pageVisible, serverVisible);
   if (failed) return <WorkspaceLoading />;
@@ -47,10 +55,10 @@ export function AlternativeLoadingScreen({ committeeCode }: { committeeCode: str
     <section className="committee-loading" data-motion={visible ? "running" : "paused"} aria-label={`${committeeCode} workspace loading`}>
       <div className="committee-loading-header">
         <div className="committee-loading-heading"><strong>MUNOS</strong><span>{committeeCode}</span></div>
-        <span className="committee-loading-tag">COMMITTEE IN SESSION</span>
+        <div className="committee-loading-controls"><span className="committee-loading-tag">COMMITTEE IN SESSION</span>{onSkip && <button type="button" className="committee-loading-skip" onClick={onSkip}>Enter workspace</button>}</div>
       </div>
       <div className="committee-loading-scene">
-        <Image className="committee-loading-art" src="/loading/committee-collage-v1.webp" alt="" fill unoptimized onError={() => setFailed(true)} />
+        <Image className="committee-loading-art" src="/loading/committee-collage-v1.webp" alt="" fill unoptimized loading="eager" onLoad={() => onArtworkReady?.()} onError={() => {setFailed(true);onArtworkFailed?.();}} />
       </div>
       <div className="committee-loading-bottom">
         <div className="committee-loading-label" role="status" aria-label="Opening your workspace">

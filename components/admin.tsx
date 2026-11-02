@@ -459,7 +459,7 @@ export function AdminScreen({ section }: { section: string }) {
       {section === "audit" && (
         <Panel
           title="Activity trail"
-          subtitle={demo ? "Demo activity is saved in this browser." : "Server-recorded conference activity."}
+          subtitle={demo ? "Demo activity is saved in this browser." : "Recent conference activity."}
         >
           <div className="table-scroll">
             <table>

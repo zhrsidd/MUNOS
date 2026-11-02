@@ -60,6 +60,8 @@
   background: var(--ink);
 }
 .committee-loading-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: var(--space-4); }
+.committee-loading-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+.committee-loading-skip { background: var(--surface); color: var(--ink); }
 .committee-loading-scene { position: absolute; inset: 0; z-index: -2; }
 .committee-loading-art { object-fit: cover; object-position: center; }
 .committee-loading::before {

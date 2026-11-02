@@ -6,7 +6,7 @@ Dates: 2 November is for fixes only. The 48-hour freeze starts 3 November. The c
 
 ## Latest preparation status
 
-The [human handover packet](cutover/2026-11-01/README.md) and [verification record](evidence/cutover-2026-11-01/VERIFICATION.md) supersede the early-morning snapshot below. Preproduction now has **38 migrations and ten synthetic conferences**; the added browser-check fixture has been revoked. Production remains demo. The owner chose **PITR off, daily backups**. No cleanup, promotion or real-data entry has happened.
+**1 November activation update:** cleanup and test-access retirement are recorded in [EXECUTION.md](cutover/2026-11-01/EXECUTION.md); the operator reports the project promoted, the Supabase-backed release healthy and the real conference shell created. GitHub confirms `production` at `cfa63dbd857e6fa639774b25448f25fc09621673` and successful push CI. The release, health evidence, owner-reported approvals and remaining Executive bootstrap, QR, setup and freeze tasks are in [RELEASES.md](RELEASES.md). PITR remains off; daily backups are selected. Capacity monitoring and request-correlation gaps remain in [CAPACITY_REVIEW.md](evidence/cutover-2026-11-01/CAPACITY_REVIEW.md); approval does not fill those gaps. The remainder of this page is the **historical pre-cutover plan and snapshots**, not a current to-do list. Do not rerun cleanup or promotion against Production.
 
 ## Early-morning snapshot on 1 November
 
@@ -17,7 +17,7 @@ The [human handover packet](cutover/2026-11-01/README.md) and [verification reco
 - [x] Staging holds nine conferences, all synthetic; 0 non-test grants. No real conference data has been entered.
 - [x] The owner deleted the metrics key, rotated the Vercel bypass secret, closed the operator terminals and deleted the session files.
 
-## Retire the connected Previews (owner, Vercel dashboard)
+## Historical: retire the connected Previews (completed)
 
 Also retire `dpl_2JExsFt7E8gvgaLsnjfKUEbL1UvF` (`munos-ka77ci8ax-dcmun.vercel.app`, `codex/owner-review-preview`, `c82dcd9`). The H3 Preview was accessed through a temporary Vercel share link during the browser check; retiring that deployment must also retire its sharing capability. Audit for newer connected deployments before declaring the list complete.
 
@@ -34,7 +34,7 @@ Claude's Vercel connector cannot delete deployments. In the Vercel dashboard, pr
 
 The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes with them. Then confirm the list for that branch is empty. Do not push to that branch name again.
 
-## Cutover steps (human-controlled, in order, from the lifecycle document)
+## Historical: cutover steps (see activation record for completion)
 
 1. [ ] Freeze the candidate SHA and the migration ledger. Reconcile synthetic work and keep the evidence.
 2. [ ] Guarded cleanup of synthetic records on the verified preproduction target. The two open submission links left on the 20 and 21 October test conferences are part of this (the original conference is protected and goes through the reviewed cleanup tooling only). Confirm no real data.
@@ -45,7 +45,7 @@ The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes
 7. [ ] Release the approved production build from the verified revision with new Production-scoped secrets. Check target, SHA and health with a non-destructive check. Release approval is John Paul Ribeiru's.
 8. [ ] Only after the sign-offs: bootstrap the real Executive, then issue real grants, codes and QR links.
 
-## Decisions and sign-offs still open
+## Historical: decisions and evidence gaps at preparation
 
 - [ ] Independent reviewer sign-off and release approver sign-off on the capacity evidence, including the recorded deviations and remaining request-correlation limitation. The [hosted re-query](evidence/cutover-2026-11-01/h3-log-requery.json) now matches aggregate counts and supersedes the earlier 45-row difference; it does not establish individual request correspondence. The summary is evidence of a reported runner PASS; it does not itself close this review.
 - [x] Backup policy: PITR is off. Owner decision recorded on 1 November: **keep PITR off and use daily backups**. Record the latest backup before cleanup.
@@ -54,7 +54,7 @@ The branch alias `munos-git-codex-preproduction-connected-dcmun.vercel.app` goes
 - [ ] **Pre-cutover capacity evidence gaps:** disk IO and swap were not recorded, and approximately five-minute dashboard samples do not establish every consecutive-minute STOP check. Recover suitable historical charts/metrics for the run or obtain the missing evidence on synthetic preproduction state. If the evidence cannot be recovered, the owner and independent reviewer must explicitly decide and record the deviation, and the release approver must consider it before sign-off. Do not silently close these operator checks. Monitoring the first live session supplements pre-cutover evidence and does not replace it.
 - [ ] Support-role read latency (Admin, Executive and Approval snapshots, 2.7 to 3.4 s p95 at 110 staff) is an observation under the existing per-action threshold, not a new role-specific failure criterion. Further read architecture work is conditional on the evidence review; delta reads remain a design option in [PERFORMANCE_FOLLOWUPS_2026-10-31.md](PERFORMANCE_FOLLOWUPS_2026-10-31.md).
 
-## Manual cutover instructions
+## Historical: manual cutover instructions (do not rerun)
 
 These are the hands-on steps for the cutover, in the order [LIFECYCLE_CONTROLS.md](LIFECYCLE_CONTROLS.md) requires (its "Human cutover order") with the commands from [DEPLOYMENT.md](DEPLOYMENT.md), [SYNTHETIC_CLEANUP.md](SYNTHETIC_CLEANUP.md) and [FIRST_EXECUTIVE_BOOTSTRAP.md](FIRST_EXECUTIVE_BOOTSTRAP.md). Where those documents differ in detail, follow them, not this page. A failure at any step leaves the project closed to real data: fix it and carry on, and never add a temporary test-access exception.
 

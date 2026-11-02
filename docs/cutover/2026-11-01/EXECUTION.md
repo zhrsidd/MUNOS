@@ -1,6 +1,20 @@
 # Cutover execution and remaining handover · 1 November 2026
 
-**The hosted project is clean, but still preproduction. Production still uses demo mode.** The reserved real conference has not been created. Do not enter real data yet.
+## Production activation · 1 November 2026
+
+GitHub independently shows PR #101 merged as `cfa63dbd857e6fa639774b25448f25fc09621673`, push-triggered Actions run [41317959187](https://github.com/zhrsidd/MUNOS/actions/runs/41317959187) succeeded, and `production` points to that SHA. Production ruleset `26307954` is active; the separate `main` ruleset is disabled by owner decision.
+
+The operator reports successful promotion of Supabase project `kllhswucdhqqywnzxado`, rotated Production credentials, and creation of **DCMUN 2026** (DCMUN XVIII, Doha College, starts 5 November 2026), UUID `586db0d4-dde5-40a1-a50e-f925fce7e70a`, with `features.real = true`. Production uses Supabase. The owner reports approval by John Paul Ribeiru and infrastructure/configuration approval by Zuhayr Siddique. No cloud-agent live access or hosted query was used to verify these reports.
+
+The operator reports the `munos` project in team `dcmun` serves [dcmun-os.vercel.app](https://dcmun-os.vercel.app) from READY deployment `dpl_9qhVfe8nbCzKC2ZUBbpm8Nc7KvZ8`, branch `production`, release SHA above, region `bom1`. At `2026-11-01T15:29:48.700Z` the reported health result was overall **ok**: Auth 724 ms, database 620 ms, Storage 478 ms. Initial database and Storage health failures were traced to Production server-credential configuration and corrected before subsequent healthy deployments; no credential is recorded here. The operator also reports that a normal phone opened Production without Vercel authentication; valid QR forms remain to be checked.
+
+The operator reports retained deployment `dpl_9uNaCa71iAU3PJX4hhQxtUWtUQSD` (`munos-i2gf6uea6-dcmun.vercel.app`) previously passed all three health checks and appears in the Instant Rollback picker. It is a **same-revision recovery option**, not an earlier-version rollback drill; no rollback was performed. PITR remains off by owner decision; daily backups are the selected policy. Prior test authority and synthetic data were retired as documented in [EXECUTION.md](EXECUTION.md).
+
+**Still pending:** first Executive bootstrap; temporary-code redemption, normal-code rotation and verification of bootstrap revocation; staff-code issuance; committee, roster and other configuration; resolution and amendment QR-link issuance and both valid forms checked from normal mobile data without submissions; known-good tag and printed operations card; and the 3 November freeze. Do not record codes or private QR tokens here. The capacity and monitoring limitations in [CAPACITY_REVIEW.md](../../evidence/cutover-2026-11-01/CAPACITY_REVIEW.md) remain; release approval does not establish missing measurements.
+
+## Historical preproduction execution
+
+The following records and instructions describe the state at the time; promotion, release and conference creation are now completed as reported above. Do not repeat cleanup, promotion or conference creation.
 
 ## Approval and execution record
 
@@ -38,7 +52,7 @@ push-triggered CI run is required before release.
 
 All seven old immutable test URLs were independently checked without credentials and returned HTTP 404 `DEPLOYMENT_NOT_FOUND`. There is no credential-rotated production rollback deployment yet; a compatible retained rollback remains a gate before real-data entry.
 
-## Finish in this order
+## Historical planned completion steps (do not rerun)
 
 1. **Credential retirement, by the owner.** In Supabase retire the old test publishable/secret and legacy keys as applicable; rotate the database password and revoke test management/PAT access. Keep newly rotated production values with the human operator and Production runtime only. Disconnect the Supabase and Vercel agent connectors. The agent must not receive new credentials or reconnect after promotion. Key/password changes through browser UI require the human to complete them.
 2. **Record the cutoff and wait.** Once test refresh capability and credential/connector access are stopped, record the last possible issuance time. Wait at least **3,600 seconds plus a recorded clock margin**, and any longer lifetime of older tokens. If a test token can be issued or refreshed again, restart the wait. The deletion time of the Auth accounts alone is not the global cutoff.

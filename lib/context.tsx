@@ -9,7 +9,7 @@ import {
 import {usePathname,useRouter} from "next/navigation";
 import {StaffAccessGate,StaffAccessStatus} from "../components/staff-access";
 import {WorkspaceLoading} from "../components/workspace-loading";
-import {CommitteeWorkspaceLoading} from "../components/committee-workspace-loading";
+import {CommitteeWorkspaceLoading,useChairOpening} from "../components/committee-workspace-loading";
 import {staffRoleForPath,staffRolePath,type StaffAccess} from "./access";
 import {requestPersistentStorage} from "./platform/persistent-storage";
 import { DurableStore } from "./sync/store";
@@ -42,6 +42,7 @@ export function ConferenceProvider({
   const health = useSyncExternalStore(repository.subscribe, repository.getHealth, repository.getHealth);
   const access=useSyncExternalStore(repository.subscribe,repository.getAccess,repository.getAccess);
   const pathname=usePathname(),router=useRouter();
+  const opening=useChairOpening({access,health,data,pathname});
   const requestedRole=staffRoleForPath(pathname);
   const wrongRole=access.status==="active"&&requestedRole&&!access.roles.includes(requestedRole);
   useEffect(()=>{if(wrongRole&&access.roles.length)router.replace(staffRolePath(access.roles[0]));},[wrongRole,access.roles,router]);
@@ -83,10 +84,11 @@ export function ConferenceProvider({
   }
   if(access.status!=="demo"&&access.status!=="active")return <StaffAccessGate access={access}/>;
   if(wrongRole)return <WorkspaceLoading label="Opening your authorized workspace…"/>;
+  if (opening) return <CommitteeWorkspaceLoading ready={!!data}/>;
   if (!data) {
     if (health.state === "error" || health.state === "waiting")
       return <StaffAccessGate access={{...access,status:"unavailable",message:health.message}}/>;
-    return <CommitteeWorkspaceLoading access={access}/>;
+    return <WorkspaceLoading />;
   }
   return (
     <Context.Provider
