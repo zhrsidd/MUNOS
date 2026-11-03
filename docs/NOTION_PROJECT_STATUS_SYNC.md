@@ -14,6 +14,7 @@ Daily at **06:17 Qatar time / 03:17 UTC**, or on manual Actions dispatch:
 - Open PR count, open issue count, latest default-branch commit SHA
 - Push-triggered GitHub Actions CI runs for the latest default-branch commit, classified as Passing, Failing or Unknown; scheduled administrative workflows are intentionally excluded
 - Last Synced timestamp
+- Per-row validation of GitHub repository URLs: malformed or non-GitHub URLs fail that row, log its Notion page ID, and **do not stop subsequent projects**. Any such errors make the overall run fail; blank GitHub fields remain skipped
 
 The workflow updates **existing project rows only**. It explicitly skips `zhrsidd/PHESMUNOS` and `zhrsidd/CIEPseudocodeEditor`, even if their Notion cards are restored later. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
 
@@ -46,7 +47,11 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 
 ### E. Review, test and activate
 
-14. Review and approve [draft PR #107](https://github.com/zhrsidd/MUNOS/pull/107) under MUNOS's normal review process. It changes only the sync script, the workflow and this guide. A merge to `main` may invoke existing deployment checks, but **scheduled Notion writes are now disabled** until the Actions variable is `true`.
+**Regression tests (no secrets or network required):** `node --test tests/notion-project-status-sync.test.mjs`. The workflow runs these before calling the real APIs. Coverage includes invalid/malformed URLs, continued processing of subsequent rows, dry-run with zero Notion writes, private-repository access failures, stale/pending CI, and paginated CI results.
+
+
+
+14. Review and approve [PR #107](https://github.com/zhrsidd/MUNOS/pull/107) under MUNOS's normal review process. It changes only the sync script, the workflow and this guide. A merge to `main` may invoke existing deployment checks, but **scheduled Notion writes are now disabled** until the Actions variable is `true`.
 15. Merge only after the PR's required reviews/checks pass. On MUNOS `main`, open **Actions → Notion project status sync → Run workflow**; leave **Preview without modifying Notion?** checked (true). GitHub manual dispatch requires the workflow on the default branch.
 16. Inspect the job summary and logs. A successful **preview** should report `Previewed 6 of 6 project rows; 0 skipped, 0 errors.` It must not change Notion. A missing private repo is an **error**, not a silent skip.
 17. With the same workflow, **Run workflow** again with the preview checkbox **unchecked** (false). Confirm `Updated 6 of 6 project rows; 0 skipped, 0 errors.` Then open the Notion database and verify current **Last Synced**, **Open PRs**, **Open Issues**, **Last Commit**, and **CI** properties.
@@ -72,6 +77,7 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 - Notion 401: inspect connection token and Actions secret.
 - Notion 403 / 404: for the selected personal access token, check workspace, API capability and user permissions on the Projects database; for an internal connection, check that the integration was explicitly shared to the database.
 - Private repository access failure: the run now fails; check the fine-grained token's selected repositories and read permissions.
+- Invalid GitHub repository URL: inspect the affected Notion page ID in the warning, correct that row's GitHub property to `https://github.com/OWNER/REPO`, then rerun. Other valid project rows continue updating; the run exits nonzero so errors cannot pass silently.
 - CI Unknown: no push-triggered Actions check on the latest default-branch SHA, an unfinished/non-success run, insufficient Actions permissions, unavailable history, or an incomplete API response. Scheduled/manual-only and third-party checks are not counted as passing push CI.
 - Scheduled job skipped: the variable `NOTION_PROJECTS_SYNC_ENABLED` is absent or not exactly `true` (intended before verification). If enabled but no runs appear, verify workflow is on the default branch and Actions scheduling is enabled.
 - Missing status for a new repository: add a Notion project row with a GitHub URL.
