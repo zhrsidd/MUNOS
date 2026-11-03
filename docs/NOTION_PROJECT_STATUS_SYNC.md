@@ -1,6 +1,6 @@
 # Free Notion project-status sync — setup and operational guide
 
-This optional GitHub Actions workflow updates the Notion Free **Academics → Projects → GitHub Projects** database without changing MUNOS production or infrastructure.
+This optional GitHub Actions workflow updates the Notion Free **Academics → Projects → GitHub Projects** database for the seven tracked projects (excluding PHESMUN OS), without changing MUNOS production or infrastructure.
 
 - [Projects home](https://app.notion.com/p/40dd6f67939b8189811ad3755792d632)
 - [Projects database](https://app.notion.com/p/ff4ef53c5fdd4699a49e8481381b3091)
@@ -15,14 +15,14 @@ Daily at **06:17 Qatar time / 03:17 UTC**, or on manual Actions dispatch:
 - Latest completed non-sync GitHub Actions result, classified as Passing, Failing or Unknown
 - Last Synced timestamp
 
-The workflow updates **existing project rows only**. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
+The workflow updates **existing project rows only**. It explicitly skips `zhrsidd/PHESMUNOS`, even if that Notion page is restored later. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
 
 ## One-time authorisation steps
 
 1. In Notion **Settings → Connections**, enable Developer Mode if required and create an internal connection named **GitHub Project Status**. Give it read and update-content capabilities; no user-information capabilities.
 2. Grant the connection access **only to the GitHub Projects database** via the page's Connections menu, not the whole workspace.
 3. In GitHub **zhrsidd/MUNOS → Settings → Secrets and variables → Actions**, create secret **NOTION_PROJECTS_API_KEY** containing the internal connection token. Never put the token in commits, chats, issues or PRs.
-4. For comprehensive access (including private PhysicsWeekly and PHESMUNOS), create a fine-grained **read-only** GitHub token covering exactly the relevant eight repositories, and add it as **PROJECT_SYNC_GH_TOKEN**. Needed read permissions: repository metadata, contents, issues, pull requests and Actions. If you omit this token, the workflow uses its scoped built-in GITHUB_TOKEN; inaccessible private repositories are skipped.
+4. For comprehensive access (including private PhysicsWeekly), create a fine-grained **read-only** GitHub token covering exactly the seven tracked repositories (explicitly **exclude PHESMUNOS**), and add it as **PROJECT_SYNC_GH_TOKEN**. Needed read permissions: repository metadata, contents, issues, pull requests and Actions. If you omit this token, the workflow uses its scoped built-in GITHUB_TOKEN; inaccessible private repositories are skipped.
 5. Review and merge this draft PR under your normal MUNOS change-control process. The workflow is triggered by schedules or manual dispatch, never by pull requests.
 6. Open **Actions → Notion project status sync → Run workflow**. The manual run defaults to **Preview without modifying Notion = true**. Inspect its output for errors or private repositories skipped (the logs deliberately avoid private repository names). Rerun with preview set to **false** to write the actual Notion values, then verify Last Synced, counts and CI.
 7. Check its first scheduled run. GitHub schedules may be delayed; on inactive public repositories, scheduled workflows can be automatically disabled after 60 days.
