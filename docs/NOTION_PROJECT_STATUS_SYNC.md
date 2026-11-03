@@ -24,7 +24,7 @@ The workflow updates **existing project rows only**. It does not change project 
 3. In GitHub **zhrsidd/MUNOS → Settings → Secrets and variables → Actions**, create secret **NOTION_PROJECTS_API_KEY** containing the internal connection token. Never put the token in commits, chats, issues or PRs.
 4. For comprehensive access (including private PhysicsWeekly and PHESMUNOS), create a fine-grained **read-only** GitHub token covering exactly the relevant eight repositories, and add it as **PROJECT_SYNC_GH_TOKEN**. Needed read permissions: repository metadata, contents, issues, pull requests and Actions. If you omit this token, the workflow uses its scoped built-in GITHUB_TOKEN; inaccessible private repositories are skipped.
 5. Review and merge this draft PR under your normal MUNOS change-control process. The workflow is triggered by schedules or manual dispatch, never by pull requests.
-6. Open **Actions → Notion project status sync → Run workflow**, then verify Notion Last Synced, counts and CI. Review whether private repositories were skipped (the logs deliberately avoid private repository names).
+6. Open **Actions → Notion project status sync → Run workflow**. The manual run defaults to **Preview without modifying Notion = true**. Inspect its output for errors or private repositories skipped (the logs deliberately avoid private repository names). Rerun with preview set to **false** to write the actual Notion values, then verify Last Synced, counts and CI.
 7. Check its first scheduled run. GitHub schedules may be delayed; on inactive public repositories, scheduled workflows can be automatically disabled after 60 days.
 
 ## Costs and limits
