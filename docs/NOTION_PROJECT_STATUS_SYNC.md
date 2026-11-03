@@ -1,6 +1,6 @@
 # Free Notion project-status sync — setup and operational guide
 
-This optional GitHub Actions workflow updates the Notion Free **Academics → Projects → GitHub Projects** database for the seven tracked projects (excluding PHESMUN OS), without changing MUNOS production or infrastructure.
+This optional GitHub Actions workflow updates the Notion Free **Academics → Projects → GitHub Projects** database for the six tracked projects (excluding PHESMUN OS and Pseudocode Lab), without changing MUNOS production or infrastructure.
 
 - [Projects home](https://app.notion.com/p/40dd6f67939b8189811ad3755792d632)
 - [Projects database](https://app.notion.com/p/ff4ef53c5fdd4699a49e8481381b3091)
@@ -15,7 +15,7 @@ Daily at **06:17 Qatar time / 03:17 UTC**, or on manual Actions dispatch:
 - Latest completed non-sync GitHub Actions result, classified as Passing, Failing or Unknown
 - Last Synced timestamp
 
-The workflow updates **existing project rows only**. It explicitly skips `zhrsidd/PHESMUNOS`, even if that Notion page is restored later. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
+The workflow updates **existing project rows only**. It explicitly skips `zhrsidd/PHESMUNOS` and `zhrsidd/CIEPseudocodeEditor`, even if their Notion cards are restored later. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
 
 ## Precise one-time setup (Notion Free + GitHub)
 
@@ -41,7 +41,7 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 ### D. Optional: allow access to private PhysicsWeekly
 
 11. Open GitHub **Profile → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-12. Set **Token name** to **Notion Projects Read Only**, **Resource owner** to **zhrsidd**, choose an expiration you will remember to renew, and **Repository access → Only select repositories**. Select these seven repositories: **MUNOS, PhysicsWeekly, CourseScope, DeutschLab, FormulaSnap, CIEPseudocodeEditor, dcmun_delegates_site**. Do **not** select PHESMUNOS.
+12. Set **Token name** to **Notion Projects Read Only**, **Resource owner** to **zhrsidd**, choose an expiration you will remember to renew, and **Repository access → Only select repositories**. Select these six repositories: **MUNOS, PhysicsWeekly, CourseScope, DeutschLab, FormulaSnap, dcmun_delegates_site**. Do **not** select PHESMUNOS or CIEPseudocodeEditor.
 13. Under **Repository permissions**, choose **read-only** for **Contents, Issues, Pull requests, and Actions**; **Metadata** read access is typically added automatically. No write permissions. Generate and copy the token.
 14. Return to MUNOS **Settings → Secrets and variables → Actions → New repository secret**. Set **Name** to **PROJECT_SYNC_GH_TOKEN**, paste the fine-grained token as **Secret**, then click **Add secret**.
 15. If you skip steps 11–14, the workflow falls back to GitHub's built-in token and may leave the private PhysicsWeekly row unsynced. Do not use a broad classic token.
@@ -51,15 +51,15 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 16. Review [draft PR #107](https://github.com/zhrsidd/MUNOS/pull/107) under the normal MUNOS release process. It changes only the synchronization script, GitHub Actions workflow, and documentation. **Do not merge without code/security review.** A merge to main may trigger your ordinary MUNOS deployment pipeline.
 17. After approval, **merge PR #107**. In MUNOS open **Actions → Notion project status sync → Run workflow**. Leave the **Preview without modifying Notion?** checkbox **enabled** for the first run.
 18. Open the workflow run, check that it completed and that the expected projects were visible. It must not write to Notion in preview mode. Troubleshoot any 401/403/404 errors before proceeding.
-19. Choose **Run workflow** again and switch **Preview without modifying Notion?** to **disabled**. Check the [GitHub Projects table](https://app.notion.com/p/ff4ef53c5fdd4699a49e8481381b3091) for updated **Last Synced**, **Open PRs**, **Open Issues**, **Last Commit** and **CI** fields on the seven remaining cards.
+19. Choose **Run workflow** again and switch **Preview without modifying Notion?** to **disabled**. Check the [GitHub Projects table](https://app.notion.com/p/ff4ef53c5fdd4699a49e8481381b3091) for updated **Last Synced**, **Open PRs**, **Open Issues**, **Last Commit** and **CI** fields on the six remaining cards.
 20. The workflow then runs daily at approximately **06:17 Qatar time**. GitHub schedules are best effort, so check the Actions run history and Notion's Last Synced field if a refresh appears late.
 
 ### F. Disable or rotate access
 
 - To pause: GitHub **Actions → Notion project status sync → ••• → Disable workflow**.
 - To revoke Notion writes: delete or rotate **NOTION_PROJECTS_API_KEY** in repository secrets and disconnect the Notion connection from the GitHub Projects database.
-- If the fine-grained GitHub token expires, create a new token with the same **read-only / seven-repository** scope and replace **PROJECT_SYNC_GH_TOKEN**.
-- PHESMUNOS is explicitly excluded by the script even if its old Notion page is restored.
+- If the fine-grained GitHub token expires, create a new token with the same **read-only / six-repository** scope and replace **PROJECT_SYNC_GH_TOKEN**.
+- PHESMUNOS and CIEPseudocodeEditor are explicitly excluded by the script even if their old Notion cards are restored.
 
 ## Costs and limits
 
