@@ -32,6 +32,8 @@ jobs:
           node-version: '22'
       - name: Check synchronization script syntax
         run: node --check scripts/notion-project-status-sync.mjs
+      - name: Run Notion synchronization regression tests
+        run: node --test tests/notion-project-status-sync.test.mjs
       - name: Refresh Notion factual project status
         env:
           NOTION_PROJECTS_API_KEY: ${{ secrets.NOTION_PROJECTS_API_KEY }}
