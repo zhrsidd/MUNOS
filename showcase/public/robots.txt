@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://munos.pages.dev/sitemap.xml
