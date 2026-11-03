@@ -81,6 +81,36 @@ async function countOpen(owner, repo, kind) {
   return result.total_count;
 }
 
+// Only push-triggered runs represent default-branch CI here. In particular, scheduled
+// administrative workflows (such as Codex's ten-minute merge gate) must not crowd
+// successful build checks out of a 100-run API response.
+async function latestCommitCiRuns(suffix, branch, commitSha) {
+  const runs = [];
+  let seen = 0;
+  const perPage = 100;
+  const maxPages = 10; // GitHub lists at most 1,000 matching workflow runs.
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const query = '?branch=' + encodeURIComponent(branch) +
+      '&head_sha=' + encodeURIComponent(commitSha) +
+      '&event=push&per_page=' + perPage + '&page=' + page;
+    const response = await github(suffix + '/actions/runs' + query, true);
+    if (!response) return { runs, complete: false };
+
+    const pageRuns = response.workflow_runs ?? [];
+    seen += pageRuns.length;
+    runs.push(...pageRuns.filter((run) =>
+      run.event === 'push' && run.head_sha === commitSha &&
+      run.name !== 'Notion project status sync'));
+
+    if (seen >= response.total_count) return { runs, complete: true };
+    if (pageRuns.length < perPage) return { runs, complete: false };
+  }
+
+  // Fail closed if GitHub truncated an unusually large result set.
+  return { runs, complete: false };
+}
+
 async function main() {
   const pages = await allProjectPages();
   let updated = 0;
@@ -108,19 +138,16 @@ async function main() {
         countOpen(owner, repo, 'issue'),
         github(suffix + '/commits/' + encodeURIComponent(info.default_branch)),
       ]);
-      // Query the exact latest default-branch commit, including unfinished runs.
-      const workflows = await github(suffix + '/actions/runs?branch=' +
-        encodeURIComponent(info.default_branch) + '&head_sha=' +
-        encodeURIComponent(commit.sha) + '&per_page=100', true);
-      const relevantRuns = (workflows?.workflow_runs ?? []).filter((run) =>
-        run.head_sha === commit.sha && run.name !== 'Notion project status sync');
+      // Scope to push-triggered CI for this exact SHA; paginate without counting noisy schedules.
+      const { runs: relevantRuns, complete } = await latestCommitCiRuns(
+        suffix, info.default_branch, commit.sha);
       const hasIncompleteRuns = relevantRuns.some((run) => run.status !== 'completed');
       const hasFailedRuns = relevantRuns.some((run) =>
         ['failure', 'timed_out', 'action_required'].includes(run.conclusion));
-      // Never claim Passing for an untested commit, a running workflow or truncated results.
-      const truncated = workflows && workflows.total_count > (workflows.workflow_runs?.length ?? 0);
-      const ci = hasFailedRuns ? 'Failing'
-        : relevantRuns.length > 0 && !hasIncompleteRuns && !truncated &&
+      // Never claim Passing for an untested SHA, an unfinished run or truncated results.
+      const ci = !complete ? 'Unknown'
+        : hasFailedRuns ? 'Failing'
+        : relevantRuns.length > 0 && !hasIncompleteRuns &&
           relevantRuns.every((run) => run.conclusion === 'success') ? 'Passing' : 'Unknown';
 
       const properties = {
