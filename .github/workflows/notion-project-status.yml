@@ -2,6 +2,11 @@ name: Notion project status sync
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview without modifying Notion?'
+        type: boolean
+        default: true
   schedule:
     # 06:17 in Qatar (UTC+3) daily; GitHub schedules can occasionally be delayed.
     - cron: '17 3 * * *'
@@ -29,4 +34,5 @@ jobs:
           NOTION_DATA_SOURCE_ID: e93b5f0c-d10b-4907-8b55-5cc2589c4542
           PROJECT_SYNC_GH_TOKEN: ${{ secrets.PROJECT_SYNC_GH_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run && '1' || '0') || '0' }}
         run: node scripts/notion-project-status-sync.mjs
