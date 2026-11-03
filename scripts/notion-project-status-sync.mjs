@@ -100,17 +100,28 @@ async function main() {
     const suffix = '/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
     try {
       const info = await github(suffix, true);
-      if (!info) { skipped += 1; continue; } // e.g. private repo without read access
-      const [prs, issues, commit, workflows] = await Promise.all([
+      if (!info) {
+        throw new Error('Cannot access ' + owner + '/' + repo + ' (GitHub 403/404). Check PROJECT_SYNC_GH_TOKEN repository permissions.');
+      }
+      const [prs, issues, commit] = await Promise.all([
         countOpen(owner, repo, 'pr'),
         countOpen(owner, repo, 'issue'),
         github(suffix + '/commits/' + encodeURIComponent(info.default_branch)),
-        github(suffix + '/actions/runs?branch=' + encodeURIComponent(info.default_branch) + '&status=completed&per_page=10', true),
       ]);
-      const lastRun = workflows?.workflow_runs?.find((run) =>
-        run.name !== 'Notion project status sync' && run.conclusion);
-      const ci = lastRun?.conclusion === 'success' ? 'Passing'
-        : ['failure', 'timed_out'].includes(lastRun?.conclusion) ? 'Failing' : 'Unknown';
+      // Query the exact latest default-branch commit, including unfinished runs.
+      const workflows = await github(suffix + '/actions/runs?branch=' +
+        encodeURIComponent(info.default_branch) + '&head_sha=' +
+        encodeURIComponent(commit.sha) + '&per_page=100', true);
+      const relevantRuns = (workflows?.workflow_runs ?? []).filter((run) =>
+        run.head_sha === commit.sha && run.name !== 'Notion project status sync');
+      const hasIncompleteRuns = relevantRuns.some((run) => run.status !== 'completed');
+      const hasFailedRuns = relevantRuns.some((run) =>
+        ['failure', 'timed_out', 'action_required'].includes(run.conclusion));
+      // Never claim Passing for an untested commit, a running workflow or truncated results.
+      const truncated = workflows && workflows.total_count > (workflows.workflow_runs?.length ?? 0);
+      const ci = hasFailedRuns ? 'Failing'
+        : relevantRuns.length > 0 && !hasIncompleteRuns && !truncated &&
+          relevantRuns.every((run) => run.conclusion === 'success') ? 'Passing' : 'Unknown';
 
       const properties = {
         'Open PRs': { number: prs },
