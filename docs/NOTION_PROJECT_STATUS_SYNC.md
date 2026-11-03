@@ -21,7 +21,7 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 
 ### A. Make a Notion API connection
 
-1. Open Notion on the web in your own workspace. Use **Settings → Connections**. Enable **Developer Mode** under Settings if the creation options are hidden, then open the developer connection controls or Personal access tokens.
+1. Open [Notion Developer connections](https://app.notion.com/developers/connections) directly in your web browser, logged into the account that owns the Notion workspace. Or open **Notion → Settings → Connections**, enable **Developer Mode** in Settings, and choose **Personal access tokens** in the developer sidebar. **Do not use Workspace → SSO/SAML/SCIM setup information**: those are identity-management settings, not the Notion content API.
 2. Click **+ New connection**, name it **GitHub Project Status**, and select the same Notion workspace that contains the Academics → Projects page. You may need workspace-owner permission.
 3. Give the connection permission to **read content and update existing pages**. Do not grant user-information access. Do not enable unrelated privileges.
 4. Open **Connections**, locate the new connection, and use its **••• menu → Retrieve internal connection token** (or the token/secret field in its detail). Copy the token into a password manager for the next step. Keep it out of notes, issues, pull requests, code, and chat.
