@@ -1,0 +1,44 @@
+name: Notion project status sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview without modifying Notion?'
+        type: boolean
+        default: true
+  schedule:
+    # 06:17 in Qatar (UTC+3) daily; GitHub schedules can occasionally be delayed.
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notion-project-status
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Scheduled runs remain disabled until a successful preview and first live sync.
+    # Manual workflow_dispatch is always available for testing.
+    if: ${{ github.repository == 'zhrsidd/MUNOS' && (github.event_name == 'workflow_dispatch' || vars.NOTION_PROJECTS_SYNC_ENABLED == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check synchronization script syntax
+        run: node --check scripts/notion-project-status-sync.mjs
+      - name: Run Notion synchronization regression tests
+        run: node --test tests/notion-project-status-sync.test.mjs
+      - name: Refresh Notion factual project status
+        env:
+          NOTION_PROJECTS_API_KEY: ${{ secrets.NOTION_PROJECTS_API_KEY }}
+          NOTION_DATA_SOURCE_ID: e93b5f0c-d10b-4907-8b55-5cc2589c4542
+          PROJECT_SYNC_GH_TOKEN: ${{ secrets.PROJECT_SYNC_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run && '1' || '0') || '0' }}
+        run: node scripts/notion-project-status-sync.mjs
