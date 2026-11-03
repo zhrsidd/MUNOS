@@ -90,8 +90,9 @@ async function main() {
   for (const page of pages) {
     const target = readRepositoryUrl(page);
     if (!target) { skipped += 1; continue; }
-    // Excluded by portfolio owner: never sync PHESMUN OS, even if its card is restored.
-    if (target.owner.toLowerCase() === 'zhrsidd' && target.repo.toLowerCase() === 'phesmunos') {
+    // Explicitly excluded from this Notion portfolio, even if an archived card is restored.
+    const excludedRepos = new Set(['phesmunos', 'ciepseudocodeeditor']);
+    if (target.owner.toLowerCase() === 'zhrsidd' && excludedRepos.has(target.repo.toLowerCase())) {
       skipped += 1;
       continue;
     }
