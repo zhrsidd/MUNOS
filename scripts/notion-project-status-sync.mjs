@@ -90,6 +90,11 @@ async function main() {
   for (const page of pages) {
     const target = readRepositoryUrl(page);
     if (!target) { skipped += 1; continue; }
+    // Excluded by portfolio owner: never sync PHESMUN OS, even if its card is restored.
+    if (target.owner.toLowerCase() === 'zhrsidd' && target.repo.toLowerCase() === 'phesmunos') {
+      skipped += 1;
+      continue;
+    }
     const { owner, repo } = target;
     const suffix = '/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
     try {
