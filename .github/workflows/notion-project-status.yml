@@ -20,7 +20,9 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'zhrsidd/MUNOS'
+    # Scheduled runs remain disabled until a successful preview and first live sync.
+    # Manual workflow_dispatch is always available for testing.
+    if: ${{ github.repository == 'zhrsidd/MUNOS' && (github.event_name == 'workflow_dispatch' || vars.NOTION_PROJECTS_SYNC_ENABLED == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -28,6 +30,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check synchronization script syntax
+        run: node --check scripts/notion-project-status-sync.mjs
       - name: Refresh Notion factual project status
         env:
           NOTION_PROJECTS_API_KEY: ${{ secrets.NOTION_PROJECTS_API_KEY }}
