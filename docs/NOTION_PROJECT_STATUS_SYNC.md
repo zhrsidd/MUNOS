@@ -12,7 +12,7 @@ This optional GitHub Actions workflow updates the Notion Free **Academics → Pr
 
 Daily at **06:17 Qatar time / 03:17 UTC**, or on manual Actions dispatch:
 - Open PR count, open issue count, latest default-branch commit SHA
-- Latest completed non-sync GitHub Actions result, classified as Passing, Failing or Unknown
+- Push-triggered GitHub Actions CI runs for the latest default-branch commit, classified as Passing, Failing or Unknown; scheduled administrative workflows are intentionally excluded
 - Last Synced timestamp
 
 The workflow updates **existing project rows only**. It explicitly skips `zhrsidd/PHESMUNOS` and `zhrsidd/CIEPseudocodeEditor`, even if their Notion cards are restored later. It does not change project Stage, Summary, Needs Attention, feedback, checklists, issues, deployments, production settings or secrets. New repositories need to be entered into the Notion database first. A merged PR is not an automatic release approval.
@@ -51,7 +51,7 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 16. Inspect the job summary and logs. A successful **preview** should report `Previewed 6 of 6 project rows; 0 skipped, 0 errors.` It must not change Notion. A missing private repo is an **error**, not a silent skip.
 17. With the same workflow, **Run workflow** again with the preview checkbox **unchecked** (false). Confirm `Updated 6 of 6 project rows; 0 skipped, 0 errors.` Then open the Notion database and verify current **Last Synced**, **Open PRs**, **Open Issues**, **Last Commit**, and **CI** properties.
 18. Only **after step 17** set the repository Actions variable `NOTION_PROJECTS_SYNC_ENABLED` to `true` as in step 13. Scheduled runs then happen around **06:17 Qatar time**, subject to GitHub's best-effort scheduler.
-19. CI is conservatively calculated using completed, non-sync Actions runs for the **latest default-branch commit**. Untested commits or active workflows show `Unknown`, not an inherited `Passing` result. If GitHub Actions data is unavailable it also shows `Unknown`.
+19. CI is conservatively calculated from **push-triggered GitHub Actions runs for the latest default-branch SHA**. The script paginates matching results and excludes scheduled administrative workflows (including the frequent Codex merge gate), so those runs cannot obscure genuine CI. A failed run shows `Failing`; an untested commit, unfinished/non-success run, missing workflow history, or incomplete API response shows `Unknown`. Repositories without push-triggered Actions checks may therefore show `Unknown` even if they have external CI.
 
 ### F. Disable or rotate access
 
@@ -72,7 +72,7 @@ The workflow updates **existing project rows only**. It explicitly skips `zhrsid
 - Notion 401: inspect connection token and Actions secret.
 - Notion 403 / 404: for the selected personal access token, check workspace, API capability and user permissions on the Projects database; for an internal connection, check that the integration was explicitly shared to the database.
 - Private repository access failure: the run now fails; check the fine-grained token's selected repositories and read permissions.
-- CI Unknown: no completed run, insufficient Actions permissions, or unavailable history.
+- CI Unknown: no push-triggered Actions check on the latest default-branch SHA, an unfinished/non-success run, insufficient Actions permissions, unavailable history, or an incomplete API response. Scheduled/manual-only and third-party checks are not counted as passing push CI.
 - Scheduled job skipped: the variable `NOTION_PROJECTS_SYNC_ENABLED` is absent or not exactly `true` (intended before verification). If enabled but no runs appear, verify workflow is on the default branch and Actions scheduling is enabled.
 - Missing status for a new repository: add a Notion project row with a GitHub URL.
 
