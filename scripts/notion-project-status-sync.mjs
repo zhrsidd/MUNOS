@@ -68,10 +68,20 @@ async function allProjectPages() {
 function readRepositoryUrl(page) {
   const raw = page.properties?.GitHub?.url;
   if (!raw) return null;
-  const parsed = new URL(raw);
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com') return null;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('Malformed GitHub repository URL in Notion project ' + page.id);
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' ||
+      parsed.search || parsed.hash) {
+    throw new Error('Invalid GitHub repository URL in Notion project ' + page.id);
+  }
   const match = /^\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)\/?$/.exec(parsed.pathname);
-  if (!match) return null;
+  if (!match) {
+    throw new Error('Invalid GitHub repository URL in Notion project ' + page.id);
+  }
   return { owner: match[1], repo: match[2] };
 }
 
@@ -118,17 +128,19 @@ async function main() {
   let failed = 0;
 
   for (const page of pages) {
-    const target = readRepositoryUrl(page);
-    if (!target) { skipped += 1; continue; }
-    // Explicitly excluded from this Notion portfolio, even if an archived card is restored.
-    const excludedRepos = new Set(['phesmunos', 'ciepseudocodeeditor']);
-    if (target.owner.toLowerCase() === 'zhrsidd' && excludedRepos.has(target.repo.toLowerCase())) {
-      skipped += 1;
-      continue;
-    }
-    const { owner, repo } = target;
-    const suffix = '/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
     try {
+      // Parse and validate inside this row's error boundary so one bad URL cannot
+      // abort the remaining projects or prevent the final nonzero error status.
+      const target = readRepositoryUrl(page);
+      if (!target) { skipped += 1; continue; }
+      // Explicitly excluded from this Notion portfolio, even if an archived card is restored.
+      const excludedRepos = new Set(['phesmunos', 'ciepseudocodeeditor']);
+      if (target.owner.toLowerCase() === 'zhrsidd' && excludedRepos.has(target.repo.toLowerCase())) {
+        skipped += 1;
+        continue;
+      }
+      const { owner, repo } = target;
+      const suffix = '/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
       const info = await github(suffix, true);
       if (!info) {
         throw new Error('Cannot access ' + owner + '/' + repo + ' (GitHub 403/404). Check PROJECT_SYNC_GH_TOKEN repository permissions.');
@@ -162,7 +174,7 @@ async function main() {
       await sleep(350); // keep below free Notion per-connection request rate
     } catch (error) {
       failed += 1;
-      console.warn('A repository could not be refreshed: ' + error.message);
+      console.warn('Notion project ' + page.id + ' could not be refreshed: ' + error.message);
     }
   }
   console.log((dryRun ? 'Previewed ' : 'Updated ') + updated + ' of ' + pages.length +
