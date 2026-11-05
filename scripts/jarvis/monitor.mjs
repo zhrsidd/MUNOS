@@ -138,13 +138,20 @@ async function runOnce() {
     const snapshot = await collect();
     const result = evaluateSnapshot(snapshot, state);
     result.state.lastCheckAt = new Date().toISOString();
+    // A resolved incident may be reported again if it genuinely recurs.
+    result.state.notifiedActive ??= {};
+    const currentIncidentIds = new Set(result.incidents.map(item => item.id));
+    for (const id of Object.keys(result.state.notifiedActive)) {
+      if (!currentIncidentIds.has(id)) delete result.state.notifiedActive[id];
+    }
     await saveState(result.state);
     if (!result.incidents.length) {
       console.log("Check completed; no urgent incidents."); // local only; no notification
       return;
     }
     // Only the highest-priority incident from this check can generate a call.
-    const item = result.incidents[0];
+    const item = result.incidents.find(incident =>
+      !result.state.notifiedActive[incident.id]) || result.incidents[0];
     await writeReport(item, snapshot); // Always write report BEFORE contacting user.
     console.log("Incident report saved:", reportPath, "(" + item.id + ")");
     if (!(await isArmed())) { console.log("Not armed; Silyring call suppressed."); return; }
