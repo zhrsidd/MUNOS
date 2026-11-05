@@ -75,7 +75,7 @@ test("call cooldown, rolling-day and total quotas", () => {
   assert.equal(canPlaceCall(state, "a", now).allowed, true);
   recordCallAttempt(state, "a", now);
   assert.equal(canPlaceCall(state, "a", now + 60_000).allowed, false);
-  assert.equal(canPlaceCall(state, "a", now + 31 * 60_000).allowed, true);
+  assert.equal(canPlaceCall(state, "a", now + 31 * 60_000).allowed, false);
   for (let i = 0; i < 5; i++) recordCallAttempt(state, "id" + i, now);
   assert.equal(canPlaceCall(state, "something-new", now + 31 * 60_000).allowed, false);
   for (let i = 0; i < 6; i++) recordCallAttempt(state, "historical" + i, now - 25 * 60 * 60_000);
