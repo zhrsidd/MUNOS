@@ -8,6 +8,7 @@ export function initialState() {
     consecutive: { db: 0, site: 0, missing: 0, delegates: 0, committees: 0 },
     callAttempts: [],
     lastCallAt: {},
+    notifiedActive: {},
   };
 }
 
@@ -97,6 +98,7 @@ export function canPlaceCall(state, incidentId, now = Date.now(), options = {}) 
   const cooldownMs = options.cooldownMs ?? 30 * 60_000;
   const perDay = options.perDay ?? 6;
   const lifetime = options.lifetime ?? 12;
+  if (state.notifiedActive?.[incidentId]) return { allowed: false, reason: "ongoing incident already called" };
   const attempts = (state.callAttempts ?? []).filter(x => Number.isFinite(x.at));
   if (attempts.length >= lifetime) return { allowed: false, reason: "total call budget reached" };
   if (attempts.filter(x => now - x.at < 24 * 60 * 60_000).length >= perDay) {
@@ -113,6 +115,8 @@ export function recordCallAttempt(state, incidentId, now = Date.now()) {
   state.lastCallAt ??= {};
   state.callAttempts.push({ id: incidentId, at: now });
   state.lastCallAt[incidentId] = now;
+  state.notifiedActive ??= {};
+  state.notifiedActive[incidentId] = true;
   return state;
 }
 
