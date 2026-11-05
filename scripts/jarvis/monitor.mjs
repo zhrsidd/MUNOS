@@ -56,7 +56,7 @@ function settings() {
 // reads the app's public /api/health report, which needs no database credentials and works with
 // the project's hardened grants. "tables" (JARVIS_SOURCE=tables) runs direct count reads and needs
 // SUPABASE_SECRET_KEY plus table SELECT grants, which the hardened DCMUN project does not give it.
-function useHealthSource() {
+function healthSourceEnabled() {
   const mode = (process.env.JARVIS_SOURCE || "").trim().toLowerCase();
   if (mode === "tables") return false;
   if (mode && mode !== "health") throw Error("JARVIS_SOURCE must be 'health' or 'tables'");
@@ -99,7 +99,7 @@ async function collectFromHealth() {
   return { databaseOk, siteOk: true };
 }
 async function collect() {
-  if (useHealthSource()) return collectFromHealth();
+  if (healthSourceEnabled()) return collectFromHealth();
   const { url, key, conferenceId } = settings();
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const healthUrl = process.env.MUNOS_HEALTH_URL?.trim();
@@ -229,13 +229,13 @@ async function main() {
     console.log(JSON.stringify({
       armed: await isArmed(),
       lastCheckAt: state.lastCheckAt || null,
-      source: useHealthSource() ? "app-health-endpoint" : "supabase-tables",
+      source: healthSourceEnabled() ? "app-health-endpoint" : "supabase-tables",
       lastIncidentReport: reportPath,
       totalCallAttempts: state.callAttempts?.length || 0,
       checksRequireModelCredits: false,
     }, null, 2));
   } else if (command === "--arm") {
-    if (!useHealthSource()) settings();
+    if (!healthSourceEnabled()) settings();
     const preflight = await collect();
     if (!preflight.databaseOk || preflight.conferenceExists === false) {
       throw Error("Cannot arm: the database check did not verify healthy, or the conference ID is missing");
