@@ -16,7 +16,8 @@ isolated from the Next.js app and Vercel.
 - It calls only after three consecutive database or site failures, two consecutive
   missing-conference checks, or two substantial population drops.
 - It makes at most 6 attempted calls in a rolling 24-hour period and 12 total per
-  monitor state, with a 30-minute per-incident cooldown. Failed/ambiguous requests
+  monitor state, with a 30-minute per-incident cooldown. An ongoing incident
+  is called about only once until it clears; no repeat status calls. Failed/ambiguous requests
   count toward the budget and are not blindly retried.
 - No delegate names, emails, credentials, audit details, or IDs go into phone calls.
   The state directory is private to the Mac user.
@@ -43,11 +44,19 @@ length; it cannot measure or guarantee exact voice minutes/credits.
 
 ## Set up now, without starting
 
-1. In the MUNOS repo on your Mac, switch to branch
-   `feature/dcmun-jarvis-monitor-prep` after fetching it from origin. Do not
-   overwrite unrelated local work or merge the branch to production without review.
+1. On your Mac, fetch the branch in an **isolated worktree** (recommended),
+   so your normal MUNOS checkout is untouched:
+
+   ```sh
+   git fetch origin feature/dcmun-jarvis-monitor-prep
+   git worktree add ../MUNOS-JARVIS origin/feature/dcmun-jarvis-monitor-prep
+   cd ../MUNOS-JARVIS
+   ```
+
+   Alternatively use a clean checkout. Do not merge the branch to production
+   without independent review.
 2. Use Node.js 22+ and the existing dependencies: `npm ci`.
-3. In your local `.env.local` (never commit), ensure:
+3. In this worktree's local `.env.local` (never commit), ensure:
    - `NEXT_PUBLIC_SUPABASE_URL=https://kllhswucdhqqywnzxado.supabase.co`
    - `NEXT_PUBLIC_CONFERENCE_ID=<your actual DCMUN conference UUID>`
    - `SUPABASE_SECRET_KEY=<local operator/server-only secret key>`
