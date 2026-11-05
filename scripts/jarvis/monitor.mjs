@@ -5,7 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile, writeFile, mkdir, rename, open, unlink, stat, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { initialState, evaluateSnapshot, canPlaceCall, recordCallAttempt, phoneScript } from "./core.mjs";
+import {
+  initialState, evaluateSnapshot, canPlaceCall, recordCallAttempt, phoneScript, clearRecoveredIncidents,
+  interpretHealthReport,
+} from "./core.mjs";
 
 const root = process.env.JARVIS_STATE_DIR || join(homedir(), ".local", "state", "dcmun-jarvis");
 const statePath = join(root, "state.json");
@@ -87,16 +90,7 @@ async function collectFromHealth() {
     });
     body = (await response.text()).slice(0, 65_536);
   } catch { return { databaseOk: null, siteOk: false }; }
-  let report = null;
-  try { report = JSON.parse(body); } catch { /* not JSON */ }
-  const valid = report && typeof report === "object" && typeof report.status === "string" &&
-    (response.status === 200 || response.status === 503);
-  if (!valid) return { databaseOk: null, siteOk: false };
-  const database = report.checks?.database?.status;
-  const supabase = report.checks?.supabase?.status;
-  const databaseOk = database === "down" || supabase === "down" ? false
-    : database === "ok" || database === "degraded" ? true : null;
-  return { databaseOk, siteOk: true };
+  return interpretHealthReport(response.status, body);
 }
 async function collect() {
   if (healthSourceEnabled()) return collectFromHealth();
@@ -185,12 +179,9 @@ async function runOnce() {
     const snapshot = await collect();
     const result = evaluateSnapshot(snapshot, state);
     result.state.lastCheckAt = new Date().toISOString();
-    // A resolved incident may be reported again if it genuinely recurs.
-    result.state.notifiedActive ??= {};
-    const currentIncidentIds = new Set(result.incidents.map(item => item.id));
-    for (const id of Object.keys(result.state.notifiedActive)) {
-      if (!currentIncidentIds.has(id)) delete result.state.notifiedActive[id];
-    }
+    // A resolved incident may be reported again if it genuinely recurs, but only once its own
+    // signal confirms recovery; an inconclusive check keeps it marked as already notified.
+    clearRecoveredIncidents(result.state, snapshot);
     await saveState(result.state);
     if (!result.incidents.length) {
       const word = value => (value === null || value === undefined) ? "not verified" : value ? "ok" : "FAILED";

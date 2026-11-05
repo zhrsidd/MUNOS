@@ -12,8 +12,14 @@ isolated from the Next.js app and Vercel.
   is "up" if it answers with a valid report, and the database is healthy, failing or unverifiable
   from `checks.database` and `checks.supabase`. This needs no database credentials and no table
   grants, which matters because the privilege-hardening migrations leave `service_role` without
-  table `SELECT`. Unverifiable (for example `not_configured`, or no valid response) is never counted
-  as a database failure, and `--arm` refuses until the database verifies healthy.
+  table `SELECT`. Unverifiable (for example `not_configured`, a "degraded" database check that carries
+  a rejection detail such as `HTTP 403`, or no valid response) is never counted as a database failure
+  and never counts as healthy, and `--arm` refuses until the database verifies healthy. A "degraded"
+  check with no detail is only a slow but successful round trip and counts as healthy. A persistently
+  unverifiable database shows as `database: not verified` but does not call, so watch that line.
+  An incident that already placed a call stays marked as notified until its own signal confirms
+  recovery, so an interrupted health endpoint cannot trigger a second call for the same outage.
+  The site and database signals are evaluated independently on every check.
 - **Optional source: direct table counts** (`JARVIS_SOURCE=tables`). It counts delegates and
   committees and verifies the expected conference is present, but needs `SUPABASE_SECRET_KEY` and
   table read grants that the hardened DCMUN project does not give `service_role`. Using it on that

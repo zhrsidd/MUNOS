@@ -20,6 +20,24 @@ export function evaluateSnapshot(sample, previous = initialState()) {
   const state = structuredClone(previous);
   const counters = state.consecutive;
   const incidents = [];
+  // The site signal is independent of the database signal, so it is evaluated on every path.
+  // A responding site (siteOk true) must break a site-failure streak even when the database
+  // reports a failure in the same check, otherwise a false "unreachable" call could result.
+  const evaluateSite = () => {
+    if (sample.siteOk === false) {
+      counters.site++;
+      if (counters.site >= 3) {
+        incidents.push(incident(
+          "site-unreachable",
+          "The DCMUN application is unreachable",
+          "Three consecutive health requests to the configured application URL failed.",
+          "Check the MUNOS production deployment and test a staff device. Use the conference runbook if saving is affected."
+        ));
+      }
+    } else {
+      counters.site = 0; // true or not configured
+    }
+  };
   // databaseOk === null means "could not be verified" (for example the app's health endpoint
   // was unreachable or reports the database as not configured). That is never a database
   // failure strike and never resets one; only a definite true/false changes the counter.
@@ -34,6 +52,7 @@ export function evaluateSnapshot(sample, previous = initialState()) {
         "Open MUNOS and Supabase from your laptop and confirm whether staff can save changes. If staff devices show RED, follow the conference recovery runbook."
       ));
     }
+    evaluateSite();
     return { state, incidents };
   }
   if (!databaseUnknown) counters.db = 0;
@@ -48,23 +67,12 @@ export function evaluateSnapshot(sample, previous = initialState()) {
         "Check the target project and conference ID before taking any corrective action."
       ));
     }
+    evaluateSite();
     return { state, incidents };
   }
   counters.missing = 0;
 
-  if (sample.siteOk === false) {
-    counters.site++;
-    if (counters.site >= 3) {
-      incidents.push(incident(
-        "site-unreachable",
-        "The DCMUN application is unreachable",
-        "Three consecutive health requests to the configured application URL failed.",
-        "Check the MUNOS production deployment and test a staff device. Use the conference runbook if saving is affected."
-      ));
-    }
-  } else {
-    counters.site = 0; // true or not configured
-  }
+  evaluateSite();
 
   // Never alert from a single count dip. High-water marks persist across restarts.
   for (const [name, minBaseline, minDrop, ratio] of [
@@ -96,6 +104,48 @@ export function evaluateSnapshot(sample, previous = initialState()) {
     }
   }
   return { state, incidents };
+}
+
+// Turns one HTTP response from the app's /api/health into a monitor sample (pure, no network).
+//  - no valid report                 -> siteOk false, databaseOk null (database state unknown)
+//  - database or supabase "down"     -> siteOk true,  databaseOk false
+//  - database "ok"                   -> siteOk true,  databaseOk true
+//  - database "degraded", no detail  -> siteOk true,  databaseOk true (successful but slow round trip)
+//  - anything else (not_configured, or "degraded" carrying a detail such as "HTTP 403",
+//    which is a rejected request rather than slowness) -> siteOk true, databaseOk null: not verified.
+export function interpretHealthReport(httpStatus, bodyText) {
+  let report = null;
+  try { report = JSON.parse(bodyText); } catch { /* not JSON */ }
+  const valid = report && typeof report === "object" && typeof report.status === "string" &&
+    (httpStatus === 200 || httpStatus === 503);
+  if (!valid) return { databaseOk: null, siteOk: false };
+  const databaseCheck = report.checks?.database;
+  const database = databaseCheck?.status;
+  const supabase = report.checks?.supabase?.status;
+  const slowButWorking = database === "degraded" && !databaseCheck?.detail;
+  const databaseOk = database === "down" || supabase === "down" ? false
+    : database === "ok" || slowButWorking ? true : null;
+  return { databaseOk, siteOk: true };
+}
+
+// An incident that already triggered a call stays "notified" until the signal that raised it
+// confirms recovery. Merely being absent from one check is not recovery: an unreachable health
+// endpoint (databaseOk null) or a skipped read would otherwise forget the incident and let the
+// same continuous outage place another call after the cooldown. Unknown ids are never cleared.
+export function clearRecoveredIncidents(state, sample) {
+  const notified = state.notifiedActive ??= {};
+  const countsRecovered = name => Number.isSafeInteger(sample.counts?.[name]) && state.consecutive[name] === 0;
+  const recovered = {
+    "supabase-unreachable": () => sample.databaseOk === true,
+    "site-unreachable": () => sample.siteOk === true,
+    "conference-missing": () => sample.conferenceExists === true,
+    "mass-delegates-loss": () => countsRecovered("delegates"),
+    "mass-committees-loss": () => countsRecovered("committees"),
+  };
+  for (const id of Object.keys(notified)) {
+    if (recovered[id]?.()) delete notified[id];
+  }
+  return state;
 }
 
 export function canPlaceCall(state, incidentId, now = Date.now(), options = {}) {
