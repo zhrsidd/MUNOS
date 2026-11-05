@@ -96,3 +96,33 @@ test("spoken message is short and contains no personal data", () => {
   assert.match(speech, /come to your laptop/);
   assert.ok(speech.length < 350);
 });
+
+test("an unverifiable database state is never a strike and never clears one", () => {
+  let state = evaluateSnapshot(healthy(), initialState()).state;
+  state = evaluateSnapshot({ databaseOk: false }, state).state;
+  state = evaluateSnapshot({ databaseOk: false }, state).state;
+  assert.equal(state.consecutive.db, 2);
+  for (let i = 0; i < 5; i++) {
+    const result = evaluateSnapshot({ databaseOk: null, siteOk: true }, state);
+    assert.deepEqual(ids(result), []);
+    assert.equal(result.state.consecutive.db, 2);
+    state = result.state;
+  }
+  assert.deepEqual(ids(evaluateSnapshot({ databaseOk: false, siteOk: true }, state)), ["supabase-unreachable"]);
+});
+test("health-endpoint snapshots without counts or a conference record raise no population alerts", () => {
+  let state = initialState();
+  for (let i = 0; i < 6; i++) {
+    const result = evaluateSnapshot({ databaseOk: true, siteOk: true }, state);
+    assert.deepEqual(ids(result), []);
+    state = result.state;
+  }
+});
+test("site failure with unknown database still needs three consecutive checks", () => {
+  let state = initialState();
+  for (let i = 1; i <= 3; i++) {
+    const result = evaluateSnapshot({ databaseOk: null, siteOk: false }, state);
+    assert.deepEqual(ids(result), i < 3 ? [] : ["site-unreachable"]);
+    state = result.state;
+  }
+});

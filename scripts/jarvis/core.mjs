@@ -20,7 +20,11 @@ export function evaluateSnapshot(sample, previous = initialState()) {
   const state = structuredClone(previous);
   const counters = state.consecutive;
   const incidents = [];
-  if (!sample.databaseOk) {
+  // databaseOk === null means "could not be verified" (for example the app's health endpoint
+  // was unreachable or reports the database as not configured). That is never a database
+  // failure strike and never resets one; only a definite true/false changes the counter.
+  const databaseUnknown = sample.databaseOk === null;
+  if (!databaseUnknown && !sample.databaseOk) {
     counters.db++;
     if (counters.db >= 3) {
       incidents.push(incident(
@@ -32,7 +36,7 @@ export function evaluateSnapshot(sample, previous = initialState()) {
     }
     return { state, incidents };
   }
-  counters.db = 0;
+  if (!databaseUnknown) counters.db = 0;
 
   if (sample.conferenceExists === false) {
     counters.missing++;

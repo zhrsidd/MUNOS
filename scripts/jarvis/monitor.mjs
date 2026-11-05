@@ -52,7 +52,54 @@ function settings() {
   if (!/^[0-9a-f-]{36}$/i.test(conferenceId)) throw Error("Unexpected conference ID");
   return { url, key, conferenceId };
 }
+// Source of truth for the database signal. "health" (default whenever MUNOS_HEALTH_URL is set)
+// reads the app's public /api/health report, which needs no database credentials and works with
+// the project's hardened grants. "tables" (JARVIS_SOURCE=tables) runs direct count reads and needs
+// SUPABASE_SECRET_KEY plus table SELECT grants, which the hardened DCMUN project does not give it.
+function useHealthSource() {
+  const mode = (process.env.JARVIS_SOURCE || "").trim().toLowerCase();
+  if (mode === "tables") return false;
+  if (mode && mode !== "health") throw Error("JARVIS_SOURCE must be 'health' or 'tables'");
+  return Boolean(process.env.MUNOS_HEALTH_URL?.trim());
+}
+function validatedHealthUrl() {
+  const healthUrl = process.env.MUNOS_HEALTH_URL?.trim();
+  if (!healthUrl) throw Error("MUNOS_HEALTH_URL is required for the app health source");
+  const parsed = new URL(healthUrl);
+  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
+    throw Error("MUNOS_HEALTH_URL must use HTTPS (or local development localhost)");
+  }
+  return healthUrl;
+}
+// One GET to the app's health endpoint. Never throws on network or parse problems:
+//  - no valid response            -> siteOk=false, databaseOk=null (database state unknown)
+//  - database or Supabase "down"  -> siteOk=true,  databaseOk=false
+//  - database "ok" or "degraded"  -> siteOk=true,  databaseOk=true ("degraded" only means slow)
+//  - database not_configured      -> siteOk=true,  databaseOk=null (unverifiable, never a strike)
+// Population counts and the conference record are not part of this report, so those rules stay idle.
+async function collectFromHealth() {
+  const healthUrl = validatedHealthUrl();
+  let response, body;
+  try {
+    response = await fetch(healthUrl, {
+      method: "GET", redirect: "manual", headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    body = (await response.text()).slice(0, 65_536);
+  } catch { return { databaseOk: null, siteOk: false }; }
+  let report = null;
+  try { report = JSON.parse(body); } catch { /* not JSON */ }
+  const valid = report && typeof report === "object" && typeof report.status === "string" &&
+    (response.status === 200 || response.status === 503);
+  if (!valid) return { databaseOk: null, siteOk: false };
+  const database = report.checks?.database?.status;
+  const supabase = report.checks?.supabase?.status;
+  const databaseOk = database === "down" || supabase === "down" ? false
+    : database === "ok" || database === "degraded" ? true : null;
+  return { databaseOk, siteOk: true };
+}
 async function collect() {
+  if (useHealthSource()) return collectFromHealth();
   const { url, key, conferenceId } = settings();
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const healthUrl = process.env.MUNOS_HEALTH_URL?.trim();
@@ -111,7 +158,7 @@ async function writeReport(item, sample) {
     "## Evidence", item.evidence, "",
     "## Suggested response", item.action, "",
     "## Check context",
-    `Database query successful: ${sample.databaseOk ? "yes" : "no"}`,
+    `Database check: ${sample.databaseOk === null ? "not verified" : sample.databaseOk ? "healthy" : "failed"}`,
     `Application health check: ${sample.siteOk == null ? "not configured" : sample.siteOk ? "responding" : "failed"}`,
     "", "This report contains no delegate personal details. Confirm the issue in the application before intervening.",
   ].join("\n");
@@ -146,7 +193,12 @@ async function runOnce() {
     }
     await saveState(result.state);
     if (!result.incidents.length) {
-      console.log("Check completed; no urgent incidents."); // local only; no notification
+      const word = value => (value === null || value === undefined) ? "not verified" : value ? "ok" : "FAILED";
+      const strikes = Object.entries(result.state.consecutive).filter(([, n]) => n > 0)
+        .map(([name, n]) => name + "=" + n).join(", ") || "none";
+      // local only; no notification
+      console.log(`Check completed; no urgent incidents. database: ${word(snapshot.databaseOk)}; ` +
+        `site: ${word(snapshot.siteOk)}; open strikes: ${strikes}.`);
       return;
     }
     // Only the highest-priority incident from this check can generate a call.
@@ -177,15 +229,16 @@ async function main() {
     console.log(JSON.stringify({
       armed: await isArmed(),
       lastCheckAt: state.lastCheckAt || null,
+      source: useHealthSource() ? "app-health-endpoint" : "supabase-tables",
       lastIncidentReport: reportPath,
       totalCallAttempts: state.callAttempts?.length || 0,
       checksRequireModelCredits: false,
     }, null, 2));
   } else if (command === "--arm") {
-    settings();
+    if (!useHealthSource()) settings();
     const preflight = await collect();
-    if (!preflight.databaseOk || !preflight.conferenceExists) {
-      throw Error("Cannot arm: Supabase read check failed or conference ID is missing");
+    if (!preflight.databaseOk || preflight.conferenceExists === false) {
+      throw Error("Cannot arm: the database check did not verify healthy, or the conference ID is missing");
     }
     if (!(await keyForSilyring())) throw Error("Silyring device key missing (~/.silyring/key)");
     await writeFile(armedPath, new Date().toISOString(), { mode: 0o600 });

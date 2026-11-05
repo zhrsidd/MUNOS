@@ -7,8 +7,18 @@ isolated from the Next.js app and Vercel.
 ## What this actually does
 
 - A macOS LaunchAgent invokes a read-only Node.js script every 120 seconds.
-- It counts delegates and committees from DCMUN Production and verifies that the expected
-  conference is present. Optionally, it checks a production app URL over HTTPS.
+- **Default source: the app's public health endpoint.** When `MUNOS_HEALTH_URL` is set (point it at
+  `https://<host>/api/health`), each check makes one GET and reads the app's own report: the site
+  is "up" if it answers with a valid report, and the database is healthy, failing or unverifiable
+  from `checks.database` and `checks.supabase`. This needs no database credentials and no table
+  grants, which matters because the privilege-hardening migrations leave `service_role` without
+  table `SELECT`. Unverifiable (for example `not_configured`, or no valid response) is never counted
+  as a database failure, and `--arm` refuses until the database verifies healthy.
+- **Optional source: direct table counts** (`JARVIS_SOURCE=tables`). It counts delegates and
+  committees and verifies the expected conference is present, but needs `SUPABASE_SECRET_KEY` and
+  table read grants that the hardened DCMUN project does not give `service_role`. Using it on that
+  project returns `403 permission denied` and records database strikes. Only the tables source
+  can detect population drops or a missing conference record.
 - It calls neither Claude nor ElevenLabs for normal checks. Claude Pro tokens are not
   needed to run the monitor.
 - It creates a local incident report in `~/.local/state/dcmun-jarvis/latest.md`
@@ -57,13 +67,14 @@ length; it cannot measure or guarantee exact voice minutes/credits.
    without independent review.
 2. Use Node.js 22+ and the existing dependencies: `npm ci`.
 3. In this worktree's local `.env.local` (never commit), ensure:
-   - `NEXT_PUBLIC_SUPABASE_URL=https://kllhswucdhqqywnzxado.supabase.co`
-   - `NEXT_PUBLIC_CONFERENCE_ID=<your actual DCMUN conference UUID>`
-   - `SUPABASE_SECRET_KEY=<local operator/server-only secret key>`
-   - Optional: `MUNOS_HEALTH_URL=https://<your actual deployed staff application host>/`
-   The script deliberately refuses another project reference. The key is high
-   privilege; keep it in a mode-0600 local env file, not a frontend variable.
-   The runner makes GET/count queries only.
+   - `MUNOS_HEALTH_URL=https://<your actual deployed staff application host>/api/health`
+     (the default and recommended source; this is all the monitor needs)
+   - Only for `JARVIS_SOURCE=tables`: `NEXT_PUBLIC_SUPABASE_URL=https://kllhswucdhqqywnzxado.supabase.co`,
+     `NEXT_PUBLIC_CONFERENCE_ID=<your actual DCMUN conference UUID>` and
+     `SUPABASE_SECRET_KEY=<local operator/server-only secret key>`. That mode refuses another
+     project reference. The key is high privilege; keep it in a mode-0600 local env file, never a
+     frontend variable, and leave it out entirely when you use the health source.
+   The runner makes GET requests and count-only reads, never writes.
 4. Verify the existing Silyring key is in `~/.silyring/key`, or put
    `SILYRING_DEVICE_KEY=<key>` in the local env file. Never commit or paste the
    key in a chat. The known one-way endpoint is
