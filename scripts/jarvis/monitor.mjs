@@ -46,7 +46,9 @@ function settings() {
   if (!url || !key || !conferenceId) {
     throw Error("Missing SUPABASE_URL, SUPABASE_SECRET_KEY or CONFERENCE_ID in the local environment");
   }
-  if (!/^https:\/\/[^/]+\.supabase\.co\/?$/.test(url)) throw Error("Unexpected Supabase URL");
+  if (new URL(url).hostname !== "kllhswucdhqqywnzxado.supabase.co") {
+    throw Error("Refusing any target other than the verified DCMUN Production project");
+  }
   if (!/^[0-9a-f-]{36}$/i.test(conferenceId)) throw Error("Unexpected conference ID");
   return { url, key, conferenceId };
 }
@@ -174,6 +176,10 @@ async function main() {
     }, null, 2));
   } else if (command === "--arm") {
     settings();
+    const preflight = await collect();
+    if (!preflight.databaseOk || !preflight.conferenceExists) {
+      throw Error("Cannot arm: Supabase read check failed or conference ID is missing");
+    }
     if (!(await keyForSilyring())) throw Error("Silyring device key missing (~/.silyring/key)");
     await writeFile(armedPath, new Date().toISOString(), { mode: 0o600 });
     console.log("JARVIS armed. No monitor is started by this command.");
