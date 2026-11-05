@@ -81,6 +81,14 @@ test("call cooldown, rolling-day and total quotas", () => {
   for (let i = 0; i < 6; i++) recordCallAttempt(state, "historical" + i, now - 25 * 60 * 60_000);
   assert.equal(canPlaceCall(state, "anything", now + 31 * 60_000).allowed, false);
 });
+test("an ongoing incident never calls twice until it has resolved", () => {
+  const now = 2_000_000_000_000;
+  const state = initialState();
+  recordCallAttempt(state, "supabase-unreachable", now);
+  assert.deepEqual(canPlaceCall(state, "supabase-unreachable", now + 24 * 60 * 60_000).allowed, false);
+  delete state.notifiedActive["supabase-unreachable"];
+  assert.deepEqual(canPlaceCall(state, "supabase-unreachable", now + 24 * 60 * 60_000).allowed, true);
+});
 test("spoken message is short and contains no personal data", () => {
   const item = evaluateSnapshot({ databaseOk: false },
     { ...initialState(), consecutive: { ...initialState().consecutive, db: 2 } }).incidents[0];
