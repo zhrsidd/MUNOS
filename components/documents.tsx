@@ -381,6 +381,21 @@ export function Approval({ section = "" }: { section?: string }) {
     </>
   );
 }
+/** Admins' printing steps, from the DCMUN admin printing guide. Collapsed so it never pushes the queue down. */
+function PrintGuide() {
+  return (
+    <details className="print-guide">
+      <summary>How to print a resolution</summary>
+      <ol>
+        <li>Start at the top of the queue. Each job shows its room and the number of copies: one per delegate in the committee, plus {PRINT_SPARES} spares.</li>
+        <li>Press <strong>Open working Google Doc</strong>.</li>
+        <li>In the Google Doc, go to <strong>File → Print</strong> and print the number of copies shown here.</li>
+        <li>Come back and press <strong>Mark printed</strong>. This tells the Chairs their copies are on the way. Then take the copies to the committee Chair.</li>
+      </ol>
+      <p>Need more copies of a resolution that is already printed? Open the <strong>Completed</strong> tab, find it by committee and country, open its working Google Doc and print the extra copies. You don’t need to mark it printed again.</p>
+    </details>
+  );
+}
 export function Logistics({ section = "" }: { section?: string }) {
   const { data, act } = useConference();
   const identify = useResolutionIdentities();
@@ -391,7 +406,7 @@ export function Logistics({ section = "" }: { section?: string }) {
   if (section === "completed")
     return (
       <>
-        <PageHeading eyebrow="ADMINS" title="Completed" description="Printed resolutions and where their documents are." />
+        <PageHeading eyebrow="ADMINS" title="Completed" description="Printed resolutions and where their documents are. To print extra copies, open a resolution’s working Google Doc and use File → Print. You don’t need to mark it printed again." />
         <Panel title="Completed jobs" subtitle={`${completed.length} documents have been printed`}>
             {completed.length ? (
               completed.map((r) => (
@@ -421,6 +436,7 @@ export function Logistics({ section = "" }: { section?: string }) {
         title="Print queue"
         description={queue.length ? `${queue.length} ${queue.length === 1 ? "job is" : "jobs are"} ready to print. Mark each printed when the copies are ready.` : "No approved resolutions are waiting to print."}
       />
+      <PrintGuide />
       <div className="print-summary">
         <Icon name="print" />
         <div>
