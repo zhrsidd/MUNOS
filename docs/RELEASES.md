@@ -22,6 +22,7 @@ To return to this release: Vercel → Deployments → this deployment → Instan
 
 | Date | Version · commit | Vercel deployment | Migration | Status | Verified by | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-03 | `1f6f200bec62e5d468cc05c461e47eb7dc9b9626` | _pending: record from Vercel → Deployments_ | 38 migrations through `20261101100000_amendment_link_committee_scope` (unchanged; this release adds no migration) | Merged to `production` by the owner on 2026-11-03 (#111) before the conference freeze; running state to be confirmed in System health | _pending: John Paul Ribeiru release approval of this SHA_ | Supersedes `cfa63db` and `c8f2a22`. Adds #103 copy polish and Chair points guide, #105 Chair welcome, and #110 delegate import with a per-row Committee column. Formal pre-release testing skipped by the owner; one live import of real delegates with a Committee column is the check. Known-good tag/card pending. |
 | 2026-11-01 | `cfa63dbd857e6fa639774b25448f25fc09621673` | `dpl_9qhVfe8nbCzKC2ZUBbpm8Nc7KvZ8` | 38 migrations through `20261101100000_amendment_link_committee_scope` (last prepromotion inventory) | Operator reports READY and healthy | Owner reports John Paul Ribeiru release approval and Zuhayr Siddique infrastructure/configuration approval | Supabase-backed Production; exact deployment, health and recovery details below. Known-good tag/card pending. |
 
 ## 1 November 2026 activation evidence
